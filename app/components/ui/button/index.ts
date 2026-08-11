@@ -23,7 +23,7 @@ export const buttonVariants = cva(
       variant: {
         default: 'bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-pressed disabled:bg-primary-disabled',
         secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary-hover active:bg-secondary-hover disabled:bg-secondary-disabled disabled:text-foreground-secondary-disabled',
-        outline: 'border-border bg-background text-primary hover:bg-secondary hover:text-primary-hover active:bg-secondary-hover disabled:border-border-neutral disabled:text-foreground-disabled',
+        outline: 'border-border bg-background text-primary hover:bg-secondary hover:text-primary-hover active:bg-secondary-hover disabled:border-stroke-neutral disabled:text-foreground-disabled',
         ghost: 'text-primary hover:bg-secondary hover:text-primary-hover active:text-primary-pressed disabled:text-foreground-disabled',
         destructive: 'bg-destructive text-primary-foreground hover:bg-destructive-hover active:bg-destructive-pressed disabled:bg-destructive-disabled',
         link: 'text-primary underline-offset-4 hover:text-primary-hover hover:underline disabled:text-foreground-disabled',

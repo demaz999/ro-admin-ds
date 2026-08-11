@@ -11,7 +11,7 @@ defineProps<{
 <template>
   <section class="scroll-mt-8 border-t border-border pt-8">
     <header class="mb-6 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-      <h2 class="text-xl font-bold tracking-tight">
+      <h2 class="text-xl font-bold">
         {{ title }}
       </h2>
       <a

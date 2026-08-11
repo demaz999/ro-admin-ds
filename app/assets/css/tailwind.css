@@ -65,6 +65,16 @@
     --text-lg--line-height: 24px;
     --text-4xl: 36px;
     --text-4xl--line-height: 40px;
+
+    /* Трекинг. У всех текстовых токенов кита letterSpacing = 0 — проверено по
+       Txt/regular13-16, Txt/bold13-16, Txt/regular15-20, Txt/medium15-20,
+       Txt/bold15-20, Txt/bold17-24, txt/bold16-20, Header/bold36-40.
+       Ноль зафиксирован явно, чтобы правка тайлвиндовского дефолта не прошла молча. */
+    --text-xs--letter-spacing: 0;
+    --text-sm--letter-spacing: 0;
+    --text-base--letter-spacing: 0;
+    --text-lg--letter-spacing: 0;
+    --text-4xl--letter-spacing: 0;
 }
 
 /* ---------------------------------------------------------------------------
@@ -184,9 +194,9 @@
     --color-scrim-light: var(--scrim-light);
     --color-scrim-dark: var(--scrim-dark);
 
-    --color-border-secondary: var(--border-secondary);
-    --color-border-accent: var(--border-accent);
-    --color-border-neutral: var(--border-neutral);
+    --color-stroke-secondary: var(--border-secondary);
+    --color-stroke-accent: var(--border-accent);
+    --color-stroke-neutral: var(--border-neutral);
 
     --color-muted-disabled: var(--muted-disabled);
 
@@ -361,10 +371,17 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
     }
   body {
     @apply bg-background text-foreground;
     @apply font-sans;
+
+    /* Figma растеризует текст тоньше, чем браузер по умолчанию. Сглаживание
+       выравнивает вес штриха и убирает лишнюю жирность на светлом фоне.
+       Кегли и веса при этом не трогаем: разницу растеризаторов компенсируем
+       рендерингом, а не подгонкой значений. */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     }
 }

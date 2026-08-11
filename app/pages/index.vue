@@ -21,20 +21,17 @@ const statusColors = ['green', 'cyan', 'violet', 'magenta', 'orange', 'red'] as 
       <p class="font-mono text-xs uppercase tracking-widest text-muted-foreground">
         кит 2 · волна 0
       </p>
-      <h1 class="text-3xl font-bold tracking-tight">
+      <h1 class="text-4xl font-bold">
         Витрина админского дизайн-кита
       </h1>
       <p class="max-w-2xl text-muted-foreground">
         Токены читаются прямо из таблиц стилей документа, поэтому витрина не может разойтись с
         файлом токенов. Компоненты показаны в состояниях default, hover, focus, disabled и error.
       </p>
-      <p
-        class="max-w-2xl rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-200"
-      >
-        <strong>Тема переносится.</strong> Значения из кита собраны полностью — 69 переменных
-        <code>mode</code> и 9 <code>menu</code>. Мапинг на слоты shadcn в работе; ниже пока
-        дефолтная тема shadcn-vue. После мапинга витрина перекрасится сама, потому что читает
-        токены из CSS.
+      <p class="max-w-2xl rounded-md border border-border bg-secondary p-3 text-sm">
+        <strong>Тема кита применена.</strong> Все 78 переменных — 69 <code>mode</code> и
+        9 <code>menu</code> — перенесены; мапинг с provenance в <code>docs/tokens.md</code>,
+        раздел 7. Состояния идут из токенов-расширений, не через прозрачность.
       </p>
     </header>
 
@@ -59,7 +56,7 @@ const statusColors = ['green', 'cyan', 'violet', 'magenta', 'orange', 'red'] as 
       <ShowcaseTokens kind="font" />
 
       <div class="mt-6 space-y-3">
-        <p class="text-3xl font-bold tracking-tight">
+        <p class="text-4xl font-bold">
           Заголовок страницы — Мои осмотры
         </p>
         <p class="text-xl font-medium">
@@ -129,7 +126,10 @@ const statusColors = ['green', 'cyan', 'violet', 'magenta', 'orange', 'red'] as 
       </div>
     </ShowcaseSection>
 
-    <ShowcaseSection title="Input">
+    <ShowcaseSection
+      title="Input"
+      note="Состояния сняты с мастера кита: везде рамка 1px, кольца нет ни в одном состоянии. В disabled поле остаётся белым — гаснут рамка и текст. Полевая обёртка (подпись, подсказка, счётчик, раскладки слева/сверху) — компонент InputField в волне 1, см. docs/waves.md."
+    >
       <div class="grid gap-4 sm:grid-cols-2">
         <ShowcaseCell label="default">
           <Input placeholder="Номер осмотра" />
@@ -145,12 +145,13 @@ const statusColors = ['green', 'cyan', 'violet', 'magenta', 'orange', 'red'] as 
         <ShowcaseCell label="disabled">
           <Input disabled placeholder="Номер осмотра" />
         </ShowcaseCell>
-        <ShowcaseCell label="error" hint="aria-invalid">
-          <div class="w-full space-y-1.5">
+        <ShowcaseCell label="error" hint="рамка 1px, красные подсказка и счётчик">
+          <div class="w-full space-y-1">
             <Input aria-invalid="true" model-value="абв" />
-            <p class="text-xs text-destructive">
-              Только цифры
-            </p>
+            <div class="flex justify-between gap-4 text-xs">
+              <span class="text-destructive">Только цифры</span>
+              <span class="text-destructive">3/10</span>
+            </div>
           </div>
         </ShowcaseCell>
       </div>

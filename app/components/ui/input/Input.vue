@@ -19,12 +19,34 @@ const modelValue = useVModel(props, 'modelValue', emits, {
 })
 </script>
 
+<!--
+  Поле ввода кита (мастер `input` 720:11753).
+
+  Состояния сняты с вариантов мастера, а не с дефолтов shadcn:
+  - default  — фон bg/page, рамка border/default
+  - focus    — рамка border/accent, БЕЗ кольца (вариант state=pressed)
+  - error    — рамка service/error-default, БЕЗ кольца
+  - disabled — фон остаётся БЕЛЫМ, гаснут рамка и текст (вариант state=disabled)
+
+  Стокового ring-эффекта в ките нет ни в одном состоянии: везде рамка 1px.
+
+  Геометрия: высота 44, радиус input/border = 8, паддинг
+  input/left-right_padding = 16, текст 15/20.
+
+  Это голое поле. Полевая обёртка кита — подпись, подсказка, счётчик и раскладки
+  «подпись слева / сверху» — идёт компонентом InputField в волне 1 к формам,
+  см. docs/waves.md.
+-->
 <template>
   <input
     v-model="modelValue"
     data-slot="input"
     :class="cn(
-      'h-11 w-full min-w-0 rounded-md border border-input bg-background px-4 py-2 text-sm text-foreground outline-none transition-colors placeholder:text-foreground-secondary focus-visible:border-ring focus-visible:ring-ring focus-visible:ring-3 aria-invalid:border-destructive aria-invalid:ring-destructive aria-invalid:ring-3 disabled:pointer-events-none disabled:cursor-not-allowed disabled:border-border-neutral disabled:bg-surface-disabled disabled:text-foreground-disabled file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground',
+      'h-11 w-full min-w-0 rounded-md border border-input bg-background px-4 text-sm text-foreground outline-none transition-colors',
+      'placeholder:text-foreground-secondary',
+      'focus:border-stroke-accent',
+      'aria-invalid:border-destructive',
+      'disabled:pointer-events-none disabled:cursor-not-allowed disabled:border-stroke-neutral disabled:bg-background disabled:text-foreground-disabled disabled:placeholder:text-foreground-secondary-disabled',
       props.class,
     )"
   >
