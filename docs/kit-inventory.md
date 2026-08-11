@@ -1,5 +1,42 @@
 # Инвентарь кита 1 (Figma)
 
+## Мастер-компоненты: nodeId
+
+Сняты обходом через Plugin API. С этими id работают `get_design_context` и `get_variable_defs` —
+искать их заново через `get_metadata` бесполезно, он не видит нужных страниц.
+
+| Компонент | nodeId | Тип | Варианты |
+|---|---|---|---|
+| `btn_accent` | `709:6413` | SET | state (Default/Hover/Pressed/Dissabled/not_active) × size (44/32) — 10 |
+| `btn_secondary` | `713:3319` | SET | state ×4 |
+| `btn_outline` | `1990:226` | SET | state ×4 |
+| `btn_txt` | `715:3605` | SET | state × size (l_20/s_16) × color (accent/warning/red) × type (bold/regular) × icon — 27 |
+| `input` | `720:11753` | SET | label (left/top) × state (Default/pressed/field/error/disabled) × size (40/44) — 20 |
+| `select` **актуальный** | `1929:4067` | SET | type: default/field/pressed/loading — 4 · обновлён 2026-06-24 |
+| `select` старый | `244:13976` | SET | label × state — 18 · обновлён 2026-01-23 |
+| `multiselect` | `251:16816` | SET | 18 · обновлён 2026-01-23 |
+| `badge` | `1173:196` | SET | color: violet/red/orange — 3 |
+| `badge` | `747:2464` | COMPONENT | одиночный |
+| `tabs` | `2702:315` | SET | amount: 2/3/4 |
+| `iconed_tab_list` | `2181:387` | SET | selected × type — 4 |
+| `left_menu` | `643:3054` | SET | type: Default/iconed/with shadow |
+| `menu_item` | `637:2521` | SET | state (default/activ/hover/selected/disabled) × size — 10 |
+
+## Страницы файла (38)
+
+`get_metadata` показывает только 5 из них. Полный список:
+
+Cover Page · 🟡 Icons · 🟡 Colors · 🟡 Typography · ✅ Menu · 🟢 Alerts · 🟢 Avatars · 🟢 Badge ·
+Bulb (counter) · 🟢 Buttons · 🟢🟡 Checkbox, Radio Button · 🟢 dropdown · 🟢 Filters · 🟢🟡 input ·
+🟢 List Item · 🟢 Modal_cards · ✅ Other (scrolls, loader) · 🟢 Pagination · 🟢 Table · 🟢 Switch ·
+🟢 Tabs · 🟢 Tags · 🟢 Text_link · 🟢 Title · 🟢 tool_tip · user_card · select и multiselect ·
+BreadCrumbs · pop_over · ➡️ slots · text area · 🚫 Accordion · 🚫 table · плюс 5 страниц-разделителей
+
+Префикс 🚫 у Accordion и table, судя по всему, означает «не использовать».
+
+---
+
+
 Снято через Figma MCP `search_design_system` из библиотеки `🖥️ UI Kit · Web Platform`
 (fileKey `uG3HTIcMwr2jI2d7YEYPs2`). Дата снятия: 2026-08-11.
 
