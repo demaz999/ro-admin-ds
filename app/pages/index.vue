@@ -30,9 +30,9 @@ const badgeVariants = ['default', 'secondary', 'outline', 'destructive'] as cons
       <p
         class="max-w-2xl rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-200"
       >
-        <strong>Тема пока не перенесена из кита.</strong> Ниже дефолтная тема shadcn-vue. В ките 1
-        нет опубликованных variables, поэтому значения снимаются со стилей компонентов — см.
-        <code>docs/open-questions.md</code>, вопрос 1.
+        <strong>Тема кита ещё не применена.</strong> Ниже дефолтная тема shadcn-vue — каркас
+        волны&nbsp;0. Значения из кита собраны (69 переменных <code>mode</code>), мапинг на слоты
+        shadcn в работе; после него витрина перекрасится сама, потому что читает токены из CSS.
       </p>
     </header>
 
@@ -77,7 +77,7 @@ const badgeVariants = ['default', 'secondary', 'outline', 'destructive'] as cons
 
     <ShowcaseSection
       title="Button"
-      note="В ките 1 кнопка разложена на 12 отдельных компонент-сетов. Здесь это один компонент с пропом variant — см. вопрос 3 в списке открытых вопросов."
+      note="В ките 1 кнопка разложена на 12 отдельных компонент-сетов. Здесь это один компонент с пропом variant: btn_accent → default, btn_txt → ghost, btn_remove → destructive. Значения вариантов ниже — ещё дефолтные shadcn, не из кита."
     >
       <div class="space-y-6">
         <div>
