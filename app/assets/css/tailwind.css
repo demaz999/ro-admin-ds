@@ -10,36 +10,48 @@
    Шрифт кита 1 — PT Root UI. Снят со стилей компонентов: все текстовые токены
    (Txt/regular13-16 … Header/bold36-40) объявлены в этом семействе.
 
-   Файлы шрифта в репозитории пока нет: PT Root UI коммерческий, веб-версию
-   должна предоставить компания. До этого момента рендерится системный fallback —
-   осознанно, чтобы не тянуть шрифт из внешней сети и не отдавать 404.
-   Как только файлы появятся в public/fonts, снять комментарий с @font-face.
-   См. docs/design-debt.md.
+   Файлы self-hosted в public/fonts, из внешней сети ничего не тянем.
+   Обновление шрифта конвертируется скриптом scripts/convert-fonts.mjs.
+
+   Кит использует три начертания: Regular 400, Medium 500, Bold 700.
+   Light 300 подключён про запас — браузер грузит только те начертания, которые
+   реально применяются, поэтому неиспользуемое ничего не стоит.
 
    Объявлено в @theme, а не в @theme inline: тогда переменные попадают в :root,
    и витрина видит их наравне с остальными токенами.
    --------------------------------------------------------------------------- */
 
-/*
 @font-face {
-  font-family: 'PT Root UI';
-  src: url('/fonts/pt-root-ui_regular.woff2') format('woff2');
-  font-weight: 400;
-  font-display: swap;
+    font-family: 'PT Root UI';
+    src: url('/fonts/pt-root-ui_light.woff2') format('woff2');
+    font-weight: 300;
+    font-style: normal;
+    font-display: swap;
 }
+
 @font-face {
-  font-family: 'PT Root UI';
-  src: url('/fonts/pt-root-ui_medium.woff2') format('woff2');
-  font-weight: 500;
-  font-display: swap;
+    font-family: 'PT Root UI';
+    src: url('/fonts/pt-root-ui_regular.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
 }
+
 @font-face {
-  font-family: 'PT Root UI';
-  src: url('/fonts/pt-root-ui_bold.woff2') format('woff2');
-  font-weight: 700;
-  font-display: swap;
+    font-family: 'PT Root UI';
+    src: url('/fonts/pt-root-ui_medium.woff2') format('woff2');
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
 }
-*/
+
+@font-face {
+    font-family: 'PT Root UI';
+    src: url('/fonts/pt-root-ui_bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
 
 @theme {
     --font-sans: 'PT Root UI', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;

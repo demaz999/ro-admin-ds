@@ -20,7 +20,7 @@ const badgeVariants = ['default', 'secondary', 'outline', 'destructive'] as cons
       <p class="font-mono text-xs uppercase tracking-widest text-muted-foreground">
         кит 2 · волна 0
       </p>
-      <h1 class="text-3xl font-semibold tracking-tight">
+      <h1 class="text-3xl font-bold tracking-tight">
         Витрина админского дизайн-кита
       </h1>
       <p class="max-w-2xl text-muted-foreground">
@@ -58,7 +58,7 @@ const badgeVariants = ['default', 'secondary', 'outline', 'destructive'] as cons
       <ShowcaseTokens kind="font" />
 
       <div class="mt-6 space-y-3">
-        <p class="text-3xl font-semibold tracking-tight">
+        <p class="text-3xl font-bold tracking-tight">
           Заголовок страницы — Мои осмотры
         </p>
         <p class="text-xl font-medium">

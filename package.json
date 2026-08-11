@@ -25,6 +25,7 @@
     "vue-router": "^5.2.0"
   },
   "devDependencies": {
-    "shadcn-nuxt": "^2.8.2"
+    "shadcn-nuxt": "^2.8.2",
+    "wawoff2": "^2.0.1"
   }
 }
