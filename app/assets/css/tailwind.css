@@ -13,21 +13,16 @@
    Файлы self-hosted в public/fonts, из внешней сети ничего не тянем.
    Обновление шрифта конвертируется скриптом scripts/convert-fonts.mjs.
 
-   Кит использует три начертания: Regular 400, Medium 500, Bold 700.
-   Light 300 подключён про запас — браузер грузит только те начертания, которые
-   реально применяются, поэтому неиспользуемое ничего не стоит.
+   Легальных начертаний ровно три: Regular 400, Medium 500, Bold 700.
+   Четвёртого не появится — Light 300 в интерфейсе не используется нигде,
+   это подтверждённый факт, а не пробел. Файл light удалён намеренно.
+
+   font-semibold (600) использовать нельзя: такого начертания нет, браузер
+   синтезирует его сам и текст уезжает относительно макета.
 
    Объявлено в @theme, а не в @theme inline: тогда переменные попадают в :root,
    и витрина видит их наравне с остальными токенами.
    --------------------------------------------------------------------------- */
-
-@font-face {
-    font-family: 'PT Root UI';
-    src: url('/fonts/pt-root-ui_light.woff2') format('woff2');
-    font-weight: 300;
-    font-style: normal;
-    font-display: swap;
-}
 
 @font-face {
     font-family: 'PT Root UI';
@@ -56,6 +51,72 @@
 @theme {
     --font-sans: 'PT Root UI', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
     --font-heading: var(--font-sans);
+
+    /* Шкала кегля из кита. Имена — стандартные тайлвиндовские, значения — кита,
+       поэтому text-sm в компонентах сразу означает «15/20 из кита».
+       Шкала: 13/16, 15/20, 16/24, 17/24, 36/40. Разбор — docs/tokens.md, раздел 10. */
+    --text-xs: 13px;
+    --text-xs--line-height: 16px;
+    --text-sm: 15px;
+    --text-sm--line-height: 20px;
+    --text-base: 16px;
+    --text-base--line-height: 24px;
+    --text-lg: 17px;
+    --text-lg--line-height: 24px;
+    --text-4xl: 36px;
+    --text-4xl--line-height: 40px;
+}
+
+/* ---------------------------------------------------------------------------
+   Расширенная палитра — шесть рамп из кита (в Figma зовутся status-01..06).
+
+   Это НЕ семантика: имя status-* в код не переносится, оно врёт о содержимом.
+   Схема номерная, потому что три рампы пересекаются по цветовому слову с
+   семантикой (01 зелёная рядом с success, 05 оранжевая рядом с warning,
+   06 красная рядом с error). Разбор — docs/tokens.md, раздел 6.
+
+   При сборке страниц дефолт — семантические токены. Палитра берётся только по
+   явному указанию макета или человека.
+
+   Полный набор состояний в ките есть только у рамп 01 и 06; у 02–05 нарисован
+   один default — см. docs/design-debt.md.
+   --------------------------------------------------------------------------- */
+:root {
+    --palette-01: #1bb149;
+    --palette-01-hover: #2fc55d;
+    --palette-01-pressed: #11a73f;
+    --palette-01-surface: #d1ead9;
+    --palette-01-disabled: #a1cda1;
+
+    --palette-02: #1192bb;
+    --palette-02-hover: #41a8c9;
+    --palette-02-pressed: #0e7c9f;
+
+    --palette-03: #806aea;
+    --palette-03-hover: #9287f2;
+    --palette-03-pressed: #724edd;
+
+    --palette-04: #d461ba;
+    --palette-04-hover: #e185cf;
+    --palette-04-pressed: #c0429d;
+
+    --palette-05: #ff8552;
+    --palette-05-hover: #ff9d75;
+    --palette-05-pressed: #cc6a42;
+
+    --palette-06: #c91826;
+    --palette-06-hover: #d44651;
+    --palette-06-pressed: #a1131e;
+    --palette-06-disabled: #f4d1d4;
+}
+
+@theme inline {
+    --color-palette-01: var(--palette-01);
+    --color-palette-02: var(--palette-02);
+    --color-palette-03: var(--palette-03);
+    --color-palette-04: var(--palette-04);
+    --color-palette-05: var(--palette-05);
+    --color-palette-06: var(--palette-06);
 }
 
 @theme inline {
@@ -90,45 +151,194 @@
     --color-card: var(--card);
     --color-foreground: var(--foreground);
     --color-background: var(--background);
-    --radius-sm: calc(var(--radius) - 4px);
-    --radius-md: calc(var(--radius) - 2px);
-    --radius-lg: var(--radius);
-    --radius-xl: calc(var(--radius) + 4px);
+    /* Лесенка радиусов кита — 4 / 8 / 12 / 16, ровно по 4.
+       Стандартную формулу shadcn calc(--radius ± 4px) не используем: она даёт
+       6px, которого в ките не существует. */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-full: 999px;               /* скролл-кноб */
+
+    /* Расширения темы как утилиты: bg-primary-hover, text-foreground-secondary… */
+    --color-foreground-hover: var(--foreground-hover);
+    --color-foreground-disabled: var(--foreground-disabled);
+    --color-foreground-secondary: var(--foreground-secondary);
+    --color-foreground-secondary-hover: var(--foreground-secondary-hover);
+    --color-foreground-secondary-pressed: var(--foreground-secondary-pressed);
+    --color-foreground-secondary-disabled: var(--foreground-secondary-disabled);
+
+    --color-primary-hover: var(--primary-hover);
+    --color-primary-pressed: var(--primary-pressed);
+    --color-primary-disabled: var(--primary-disabled);
+
+    --color-secondary-hover: var(--secondary-hover);
+    --color-secondary-disabled: var(--secondary-disabled);
+
+    --color-surface-contrast: var(--surface-contrast);
+    --color-surface-disabled: var(--surface-disabled);
+    --color-surface-new: var(--surface-new);
+    --color-surface-selected: var(--surface-selected);
+    --color-surface-selected-hover: var(--surface-selected-hover);
+    --color-overlay: var(--overlay);
+    --color-scrim-light: var(--scrim-light);
+    --color-scrim-dark: var(--scrim-dark);
+
+    --color-border-secondary: var(--border-secondary);
+    --color-border-accent: var(--border-accent);
+    --color-border-neutral: var(--border-neutral);
+
+    --color-muted-disabled: var(--muted-disabled);
+
+    --color-destructive-hover: var(--destructive-hover);
+    --color-destructive-pressed: var(--destructive-pressed);
+    --color-destructive-surface: var(--destructive-surface);
+    --color-destructive-disabled: var(--destructive-disabled);
+
+    --color-warning: var(--warning);
+    --color-warning-hover: var(--warning-hover);
+    --color-warning-pressed: var(--warning-pressed);
+    --color-warning-surface: var(--warning-surface);
+    --color-warning-disabled: var(--warning-disabled);
+
+    --color-success: var(--success);
+    --color-success-hover: var(--success-hover);
+    --color-success-pressed: var(--success-pressed);
+    --color-success-surface: var(--success-surface);
+
+    --color-sidebar-active: var(--sidebar-active);
+    --color-sidebar-active-foreground: var(--sidebar-active-foreground);
+    --color-sidebar-disabled: var(--sidebar-disabled);
+    --color-sidebar-scroll-track: var(--sidebar-scroll-track);
+    --color-sidebar-scroll-thumb: var(--sidebar-scroll-thumb);
 }
 
+/* ---------------------------------------------------------------------------
+   Тема кита. Значения перенесены из коллекций mode (69) и menu (9).
+   Слева от значения — исходное имя переменной в Figma.
+   Мапинг с обоснованиями и provenance — docs/tokens.md, раздел 7.
+   --------------------------------------------------------------------------- */
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+    /* --- поверхности и текст --- */
+    --background: #ffffff;              /* bg/page */
+    --foreground: #0e1e33;              /* fg/primary */
+
+    /* card и popover своих поверхностей в ките не имеют — сидят на bg/page */
+    --card: #ffffff;                    /* bg/page */
+    --card-foreground: #0e1e33;         /* fg/primary */
+    --popover: #ffffff;                 /* bg/page */
+    --popover-foreground: #0e1e33;      /* fg/primary */
+
+    /* --- бренд ---
+       Ловушка 1: у нас accent/* — это бренд, а в shadcn бренд живёт в primary. */
+    --primary: #0059cf;                 /* accent/default */
+    --primary-foreground: #ffffff;      /* fg/default_on-accent */
+
+    /* --- вторичная кнопка --- */
+    --secondary: #edf3fc;               /* accent/surface_soft — фон btn_secondary */
+    --secondary-foreground: #0059cf;    /* accent/default */
+
+    /* --- приглушённое --- */
+    --muted: #e8e9ec;                   /* neutral/soft */
+    --muted-foreground: #6e7885;        /* neutral/default */
+
+    /* shadcn-овский accent — это hover-поверхность, а не бренд.
+       Поэтому сюда идёт bg/surface_hover, буквально та же роль. */
+    --accent: #f7f9fc;                  /* bg/surface_hover */
+    --accent-foreground: #0e1e33;       /* fg/primary */
+
+    --destructive: #fa3948;             /* service/error-default */
+
+    --border: #ccdef5;                  /* border/default */
+    --input: #ccdef5;                   /* border/default */
+    --ring: #0059cf;                    /* accent/default */
+
+    /* Графики — категориальные цвета, семантики не несут, поэтому берут палитру. */
+    --chart-1: var(--palette-01);
+    --chart-2: var(--palette-02);
+    --chart-3: var(--palette-03);
+    --chart-4: var(--palette-04);
+    --chart-5: var(--palette-05);
+
+    --radius: 8px;                      /* btn/accent/radius, input/border, pag_btn/border */
+
+    /* --- сайдбар: коллекция menu ---
+       Тёмный при светлом интерфейсе. Это не тёмная тема и не второй мод. */
+    --sidebar: #0e1e33;                             /* menu/bg/default */
+    --sidebar-foreground: #d9e8fc;                  /* menu/fg/default */
+    --sidebar-accent: #1a293d;                      /* menu/bg/layer_hover */
+    --sidebar-accent-foreground: #ffffff;           /* menu/fg/activ */
+    --sidebar-border: #a2a9b2;                      /* menu/devider/default */
+    --sidebar-primary: #669be2;                     /* fg/secondary_hover — см. вопрос 15 */
+    --sidebar-primary-foreground: #0e1e33;          /* menu/bg/default */
+    --sidebar-ring: #d9e8fc;                        /* menu/fg/default */
+
+    /* =========================================================================
+       Расширения темы.
+
+       Ловушка 2: состояния в ките нарисованы руками, прозрачность поверх
+       подложки даёт другой цвет. Схлопывать в bg-primary/90 нельзя.
+       Расширения живут внутри компонентов кита и на генерацию страниц не влияют.
+       ========================================================================= */
+
+    /* текст */
+    --foreground-hover: #003881;                    /* fg/primary_hover */
+    --foreground-disabled: #8b939e;                 /* fg/primary_disabled */
+    --foreground-secondary: #567499;                /* fg/secondary = secondary/default */
+    --foreground-secondary-hover: #669be2;          /* fg/secondary_hover */
+    --foreground-secondary-pressed: #455f84;        /* fg/secondary_pressed */
+    --foreground-secondary-disabled: #bccbe0;       /* fg/secondary_disabled = secondary/disabled */
+
+    /* бренд */
+    --primary-hover: #337ad9;                       /* accent/hover */
+    --primary-pressed: #004eb5;                     /* accent/pressed */
+    --primary-disabled: #80ace7;                    /* accent/disabled */
+
+    /* вторичная кнопка */
+    --secondary-hover: #d9e8fc;                     /* accent/surface_bright */
+    --secondary-disabled: #f7f9fc;                  /* accent/surface_disabled */
+
+    /* поверхности */
+    --surface-contrast: #0e1e33;                    /* bg/contrast */
+    --surface-disabled: #d0d4d8;                    /* bg/disabled */
+    --surface-new: #fff3ee;                         /* bg/surface_new */
+    --surface-selected: #edf3fc;                    /* bg/surface_selected */
+    --surface-selected-hover: #d9e8fc;              /* bg/surface_hover_selected */
+    --overlay: #edf3fc80;                           /* bg/overlay */
+    --scrim-light: #ffffff66;                       /* bg/neutral_white40% */
+    --scrim-dark: #000000b2;                        /* bg/neutral_black70% */
+
+    /* границы */
+    --border-secondary: #9aacc2;                    /* border/secondary */
+    --border-accent: #0059cf;                       /* border/accent */
+    --border-neutral: #d0d4d8;                      /* border/neutral_soft */
+
+    /* нейтральные */
+    --muted-disabled: #b9bec5;                      /* neutral/disabled */
+
+    /* служебные состояния */
+    --destructive-hover: #ff6874;                   /* service/error-hover */
+    --destructive-pressed: #e92837;                 /* service/error-pressed */
+    --destructive-surface: #fff0f1;                 /* service/error-surface */
+    --destructive-disabled: #ff9fa6;                /* service/error-fg_disabled */
+
+    --warning: #e98326;                             /* service/warning-default */
+    --warning-hover: #ed9e4a;                       /* service/warning-hover */
+    --warning-pressed: #da6a1c;                     /* service/warning-pressed */
+    --warning-surface: #fcefd8;                     /* service/warning-surface */
+    --warning-disabled: #f3c27e;                    /* service/warning-disabled */
+
+    --success: #00b288;                             /* service/success-default */
+    --success-hover: #14cba3;                       /* service/success-hover */
+    --success-pressed: #009774;                     /* service/success-pressed */
+    --success-surface: #e6f7f3;                     /* service/success-surface */
+
+    /* сайдбар */
+    --sidebar-active: #263547;                      /* menu/bg/layer_activ */
+    --sidebar-active-foreground: #ffffff;           /* menu/fg/activ */
+    --sidebar-disabled: #6e7885;                    /* menu/fg/disabled */
+    --sidebar-scroll-track: #223247;                /* menu/scroll/bg */
+    --sidebar-scroll-thumb: #6e7885;                /* menu/scroll/fg */
 }
 
 /* ---------------------------------------------------------------------------

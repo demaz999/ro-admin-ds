@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 import { badgeVariants } from '.'
 
 const props = defineProps<PrimitiveProps & {
-  variant?: BadgeVariants['variant']
+  color?: BadgeVariants['color']
   class?: HTMLAttributes['class']
 }>()
 
@@ -18,8 +18,8 @@ const delegatedProps = reactiveOmit(props, 'class')
 <template>
   <Primitive
     data-slot="badge"
-    :data-variant="variant"
-    :class="cn(badgeVariants({ variant }), props.class)"
+    :data-color="color"
+    :class="cn(badgeVariants({ color }), props.class)"
     v-bind="delegatedProps"
   >
     <slot />

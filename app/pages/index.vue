@@ -11,7 +11,8 @@ onMounted(() => {
 })
 
 const buttonVariants = ['default', 'secondary', 'outline', 'ghost', 'link', 'destructive'] as const
-const badgeVariants = ['default', 'secondary', 'outline', 'destructive'] as const
+const badgeColors = ['violet', 'red', 'orange'] as const
+const statusColors = ['green', 'cyan', 'violet', 'magenta', 'orange', 'red'] as const
 </script>
 
 <template>
@@ -188,22 +189,38 @@ const badgeVariants = ['default', 'secondary', 'outline', 'destructive'] as cons
     <ShowcaseSection title="Badge">
       <div class="space-y-6">
         <div class="flex flex-wrap gap-3">
-          <Badge v-for="v in badgeVariants" :key="v" :variant="v">
-            {{ v }}
+          <Badge v-for="c in badgeColors" :key="c" :color="c">
+            {{ c }}
           </Badge>
         </div>
-        <div class="flex flex-wrap gap-3">
-          <Badge>Новый</Badge>
-          <Badge variant="secondary">
-            В работе
-          </Badge>
-          <Badge variant="outline">
-            Черновик
-          </Badge>
-          <Badge variant="destructive">
-            Отклонён
-          </Badge>
+        <p class="text-sm text-muted-foreground">
+          Набор цветов — ровно тот, что нарисован в ките: violet, red, orange. Заливка сплошная,
+          текст белый, кегль 13/16 Bold.
+        </p>
+      </div>
+    </ShowcaseSection>
+
+    <ShowcaseSection
+      title="StatusBadge"
+      note="Статусная плашка кита: точка 8×8 плюс подпись. Цвет — явный проп, отдельный статусный слой, а не общий variant."
+    >
+      <div class="space-y-4">
+        <p
+          class="max-w-2xl rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-900"
+        >
+          <strong>Цвета иллюстративные.</strong> Раскладка повторяет текущие макеты, чтобы
+          прототипы рендерились цветными. В продукте статусные цвета приходят с сервера вместе с
+          данными — при интеграции здесь будет мапинг с данных, а не выбор цвета руками.
+        </p>
+        <div class="flex flex-wrap gap-6">
+          <StatusBadge v-for="c in statusColors" :key="c" :color="c">
+            {{ c }}
+          </StatusBadge>
         </div>
+        <p class="text-sm text-muted-foreground">
+          Имя <code>cyan</code> вместо китового <code>grey</code> — в ките ошибка: вариант с именем
+          grey красится в бирюзовый. См. вопрос 12.
+        </p>
       </div>
     </ShowcaseSection>
 

@@ -200,9 +200,133 @@
 
 ### Токены
 
-> **Пока не заполнена.** Значения переменных собраны (69 `mode` + 9 `menu`); таблица появится
-> здесь же вместе со списком непокрытых слотов shadcn и списком переменных, которым в shadcn
-> места нет. Требования к содержимому — в разделе 9.
+**Все значения без исключения взяты из Figma** — ни одно не подобрано на глаз. Колонка
+provenance описывает выбор **слота**: `прямой` — соответствие однозначно, `решение` — наш
+выбор с обоснованием.
+
+Полнота: 69 `mode` + 9 `menu` = **78 переменных, замаплены все 78**. Списка «нет места» нет —
+он пуст. Непокрытых слотов shadcn нет.
+
+#### Текст
+
+| Figma | Значение | Слот | Provenance |
+|---|---|---|---|
+| `fg/primary` | `#0e1e33` | `--foreground`, `--card-foreground`, `--popover-foreground`, `--accent-foreground` | прямой |
+| `fg/primary_hover` | `#003881` | `--foreground-hover` *(расш.)* | прямой |
+| `fg/primary_disabled` | `#8b939e` | `--foreground-disabled` *(расш.)* | прямой |
+| `fg/secondary` | `#567499` | `--foreground-secondary` *(расш.)* | прямой |
+| `fg/secondary_hover` | `#669be2` | `--foreground-secondary-hover` *(расш.)*, `--sidebar-primary` | **решение** — см. вопрос 15 |
+| `fg/secondary_pressed` | `#455f84` | `--foreground-secondary-pressed` *(расш.)* | прямой |
+| `fg/secondary_disabled` | `#bccbe0` | `--foreground-secondary-disabled` *(расш.)* | прямой |
+| `fg/default_on-accent` | `#ffffff` | `--primary-foreground` | прямой |
+
+#### Поверхности
+
+| Figma | Значение | Слот | Provenance |
+|---|---|---|---|
+| `bg/page` | `#ffffff` | `--background`, `--card`, `--popover` | **решение** — своих поверхностей у card и popover в ките нет, ловушка 3 |
+| `bg/surface_hover` | `#f7f9fc` | `--accent` | **решение** — shadcn-овский `accent` это hover-поверхность, а не бренд; ловушка 1 |
+| `bg/contrast` | `#0e1e33` | `--surface-contrast` *(расш.)* | прямой |
+| `bg/disabled` | `#d0d4d8` | `--surface-disabled` *(расш.)* | прямой |
+| `bg/surface_new` | `#fff3ee` | `--surface-new` *(расш.)* | прямой · имя `_new` предложено к переименованию |
+| `bg/surface_selected` | `#edf3fc` | `--surface-selected` *(расш.)* | прямой |
+| `bg/surface_hover_selected` | `#d9e8fc` | `--surface-selected-hover` *(расш.)* | прямой |
+| `bg/overlay` | `#edf3fc80` | `--overlay` *(расш.)* | прямой |
+| `bg/neutral_white40%` | `#ffffff66` | `--scrim-light` *(расш.)* | **решение** — процент в имени токена не тащим |
+| `bg/neutral_black70%` | `#000000b2` | `--scrim-dark` *(расш.)* | **решение** — то же |
+
+#### Бренд
+
+| Figma | Значение | Слот | Provenance |
+|---|---|---|---|
+| `accent/default` | `#0059cf` | `--primary`, `--ring` | **решение** — ловушка 1: бренд идёт в `primary`, не в `accent` |
+| `accent/hover` | `#337ad9` | `--primary-hover` *(расш.)* | прямой |
+| `accent/pressed` | `#004eb5` | `--primary-pressed` *(расш.)* | прямой |
+| `accent/disabled` | `#80ace7` | `--primary-disabled` *(расш.)* | прямой |
+| `accent/surface_soft` | `#edf3fc` | `--secondary` | **решение** — фон `btn_secondary`, снят с узла |
+| `accent/surface_bright` | `#d9e8fc` | `--secondary-hover` *(расш.)* | **решение** — hover вторичной кнопки |
+| `accent/surface_disabled` | `#f7f9fc` | `--secondary-disabled` *(расш.)* | прямой |
+
+#### Границы и нейтральные
+
+| Figma | Значение | Слот | Provenance |
+|---|---|---|---|
+| `border/default` | `#ccdef5` | `--border`, `--input` | прямой |
+| `border/secondary` | `#9aacc2` | `--border-secondary` *(расш.)* | прямой |
+| `border/accent` | `#0059cf` | `--border-accent` *(расш.)* | прямой |
+| `border/neutral_soft` | `#d0d4d8` | `--border-neutral` *(расш.)* | прямой |
+| `neutral/default` | `#6e7885` | `--muted-foreground` | прямой |
+| `neutral/soft` | `#e8e9ec` | `--muted` | прямой |
+| `neutral/disabled` | `#b9bec5` | `--muted-disabled` *(расш.)* | прямой |
+| `secondary/default` | `#567499` | `--foreground-secondary` *(расш.)* | **дубль значения** `fg/secondary`, отдельного токена не заводим |
+| `secondary/disabled` | `#bccbe0` | `--foreground-secondary-disabled` *(расш.)* | **дубль значения** `fg/secondary_disabled` |
+
+#### Служебные
+
+| Figma | Значение | Слот | Provenance |
+|---|---|---|---|
+| `service/error-default` | `#fa3948` | `--destructive` | прямой |
+| `service/error-hover` | `#ff6874` | `--destructive-hover` *(расш.)* | прямой |
+| `service/error-pressed` | `#e92837` | `--destructive-pressed` *(расш.)* | прямой |
+| `service/error-surface` | `#fff0f1` | `--destructive-surface` *(расш.)* | прямой |
+| `service/error-fg_disabled` | `#ff9fa6` | `--destructive-disabled` *(расш.)* | прямой |
+| `service/warning-default` | `#e98326` | `--warning` *(расш.)* | **решение** — своего слота в shadcn нет |
+| `service/warning-hover` | `#ed9e4a` | `--warning-hover` *(расш.)* | прямой |
+| `service/warning-pressed` | `#da6a1c` | `--warning-pressed` *(расш.)* | прямой |
+| `service/warning-surface` | `#fcefd8` | `--warning-surface` *(расш.)* | прямой |
+| `service/warning-disabled` | `#f3c27e` | `--warning-disabled` *(расш.)* | прямой |
+| `service/success-default` | `#00b288` | `--success` *(расш.)* | **решение** — своего слота в shadcn нет |
+| `service/success-hover` | `#14cba3` | `--success-hover` *(расш.)* | прямой |
+| `service/success-pressed` | `#009774` | `--success-pressed` *(расш.)* | прямой |
+| `service/success-surface` | `#e6f7f3` | `--success-surface` *(расш.)* | прямой |
+
+#### Расширенная палитра
+
+Имя `status-*` в код не переносится — схема номерная, обоснование в разделе 6.
+Суффикс `bg` в ките переименован в `surface` ради единообразия с `service/*-surface`.
+
+| Figma | Значение | Слот | Provenance |
+|---|---|---|---|
+| `status-01/default` `/hover` `/pressed` `/bg` `/disabled` | `#1bb149` `#2fc55d` `#11a73f` `#d1ead9` `#a1cda1` | `--palette-01` + `-hover` `-pressed` `-surface` `-disabled` | **решение** — переименование, разбор в разделе 6 |
+| `status-02/default` `/hover` `/pressed` | `#1192bb` `#41a8c9` `#0e7c9f` | `--palette-02` + `-hover` `-pressed` | то же |
+| `status-03/default` `/hover` `/pressed` | `#806aea` `#9287f2` `#724edd` | `--palette-03` + `-hover` `-pressed` | то же |
+| `status-04/default` `/hover` `/pressed` | `#d461ba` `#e185cf` `#c0429d` | `--palette-04` + `-hover` `-pressed` | то же · рампа не используется ничем |
+| `status-05/default` `/hover` `/pressed` | `#ff8552` `#ff9d75` `#cc6a42` | `--palette-05` + `-hover` `-pressed` | то же |
+| `status-06/default` `/hover` `/pressed` `/disabled` | `#c91826` `#d44651` `#a1131e` `#f4d1d4` | `--palette-06` + `-hover` `-pressed` `-disabled` | то же |
+
+#### Сайдбар — коллекция `menu`
+
+Принцип разведения: штатный слот получает состояние, которое стоковая разметка триггерит сама
+(hover); состояние, которое прошивает наш код (activ), уходит в расширение.
+
+| Figma | Значение | Слот | Provenance |
+|---|---|---|---|
+| `menu/bg/default` | `#0e1e33` | `--sidebar`, `--sidebar-primary-foreground` | прямой · для foreground — **решение**, контраст 5.9:1 |
+| `menu/bg/layer_hover` | `#1a293d` | `--sidebar-accent` | **решение** — hover приходит из стоковой разметки даром |
+| `menu/bg/layer_activ` | `#263547` | `--sidebar-active` *(расш.)* | **решение** — activ ставит наш код, через data-атрибут |
+| `menu/fg/default` | `#d9e8fc` | `--sidebar-foreground`, `--sidebar-ring` | прямой · для ring — **решение**, контраст 13.5:1 |
+| `menu/fg/activ` | `#ffffff` | `--sidebar-accent-foreground`, `--sidebar-active-foreground` *(расш.)* | прямой |
+| `menu/fg/disabled` | `#6e7885` | `--sidebar-disabled` *(расш.)* | **решение** — штатного слота нет |
+| `menu/devider/default` | `#a2a9b2` | `--sidebar-border` | прямой · опечатка `devider` в код не переносится |
+| `menu/scroll/bg` | `#223247` | `--sidebar-scroll-track` *(расш.)* | **решение** — штатного слота нет |
+| `menu/scroll/fg` | `#6e7885` | `--sidebar-scroll-thumb` *(расш.)* | **решение** — штатного слота нет · дубль значения `menu/fg/disabled` |
+
+#### Слоты shadcn, закрытые не из `mode`/`menu`
+
+| Слот | Чем закрыт | Provenance |
+|---|---|---|
+| `--chart-1` … `--chart-5` | `--palette-01` … `--palette-05` | **решение** — графики категориальны и семантики не несут, палитра ложится точно |
+| `--radius` | `8px` — `btn/accent/radius`, `input/border`, `pag_btn/border` | из файла, code-first |
+| `--radius-sm/md/lg/xl` | `4 / 8 / 12 / 16` | **решение** — формула shadcn `calc(±4px)` даёт 6px, которого в ките нет |
+| `--font-sans` | `PT Root UI` | из файла, code-first |
+
+#### Проверки приёмки
+
+| Проверка | Результат |
+|---|---|
+| Двусторонняя полнота | 78/78 переменных замаплены; список «нет места» пуст; непокрытых слотов shadcn нет |
+| Provenance на каждой строке | да; значения все до одного из Figma, колонка описывает выбор слота |
+| Легаси не просочилось | `bg/dark_default`, `fg/white`, `brand/default`, `fg/semi_bright` в отчёте отсутствуют. Дополнительно: коллекции `components` и `theme(primitives)` не опубликованы в библиотеку, поэтому в поиск не попадают структурно |
 
 ### Компоненты и варианты
 
