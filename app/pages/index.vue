@@ -30,9 +30,10 @@ const badgeVariants = ['default', 'secondary', 'outline', 'destructive'] as cons
       <p
         class="max-w-2xl rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-200"
       >
-        <strong>Тема кита ещё не применена.</strong> Ниже дефолтная тема shadcn-vue — каркас
-        волны&nbsp;0. Значения из кита собраны (69 переменных <code>mode</code>), мапинг на слоты
-        shadcn в работе; после него витрина перекрасится сама, потому что читает токены из CSS.
+        <strong>Тема переносится.</strong> Значения из кита собраны полностью — 69 переменных
+        <code>mode</code> и 9 <code>menu</code>. Мапинг на слоты shadcn в работе; ниже пока
+        дефолтная тема shadcn-vue. После мапинга витрина перекрасится сама, потому что читает
+        токены из CSS.
       </p>
     </header>
 
