@@ -1,0 +1,231 @@
+<script setup lang="ts">
+import { onMounted, ref } from 'vue'
+
+useHead({ title: 'Витрина — админский дизайн-кит' })
+
+/** Состояние focus нельзя показать статикой — наводим его программно на один экземпляр. */
+const focusedInput = ref<HTMLElement | null>(null)
+
+onMounted(() => {
+  focusedInput.value?.querySelector('input')?.focus()
+})
+
+const buttonVariants = ['default', 'secondary', 'outline', 'ghost', 'link', 'destructive'] as const
+const badgeVariants = ['default', 'secondary', 'outline', 'destructive'] as const
+</script>
+
+<template>
+  <main class="mx-auto max-w-5xl space-y-12 px-6 py-10">
+    <header class="space-y-3">
+      <p class="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+        кит 2 · волна 0
+      </p>
+      <h1 class="text-3xl font-semibold tracking-tight">
+        Витрина админского дизайн-кита
+      </h1>
+      <p class="max-w-2xl text-muted-foreground">
+        Токены читаются прямо из таблиц стилей документа, поэтому витрина не может разойтись с
+        файлом токенов. Компоненты показаны в состояниях default, hover, focus, disabled и error.
+      </p>
+      <p
+        class="max-w-2xl rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-200"
+      >
+        <strong>Тема пока не перенесена из кита.</strong> Ниже дефолтная тема shadcn-vue. В ките 1
+        нет опубликованных variables, поэтому значения снимаются со стилей компонентов — см.
+        <code>docs/open-questions.md</code>, вопрос 1.
+      </p>
+    </header>
+
+    <ShowcaseSection
+      title="Палитра"
+      note="Все цветовые токены темы. Свотч залит через var(), то есть показывает ровно то, что применится в компонентах."
+    >
+      <ShowcaseTokens kind="color" />
+    </ShowcaseSection>
+
+    <ShowcaseSection
+      title="Радиусы"
+      note="Значения --radius-* и производные от них."
+    >
+      <ShowcaseTokens prefix="--radius" />
+    </ShowcaseSection>
+
+    <ShowcaseSection
+      title="Типографика"
+      note="Семейства шрифтов темы."
+    >
+      <ShowcaseTokens kind="font" />
+
+      <div class="mt-6 space-y-3">
+        <p class="text-3xl font-semibold tracking-tight">
+          Заголовок страницы — Мои осмотры
+        </p>
+        <p class="text-xl font-medium">
+          Заголовок раздела — Фильтры
+        </p>
+        <p class="text-base">
+          Основной текст. Проверка кириллицы: съешь ещё этих мягких французских булок.
+        </p>
+        <p class="text-sm text-muted-foreground">
+          Вспомогательный текст и подписи полей.
+        </p>
+        <p class="font-mono text-sm">
+          Моноширинный: ID 4815162342
+        </p>
+      </div>
+    </ShowcaseSection>
+
+    <ShowcaseSection
+      title="Button"
+      note="В ките 1 кнопка разложена на 12 отдельных компонент-сетов. Здесь это один компонент с пропом variant — см. вопрос 3 в списке открытых вопросов."
+    >
+      <div class="space-y-6">
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Варианты
+          </h3>
+          <div class="flex flex-wrap gap-3">
+            <Button v-for="v in buttonVariants" :key="v" :variant="v">
+              {{ v }}
+            </Button>
+          </div>
+        </div>
+
+        <div class="grid gap-4 sm:grid-cols-2">
+          <ShowcaseCell label="default">
+            <Button>Найти</Button>
+          </ShowcaseCell>
+          <ShowcaseCell label="hover" hint="наведите курсор">
+            <Button>Найти</Button>
+          </ShowcaseCell>
+          <ShowcaseCell label="focus" hint="Tab до кнопки">
+            <Button>Найти</Button>
+          </ShowcaseCell>
+          <ShowcaseCell label="disabled">
+            <Button disabled>
+              Найти
+            </Button>
+          </ShowcaseCell>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Размеры
+          </h3>
+          <div class="flex flex-wrap items-center gap-3">
+            <Button size="sm">
+              Маленькая
+            </Button>
+            <Button size="default">
+              Обычная
+            </Button>
+            <Button size="lg">
+              Большая
+            </Button>
+          </div>
+        </div>
+      </div>
+    </ShowcaseSection>
+
+    <ShowcaseSection title="Input">
+      <div class="grid gap-4 sm:grid-cols-2">
+        <ShowcaseCell label="default">
+          <Input placeholder="Номер осмотра" />
+        </ShowcaseCell>
+        <ShowcaseCell label="focus" hint="наведён программно">
+          <div ref="focusedInput" class="w-full">
+            <Input placeholder="Номер осмотра" />
+          </div>
+        </ShowcaseCell>
+        <ShowcaseCell label="filled">
+          <Input model-value="4815162342" />
+        </ShowcaseCell>
+        <ShowcaseCell label="disabled">
+          <Input disabled placeholder="Номер осмотра" />
+        </ShowcaseCell>
+        <ShowcaseCell label="error" hint="aria-invalid">
+          <div class="w-full space-y-1.5">
+            <Input aria-invalid="true" model-value="абв" />
+            <p class="text-xs text-destructive">
+              Только цифры
+            </p>
+          </div>
+        </ShowcaseCell>
+      </div>
+    </ShowcaseSection>
+
+    <ShowcaseSection title="Select">
+      <div class="grid gap-4 sm:grid-cols-2">
+        <ShowcaseCell label="default">
+          <Select>
+            <SelectTrigger class="w-56">
+              <SelectValue placeholder="Статус осмотра" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="new">
+                Новый
+              </SelectItem>
+              <SelectItem value="in-progress">
+                В работе
+              </SelectItem>
+              <SelectItem value="done">
+                Завершён
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </ShowcaseCell>
+        <ShowcaseCell label="disabled">
+          <Select disabled>
+            <SelectTrigger class="w-56">
+              <SelectValue placeholder="Статус осмотра" />
+            </SelectTrigger>
+          </Select>
+        </ShowcaseCell>
+      </div>
+    </ShowcaseSection>
+
+    <ShowcaseSection title="Badge">
+      <div class="space-y-6">
+        <div class="flex flex-wrap gap-3">
+          <Badge v-for="v in badgeVariants" :key="v" :variant="v">
+            {{ v }}
+          </Badge>
+        </div>
+        <div class="flex flex-wrap gap-3">
+          <Badge>Новый</Badge>
+          <Badge variant="secondary">
+            В работе
+          </Badge>
+          <Badge variant="outline">
+            Черновик
+          </Badge>
+          <Badge variant="destructive">
+            Отклонён
+          </Badge>
+        </div>
+      </div>
+    </ShowcaseSection>
+
+    <ShowcaseSection title="Tabs">
+      <Tabs default-value="all" class="w-full">
+        <TabsList>
+          <TabsTrigger value="all">
+            Все
+          </TabsTrigger>
+          <TabsTrigger value="mine">
+            Мои
+          </TabsTrigger>
+          <TabsTrigger value="archive" disabled>
+            Архив
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="all" class="pt-4 text-sm text-muted-foreground">
+          Все осмотры.
+        </TabsContent>
+        <TabsContent value="mine" class="pt-4 text-sm text-muted-foreground">
+          Осмотры текущего пользователя.
+        </TabsContent>
+      </Tabs>
+    </ShowcaseSection>
+  </main>
+</template>
