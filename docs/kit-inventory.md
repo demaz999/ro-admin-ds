@@ -15,8 +15,8 @@
 | `select` **актуальный** | `1929:4067` | SET | type: default/field/pressed/loading — 4 · обновлён 2026-06-24 |
 | `select` старый | `244:13976` | SET | label × state — 18 · обновлён 2026-01-23 |
 | `multiselect` | `251:16816` | SET | 18 · обновлён 2026-01-23 |
-| `badge` | `1173:196` | SET | color: violet/red/orange — 3 |
-| `badge` | `747:2464` | COMPONENT | одиночный |
+| `badge` → в коде **`Badge`** | `1173:196` | SET | color: violet/red/orange — 3 · высота **24**, иконка, декоративная статусная метка |
+| `badge` → в коде **`Chip`** | `747:2464` | COMPONENT | высота **32**, внутри счётчик `bulb` и крестик `20_ic_close` · интерактивный |
 | `tabs` | `2702:315` | SET | amount: 2/3/4 |
 | `iconed_tab_list` | `2181:387` | SET | selected × type — 4 |
 | `left_menu` | `643:3054` | SET | type: Default/iconed/with shadow |
@@ -51,7 +51,8 @@ BreadCrumbs · pop_over · ➡️ slots · text area · 🚫 Accordion · 🚫 t
 | Button | `btn_accent`, `btn_secondary`, `btn_outline`, `btn_txt`, `btn_service`, `btn_back`, `btn_remove`, `btn_map`, `btn_navigation`, `accent_icon_btn`, `collapsed_btn`, `page_btn` | есть |
 | Input | `input`, `txt_field`, `txt_area` | есть |
 | Select | `select` (два сета), `select_container`, `multiselect`, `dropdown_list` | есть |
-| Badge | `badge` (сет + отдельный компонент), `tag_platform_type` | есть |
+| Badge | `badge` `1173:196`, `tag_platform_type` | есть |
+| Chip | `badge` `747:2464` — под тем же именем, но другой компонент | есть |
 | Tabs | `tabs`, `iconed_tab_list` | есть |
 | Dialog | `modal_cards_header`, `overlay`, `Popover`, `card` | частично — только шапка и подложка |
 | Dropdown Menu | `dropdown_menu`, `dropdown_list`, `menu`, `menu_item`, `menu_devider`, `Popover` | есть |
