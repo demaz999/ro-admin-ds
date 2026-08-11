@@ -67,3 +67,6 @@
 
 Skeleton, Accordion, детерминированный Progress bar, Date picker / Calendar (есть только иконка
 и `filter_date`), Empty state, Stepper, Command / Combobox, строка таблицы, тело и футер диалога.
+
+Всё перечисленное **не блокирует работу**: берётся дефолтом shadcn-vue сразу и учитывается в
+[design-debt.md](design-debt.md). Кит закрывает любой экран админки.
