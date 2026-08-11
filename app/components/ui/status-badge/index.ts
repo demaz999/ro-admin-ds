@@ -15,7 +15,7 @@ export { default as StatusBadge } from './StatusBadge.vue'
  * общим `variant`.
  *
  * Имя `cyan` вместо китового `grey` — в ките ошибка: вариант с именем grey
- * красится в #1192bb. См. docs/open-questions.md, вопрос 12.
+ * красится в бирюзовый. См. docs/open-questions.md, вопрос 12.
  */
 export const statusBadgeVariants = cva(
   'inline-flex h-5 w-fit shrink-0 items-center gap-2 whitespace-nowrap text-sm font-medium text-foreground',

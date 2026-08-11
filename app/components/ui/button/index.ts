@@ -17,7 +17,7 @@ export { default as Button } from './Button.vue'
  * горизонтальный паддинг 10, текст 15/20 Bold.
  */
 export const buttonVariants = cva(
-  'group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-md border border-transparent bg-clip-padding text-sm font-bold transition-colors outline-none select-none focus-visible:border-ring focus-visible:ring-ring focus-visible:ring-[3px] aria-invalid:border-destructive aria-invalid:ring-destructive aria-invalid:ring-[3px] disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*=size-])]:size-4',
+  'group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-md border border-transparent bg-clip-padding text-sm font-bold transition-colors outline-none select-none focus-visible:border-ring focus-visible:ring-ring focus-visible:ring-3 aria-invalid:border-destructive aria-invalid:ring-destructive aria-invalid:ring-3 disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*=size-])]:size-4',
   {
     variants: {
       variant: {
