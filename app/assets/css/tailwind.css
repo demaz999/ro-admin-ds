@@ -67,17 +67,26 @@
        нет. Теперь такой класс просто не сгенерируется, и ошибка станет видимой. */
     --text-*: initial;
 
+    /* Семь кеглей — по одиннадцати текстовым стилям документа (кегли повторяются
+       в разных начертаниях). Снято через getLocalTextStylesAsync, а не выведено
+       из компонентов.
+
+       `text-base` намеренно НЕ объявлен: кегль 16/20 в ките есть на 51 узле, но
+       стилем документа не заведён. Значение без источника в шкалу не берём. */
+    --text-2xs: 12px;
+    --text-2xs--line-height: 16px;
     --text-xs: 13px;
     --text-xs--line-height: 16px;
     --text-sm: 15px;
     --text-sm--line-height: 20px;
-    /* 16/20 — токен кита txt/bold16-20. Не 16/24: такой кегль в ките встречается
-       (счётчик пагинации), но текстового токена под него нет, поэтому в шкалу
-       он не попадает. См. docs/tokens.md, раздел 10. */
-    --text-base: 16px;
-    --text-base--line-height: 20px;
     --text-lg: 17px;
     --text-lg--line-height: 24px;
+    /* Заголовочная группа: title, H2, H1. У всех трёх paragraphSpacing 0,
+       у наборных — 8. */
+    --text-xl: 20px;
+    --text-xl--line-height: 24px;
+    --text-2xl: 24px;
+    --text-2xl--line-height: 28px;
     --text-4xl: 36px;
     --text-4xl--line-height: 40px;
 
@@ -85,10 +94,12 @@
        Txt/regular13-16, Txt/bold13-16, Txt/regular15-20, Txt/medium15-20,
        Txt/bold15-20, Txt/bold17-24, txt/bold16-20, Header/bold36-40.
        Ноль зафиксирован явно, чтобы правка тайлвиндовского дефолта не прошла молча. */
+    --text-2xs--letter-spacing: 0;
     --text-xs--letter-spacing: 0;
     --text-sm--letter-spacing: 0;
-    --text-base--letter-spacing: 0;
     --text-lg--letter-spacing: 0;
+    --text-xl--letter-spacing: 0;
+    --text-2xl--letter-spacing: 0;
     --text-4xl--letter-spacing: 0;
 }
 

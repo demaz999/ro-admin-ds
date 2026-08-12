@@ -453,37 +453,57 @@ font-stretch property specifications».
 
 | Стиль в ките | Начертание | Размер / интерлиньяж | Где применяется |
 |---|---|---|---|
-| `Txt/regular13-16` | Regular 400 | 13 / 16 | `btn_txt`, подпись `menu_item` |
-| `Txt/bold13-16` | Bold 700 | 13 / 16 | `badge`, `inspection_card` |
-| `Txt/regular15-20` | Regular 400 | 15 / 20 | плейсхолдер `input`, `checkbox_title`, статусы |
-| `Txt/medium15-20` | Medium 500 | 15 / 20 | текст статуса |
-| `Txt/bold15-20` | Bold 700 | 15 / 20 | `btn_accent`, `btn_secondary`, `page_number`, `filter_name` |
+| `Header/bold36-40` | Bold 700 | 36 / 40 | H1 |
+| `Header/bold24-28` | Bold 700 | 24 / 28 | H2 |
+| `Header/bold20-24` | Bold 700 | 20 / 24 | title |
 | `Txt/bold17-24` | Bold 700 | 17 / 24 | заголовки блоков |
-| `Header/bold36-40` | Bold 700 | 36 / 40 | H1 страницы |
-| `txt/bold16-20` | Bold 700 | 16 / 20 | объявлен, фактического употребления не найдено |
+| `Txt/bold15-20` | Bold 700 | 15 / 20 | `btn_accent`, `btn_secondary`, подпись поля |
+| `Txt/medium15-20` | Medium 500 | 15 / 20 | текст статуса |
+| `Txt/regular15-20` | Regular 400 | 15 / 20 | текст поля, пункт списка, таб |
+| `Txt/bold13-16` | Bold 700 | 13 / 16 | `badge`, счётчик поля |
+| `Txt/regular13-16` | Regular 400 | 13 / 16 | подсказка поля, `btn_txt` |
+| `Txt/bold12-16` | Bold 700 | 12 / 16 | дополнительный |
+| `Txt/regular12-16` | Regular 400 | 12 / 16 | дополнительный |
 
-Не покрыто токеном: счётчик пагинации — Regular 400, 16 / 24, с `font-feature-settings: lnum, tnum`.
-В шкалу он не входит: кегль есть, текстового токена под него нет. `--text-base` держит **16 / 20**
-по токену `txt/bold16-20`, а не 16 / 24.
+Одиннадцать стилей документа, семь кеглей, три начертания. Medium заведён единственным
+стилем — `Txt/medium15-20`.
+
+**Кеглей, набранных мимо стилей, в ките заметно больше:** 16/20 Bold (51 узел), 14/16 Regular
+(42), 15/16, 20/24 Medium, 16/20 Regular, 14/20. Кегля 14 нет ни одним стилем вообще.
+В шкалу они не взяты — значение без источника не переносим.
+См. [open-questions.md](open-questions.md), вопрос 20.
 
 #### Как стиль берётся в коде
 
 Отдельных утилит под стили не заводим — каждый достижим парой «кегль + начертание»:
 
-| Токен кита | Классы |
-|---|---|
-| `Txt/regular13-16` | `text-xs font-normal` |
-| `Txt/bold13-16` | `text-xs font-bold` |
-| `Txt/regular15-20` | `text-sm font-normal` |
-| `Txt/medium15-20` | `text-sm font-medium` |
-| `Txt/bold15-20` | `text-sm font-bold` |
-| `txt/bold16-20` | `text-base font-bold` |
-| `Txt/bold17-24` | `text-lg font-bold` |
-| `Header/bold36-40` | `text-4xl font-bold` |
+Стилей документа в ките **11** — снято через `getLocalTextStylesAsync`, а не выведено из
+компонентов. Кеглей семь, начертаний три (Medium заведён единственным стилем).
 
-Шкала Tailwind погашена целиком (`--text-*: initial`), объявлены только эти пять ступеней.
-Класс вне списка — `text-xl`, `text-2xl` и прочие — **не сгенерируется**: взять кегль из
-фреймворка вместо кита технически невозможно.
+| Токен кита | Классы | Роль |
+|---|---|---|
+| `Header/bold36-40` | `text-4xl font-bold` | H1 |
+| `Header/bold24-28` | `text-2xl font-bold` | H2 |
+| `Header/bold20-24` | `text-xl font-bold` | title |
+| `Txt/bold17-24` | `text-lg font-bold` | заголовок блока |
+| `Txt/bold15-20` | `text-sm font-bold` | наборный |
+| `Txt/medium15-20` | `text-sm font-medium` | наборный |
+| `Txt/regular15-20` | `text-sm font-normal` | наборный |
+| `Txt/bold13-16` | `text-xs font-bold` | мелкий |
+| `Txt/regular13-16` | `text-xs font-normal` | мелкий |
+| `Txt/bold12-16` | `text-2xs font-bold` | дополнительный |
+| `Txt/regular12-16` | `text-2xs font-normal` | дополнительный |
+
+Шкала Tailwind погашена целиком (`--text-*: initial`), объявлены только эти семь ступеней.
+Класс вне списка не сгенерируется — взять кегль из фреймворка вместо кита технически невозможно.
+
+> **`text-base` намеренно отсутствует.** Кегль 16/20 в ките набран на 51 узле, но **стилем
+> документа не заведён** — это сырой текст. Значение без источника в шкалу не берётся.
+> Раньше он тут стоял как `txt/bold16-20`: имя выглядело как токен, но было именем слоя.
+> См. [open-questions.md](open-questions.md), вопрос 20.
+
+У заголовочных стилей `paragraphSpacing` = 0, у наборных = 8 — различие в файле есть, на вёрстку
+пока не переносится.
 
 ### Радиусы
 

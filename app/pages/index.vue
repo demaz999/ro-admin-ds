@@ -20,14 +20,17 @@ const statusColors = ['green', 'cyan', 'violet', 'magenta', 'orange', 'red'] as 
  * достижим парой «кегль + начертание», отдельных утилит не заводим.
  */
 const kitTextStyles = [
-  { token: 'Txt/regular13-16', classes: 'text-xs font-normal' },
-  { token: 'Txt/bold13-16', classes: 'text-xs font-bold' },
-  { token: 'Txt/regular15-20', classes: 'text-sm font-normal' },
-  { token: 'Txt/medium15-20', classes: 'text-sm font-medium' },
-  { token: 'Txt/bold15-20', classes: 'text-sm font-bold' },
-  { token: 'txt/bold16-20', classes: 'text-base font-bold' },
-  { token: 'Txt/bold17-24', classes: 'text-lg font-bold' },
-  { token: 'Header/bold36-40', classes: 'text-4xl font-bold' },
+  { token: 'Header/bold36-40', classes: 'text-4xl font-bold', note: 'H1' },
+  { token: 'Header/bold24-28', classes: 'text-2xl font-bold', note: 'H2' },
+  { token: 'Header/bold20-24', classes: 'text-xl font-bold', note: 'title' },
+  { token: 'Txt/bold17-24', classes: 'text-lg font-bold', note: '' },
+  { token: 'Txt/bold15-20', classes: 'text-sm font-bold', note: '' },
+  { token: 'Txt/medium15-20', classes: 'text-sm font-medium', note: '' },
+  { token: 'Txt/regular15-20', classes: 'text-sm font-normal', note: '' },
+  { token: 'Txt/bold13-16', classes: 'text-xs font-bold', note: '' },
+  { token: 'Txt/regular13-16', classes: 'text-xs font-normal', note: '' },
+  { token: 'Txt/bold12-16', classes: 'text-2xs font-bold', note: '' },
+  { token: 'Txt/regular12-16', classes: 'text-2xs font-normal', note: '' },
 ]
 
 /** Ult — это Ultra Black, самый жирный, а не UltraLight: сказано в Changelog поставки. */
@@ -96,7 +99,7 @@ const martianWidths = [
 
       <div class="mt-6 space-y-4">
         <p class="text-sm text-muted-foreground">
-          Полный набор текстовых стилей кита — восемь штук. Каждый подписан именем токена в
+          Все одиннадцать текстовых стилей документа кита. Каждый подписан именем токена в
           Figma. Других кеглей в шкале нет: дефолты Tailwind погашены целиком, поэтому взять
           размер «из фреймворка» уже нельзя.
         </p>
@@ -107,7 +110,8 @@ const martianWidths = [
           class="flex flex-wrap items-baseline gap-x-4 border-t border-border pt-3"
         >
           <code class="w-48 shrink-0 text-xs text-muted-foreground">{{ s.token }}</code>
-          <code class="w-28 shrink-0 text-xs text-muted-foreground">{{ s.classes }}</code>
+          <code class="w-40 shrink-0 text-xs text-muted-foreground">{{ s.classes }}</code>
+          <span class="w-10 shrink-0 text-xs text-muted-foreground">{{ s.note }}</span>
           <p :class="s.classes">
             Съешь ещё этих мягких булок
           </p>
