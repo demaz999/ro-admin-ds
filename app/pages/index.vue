@@ -319,26 +319,58 @@ const martianWidths = [
       </div>
     </ShowcaseSection>
 
-    <ShowcaseSection title="Tabs">
-      <Tabs default-value="all" class="w-full">
-        <TabsList>
-          <TabsTrigger value="all">
-            Все
-          </TabsTrigger>
-          <TabsTrigger value="mine">
-            Мои
-          </TabsTrigger>
-          <TabsTrigger value="archive" disabled>
-            Архив
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent value="all" class="pt-4 text-sm text-muted-foreground">
-          Все осмотры.
-        </TabsContent>
-        <TabsContent value="mine" class="pt-4 text-sm text-muted-foreground">
-          Осмотры текущего пользователя.
-        </TabsContent>
-      </Tabs>
+    <ShowcaseSection
+      title="Tabs"
+      note="В ките два разных мастера вкладок, и они не сводятся друг к другу: tabs 2702:315 — навигация с подчёркиванием, iconed_tab_list 2181:387 — переключатель режима показа."
+    >
+      <div class="space-y-8">
+        <div>
+          <h3 class="mb-3 text-sm font-medium">variant="line" · мастер tabs 2702:315</h3>
+          <p class="mb-3 text-sm text-muted-foreground">
+            Рельс 1px neutral/soft под всем списком, активный таб — линия 2px accent/default
+            во всю ширину поверх рельса. Активный становится Bold, неактивный — fg/primary.
+            Табы равными долями, gap 4.
+          </p>
+          <Tabs default-value="all" class="w-full max-w-md">
+            <TabsList variant="line">
+              <TabsTrigger variant="line" value="all">Все</TabsTrigger>
+              <TabsTrigger variant="line" value="mine">Мои</TabsTrigger>
+              <TabsTrigger variant="line" value="archive">Архив</TabsTrigger>
+            </TabsList>
+            <TabsContent value="all" class="pt-6 text-sm text-muted-foreground">Все осмотры.</TabsContent>
+            <TabsContent value="mine" class="pt-6 text-sm text-muted-foreground">Осмотры текущего пользователя.</TabsContent>
+            <TabsContent value="archive" class="pt-6 text-sm text-muted-foreground">Архив.</TabsContent>
+          </Tabs>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">variant="pill" · мастер iconed_tab_list 2181:387</h3>
+          <p class="mb-3 text-sm text-muted-foreground">
+            Контейнер h44 r8 на accent/surface_soft с паддингом 4, табы вплотную. Активный —
+            белая плашка с Button Shadow. Начертание не меняется, неактивный текст fg/secondary.
+            В ките ровно два таба, а иконка и текст взаимоисключающи.
+          </p>
+          <div class="flex flex-wrap gap-6">
+            <Tabs default-value="list">
+              <TabsList variant="pill">
+                <TabsTrigger variant="pill" value="list">
+                  <template #icon><IconPlaceholder /></template>
+                </TabsTrigger>
+                <TabsTrigger variant="pill" value="cards">
+                  <template #icon><IconPlaceholder /></template>
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            <Tabs default-value="a">
+              <TabsList variant="pill">
+                <TabsTrigger variant="pill" value="a">Кадры</TabsTrigger>
+                <TabsTrigger variant="pill" value="b">Видео</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+        </div>
+      </div>
     </ShowcaseSection>
   </main>
 </template>
