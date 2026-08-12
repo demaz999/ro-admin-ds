@@ -261,6 +261,7 @@
     --color-field-clear-elevated: var(--field-clear-elevated);
     --color-field-clear-foreground: var(--field-clear-foreground);
     --color-field-error-foreground: var(--field-error-foreground);
+    --color-field-scroll-thumb: var(--field-scroll-thumb);
 
     /* Расширения темы как утилиты: bg-primary-hover, text-foreground-secondary… */
     --color-foreground-hover: var(--foreground-hover);
@@ -463,6 +464,7 @@
     --field-clear-elevated: var(--accent);          /* решение: bg/surface_hover — светлее белого не бывает, берём ближайшую светлую нейтраль */
     --field-clear-foreground: var(--foreground-secondary); /* решение: крестик идёт за подписью, не за значением */
     --field-error-foreground: var(--destructive);   /* решение: service/error-default — строка сообщения об ошибке */
+    --field-scroll-thumb: var(--background);        /* решение: bg/page — бегунок скролла внутри поля */
 
     /* Атом гасит выключенное поле прозрачностью всего узла, а не отдельными
        цветами. Это механизм состава, а не цвет, поэтому значение общее для тем. */
@@ -499,6 +501,7 @@
     --field-clear-elevated: #f5f6f8;                /* 1887:12349 */
     --field-clear-foreground: #80858e;              /* 249:2838 — крестик */
     --field-error-foreground: #e35454;              /* 255:2824 — строка сообщения */
+    --field-scroll-thumb: #ffffff;                  /* 344:2796 — бегунок 4px, r2, спека Textarea */
 
     --shadow-elevated: 0 4px 16px 0 #0c10181f;      /* 309:2310 — 12% */
     --shadow-elevated-hover: 0 4px 16px 0 #0c101829; /* 309:2322 — 16% */

@@ -271,6 +271,31 @@ const martianWidths = [
           См. <code>docs/design-debt.md</code>.
         </p>
 
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Textarea · мастер 282:4688
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Та же лестница состояний, что у поля ввода — спека формулирует её прямым текстом:
+            «bg django, opacity +16». Коробка 272×140, высота фиксированная: оси размера в мастере
+            нет и ручки растягивания не нарисовано. Скроллбар свой, 4px с радиусом 2.
+          </p>
+          <div class="grid gap-6 sm:grid-cols-2">
+            <ShowcaseCell label="пусто">
+              <Textarea />
+            </ShowcaseCell>
+            <ShowcaseCell label="заполнено">
+              <Textarea model-value="Input text" />
+            </ShowcaseCell>
+            <ShowcaseCell label="disabled">
+              <Textarea model-value="Input text" disabled />
+            </ShowcaseCell>
+            <ShowcaseCell label="error">
+              <Textarea invalid error-text="text about error here" />
+            </ShowcaseCell>
+          </div>
+        </div>
+
         <p class="max-w-2xl rounded-md border border-border p-3 text-sm">
           <strong>Между полями формы — минимум 24px по вертикали.</strong> Правило размётки, снятое
           со спеки: два соседних поля стоят с зазором 24, метка «min 24px» стоит ровно в этом

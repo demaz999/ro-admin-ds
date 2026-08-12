@@ -33,6 +33,14 @@ const variants = [
   { t: 'elevated · 64 · пусто · disabled', x: 320, y: 456, h: 64, variant: 'elevated', size: 'lg', disabled: true },
   { t: 'elevated · 64 · заполнено · disabled', x: 320, y: 544, h: 64, variant: 'elevated', size: 'lg', value: VALUE, disabled: true },
 ] as const
+
+/** Textarea, мастер 282:4688 — 304×640, четыре варианта столбиком. */
+const textareaVariants = [
+  { t: 'Textarea · пусто', x: 16, y: 16 },
+  { t: 'Textarea · заполнено', x: 16, y: 172, value: VALUE },
+  { t: 'Textarea · пусто · disabled', x: 16, y: 328, disabled: true },
+  { t: 'Textarea · заполнено · disabled', x: 16, y: 484, value: VALUE, disabled: true },
+] as const
 </script>
 
 <template>
@@ -150,6 +158,32 @@ const variants = [
         note="ошибка — не рамка, а подмена заливки на красноватую. Рамки нет и здесь"
       >
         <Input invalid />
+      </CompareFrame>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="text-lg font-bold">
+        Textarea · 282:4688 · все 4 варианта
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Оси мастера — State и Disabled, состояний в нём нет. Спека <code>282:4784</code> задаёт ту
+        же лестницу, что у поля ввода, и формулирует её прямым текстом:
+        <strong>«bg django, opacity +16»</strong> — та же заливка плюс шестнадцать пунктов.
+        Паддинги асимметричные: по бокам и снизу 16, сверху 10 в пустом и 8 в заполненном.
+      </p>
+
+      <CompareFrame
+        v-for="t in textareaVariants"
+        :key="t.t"
+        :title="t.t"
+        node="282:4688"
+        master="atom/textarea_282-4688.png"
+        :x="t.x"
+        :y="t.y"
+        :width="272"
+        :height="140"
+      >
+        <Textarea :model-value="t.value ?? ''" :disabled="t.disabled ?? false" />
       </CompareFrame>
     </section>
 
