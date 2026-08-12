@@ -82,7 +82,7 @@ const martianWidths = [
         <p class="text-4xl font-bold">
           Заголовок страницы — Мои осмотры
         </p>
-        <p class="text-xl font-medium">
+        <p class="text-lg font-bold">
           Заголовок раздела — Фильтры
         </p>
         <p class="text-base">
