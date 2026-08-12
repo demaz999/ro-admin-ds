@@ -4,7 +4,7 @@ import { ref } from 'vue'
 const props = defineProps<{
   /** Подпись сравнения. */
   title: string
-  /** Файл эталона в public/compare/kit. */
+  /** Путь к эталону внутри public/compare — например `atom/input_249-2768.png`. */
   master: string
   /** Ширина и высота вырезаемой области эталона, px — размер варианта в мастере. */
   width: number
@@ -33,7 +33,7 @@ function masterStyle() {
   return {
     width: `${props.width}px`,
     height: `${props.height}px`,
-    backgroundImage: `url(/compare/kit/${props.master})`,
+    backgroundImage: `url(/compare/${props.master})`,
     backgroundPosition: `-${props.x ?? 0}px -${props.y ?? 0}px`,
     backgroundRepeat: 'no-repeat',
   }
