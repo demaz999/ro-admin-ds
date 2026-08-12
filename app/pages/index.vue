@@ -296,6 +296,39 @@ const martianWidths = [
           </div>
         </div>
 
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Select · триггер · мастер 434:3074
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            У Атома селект — то же поле ввода плюс шеврон, вплоть до паддингов. Ось
+            <code>Active</code> меняет только направление шеврона: заливка при нажатии
+            остаётся заливкой покоя, в отличие от <code>Input</code>.
+            Выпадающая часть — отдельный мастер <code>571:4889</code>, ещё не перенесён,
+            поэтому открытость здесь приходит пропом.
+          </p>
+          <div class="grid gap-6 sm:grid-cols-2">
+            <ShowcaseCell label="закрыт · пусто">
+              <Select />
+            </ShowcaseCell>
+            <ShowcaseCell label="закрыт · выбрано">
+              <Select model-value="Option" />
+            </ShowcaseCell>
+            <ShowcaseCell label="открыт">
+              <Select open />
+            </ShowcaseCell>
+            <ShowcaseCell label="disabled">
+              <Select model-value="Option" disabled />
+            </ShowcaseCell>
+            <ShowcaseCell label="elevated">
+              <Select variant="elevated" />
+            </ShowcaseCell>
+            <ShowcaseCell label="elevated · выбрано">
+              <Select variant="elevated" model-value="Option" />
+            </ShowcaseCell>
+          </div>
+        </div>
+
         <p class="max-w-2xl rounded-md border border-border p-3 text-sm">
           <strong>Между полями формы — минимум 24px по вертикали.</strong> Правило размётки, снятое
           со спеки: два соседних поля стоят с зазором 24, метка «min 24px» стоит ровно в этом

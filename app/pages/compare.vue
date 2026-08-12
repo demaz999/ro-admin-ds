@@ -34,6 +34,30 @@ const variants = [
   { t: 'elevated · 64 · заполнено · disabled', x: 320, y: 544, h: 64, variant: 'elevated', size: 'lg', value: VALUE, disabled: true },
 ] as const
 
+/**
+ * Select, мастер 434:3074 — 616×536. Левая колонка включённые, правая
+ * выключенные; внутри колонки по вертикали: default/filled × закрыт/открыт,
+ * сначала обычный тип, потом поверх карты.
+ */
+const selectVariants = [
+  { t: 'filled · закрыт · пусто', x: 16, y: 24, variant: 'filled' },
+  { t: 'filled · закрыт · выбрано', x: 16, y: 88, variant: 'filled', value: VALUE },
+  { t: 'filled · открыт · пусто', x: 16, y: 152, variant: 'filled', open: true },
+  { t: 'filled · открыт · выбрано', x: 16, y: 216, variant: 'filled', open: true, value: VALUE },
+  { t: 'elevated · закрыт · пусто', x: 16, y: 280, variant: 'elevated' },
+  { t: 'elevated · закрыт · выбрано', x: 16, y: 344, variant: 'elevated', value: VALUE },
+  { t: 'elevated · открыт · пусто', x: 16, y: 408, variant: 'elevated', open: true },
+  { t: 'elevated · открыт · выбрано', x: 16, y: 472, variant: 'elevated', open: true, value: VALUE },
+  { t: 'filled · закрыт · пусто · disabled', x: 312, y: 24, variant: 'filled', disabled: true },
+  { t: 'filled · закрыт · выбрано · disabled', x: 312, y: 88, variant: 'filled', value: VALUE, disabled: true },
+  { t: 'filled · открыт · пусто · disabled', x: 312, y: 152, variant: 'filled', open: true, disabled: true },
+  { t: 'filled · открыт · выбрано · disabled', x: 312, y: 216, variant: 'filled', open: true, value: VALUE, disabled: true },
+  { t: 'elevated · закрыт · пусто · disabled', x: 312, y: 280, variant: 'elevated', disabled: true },
+  { t: 'elevated · закрыт · выбрано · disabled', x: 312, y: 344, variant: 'elevated', value: VALUE, disabled: true },
+  { t: 'elevated · открыт · пусто · disabled', x: 312, y: 408, variant: 'elevated', open: true, disabled: true },
+  { t: 'elevated · открыт · выбрано · disabled', x: 312, y: 472, variant: 'elevated', open: true, value: VALUE, disabled: true },
+] as const
+
 /** Textarea, мастер 282:4688 — 304×640, четыре варианта столбиком. */
 const textareaVariants = [
   { t: 'Textarea · пусто', x: 16, y: 16 },
@@ -158,6 +182,40 @@ const textareaVariants = [
         note="ошибка — не рамка, а подмена заливки на красноватую. Рамки нет и здесь"
       >
         <Input invalid />
+      </CompareFrame>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="text-lg font-bold">
+        Select · 434:3074 · все 16 вариантов
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Триггер — это поле ввода плюс шеврон: коробка 272×40, паддинги 10/16, зазор 8, радиус 8,
+        рамки нет. Заливка и цветовая лестница те же, что у <code>Input</code>, поэтому он сидит
+        на тех же ролях. Ось <code>Active</code> меняет ровно одно — направление шеврона.
+      </p>
+      <p class="max-w-3xl rounded-md border border-border p-3 text-sm">
+        <strong>Зазор 8 во всех шестнадцати</strong> — в отличие от <code>Input</code>, где
+        заполненное состояние раздвигает контейнер до 12. Оси под это в мастере нет.
+      </p>
+
+      <CompareFrame
+        v-for="s in selectVariants"
+        :key="s.t"
+        :title="s.t"
+        node="434:3074"
+        master="atom/select_434-3074.png"
+        :x="s.x"
+        :y="s.y"
+        :width="272"
+        :height="40"
+      >
+        <Select
+          :variant="s.variant"
+          :open="s.open ?? false"
+          :model-value="s.value ?? ''"
+          :disabled="s.disabled ?? false"
+        />
       </CompareFrame>
     </section>
 
