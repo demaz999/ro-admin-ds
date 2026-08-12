@@ -18,7 +18,8 @@ const inputVariants = [
 const masters = [
   { src: 'btn-accent_709-6413.png', cap: 'btn_accent · 709:6413 · 10 вариантов' },
   { src: 'input_720-11753.png', cap: 'input · 720:11753 · 20 вариантов' },
-  { src: 'select_1929-4067.png', cap: 'select · 1929:4067 · 4 типа' },
+  { src: 'select-master_244-13976.png', cap: 'select · 244:13976 · выбранный мастер, 18 вариантов' },
+  { src: 'select_1929-4067.png', cap: 'select · 1929:4067 · второй кандидат, не переносится' },
   { src: 'select-dropdown_1059-6225.png', cap: 'выпадающая часть · 1059:6225' },
   { src: 'tabs_720-9159.png', cap: 'tabs · 720:9159 · два вида вкладок' },
   { src: 'iconed-tab-list_2181-387.png', cap: 'iconed_tab_list · 2181:387 · вкладки-таблетка' },
@@ -28,6 +29,13 @@ const masters = [
     cap: 'большая кнопка · 1314:2350 · сайтовый слой, файл byDGy0Ab4QciP0CHTMLxYv, шрифт Martian Grotesk',
   },
 ]
+
+const selectVariants = [
+  { title: 'select · label=top, Default', x: 515, y: 5, w: 304, h: 100, note: 'плейсхолдер' },
+  { title: 'select · label=top, hovered', x: 515, y: 144, w: 304, h: 100, note: 'наведение: добавляется рамка' },
+  { title: 'select · label=top, field', x: 515, y: 296, w: 304, h: 100, value: 'Input Text', note: 'есть значение' },
+  { title: 'select · label=top, disabled', x: 509, y: 1326, w: 304, h: 100, disabled: true, note: 'фон и текст гаснут' },
+] as const
 
 const badgeVariants = [
   { title: 'badge · violet', x: 16, y: 16, w: 97, h: 24, color: 'violet' as const },
@@ -95,6 +103,52 @@ const badgeVariants = [
             <IconPlaceholder />
           </template>
         </Input>
+      </CompareFrame>
+    </section>
+
+    <section class="space-y-3">
+      <h2 class="text-lg font-bold">
+        Автопроверка шрифтов
+      </h2>
+      <p class="text-sm text-muted-foreground">
+        Наложение не ловит один класс дефектов: если компонент не зарегистрировался и отрисовался
+        нераспознанным тегом, на эталоне просто ничего не появится, а глаз спишет это на
+        прозрачность. Так подпись селекта уехала в системный monospace. Эта проверка идёт по
+        computed-стилям, а не по картинке.
+      </p>
+      <CompareFontAudit />
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="text-lg font-bold">
+        Select
+      </h2>
+      <p class="text-sm text-muted-foreground">
+        Мастер 244:13976. Цвет в коде взят из mode по решению B, поэтому фон и рамка в режиме
+        разницы светятся намеренно — это не ошибка переноса. Геометрия и типографика светиться
+        не должны.
+      </p>
+
+      <CompareFrame
+        v-for="v in selectVariants"
+        :key="v.title"
+        :title="v.title"
+        node="244:13976"
+        master="select-master_244-13976.png"
+        :x="v.x"
+        :y="v.y"
+        :width="v.w"
+        :height="v.h"
+        :note="v.note"
+      >
+        <SelectField label="Заголовок" hint="Подсказка" counter="10/25" :disabled="v.disabled">
+          <Select :disabled="v.disabled" :default-value="v.value ? 'x' : undefined">
+            <SelectTrigger>
+              <SelectValue placeholder="Placeholder" />
+            </SelectTrigger>
+            <SelectContent><SelectItem value="x">Input Text</SelectItem></SelectContent>
+          </Select>
+        </SelectField>
       </CompareFrame>
     </section>
 

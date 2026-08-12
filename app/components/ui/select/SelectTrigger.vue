@@ -22,18 +22,25 @@ const forwardedProps = useForwardProps(delegatedProps)
     :data-size="size"
     v-bind="forwardedProps"
     :class="cn(
-      'flex h-10 w-full items-center gap-2 rounded-md border bg-background px-4 text-sm text-foreground outline-none transition-colors select-none',
-              'border-input data-[state=open]:border-stroke-accent hover:border-stroke-accent',
-              'data-placeholder:text-foreground-secondary',
-              'disabled:cursor-not-allowed disabled:border-stroke-neutral disabled:text-foreground-disabled',
-              '[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*=size-])]:size-6',
-              'text-foreground-secondary disabled:[&_svg]:text-foreground-secondary-disabled',
+      'flex h-10 w-full items-center gap-2 rounded-md border bg-background px-4 text-sm font-bold text-foreground outline-none transition-colors select-none',
+      'border-input hover:border-stroke-accent data-[state=open]:border-stroke-accent',
+      'data-placeholder:text-foreground-secondary',
+      'disabled:cursor-not-allowed disabled:border-stroke-neutral disabled:text-foreground-disabled',
+      '[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg]:text-foreground-secondary',
+      'disabled:[&_svg]:text-foreground-secondary-disabled',
       props.class,
     )"
   >
-    <slot />
+    <span v-if="$slots.left" class="flex size-6 shrink-0 items-center justify-center">
+      <slot name="left" />
+    </span>
+
+    <span class="flex min-w-0 flex-1 items-center">
+      <slot />
+    </span>
+
     <SelectIcon as-child>
-      <ChevronDownIcon class="text-muted-foreground size-4 pointer-events-none" />
+      <ChevronDownIcon class="size-6 shrink-0 pointer-events-none" />
     </SelectIcon>
   </SelectTrigger>
 </template>
