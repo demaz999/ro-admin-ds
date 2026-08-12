@@ -14,6 +14,21 @@ const buttonVariants = ['default', 'secondary', 'outline', 'ghost', 'link', 'des
 const badgeColors = ['violet', 'red', 'orange'] as const
 const statusColors = ['green', 'cyan', 'violet', 'magenta', 'orange', 'red'] as const
 
+/**
+ * Восемь текстовых стилей кита. Имена слева — как в Figma; каждый стиль
+ * достижим парой «кегль + начертание», отдельных утилит не заводим.
+ */
+const kitTextStyles = [
+  { token: 'Txt/regular13-16', classes: 'text-xs font-normal' },
+  { token: 'Txt/bold13-16', classes: 'text-xs font-bold' },
+  { token: 'Txt/regular15-20', classes: 'text-sm font-normal' },
+  { token: 'Txt/medium15-20', classes: 'text-sm font-medium' },
+  { token: 'Txt/bold15-20', classes: 'text-sm font-bold' },
+  { token: 'txt/bold16-20', classes: 'text-base font-bold' },
+  { token: 'Txt/bold17-24', classes: 'text-lg font-bold' },
+  { token: 'Header/bold36-40', classes: 'text-4xl font-bold' },
+]
+
 /** Ult — это Ultra Black, самый жирный, а не UltraLight: сказано в Changelog поставки. */
 const martianWeights = [
   { value: 100, name: 'Thin' },
@@ -78,22 +93,24 @@ const martianWidths = [
     >
       <ShowcaseTokens kind="font" />
 
-      <div class="mt-6 space-y-3">
-        <p class="text-4xl font-bold">
-          Заголовок страницы — Мои осмотры
-        </p>
-        <p class="text-lg font-bold">
-          Заголовок раздела — Фильтры
-        </p>
-        <p class="text-base">
-          Основной текст. Проверка кириллицы: съешь ещё этих мягких французских булок.
-        </p>
+      <div class="mt-6 space-y-4">
         <p class="text-sm text-muted-foreground">
-          Вспомогательный текст и подписи полей.
+          Полный набор текстовых стилей кита — восемь штук. Каждый подписан именем токена в
+          Figma. Других кеглей в шкале нет: дефолты Tailwind погашены целиком, поэтому взять
+          размер «из фреймворка» уже нельзя.
         </p>
-        <p class="font-mono text-sm">
-          Моноширинный: ID 4815162342
-        </p>
+
+        <div
+          v-for="s in kitTextStyles"
+          :key="s.token"
+          class="flex flex-wrap items-baseline gap-x-4 border-t border-border pt-3"
+        >
+          <code class="w-48 shrink-0 text-xs text-muted-foreground">{{ s.token }}</code>
+          <code class="w-28 shrink-0 text-xs text-muted-foreground">{{ s.classes }}</code>
+          <p :class="s.classes">
+            Съешь ещё этих мягких булок
+          </p>
+        </div>
       </div>
     </ShowcaseSection>
 

@@ -71,8 +71,11 @@
     --text-xs--line-height: 16px;
     --text-sm: 15px;
     --text-sm--line-height: 20px;
+    /* 16/20 — токен кита txt/bold16-20. Не 16/24: такой кегль в ките встречается
+       (счётчик пагинации), но текстового токена под него нет, поэтому в шкалу
+       он не попадает. См. docs/tokens.md, раздел 10. */
     --text-base: 16px;
-    --text-base--line-height: 24px;
+    --text-base--line-height: 20px;
     --text-lg: 17px;
     --text-lg--line-height: 24px;
     --text-4xl: 36px;

@@ -463,6 +463,27 @@ font-stretch property specifications».
 | `txt/bold16-20` | Bold 700 | 16 / 20 | объявлен, фактического употребления не найдено |
 
 Не покрыто токеном: счётчик пагинации — Regular 400, 16 / 24, с `font-feature-settings: lnum, tnum`.
+В шкалу он не входит: кегль есть, текстового токена под него нет. `--text-base` держит **16 / 20**
+по токену `txt/bold16-20`, а не 16 / 24.
+
+#### Как стиль берётся в коде
+
+Отдельных утилит под стили не заводим — каждый достижим парой «кегль + начертание»:
+
+| Токен кита | Классы |
+|---|---|
+| `Txt/regular13-16` | `text-xs font-normal` |
+| `Txt/bold13-16` | `text-xs font-bold` |
+| `Txt/regular15-20` | `text-sm font-normal` |
+| `Txt/medium15-20` | `text-sm font-medium` |
+| `Txt/bold15-20` | `text-sm font-bold` |
+| `txt/bold16-20` | `text-base font-bold` |
+| `Txt/bold17-24` | `text-lg font-bold` |
+| `Header/bold36-40` | `text-4xl font-bold` |
+
+Шкала Tailwind погашена целиком (`--text-*: initial`), объявлены только эти пять ступеней.
+Класс вне списка — `text-xl`, `text-2xl` и прочие — **не сгенерируется**: взять кегль из
+фреймворка вместо кита технически невозможно.
 
 ### Радиусы
 
