@@ -22,7 +22,7 @@ export const statusBadgeVariants = cva(
 )
 
 export const statusDotVariants = cva(
-  'size-2 shrink-0 rounded-sm',
+  'size-2 shrink-0 rounded-xs',
   {
     variants: {
       color: {
