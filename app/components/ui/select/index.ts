@@ -2,6 +2,9 @@ import type { VariantProps } from 'class-variance-authority'
 import { cva } from 'class-variance-authority'
 
 export { default as Select } from './Select.vue'
+export { default as SelectContent } from './SelectContent.vue'
+export { default as SelectGroup } from './SelectGroup.vue'
+export { default as SelectItem } from './SelectItem.vue'
 
 /**
  * Триггер селекта. Источник двухчастный:

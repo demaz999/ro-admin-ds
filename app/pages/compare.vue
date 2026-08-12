@@ -221,6 +221,52 @@ const textareaVariants = [
 
     <section class="space-y-2">
       <h2 class="text-lg font-bold">
+        Выпадающая плашка · PopOverList 571:4889
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Ширина 320, радиус 12, фон белый, тень 0/8/32 при 12% — совпадает с нашим
+        <code>--shadow-dropdown</code> до значения, рамки нет. Паддинг асимметричный,
+        <code>4 / 0 / 4 / 4</code>: справа ноль, там проходит скроллбар шириной 4.
+        Поиск внутри — настоящий инстанс <code>Input</code> шириной 312, включён по умолчанию;
+        слот под ним в мастере скрыт.
+      </p>
+      <p class="max-w-3xl rounded-md border border-border p-3 text-sm">
+        <strong>Наложение проверяет геометрию, а не подписи строк.</strong> Текст в эталоне свой;
+        сверяются коробка плашки, паддинги, высота и радиус строк, зазоры между группами.
+        Эталон экспортирован с выносом тени, поэтому вырезка идёт со смещением 32.
+      </p>
+
+      <CompareFrame
+        title="PopOverList · default · 663:5432"
+        node="571:4889"
+        master="atom/popoverlist_663-5432.png"
+        :x="32"
+        :y="32"
+        :width="320"
+        :height="304"
+      >
+        <SelectContent>
+          <template #search>
+            <Input placeholder="Search" :style="{ width: '312px' }" />
+          </template>
+          <SelectGroup>
+            <SelectItem>Option</SelectItem>
+            <SelectItem>Option</SelectItem>
+            <SelectItem selected>
+              Option
+            </SelectItem>
+            <SelectItem>Option</SelectItem>
+            <SelectItem>Option</SelectItem>
+            <SelectItem disabled>
+              Option
+            </SelectItem>
+          </SelectGroup>
+        </SelectContent>
+      </CompareFrame>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="text-lg font-bold">
         Textarea · 282:4688 · все 4 варианта
       </h2>
       <p class="max-w-3xl text-sm text-muted-foreground">

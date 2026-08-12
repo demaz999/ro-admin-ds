@@ -71,9 +71,14 @@ const isFloating = computed(() => focused.value || model.value.length > 0)
   скроллбар браузера шире и рисуется иначе, поэтому переносится свой.
   Значения — токенами: ширина из лесенки, цвет ролью поля.
 */
-.field-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: var(--field-scroll-thumb) transparent;
+/* Ширину задаёт webkit-правило: стандартное `scrollbar-width: thin` перебивает
+   его и даёт около 10px вместо мастерских 4. Поэтому оно объявляется только
+   там, где webkit-псевдоэлемента нет, — то есть в Firefox. */
+@supports not selector(::-webkit-scrollbar) {
+  .field-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: var(--field-scroll-thumb) transparent;
+  }
 }
 
 .field-scroll::-webkit-scrollbar {

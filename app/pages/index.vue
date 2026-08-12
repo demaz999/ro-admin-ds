@@ -329,6 +329,41 @@ const martianWidths = [
           </div>
         </div>
 
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Выпадающая плашка · PopOverList 571:4889
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            320×304, радиус 12, тень 0/8/32, рамки нет. Паддинг <code>4 / 0 / 4 / 4</code> —
+            справа ноль, там скроллбар шириной 4. Поиск внутри плашки у Атома встроенный и
+            включён по умолчанию, а не пустой слот. Строка: 44 в одну строку, 52 с подписью,
+            заливки в покое нет — она появляется под курсором.
+          </p>
+          <SelectContent>
+            <template #search>
+              <Input placeholder="Search" :style="{ width: '312px' }" />
+            </template>
+            <SelectGroup header="Группа">
+              <SelectItem show-icon>
+                Первый
+              </SelectItem>
+              <SelectItem subtitle="Подпись строки">
+                Второй
+              </SelectItem>
+              <SelectItem selected>
+                Выбранный
+              </SelectItem>
+              <SelectItem disabled>
+                Недоступный
+              </SelectItem>
+            </SelectGroup>
+            <SelectGroup header="Вторая группа">
+              <SelectItem>Ещё один</SelectItem>
+              <SelectItem>И ещё</SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </div>
+
         <p class="max-w-2xl rounded-md border border-border p-3 text-sm">
           <strong>Между полями формы — минимум 24px по вертикали.</strong> Правило размётки, снятое
           со спеки: два соседних поля стоят с зазором 24, метка «min 24px» стоит ровно в этом

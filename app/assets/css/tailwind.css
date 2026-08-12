@@ -263,6 +263,13 @@
     --color-field-error-foreground: var(--field-error-foreground);
     --color-field-scroll-thumb: var(--field-scroll-thumb);
 
+    /* --- строка выпадающего списка ---
+       У Атома строка не имеет заливки в покое: она появляется под наведением и
+       остаётся у выбранной, отличаясь только плотностью — 8% против 12%. */
+    --color-list-hover: var(--list-hover);
+    --color-list-selected: var(--list-selected);
+    --color-popover-scroll-thumb: var(--popover-scroll-thumb);
+
     /* Расширения темы как утилиты: bg-primary-hover, text-foreground-secondary… */
     --color-foreground-hover: var(--foreground-hover);
     --color-foreground-disabled: var(--foreground-disabled);
@@ -465,10 +472,17 @@
     --field-clear-foreground: var(--foreground-secondary); /* решение: крестик идёт за подписью, не за значением */
     --field-error-foreground: var(--destructive);   /* решение: service/error-default — строка сообщения об ошибке */
     --field-scroll-thumb: var(--background);        /* решение: bg/page — бегунок скролла внутри поля */
+    --list-hover: var(--accent);                    /* решение: bg/surface_hover — роль совпадает буквально */
+    --list-selected: var(--surface-selected);       /* решение: bg/surface_selected — то же */
+    --popover-scroll-thumb: var(--border-neutral);  /* решение: border/neutral_soft — серый бегунок на белой плашке */
 
     /* Атом гасит выключенное поле прозрачностью всего узла, а не отдельными
        цветами. Это механизм состава, а не цвет, поэтому значение общее для тем. */
     --opacity-disabled: 0.48;                       /* мастер 282:3643 */
+
+    /* Иконка строки списка в покое приглушена прозрачностью, а не цветом:
+       спека ListItem 457:4033 подписывает её «icon 0.72», под наведением «icon 1». */
+    --opacity-icon-muted: 0.72;
 }
 
 /* ---------------------------------------------------------------------------
@@ -502,6 +516,11 @@
     --field-clear-foreground: #80858e;              /* 249:2838 — крестик */
     --field-error-foreground: #e35454;              /* 255:2824 — строка сообщения */
     --field-scroll-thumb: #ffffff;                  /* 344:2796 — бегунок 4px, r2, спека Textarea */
+
+    /* Строка списка: спека ListItem 457:4033. Заливки в покое нет. */
+    --list-hover: #aaaeb614;                        /* 3961:34908 — 8% */
+    --list-selected: #aaaeb61f;                     /* 3961:34957 — 12% */
+    --popover-scroll-thumb: #d4d5d9;                /* ScrollBar 1159:10439, малый размер */
 
     --shadow-elevated: 0 4px 16px 0 #0c10181f;      /* 309:2310 — 12% */
     --shadow-elevated-hover: 0 4px 16px 0 #0c101829; /* 309:2322 — 16% */
