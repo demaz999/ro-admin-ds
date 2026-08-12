@@ -12,8 +12,8 @@
 | `btn_outline` | `1990:226` | SET | state ×4 |
 | `btn_txt` | `715:3605` | SET | state × size (l_20/s_16) × color (accent/warning/red) × type (bold/regular) × icon — 27 |
 | `input` | `720:11753` | SET | label (left/top) × state (Default/pressed/field/error/disabled) × size (40/44) — 20 |
-| `select` **актуальный** | `1929:4067` | SET | type: default/field/pressed/loading — 4 · обновлён 2026-06-24 |
-| `select` старый | `244:13976` | SET | label × state — 18 · обновлён 2026-01-23 |
+| `select` **выбран Михаилом** | `244:13976` | SET | label (3) × state (6) — 18 · свои узлы `select_container`/`select_body`, высота 40, коллекция `select/color/*` · обновлён 2026-01-23 |
+| `select` второй кандидат | `1929:4067` | SET | type ×4 · триггер — инстанс `input`, высота 44, коллекция `mode` · обновлён 2026-06-24 |
 | `multiselect` | `251:16816` | SET | 18 · обновлён 2026-01-23 |
 | `badge` → в коде **`Badge`** | `1173:196` | SET | color: violet/red/orange — 3 · высота **24**, иконка, декоративная статусная метка |
 | `badge` → в коде **`Chip`** | `747:2464` | COMPONENT | высота **32**, внутри счётчик `bulb` и крестик `20_ic_close` · интерактивный |
@@ -21,6 +21,22 @@
 | `iconed_tab_list` | `2181:387` | SET | selected × type — 4 |
 | `left_menu` | `643:3054` | SET | type: Default/iconed/with shadow |
 | `menu_item` | `637:2521` | SET | state (default/activ/hover/selected/disabled) × size — 10 |
+
+### Выпадашки: два параллельных семейства
+
+Не взаимозаменяемы, визуал расходится. Какое брать — следует из того, какой выбран `select`.
+
+| Семейство | Список | Строка | Высота строки | Кого открывает |
+|---|---|---|---|---|
+| старое | `dropdown_list3` `240:8201` | `items3` `238:7389` | **36** | `select` `244:13976` |
+| новое | `dropdown_list` `1058:2018` | `items` `1058:1919` | **52** | `select` `1929:4067` |
+
+Расхождения: в `items` у `selected` фон не меняется, в `items3` — `bg/surface_selected`;
+`group title` 13/16 `fg/secondary` против 12/16 `fg/primary_disabled`; галочка `20_ic_check`
+против `16ic_done` слева при `multiselect=on`.
+
+Общие части: `Scroll` `815:30416`, `loader` `867:4436`, `Tooltip` `90:3983` (14 вариантов),
+`horizontal_slot` `325:2519` — во всём ките слоты пустые, содержимого нет ни в одном примере.
 
 ## Сайтовый слой — другой файл
 
