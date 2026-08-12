@@ -1,0 +1,575 @@
+/* Сгенерировано scripts/generate-martian-css.mjs — руками не править.
+
+   Martian Grotesk — ДОПОЛНИТЕЛЬНАЯ гарнитура. Шрифт кита 1 — PT Root UI,
+   и компоненты кита используют только его. Martian Grotesk берётся точечно и
+   только по явному указанию: см. docs/tokens.md, раздел 10.
+
+   63 начертаний: 9 весов × 7 ширин. Одно семейство с дескрипторами
+   font-weight и font-stretch — браузер грузит только применённое начертание. */
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-CnTh.woff2') format('woff2');
+    font-weight: 100;
+    font-stretch: 75%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-CnxLt.woff2') format('woff2');
+    font-weight: 200;
+    font-stretch: 75%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-CnLt.woff2') format('woff2');
+    font-weight: 300;
+    font-stretch: 75%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-CnRg.woff2') format('woff2');
+    font-weight: 400;
+    font-stretch: 75%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-CnMd.woff2') format('woff2');
+    font-weight: 500;
+    font-stretch: 75%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-CnBd.woff2') format('woff2');
+    font-weight: 700;
+    font-stretch: 75%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-CnxBd.woff2') format('woff2');
+    font-weight: 800;
+    font-stretch: 75%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-CnBl.woff2') format('woff2');
+    font-weight: 900;
+    font-stretch: 75%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-CnUlt.woff2') format('woff2');
+    font-weight: 1000;
+    font-stretch: 75%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-NrTh.woff2') format('woff2');
+    font-weight: 100;
+    font-stretch: 87.5%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-NrxLt.woff2') format('woff2');
+    font-weight: 200;
+    font-stretch: 87.5%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-NrLt.woff2') format('woff2');
+    font-weight: 300;
+    font-stretch: 87.5%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-NrRg.woff2') format('woff2');
+    font-weight: 400;
+    font-stretch: 87.5%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-NrMd.woff2') format('woff2');
+    font-weight: 500;
+    font-stretch: 87.5%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-NrBd.woff2') format('woff2');
+    font-weight: 700;
+    font-stretch: 87.5%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-NrxBd.woff2') format('woff2');
+    font-weight: 800;
+    font-stretch: 87.5%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-NrBl.woff2') format('woff2');
+    font-weight: 900;
+    font-stretch: 87.5%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-NrUlt.woff2') format('woff2');
+    font-weight: 1000;
+    font-stretch: 87.5%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-StdTh.woff2') format('woff2');
+    font-weight: 100;
+    font-stretch: 100%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-StdxLt.woff2') format('woff2');
+    font-weight: 200;
+    font-stretch: 100%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-StdLt.woff2') format('woff2');
+    font-weight: 300;
+    font-stretch: 100%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-StdRg.woff2') format('woff2');
+    font-weight: 400;
+    font-stretch: 100%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-StdMd.woff2') format('woff2');
+    font-weight: 500;
+    font-stretch: 100%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-StdBd.woff2') format('woff2');
+    font-weight: 700;
+    font-stretch: 100%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-StdxBd.woff2') format('woff2');
+    font-weight: 800;
+    font-stretch: 100%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-StdBl.woff2') format('woff2');
+    font-weight: 900;
+    font-stretch: 100%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-StdUlt.woff2') format('woff2');
+    font-weight: 1000;
+    font-stretch: 100%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-sWdTh.woff2') format('woff2');
+    font-weight: 100;
+    font-stretch: 112.5%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-sWdxLt.woff2') format('woff2');
+    font-weight: 200;
+    font-stretch: 112.5%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-sWdLt.woff2') format('woff2');
+    font-weight: 300;
+    font-stretch: 112.5%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-sWdRg.woff2') format('woff2');
+    font-weight: 400;
+    font-stretch: 112.5%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-sWdMd.woff2') format('woff2');
+    font-weight: 500;
+    font-stretch: 112.5%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-sWdBd.woff2') format('woff2');
+    font-weight: 700;
+    font-stretch: 112.5%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-sWdxBd.woff2') format('woff2');
+    font-weight: 800;
+    font-stretch: 112.5%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-sWdBl.woff2') format('woff2');
+    font-weight: 900;
+    font-stretch: 112.5%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-sWdUlt.woff2') format('woff2');
+    font-weight: 1000;
+    font-stretch: 112.5%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-WdTh.woff2') format('woff2');
+    font-weight: 100;
+    font-stretch: 125%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-WdxLt.woff2') format('woff2');
+    font-weight: 200;
+    font-stretch: 125%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-WdLt.woff2') format('woff2');
+    font-weight: 300;
+    font-stretch: 125%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-WdRg.woff2') format('woff2');
+    font-weight: 400;
+    font-stretch: 125%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-WdMd.woff2') format('woff2');
+    font-weight: 500;
+    font-stretch: 125%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-WdBd.woff2') format('woff2');
+    font-weight: 700;
+    font-stretch: 125%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-WdxBd.woff2') format('woff2');
+    font-weight: 800;
+    font-stretch: 125%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-WdBl.woff2') format('woff2');
+    font-weight: 900;
+    font-stretch: 125%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-WdUlt.woff2') format('woff2');
+    font-weight: 1000;
+    font-stretch: 125%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-xWdTh.woff2') format('woff2');
+    font-weight: 100;
+    font-stretch: 150%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-xWdxLt.woff2') format('woff2');
+    font-weight: 200;
+    font-stretch: 150%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-xWdLt.woff2') format('woff2');
+    font-weight: 300;
+    font-stretch: 150%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-xWdRg.woff2') format('woff2');
+    font-weight: 400;
+    font-stretch: 150%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-xWdMd.woff2') format('woff2');
+    font-weight: 500;
+    font-stretch: 150%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-xWdBd.woff2') format('woff2');
+    font-weight: 700;
+    font-stretch: 150%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-xWdxBd.woff2') format('woff2');
+    font-weight: 800;
+    font-stretch: 150%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-xWdBl.woff2') format('woff2');
+    font-weight: 900;
+    font-stretch: 150%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-xWdUlt.woff2') format('woff2');
+    font-weight: 1000;
+    font-stretch: 150%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-uWdTh.woff2') format('woff2');
+    font-weight: 100;
+    font-stretch: 200%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-uWdxLt.woff2') format('woff2');
+    font-weight: 200;
+    font-stretch: 200%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-uWdLt.woff2') format('woff2');
+    font-weight: 300;
+    font-stretch: 200%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-uWdRg.woff2') format('woff2');
+    font-weight: 400;
+    font-stretch: 200%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-uWdMd.woff2') format('woff2');
+    font-weight: 500;
+    font-stretch: 200%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-uWdBd.woff2') format('woff2');
+    font-weight: 700;
+    font-stretch: 200%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-uWdxBd.woff2') format('woff2');
+    font-weight: 800;
+    font-stretch: 200%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-uWdBl.woff2') format('woff2');
+    font-weight: 900;
+    font-stretch: 200%;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Martian Grotesk';
+    src: url('/fonts/martian-grotesk/MartianGrotesk-uWdUlt.woff2') format('woff2');
+    font-weight: 1000;
+    font-stretch: 200%;
+    font-style: normal;
+    font-display: swap;
+}

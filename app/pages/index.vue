@@ -13,6 +13,29 @@ onMounted(() => {
 const buttonVariants = ['default', 'secondary', 'outline', 'ghost', 'link', 'destructive'] as const
 const badgeColors = ['violet', 'red', 'orange'] as const
 const statusColors = ['green', 'cyan', 'violet', 'magenta', 'orange', 'red'] as const
+
+/** Ult — это Ultra Black, самый жирный, а не UltraLight: сказано в Changelog поставки. */
+const martianWeights = [
+  { value: 100, name: 'Thin' },
+  { value: 200, name: 'ExtraLight' },
+  { value: 300, name: 'Light' },
+  { value: 400, name: 'Regular' },
+  { value: 500, name: 'Medium' },
+  { value: 700, name: 'Bold' },
+  { value: 800, name: 'ExtraBold' },
+  { value: 900, name: 'Black' },
+  { value: 1000, name: 'Ultra Black' },
+]
+
+const martianWidths = [
+  { value: 75, name: 'Condensed' },
+  { value: 87.5, name: 'Narrow' },
+  { value: 100, name: 'Standard' },
+  { value: 112.5, name: 'SemiWide' },
+  { value: 125, name: 'Wide' },
+  { value: 150, name: 'ExtraWide' },
+  { value: 200, name: 'UltraWide' },
+]
 </script>
 
 <template>
@@ -71,6 +94,41 @@ const statusColors = ['green', 'cyan', 'violet', 'magenta', 'orange', 'red'] as 
         <p class="font-mono text-sm">
           Моноширинный: ID 4815162342
         </p>
+      </div>
+    </ShowcaseSection>
+
+    <ShowcaseSection
+      title="Martian Grotesk — дополнительная гарнитура"
+      note="Не шрифт кита. Компоненты кита живут только на PT Root UI; эта гарнитура берётся точечно и по явному указанию."
+    >
+      <div class="space-y-6">
+        <p class="max-w-2xl text-sm text-muted-foreground">
+          63 начертания: 9 весов (100–1000, шестисотого нет) × 7 ширин (75–200%). Зарегистрированы
+          одним семейством, поэтому работают ключевые слова
+          <code>font-stretch: condensed</code>. Браузер грузит только применённое начертание.
+        </p>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Веса
+          </h3>
+          <div class="space-y-1 font-display text-lg">
+            <p v-for="w in martianWeights" :key="w.value" :style="{ fontWeight: w.value }">
+              {{ w.value }} — {{ w.name }} · съешь ещё этих булок
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Ширины
+          </h3>
+          <div class="space-y-1 font-display text-lg">
+            <p v-for="s in martianWidths" :key="s.value" :style="{ fontStretch: `${s.value}%` }">
+              {{ s.value }}% — {{ s.name }} · Мои осмотры
+            </p>
+          </div>
+        </div>
       </div>
     </ShowcaseSection>
 
