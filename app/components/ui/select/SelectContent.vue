@@ -34,12 +34,22 @@ withDefaults(defineProps<{
     class="flex flex-col gap-1 rounded-lg bg-popover py-1 pl-1 shadow-dropdown"
     :style="{ width: `${width}px`, maxHeight: `${maxHeight}px` }"
   >
-    <slot name="search" />
-    <slot name="top" />
+    <!--
+      shrink-0 обязателен: плашка ограничена по высоте, и без него флекс ужимает
+      поиск и слоты, отнимая у поиска три пикселя от мастерских сорока.
+    -->
+    <div v-if="$slots.search" class="shrink-0">
+      <slot name="search" />
+    </div>
+    <div v-if="$slots.top" class="shrink-0">
+      <slot name="top" />
+    </div>
     <div data-slot="popover-viewport" class="popover-scroll flex min-h-0 flex-col gap-2 overflow-y-auto">
       <slot />
     </div>
-    <slot name="bottom" />
+    <div v-if="$slots.bottom" class="shrink-0">
+      <slot name="bottom" />
+    </div>
   </div>
 </template>
 

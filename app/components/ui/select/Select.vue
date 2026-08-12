@@ -1,79 +1,122 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Icon } from '../icon'
-import { selectTriggerVariants, type SelectTriggerVariants } from '.'
+import {
+  ComboboxAnchor,
+  ComboboxContent,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxPortal,
+  ComboboxRoot,
+  ComboboxTrigger,
+  ComboboxViewport,
+} from 'reka-ui'
+import SelectContent from './SelectContent.vue'
+import SelectItem from './SelectItem.vue'
+import SelectTrigger from './SelectTrigger.vue'
+import type { SelectTriggerVariants } from '.'
 
 /**
- * Триггер селекта — перенос мастера `434:3074` целиком, все 16 вариантов.
+ * Селект — выбор **строго из списка**, без свободного ввода.
  *
- * Выпадающая часть **сюда не входит**: у Атома это отдельный мастер
- * `PopOverList` `571:4889` со своей спекой `571:6147`. Он переносится отдельной
- * единицей, вместе с `ListGroup`, `ListItem` и скроллбаром. До этого момента
- * триггер — управляемый контрол: открытость приходит пропом, поведение
- * навесит Reka, когда появится список.
+ * Источники: триггер — мастер `434:3074` и спека `444:3849`; выпадающая часть —
+ * мастер `PopOverList` `571:4889` и спека `571:6147`.
+ *
+ * ## Почему `Combobox` Reka, а не `Select`
+ *
+ * У Атома **в плашке встроенный поиск, включённый по умолчанию** — это настоящий
+ * инстанс `Input` шириной 312, а не пустой слот. Примитив `Select` поиска внутри
+ * не поддерживает: то, что нарисовано у Атома, в словаре Reka называется
+ * `Combobox`. На нём же собран `Autocomplete` — механика общая, различается
+ * поведение.
+ *
+ * | | `Select` | `Autocomplete` |
+ * |---|---|---|
+ * | что вводит пользователь | ничего: выбор из списка | свободный текст |
+ * | где поиск | **внутри плашки**, отдельным полем | само поле и есть поиск |
+ * | можно ли значение вне списка | нет | да |
+ *
+ * Разбор для дизайнеров — `docs/naming.md`, раздел 5.
  */
 const props = withDefaults(defineProps<{
-  /** Ось `Type` мастера: `filled` — залитый, `elevated` — белый с тенью поверх карты. */
   variant?: NonNullable<SelectTriggerVariants['variant']>
-  /** Ось `Active` мастера: единственное, что она меняет, — направление шеврона. */
-  open?: boolean
   /** Текстовый проп мастера `Select option` — подпись поля. */
   placeholder?: string
-  /** Текстовый проп мастера `Option` — выбранное значение. */
-  modelValue?: string
-  /** Булев проп мастера `Show icon`. В мастере включён по умолчанию. */
+  items?: { value: string, label: string, subtitle?: string, disabled?: boolean }[]
+  /**
+   * Булев проп мастера `Search field`. **По умолчанию включён** — так в мастере
+   * `PopOverList`, где поиск нарисован внутри плашки.
+   */
+  searchable?: boolean
   showIcon?: boolean
   disabled?: boolean
 }>(), {
   variant: 'filled',
-  open: false,
   placeholder: 'Select option',
-  modelValue: '',
+  items: () => [],
+  searchable: true,
   showIcon: true,
   disabled: false,
 })
 
-/** Состояние `filled` мастера — наличие выбранного значения. */
-const isFilled = computed(() => props.modelValue.length > 0)
+const model = defineModel<string>({ default: '' })
+
+const selected = computed(() => props.items.find(i => i.value === model.value))
 </script>
 
 <template>
-  <button
-    data-slot="field"
-    type="button"
-    :disabled="props.disabled"
-    :data-state="props.open ? 'open' : 'closed'"
-    :class="selectTriggerVariants({ variant, disabled })"
-  >
-    <slot v-if="props.showIcon" name="icon">
-      <Icon name="link" :size="16" />
-    </slot>
+  <ComboboxRoot v-model="model" :disabled="props.disabled" class="w-full">
+    <ComboboxAnchor as-child>
+      <ComboboxTrigger as-child>
+        <SelectTrigger
+          :variant="props.variant"
+          :placeholder="props.placeholder"
+          :label="selected?.label ?? ''"
+          :show-icon="props.showIcon"
+          :disabled="props.disabled"
+        >
+          <template #icon>
+            <slot name="icon" />
+          </template>
+        </SelectTrigger>
+      </ComboboxTrigger>
+    </ComboboxAnchor>
 
-    <!--
-      Текстовый блок. В мастере его ширина 192 — это 272 минус паддинги 32,
-      минус две иконки по 16, минус два зазора по 8. В коде ширина берётся
-      остатком, чтобы поле тянулось за контейнером.
-    -->
-    <span class="flex min-w-0 flex-1 flex-col items-start text-left" :class="isFilled ? 'h-9' : 'h-5'">
-      <span
-        v-if="isFilled"
-        data-slot="field-label"
-        class="h-4 w-full truncate text-xs font-medium text-field-placeholder group-hover/field:text-field-placeholder-hover"
-      >
-        {{ props.placeholder }}
-      </span>
-      <span
-        data-slot="field-input"
-        class="h-5 w-full truncate text-sm font-medium"
-        :class="isFilled
-          ? 'text-field-foreground group-hover/field:text-field-foreground-hover'
-          : 'text-field-placeholder group-hover/field:text-field-placeholder-hover'"
-      >
-        {{ isFilled ? props.modelValue : props.placeholder }}
-      </span>
-    </span>
+    <ComboboxPortal>
+      <ComboboxContent position="popper" :side-offset="4" as-child>
+        <SelectContent>
+          <!--
+            Поиск внутри плашки — то самое, из-за чего взят Combobox.
+            Геометрия поля берётся у Input: 40 высотой, 312 шириной.
+          -->
+          <template v-if="props.searchable" #search>
+            <ComboboxInput as-child>
+              <input
+                data-slot="field-input"
+                class="h-10 w-78 rounded-md bg-field px-4 text-sm font-medium outline-none text-field-foreground placeholder:text-field-placeholder"
+                placeholder="Search"
+              >
+            </ComboboxInput>
+          </template>
 
-    <!-- Шеврон — обязательная часть мастера, слота под него нет. -->
-    <Icon :name="props.open ? 'chevron-up' : 'chevron-down'" :size="16" />
-  </button>
+          <ComboboxViewport>
+            <ComboboxItem
+              v-for="item in props.items"
+              :key="item.value"
+              :value="item.value"
+              :disabled="item.disabled"
+              as-child
+            >
+              <SelectItem
+                :subtitle="item.subtitle"
+                :selected="item.value === model"
+                :disabled="item.disabled"
+              >
+                {{ item.label }}
+              </SelectItem>
+            </ComboboxItem>
+          </ComboboxViewport>
+        </SelectContent>
+      </ComboboxContent>
+    </ComboboxPortal>
+  </ComboboxRoot>
 </template>

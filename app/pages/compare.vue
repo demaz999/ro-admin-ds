@@ -58,6 +58,22 @@ const selectVariants = [
   { t: 'elevated · открыт · выбрано · disabled', x: 312, y: 472, variant: 'elevated', open: true, value: VALUE, disabled: true },
 ] as const
 
+/**
+ * Autocomplete, мастер 3874:36379 — 616×280, восемь вариантов.
+ * Смещения внутри мастера отрицательные относительно его рамки, поэтому взяты
+ * как разности координат: левая колонка включённые, правая выключенные.
+ */
+const autocompleteVariants = [
+  { t: 'filled · пусто', x: 16, y: 16, variant: 'filled' },
+  { t: 'filled · заполнено', x: 16, y: 80, variant: 'filled', value: VALUE },
+  { t: 'elevated · пусто', x: 16, y: 144, variant: 'elevated' },
+  { t: 'elevated · заполнено', x: 16, y: 208, variant: 'elevated', value: VALUE },
+  { t: 'filled · пусто · disabled', x: 312, y: 16, variant: 'filled', disabled: true },
+  { t: 'filled · заполнено · disabled', x: 312, y: 80, variant: 'filled', value: VALUE, disabled: true },
+  { t: 'elevated · пусто · disabled', x: 312, y: 144, variant: 'elevated', disabled: true },
+  { t: 'elevated · заполнено · disabled', x: 312, y: 208, variant: 'elevated', value: VALUE, disabled: true },
+] as const
+
 /** Textarea, мастер 282:4688 — 304×640, четыре варианта столбиком. */
 const textareaVariants = [
   { t: 'Textarea · пусто', x: 16, y: 16 },
@@ -210,11 +226,42 @@ const textareaVariants = [
         :width="272"
         :height="40"
       >
-        <Select
+        <SelectTrigger
           :variant="s.variant"
           :open="s.open ?? false"
-          :model-value="s.value ?? ''"
+          :label="s.value ?? ''"
           :disabled="s.disabled ?? false"
+        />
+      </CompareFrame>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="text-lg font-bold">
+        Autocomplete · 3874:36379 · все 8 вариантов
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Геометрия совпадает с <code>Input</code> до единицы — та же коробка, те же паддинги,
+        зазоры, радиус и заливка. Отличие одно: <strong>крестик очистки нарисован во всех
+        заполненных вариантах</strong>, тогда как у поля ввода он по умолчанию выключен.
+        Своей выпадашки у мастера нет: подсказки показываются в той же плашке
+        <code>PopOverList</code>.
+      </p>
+
+      <CompareFrame
+        v-for="a in autocompleteVariants"
+        :key="a.t"
+        :title="a.t"
+        node="3874:36379"
+        master="atom/autocomplete_3874-36379.png"
+        :x="a.x"
+        :y="a.y"
+        :width="272"
+        :height="40"
+      >
+        <Autocomplete
+          :variant="a.variant"
+          :model-value="a.value ?? ''"
+          :disabled="a.disabled ?? false"
         />
       </CompareFrame>
     </section>

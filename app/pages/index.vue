@@ -19,6 +19,16 @@ const themes = [
 
 const theme = ref<typeof themes[number]['value']>('rososmotr')
 
+/** Строки для Select и Autocomplete — оба на одном примитиве Combobox. */
+const options = [
+  { value: 'one', label: 'Первый' },
+  { value: 'two', label: 'Второй', subtitle: 'Подпись строки' },
+  { value: 'three', label: 'Третий' },
+  { value: 'four', label: 'Четвёртый', disabled: true },
+  { value: 'five', label: 'Пятый' },
+  { value: 'six', label: 'Шестой' },
+]
+
 /** Состояния Input, сведённые к осям мастера Атома 249:2768. */
 const inputRows = [
   { label: 'filled · 40 · пусто', variant: 'filled', size: 'md', value: '' },
@@ -308,23 +318,23 @@ const martianWidths = [
             поэтому открытость здесь приходит пропом.
           </p>
           <div class="grid gap-6 sm:grid-cols-2">
-            <ShowcaseCell label="закрыт · пусто">
-              <Select />
+            <ShowcaseCell label="с поиском" hint="нажмите — поиск включён, как в мастере">
+              <Select :items="options" />
             </ShowcaseCell>
-            <ShowcaseCell label="закрыт · выбрано">
-              <Select model-value="Option" />
+            <ShowcaseCell label="без поиска" hint="searchable=false">
+              <Select :items="options" :searchable="false" />
             </ShowcaseCell>
-            <ShowcaseCell label="открыт">
-              <Select open />
+            <ShowcaseCell label="выбрано">
+              <Select :items="options" model-value="two" />
             </ShowcaseCell>
             <ShowcaseCell label="disabled">
-              <Select model-value="Option" disabled />
+              <Select :items="options" model-value="two" disabled />
             </ShowcaseCell>
             <ShowcaseCell label="elevated">
-              <Select variant="elevated" />
+              <Select :items="options" variant="elevated" />
             </ShowcaseCell>
-            <ShowcaseCell label="elevated · выбрано">
-              <Select variant="elevated" model-value="Option" />
+            <ShowcaseCell label="триггер отдельно" hint="презентационный, для наложения">
+              <SelectTrigger open label="Option" />
             </ShowcaseCell>
           </div>
         </div>
@@ -362,6 +372,50 @@ const martianWidths = [
               <SelectItem>И ещё</SelectItem>
             </SelectGroup>
           </SelectContent>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Autocomplete · мастер 3874:36379
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Тот же примитив <code>Combobox</code>, что и у селекта, — различается поведение,
+            а не вид. Здесь пользователь вводит текст сам, и введённое может не совпасть ни с
+            одной строкой. Поиска внутри плашки нет: полем поиска работает само поле.
+            Геометрия совпадает с <code>Input</code>, крестик очистки в мастере нарисован во
+            всех заполненных вариантах.
+          </p>
+          <div class="grid gap-6 sm:grid-cols-2">
+            <ShowcaseCell label="пусто" hint="наберите текст">
+              <Autocomplete :items="options" />
+            </ShowcaseCell>
+            <ShowcaseCell label="заполнено">
+              <Autocomplete :items="options" model-value="Первый" />
+            </ShowcaseCell>
+            <ShowcaseCell label="elevated">
+              <Autocomplete :items="options" variant="elevated" />
+            </ShowcaseCell>
+            <ShowcaseCell label="disabled">
+              <Autocomplete :items="options" model-value="Первый" disabled />
+            </ShowcaseCell>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Popover · мастер 405:3786
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            В мастере это пустой контейнер: 320 шириной, радиус 12, фон белый, тень 0/8/32,
+            паддинга и рамки нет. Начинку кладёт тот, кто применяет. Плашка светлая даже
+            когда вылетает из тёмного меню.
+          </p>
+          <Popover>
+            <div class="p-4 text-sm text-foreground">
+              Содержимое плашки. Паддинг задаёт содержимое, а не сам компонент —
+              в мастере паддинга нет.
+            </div>
+          </Popover>
         </div>
 
         <p class="max-w-2xl rounded-md border border-border p-3 text-sm">
