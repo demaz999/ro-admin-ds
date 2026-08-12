@@ -155,6 +155,25 @@ const variants = [
 
     <section class="space-y-3">
       <h2 class="text-lg font-bold">
+        Автопроверка оптики иконок
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Наложение сравнивает бокс, а не глиф. Пикта Атома заполняет бокс целиком — в мастере
+        <code>Input</code> бокс 16×16 и отрисованные границы глифа тоже 16×16. Material рисует
+        глиф с полями внутри квадрата 960: у <code>search</code> контур занимает 75%, у
+        <code>close</code> — 58%. При одинаковом боксе видимый глиф выходит на четверть мельче.
+      </p>
+      <p class="max-w-3xl rounded-md border border-border p-3 text-sm">
+        <strong>Оптический размер это не лечит.</strong> Замерено по официальной выгрузке:
+        доля поля у <code>search</code> — 70% при opsz 20 и 75% при opsz 24 и 48. Оптический
+        размер меняет толщину штриха и детализацию, а не долю поля. Рычаг один — масштаб глифа
+        внутри бокса, поэтому <code>Icon</code> строит viewBox по плотным границам контура.
+      </p>
+      <CompareIconAudit />
+    </section>
+
+    <section class="space-y-3">
+      <h2 class="text-lg font-bold">
         Автопроверка шрифтов
       </h2>
       <p class="max-w-3xl text-sm text-muted-foreground">
