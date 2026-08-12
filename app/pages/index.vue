@@ -254,33 +254,88 @@ const martianWidths = [
       </div>
     </ShowcaseSection>
 
-    <ShowcaseSection title="Select">
-      <div class="grid gap-4 sm:grid-cols-2">
-        <ShowcaseCell label="default">
-          <Select>
-            <SelectTrigger class="w-56">
-              <SelectValue placeholder="Статус осмотра" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="new">
-                Новый
-              </SelectItem>
-              <SelectItem value="in-progress">
-                В работе
-              </SelectItem>
-              <SelectItem value="done">
-                Завершён
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </ShowcaseCell>
-        <ShowcaseCell label="disabled">
-          <Select disabled>
-            <SelectTrigger class="w-56">
-              <SelectValue placeholder="Статус осмотра" />
-            </SelectTrigger>
-          </Select>
-        </ShowcaseCell>
+    <ShowcaseSection
+      title="Select"
+      note="Мастер 244:13976: шесть состояний, три раскладки подписи, своя архитектура (не инстанс input), высота 40. Цвет взят из mode — коллекция select/color/* мастера в код не переносится, см. вопросы 21 и 22."
+    >
+      <div class="space-y-6">
+        <div class="grid gap-6 sm:grid-cols-2">
+          <ShowcaseCell label="Default" hint="плейсхолдер">
+            <SelectField label="Статус осмотра" hint="Подсказка" counter="10/25">
+              <Select>
+                <SelectTrigger>
+                  <template #left><IconPlaceholder /></template>
+                  <SelectValue placeholder="Placeholder" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectLabel>Группа</SelectLabel>
+                  <SelectItem value="new" hint="Ожидает назначения">Новый</SelectItem>
+                  <SelectItem value="work">В работе</SelectItem>
+                  <SelectSeparator />
+                  <SelectItem value="done">Завершён</SelectItem>
+                  <SelectItem value="off" disabled>Недоступен</SelectItem>
+                </SelectContent>
+              </Select>
+            </SelectField>
+          </ShowcaseCell>
+
+          <ShowcaseCell label="field" hint="есть значение">
+            <SelectField label="Статус осмотра" hint="Подсказка" counter="10/25">
+              <Select default-value="work">
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="work">В работе</SelectItem>
+                  <SelectItem value="done">Завершён</SelectItem>
+                </SelectContent>
+              </Select>
+            </SelectField>
+          </ShowcaseCell>
+
+          <ShowcaseCell label="disabled">
+            <SelectField label="Статус осмотра" hint="Подсказка" counter="10/25" disabled>
+              <Select disabled>
+                <SelectTrigger>
+                  <template #left><IconPlaceholder /></template>
+                  <SelectValue placeholder="Text" />
+                </SelectTrigger>
+              </Select>
+            </SelectField>
+          </ShowcaseCell>
+
+          <ShowcaseCell label="label=left">
+            <SelectField label="Заголовок" orientation="left">
+              <Select>
+                <SelectTrigger><SelectValue placeholder="Placeholder" /></SelectTrigger>
+                <SelectContent><SelectItem value="a">Вариант</SelectItem></SelectContent>
+              </Select>
+            </SelectField>
+          </ShowcaseCell>
+
+          <ShowcaseCell label="label=no">
+            <Select>
+              <SelectTrigger><SelectValue placeholder="Placeholder" /></SelectTrigger>
+              <SelectContent><SelectItem value="a">Вариант</SelectItem></SelectContent>
+            </Select>
+          </ShowcaseCell>
+
+          <ShowcaseCell label="multiselect" hint="отметка слева">
+            <Select>
+              <SelectTrigger><SelectValue placeholder="Выберите" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="a" multiselect>Первый</SelectItem>
+                <SelectItem value="b" multiselect>Второй</SelectItem>
+              </SelectContent>
+            </Select>
+          </ShowcaseCell>
+        </div>
+
+        <p class="text-sm text-muted-foreground">
+          Состояния hovered, pressed и edit — это наведение и открытый список: в мастере они
+          отличаются рамкой и шевроном вверх. Пара pressed / edit относится друг к другу как
+          Default / field: пусто против заполненного.
+        </p>
       </div>
     </ShowcaseSection>
 
