@@ -7,12 +7,12 @@ useHead({ title: 'Наложение — сверка с китом 1' })
  * вырезка попадает в вариант точно, без подгонки на глаз.
  */
 const inputVariants = [
-  { title: 'input · label=top, Default, 44', x: 1777, y: 32, w: 464, h: 92 },
-  { title: 'input · label=top, pressed, 44', x: 1777, y: 171, w: 464, h: 92 },
-  { title: 'input · label=top, field, 44', x: 1773, y: 311, w: 464, h: 92 },
-  { title: 'input · label=top, error, 44', x: 1777, y: 437, w: 464, h: 92 },
-  { title: 'input · label=top, disabled, 44', x: 1777, y: 578, w: 464, h: 92 },
-]
+  { title: 'input · label=top, Default, 44', x: 1777, y: 32, w: 464, h: 92, note: 'плейсхолдер в цвете fg/secondary' },
+  { title: 'input · label=top, pressed, 44', x: 1777, y: 171, w: 464, h: 92, note: 'фокус: меняется только цвет рамки, кольца нет — навести курсор в поле' },
+  { title: 'input · label=top, field, 44', x: 1773, y: 311, w: 464, h: 92, value: 'Text', note: 'не состояние контрола, а наличие значения: отличается от Default только цветом текста' },
+  { title: 'input · label=top, error, 44', x: 1777, y: 437, w: 464, h: 92, value: 'Text', invalid: true, note: 'краснеют рамка, подсказка и счётчик; подпись и иконки — нет' },
+  { title: 'input · label=top, disabled, 44', x: 1777, y: 578, w: 464, h: 92, value: 'Text', disabled: true, note: 'фон остаётся белым, гаснут подпись, иконки, подсказка и счётчик' },
+] as const
 
 /** Эталоны целиком. Источник-файл указан там, где он не админский кит. */
 const masters = [
@@ -51,9 +51,9 @@ const badgeVariants = [
         гаснет в чёрный, расхождение светится.
       </p>
       <p class="max-w-3xl rounded-md border border-destructive bg-destructive-surface p-3 text-sm">
-        <strong>Это рабочая страница, а не витрина.</strong> Компоненты ниже собирались от базы
-        shadcn с подкраской токенами — способ, запрещённый протоколом. Страница сделана, чтобы
-        по ней пересобрать их от мастеров. Расхождения ожидаемы.
+        <strong>Это рабочая страница, а не витрина.</strong> Компоненты пересобраны от мастеров
+        по протоколу переноса. Наложение — способ проверки, а не иллюстрация: расхождение
+        видно в режиме «разница».
       </p>
     </header>
 
@@ -62,9 +62,9 @@ const badgeVariants = [
         Input
       </h2>
       <p class="text-sm text-muted-foreground">
-        В мастере 20 вариантов: label (left / top) × state (Default / pressed / field / error /
-        disabled) × size (40 / 44). В коде сейчас голое поле без подписи, подсказки и счётчика —
-        расхождение по составу, а не по цвету.
+        Мастер описывает поле целиком: подпись, поле с двумя иконочными слотами, строка
+        подсказки со счётчиком. Видимостью частей в Figma управляют 10 component properties,
+        поэтому в коде это пропы и слоты, а не значения variant.
       </p>
 
       <CompareFrame
@@ -77,10 +77,24 @@ const badgeVariants = [
         :y="v.y"
         :width="v.w"
         :height="v.h"
+        :note="v.note"
       >
-        <div class="flex h-full w-full flex-col justify-end">
-          <Input placeholder="Placeholder" />
-        </div>
+        <Input
+          label="lable_top"
+          hint="Подсказка"
+          counter="10/25"
+          placeholder="Text"
+          :model-value="v.value"
+          :invalid="v.invalid"
+          :disabled="v.disabled"
+        >
+          <template #left>
+            <IconPlaceholder />
+          </template>
+          <template #right>
+            <IconPlaceholder />
+          </template>
+        </Input>
       </CompareFrame>
     </section>
 
@@ -89,7 +103,8 @@ const badgeVariants = [
         Badge
       </h2>
       <p class="text-sm text-muted-foreground">
-        В мастере у метки есть иконка — в коде она потеряна.
+        Иконка в мастере обязательна: булевой пропы «показать иконку» там нет, только подмена
+        глифа. Контейнер 14×14, глиф 20×20 навылет — так нарисовано.
       </p>
 
       <CompareFrame
@@ -104,6 +119,7 @@ const badgeVariants = [
         :height="v.h"
       >
         <Badge :color="v.color">
+          <template #icon><IconPlaceholder /></template>
           Badge
         </Badge>
       </CompareFrame>

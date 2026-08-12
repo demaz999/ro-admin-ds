@@ -22,7 +22,7 @@ const forwardedProps = useForwardProps(delegatedProps)
     :data-size="size"
     v-bind="forwardedProps"
     :class="cn(
-      'flex w-fit items-center justify-between gap-1.5 whitespace-nowrap rounded-md border border-input bg-background py-2 pr-2 pl-4 text-sm text-foreground outline-none transition-colors select-none data-placeholder:text-foreground-secondary data-[size=default]:h-11 data-[size=sm]:h-8 focus-visible:border-ring focus-visible:ring-ring focus-visible:ring-3 aria-invalid:border-destructive aria-invalid:ring-destructive aria-invalid:ring-3 disabled:cursor-not-allowed disabled:border-stroke-neutral disabled:bg-surface-disabled disabled:text-foreground-disabled *:data-[slot=select-value]:line-clamp-1 *:data-[slot=select-value]:flex *:data-[slot=select-value]:items-center *:data-[slot=select-value]:gap-1.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*=size-])]:size-4',
+      'flex w-full items-center justify-between gap-2 rounded-md border border-input bg-background px-4 text-sm text-foreground outline-none transition-colors select-none data-[size=default]:h-11 data-[size=sm]:h-10 data-placeholder:text-foreground-secondary data-[state=open]:border-stroke-accent aria-invalid:border-destructive disabled:cursor-not-allowed disabled:border-stroke-neutral disabled:text-foreground-disabled [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*=size-])]:size-6',
       props.class,
     )"
   >

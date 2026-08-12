@@ -10,7 +10,8 @@ onMounted(() => {
   focusedInput.value?.querySelector('input')?.focus()
 })
 
-const buttonVariants = ['default', 'secondary', 'outline', 'ghost', 'link', 'destructive'] as const
+const buttonVariants = ['default', 'secondary', 'outline', 'ghost'] as const
+const ghostTones = ['accent', 'warning', 'red'] as const
 const badgeColors = ['violet', 'red', 'orange'] as const
 const statusColors = ['green', 'cyan', 'violet', 'magenta', 'orange', 'red'] as const
 
@@ -151,51 +152,61 @@ const martianWidths = [
 
     <ShowcaseSection
       title="Button"
-      note="В ките 1 кнопка разложена на 12 отдельных компонент-сетов. Здесь это один компонент с пропом variant: btn_accent → default, btn_txt → ghost, btn_remove → destructive. Значения вариантов ниже — ещё дефолтные shadcn, не из кита."
+      note="Четыре мастера кита сведены в один компонент: btn_accent → default, btn_secondary → secondary, btn_outline → outline, btn_txt → ghost. Иконочные слоты в мастерах включены по умолчанию, поэтому показаны с ними."
     >
       <div class="space-y-6">
         <div>
-          <h3 class="mb-3 text-sm font-medium">
-            Варианты
-          </h3>
-          <div class="flex flex-wrap gap-3">
+          <h3 class="mb-3 text-sm font-medium">Варианты · size 44</h3>
+          <div class="flex flex-wrap items-center gap-3">
             <Button v-for="v in buttonVariants" :key="v" :variant="v">
+              <template #left><IconPlaceholder /></template>
+              {{ v }}
+              <template #right><IconPlaceholder /></template>
+            </Button>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">size 32</h3>
+          <div class="flex flex-wrap items-center gap-3">
+            <Button v-for="v in buttonVariants" :key="v" :variant="v" size="sm">
+              <template #left><IconPlaceholder /></template>
               {{ v }}
             </Button>
           </div>
         </div>
 
         <div class="grid gap-4 sm:grid-cols-2">
-          <ShowcaseCell label="default">
-            <Button>Найти</Button>
-          </ShowcaseCell>
-          <ShowcaseCell label="hover" hint="наведите курсор">
-            <Button>Найти</Button>
-          </ShowcaseCell>
-          <ShowcaseCell label="focus" hint="Tab до кнопки">
-            <Button>Найти</Button>
-          </ShowcaseCell>
-          <ShowcaseCell label="disabled">
-            <Button disabled>
-              Найти
-            </Button>
+          <ShowcaseCell label="Default"><Button>Найти</Button></ShowcaseCell>
+          <ShowcaseCell label="Hover" hint="наведите курсор"><Button>Найти</Button></ShowcaseCell>
+          <ShowcaseCell label="Pressed" hint="зажмите"><Button>Найти</Button></ShowcaseCell>
+          <ShowcaseCell label="Dissabled"><Button disabled>Найти</Button></ShowcaseCell>
+          <ShowcaseCell label="not_active" hint="пятое состояние, только у accent">
+            <Button inactive>Найти</Button>
           </ShowcaseCell>
         </div>
 
         <div>
-          <h3 class="mb-3 text-sm font-medium">
-            Размеры
-          </h3>
+          <h3 class="mb-3 text-sm font-medium">btn_txt · цветовая ось и начертание</h3>
+          <div class="flex flex-wrap items-center gap-4">
+            <Button v-for="t in ghostTones" :key="t" variant="ghost" :tone="t">
+              <template #left><IconPlaceholder /></template>
+              {{ t }}
+            </Button>
+            <Button variant="ghost" weight="regular">regular</Button>
+            <Button variant="ghost" size="sm">s_16</Button>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">Только иконка</h3>
+          <p class="mb-3 text-sm text-muted-foreground">
+            Отдельного варианта в ките нет — режим достигается пропом «показать текст» = false.
+            У secondary и outline получается 44×44, у accent ширина в мастере зафиксирована на 152.
+          </p>
           <div class="flex flex-wrap items-center gap-3">
-            <Button size="sm">
-              Маленькая
-            </Button>
-            <Button size="default">
-              Обычная
-            </Button>
-            <Button size="lg">
-              Большая
-            </Button>
+            <Button variant="secondary"><template #left><IconPlaceholder /></template></Button>
+            <Button variant="outline"><template #left><IconPlaceholder /></template></Button>
           </div>
         </div>
       </div>
@@ -205,29 +216,36 @@ const martianWidths = [
       title="Input"
       note="Состояния сняты с мастера кита: везде рамка 1px, кольца нет ни в одном состоянии. В disabled поле остаётся белым — гаснут рамка и текст. Полевая обёртка (подпись, подсказка, счётчик, раскладки слева/сверху) — компонент InputField в волне 1, см. docs/waves.md."
     >
-      <div class="grid gap-4 sm:grid-cols-2">
-        <ShowcaseCell label="default">
-          <Input placeholder="Номер осмотра" />
+      <div class="grid gap-6 sm:grid-cols-2">
+        <ShowcaseCell label="Default">
+          <Input label="Номер осмотра" placeholder="Text" hint="Подсказка" counter="0/25">
+            <template #left><IconPlaceholder /></template>
+            <template #right><IconPlaceholder /></template>
+          </Input>
         </ShowcaseCell>
-        <ShowcaseCell label="focus" hint="наведён программно">
-          <div ref="focusedInput" class="w-full">
-            <Input placeholder="Номер осмотра" />
-          </div>
+        <ShowcaseCell label="field" hint="есть значение">
+          <Input label="Номер осмотра" model-value="4815162342" hint="Подсказка" counter="10/25">
+            <template #left><IconPlaceholder /></template>
+            <template #right><IconPlaceholder /></template>
+          </Input>
         </ShowcaseCell>
-        <ShowcaseCell label="filled">
-          <Input model-value="4815162342" />
+        <ShowcaseCell label="error">
+          <Input label="Номер осмотра" model-value="абв" invalid hint="Только цифры" counter="3/25">
+            <template #left><IconPlaceholder /></template>
+            <template #right><IconPlaceholder /></template>
+          </Input>
         </ShowcaseCell>
         <ShowcaseCell label="disabled">
-          <Input disabled placeholder="Номер осмотра" />
+          <Input label="Номер осмотра" model-value="Text" disabled hint="Подсказка" counter="4/25">
+            <template #left><IconPlaceholder /></template>
+            <template #right><IconPlaceholder /></template>
+          </Input>
         </ShowcaseCell>
-        <ShowcaseCell label="error" hint="рамка 1px, красные подсказка и счётчик">
-          <div class="w-full space-y-1">
-            <Input aria-invalid="true" model-value="абв" />
-            <div class="flex justify-between gap-4 text-xs">
-              <span class="text-destructive">Только цифры</span>
-              <span class="text-destructive">3/10</span>
-            </div>
-          </div>
+        <ShowcaseCell label="label=left">
+          <Input label="Заголовок" orientation="left" placeholder="Text" hint="Подсказка" counter="0/25" />
+        </ShowcaseCell>
+        <ShowcaseCell label="size=40">
+          <Input label="Номер осмотра" size="sm" placeholder="Text" />
         </ShowcaseCell>
       </div>
     </ShowcaseSection>
@@ -266,6 +284,7 @@ const martianWidths = [
       <div class="space-y-6">
         <div class="flex flex-wrap gap-3">
           <Badge v-for="c in badgeColors" :key="c" :color="c">
+            <template #icon><IconPlaceholder /></template>
             {{ c }}
           </Badge>
         </div>

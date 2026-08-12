@@ -4,21 +4,24 @@ import { cva } from 'class-variance-authority'
 export { default as Badge } from './Badge.vue'
 
 /**
- * Декоративная статусная метка кита (`badge` 1173:196, высота 24).
+ * Декоративная статусная метка кита — мастер `badge` `1173:196`.
+ * Одна ось `color`: violet / red / orange. Высота фиксированная 24, радиус 16.
  *
- * Не путать с `Chip` — 32-пиксельным интерактивным компонентом со счётчиком и
- * крестиком, который в ките лежит под тем же именем `badge` (747:2464).
+ * Не путать с `Chip` (`747:2464`, 32px, счётчик и крестик) — в ките они лежат
+ * под одним именем, но это разные компоненты.
  *
- * Цвета берутся из расширенной палитры. Набор вариантов — ровно тот, что
- * нарисован в ките: violet, red, orange. Заливка сплошная, текст белый,
- * кегль 13/16 Bold — снято с узла.
+ * Иконка в мастере ОБЯЗАТЕЛЬНА: булева пропа «показать иконку» там нет, только
+ * INSTANCE_SWAP (`20_ic_layers` по умолчанию). Варианта без иконки в ките 1 не
+ * нарисовано, поэтому слот здесь не опциональный.
+ *
+ * Цвета берутся из расширенной палитры (`status-03/05/06`) — это явное указание
+ * мастера, легальное употребление палитры.
  *
  * @debt Цвета иллюстративные. В продукте цвет метки приходит с сервера вместе
- * с данными; при интеграции — мапинг с данных, а не выбор варианта руками.
- * См. docs/design-debt.md.
+ * с данными; при интеграции — мапинг с данных. См. docs/design-debt.md
  */
 export const badgeVariants = cva(
-  'inline-flex h-6 w-fit shrink-0 items-center justify-center gap-1 overflow-hidden whitespace-nowrap rounded-xl px-2 py-1 text-xs font-bold text-primary-foreground [&>svg]:pointer-events-none [&>svg]:size-4',
+  'inline-flex h-6 w-fit shrink-0 items-center gap-1 rounded-xl px-2 text-xs font-bold whitespace-nowrap text-primary-foreground',
   {
     variants: {
       color: {
@@ -32,4 +35,5 @@ export const badgeVariants = cva(
     },
   },
 )
+
 export type BadgeVariants = VariantProps<typeof badgeVariants>

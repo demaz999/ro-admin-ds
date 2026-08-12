@@ -142,6 +142,16 @@
     --color-palette-04: var(--palette-04);
     --color-palette-05: var(--palette-05);
     --color-palette-06: var(--palette-06);
+
+    /* Состояния рамп. Полный набор в ките есть только у 01 и 06 — у 02–05
+       нарисован один default, поэтому и утилит под них нет. */
+    --color-palette-01-hover: var(--palette-01-hover);
+    --color-palette-01-pressed: var(--palette-01-pressed);
+    --color-palette-01-surface: var(--palette-01-surface);
+    --color-palette-01-disabled: var(--palette-01-disabled);
+    --color-palette-06-hover: var(--palette-06-hover);
+    --color-palette-06-pressed: var(--palette-06-pressed);
+    --color-palette-06-disabled: var(--palette-06-disabled);
 }
 
 @theme inline {
@@ -191,6 +201,12 @@
     --radius-xl: 16px;                  /* badge 24px */
     --radius-2xl: 24px;                 /* Chip 32px */
     --radius-full: 999px;               /* bulb-точки: радиус заведомо больше половины стороны */
+
+    /* Тени кита — эффект-стили, а не свободные значения.
+       Button Shadow: активная плашка вкладки-таблетки.
+       BigShadow: выпадающие плашки. Рамки у них при этом НЕТ. */
+    --shadow-button: 0 1px 2px 0 #0000000d;
+    --shadow-dropdown: 0 8px 32px 0 #0c10181f;
 
     /* Расширения темы как утилиты: bg-primary-hover, text-foreground-secondary… */
     --color-foreground-hover: var(--foreground-hover);
