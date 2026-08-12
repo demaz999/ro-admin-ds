@@ -1,5 +1,37 @@
 <script setup lang="ts">
+import { ref } from 'vue'
+
 useHead({ title: 'Витрина — админский дизайн-кит' })
+
+/**
+ * Переключатель тем. Три темы на одном наборе ролей: имена переменных везде одни
+ * и те же, отличаются только значения — см. docs/themes.md.
+ *
+ * `atom` неполна намеренно: в неё попадает только то, что показал мастер
+ * очередного перенесённого компонента. Остальные роли наследуются от rososmotr,
+ * поэтому переключение выглядит как частичная подмена, а не как второй бренд.
+ */
+const themes = [
+  { value: 'rososmotr', label: 'rososmotr', note: 'рабочая тема, приёмка идёт в ней' },
+  { value: 'atom', label: 'atom', note: 'сверочная: родные цвета и гарнитура эталона' },
+  { value: 'viewapp', label: 'viewapp', note: 'каркас, значений пока нет' },
+] as const
+
+const theme = ref<typeof themes[number]['value']>('rososmotr')
+
+/** Состояния Input, сведённые к осям мастера Атома 249:2768. */
+const inputRows = [
+  { label: 'filled · 40 · пусто', variant: 'filled', size: 'md', value: '' },
+  { label: 'filled · 40 · заполнено', variant: 'filled', size: 'md', value: 'Input text' },
+  { label: 'filled · 40 · disabled', variant: 'filled', size: 'md', value: 'Input text', disabled: true },
+  { label: 'elevated · 40 · пусто', variant: 'elevated', size: 'md', value: '' },
+  { label: 'elevated · 40 · заполнено', variant: 'elevated', size: 'md', value: 'Input text' },
+  { label: 'elevated · 40 · disabled', variant: 'elevated', size: 'md', value: 'Input text', disabled: true },
+  { label: 'filled · 64 · пусто', variant: 'filled', size: 'lg', value: '' },
+  { label: 'filled · 64 · заполнено', variant: 'filled', size: 'lg', value: 'Input text' },
+  { label: 'elevated · 64 · пусто', variant: 'elevated', size: 'lg', value: '' },
+  { label: 'elevated · 64 · заполнено', variant: 'elevated', size: 'lg', value: 'Input text' },
+] as const
 
 /**
  * Восемь текстовых стилей кита. Имена слева — как в Figma; каждый стиль
@@ -44,7 +76,7 @@ const martianWidths = [
 </script>
 
 <template>
-  <main class="mx-auto max-w-5xl space-y-12 px-6 py-10">
+  <main :data-theme="theme" class="mx-auto max-w-5xl space-y-12 bg-background px-6 py-10 font-sans text-foreground">
     <header class="space-y-3">
       <p class="font-mono text-xs uppercase tracking-widest text-muted-foreground">
         кит 2 · перенос Атома
@@ -62,11 +94,31 @@ const martianWidths = [
         раздел 7. Состояния идут из токенов-расширений, не через прозрачность.
       </p>
       <p class="max-w-2xl rounded-md border border-border p-3 text-sm">
-        <strong>Компонентов на витрине сейчас нет.</strong> Основа переносится заново из
-        дизайн-системы Атом — решение от 2026-08-12. Компоненты волны 0, собранные по составам
-        кита 1, отложены в <code>archive/kit1-components</code> до фазы обогащения и из витрины
-        отключены. Разбивка по волнам — <code>docs/atom-audit.md</code>.
+        <strong>Основа переносится заново из дизайн-системы Атом</strong> — решение от
+        2026-08-12. Компоненты волны 0, собранные по составам кита 1, отложены в
+        <code>archive/kit1-components</code> до фазы обогащения. Разбивка по волнам —
+        <code>docs/atom-audit.md</code>, наложение на эталоны — <code>/compare</code>.
       </p>
+
+      <div class="flex flex-wrap items-center gap-3 pt-2">
+        <span class="text-sm font-medium">Тема:</span>
+        <div class="flex gap-1">
+          <button
+            v-for="t in themes"
+            :key="t.value"
+            type="button"
+            :title="t.note"
+            class="rounded-sm px-3 py-1.5 text-sm"
+            :class="theme === t.value ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'"
+            @click="theme = t.value"
+          >
+            {{ t.label }}
+          </button>
+        </div>
+        <span class="text-xs text-muted-foreground">
+          {{ themes.find(t => t.value === theme)?.note }}
+        </span>
+      </div>
     </header>
 
     <ShowcaseSection
@@ -143,6 +195,50 @@ const martianWidths = [
             </p>
           </div>
         </div>
+      </div>
+    </ShowcaseSection>
+
+    <ShowcaseSection
+      title="Input · волна 1"
+      note="Мастер Атома 249:2768, 16 вариантов. Поле — залитая поверхность без рамки: обводки нет ни в одном из шестнадцати. Заполненное состояние перестраивает разметку — плейсхолдер уезжает наверх подписью 13/16, под ним появляется значение."
+    >
+      <div class="space-y-6">
+        <div class="grid gap-6 sm:grid-cols-2">
+          <ShowcaseCell v-for="r in inputRows" :key="r.label" :label="r.label">
+            <Input
+              :variant="r.variant"
+              :size="r.size"
+              :model-value="r.value"
+              :disabled="r.disabled ?? false"
+            />
+          </ShowcaseCell>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Кнопка очистки
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Булев проп мастера <code>Show ClearButton</code>, по умолчанию выключен — поэтому в
+            экспорте эталона его нет ни в одном варианте и наложением он не проверяется.
+            Появляется только в заполненном поле, как и в мастере.
+          </p>
+          <div class="grid gap-6 sm:grid-cols-2">
+            <ShowcaseCell label="filled · с очисткой">
+              <Input model-value="Input text" clearable />
+            </ShowcaseCell>
+            <ShowcaseCell label="elevated · с очисткой">
+              <Input variant="elevated" model-value="Input text" clearable />
+            </ShowcaseCell>
+          </div>
+        </div>
+
+        <p class="max-w-2xl rounded-md border border-border p-3 text-sm">
+          <strong>Чего у Атома нет вовсе:</strong> hover, focus, pressed, error, внешней подписи,
+          подсказки и счётчика символов. В документации Атома hover и error нарисованы картинками,
+          вариантами компонента они не являются — перенесён факт, а не картинка.
+          См. <code>docs/open-questions.md</code>, вопрос 26.
+        </p>
       </div>
     </ShowcaseSection>
   </main>

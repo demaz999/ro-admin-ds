@@ -12,6 +12,17 @@ import { onMounted, ref } from 'vue'
  * Что считается ошибкой: computed font-family не из темы, либо кегль вне шкалы
  * кита. Проверяются только узлы внутри `[data-slot]` — то есть компоненты кита;
  * хром витрины с его моноширинными подписями сюда не попадает.
+ *
+ * Две вещи, на которых проверка уже прокалывалась:
+ *
+ * 1. **Контролы не имеют текстового узла.** У `input` и `textarea` текст лежит в
+ *    атрибуте `value`/`placeholder`, поэтому обход «узлы с собственным текстом»
+ *    пропускал поля целиком — то есть именно то, что проверяется. Такие элементы
+ *    добираются по тегу.
+ * 2. **Тема бывает не на корне.** `/compare` идёт в теме `atom`, объявленной на
+ *    контейнере страницы. Разрешённое семейство поэтому читается с самого
+ *    элемента, а не с `documentElement`: кастомные свойства наследуются, и узел
+ *    внутри `[data-theme]` вернёт гарнитуру своей темы.
  */
 
 interface Finding {
@@ -33,35 +44,46 @@ function firstFamily(value: string) {
   return value.split(',')[0].replace(/["']/g, '').trim()
 }
 
-onMounted(() => {
-  const root = getComputedStyle(document.documentElement)
-  const sans = firstFamily(root.getPropertyValue('--font-sans'))
-  const display = firstFamily(root.getPropertyValue('--font-display'))
-  allowedFamilies.value = [sans, display].filter(Boolean)
+/** Текст узла: собственные текстовые узлы, а у контролов — значение или плейсхолдер. */
+function ownText(el: Element) {
+  if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+    return (el.value || el.placeholder || '').trim()
+  }
+  return Array.from(el.childNodes)
+    .filter(c => c.nodeType === Node.TEXT_NODE)
+    .map(c => c.textContent?.trim() ?? '')
+    .join(' ')
+    .trim()
+}
 
+onMounted(() => {
   const out: Finding[] = []
+  const seenFamilies = new Set<string>()
   let n = 0
 
   for (const host of Array.from(document.querySelectorAll('[data-slot]'))) {
     const nodes = [host, ...Array.from(host.querySelectorAll('*'))]
 
     for (const el of nodes) {
-      // Интересует только узел, у которого есть собственный видимый текст.
-      const own = Array.from(el.childNodes)
-        .filter(c => c.nodeType === Node.TEXT_NODE)
-        .map(c => c.textContent?.trim() ?? '')
-        .join(' ')
-        .trim()
-
+      const own = ownText(el)
       if (!own) continue
 
       n += 1
-      const cs = getComputedStyle(el as Element)
+      const cs = getComputedStyle(el)
+
+      // Разрешённые семейства берутся с самого узла: тема может быть объявлена
+      // не на корне, а на контейнере страницы — как на этой.
+      const allowed = [
+        firstFamily(cs.getPropertyValue('--font-sans')),
+        firstFamily(cs.getPropertyValue('--font-display')),
+      ].filter(Boolean)
+      allowed.forEach(f => seenFamilies.add(f))
+
       const family = firstFamily(cs.fontFamily)
       const size = Math.round(Number.parseFloat(cs.fontSize))
       const reasons: string[] = []
 
-      if (!allowedFamilies.value.includes(family)) reasons.push('семейство не из темы')
+      if (!allowed.includes(family)) reasons.push('семейство не из темы')
       if (!KIT_SIZES.includes(size)) reasons.push(`кегль ${size} вне шкалы кита`)
 
       if (reasons.length) {
@@ -76,6 +98,7 @@ onMounted(() => {
     }
   }
 
+  allowedFamilies.value = [...seenFamilies]
   checked.value = n
   findings.value = out
 })

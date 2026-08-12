@@ -49,6 +49,22 @@
     font-display: swap;
 }
 
+/* Golos Text — гарнитура ТЕМЫ ATOM, не Рососмотра.
+
+   Подключена ради сверки: /compare идёт в теме atom, на родных цветах и родной
+   гарнитуре эталона, иначе расхождение состава путается с расхождением шрифта.
+   В теме rososmotr не появляется никогда — там PT Root UI.
+
+   Вариативный woff2, 73 КБ, лицензия OFL от googlefonts. Диапазон весов 400–900,
+   но легальны те же три, что и у PT Root UI: 400, 500, 700. */
+@font-face {
+    font-family: 'Golos Text';
+    src: url('/fonts/golos/golos-text-variable.woff2') format('woff2-variations');
+    font-weight: 400 900;
+    font-style: normal;
+    font-display: swap;
+}
+
 @theme {
     --font-sans: 'PT Root UI', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
     --font-heading: var(--font-sans);
@@ -212,6 +228,7 @@
     --radius-lg: 12px;                  /* menu_item */
     --radius-xl: 16px;                  /* badge 24px */
     --radius-2xl: 24px;                 /* Chip 32px */
+    --radius-3xl: 32px;                 /* Атом: Input размера 64 — мастер 3451:21529 */
     --radius-full: 999px;               /* bulb-точки: радиус заведомо больше половины стороны */
 
     /* Тени кита — эффект-стили, а не свободные значения.
@@ -219,6 +236,19 @@
        BigShadow: выпадающие плашки. Рамки у них при этом НЕТ. */
     --shadow-button: 0 1px 2px 0 #0000000d;
     --shadow-dropdown: 0 8px 32px 0 #0c10181f;
+    /* Атом, MediumShadow — поле, лежащее поверх карты или фото (мастер 297:2316).
+       Цвет тот же, что у dropdown, отличается только геометрия: 0/4/16 против 0/8/32. */
+    --shadow-elevated: 0 4px 16px 0 #0c10181f;
+
+    /* --- поле ввода ---
+       У Атома поле — ЗАЛИТАЯ поверхность без рамки, а не белое поле с обводкой.
+       Роли заведены под этот состав; значения на тему — ниже. */
+    --color-field: var(--field);
+    --color-field-elevated: var(--field-elevated);
+    --color-field-placeholder: var(--field-placeholder);
+    --color-field-foreground: var(--field-foreground);
+    --color-field-clear: var(--field-clear);
+    --color-field-clear-elevated: var(--field-clear-elevated);
 
     /* Расширения темы как утилиты: bg-primary-hover, text-foreground-secondary… */
     --color-foreground-hover: var(--foreground-hover);
@@ -277,8 +307,12 @@
    Тема кита. Значения перенесены из коллекций mode (69) и menu (9).
    Слева от значения — исходное имя переменной в Figma.
    Мапинг с обоснованиями и provenance — docs/tokens.md, раздел 7.
+
+   Это тема rososmotr — она же дефолт. Имя продублировано атрибутом, чтобы
+   переключатель мог выставить её явно, а не «снятием» другой темы.
    --------------------------------------------------------------------------- */
-:root {
+:root,
+[data-theme="rososmotr"] {
     /* --- поверхности и текст --- */
     --background: #ffffff;              /* bg/page */
     --foreground: #0e1e33;              /* fg/primary */
@@ -399,6 +433,56 @@
     --sidebar-disabled: #6e7885;                    /* menu/fg/disabled */
     --sidebar-scroll-track: #223247;                /* menu/scroll/bg */
     --sidebar-scroll-thumb: #6e7885;                /* menu/scroll/fg */
+
+    /* --- поле ввода ---
+       Состав атомовский (залитая поверхность без рамки), цвет — наш. Каждая
+       строка — решение о том, какая из 78 переменных играет эту роль.
+       Разбор — docs/naming.md, раздел 2. */
+    --field: var(--muted);                          /* решение: neutral/soft — мягкая нейтральная заливка */
+    --field-elevated: var(--background);            /* решение: bg/page — поле поверх карты остаётся белым */
+    --field-placeholder: var(--foreground-secondary); /* решение: fg/secondary — роль плейсхолдера */
+    --field-foreground: var(--foreground);          /* решение: fg/primary — введённое значение */
+    --field-clear: var(--background);               /* решение: bg/page */
+    --field-clear-elevated: var(--accent);          /* решение: bg/surface_hover — светлее белого не бывает, берём ближайшую светлую нейтраль */
+
+    /* Атом гасит выключенное поле прозрачностью всего узла, а не отдельными
+       цветами. Это механизм состава, а не цвет, поэтому значение общее для тем. */
+    --opacity-disabled: 0.48;                       /* мастер 282:3643 */
+}
+
+/* ---------------------------------------------------------------------------
+   Тема atom — СВЕРОЧНАЯ, не для продакшена.
+
+   Значения снимаются с мастеров Атома по ходу переноса каждого компонента и
+   кладутся на те же семантические роли. Семантику Атома не раскапываем: чего
+   мастер не показал — того здесь нет, роль просто наследуется от rososmotr.
+   Поэтому блок неполный намеренно и будет расти по компонентам.
+
+   Кодовые имена Атома (rocky, fargo, django, metropolis, troy и прочие фильмы)
+   в код не попадают — ни переменными, ни комментариями. Слева от значения
+   указан только node id мастера, с которого оно снято.
+   --------------------------------------------------------------------------- */
+[data-theme="atom"] {
+    --font-sans: 'Golos Text', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+
+    /* Input, мастер 249:2768 */
+    --field: #d4d5d952;                             /* 249:2769 — заливка 32% */
+    --field-elevated: #ffffff;                      /* 297:2316 */
+    --field-placeholder: #80858e;                   /* 249:2770 — плейсхолдер и подпись */
+    --field-foreground: #525760;                    /* 249:2819 — введённое значение */
+    --field-clear: #ffffff;                         /* 1887:11943 */
+    --field-clear-elevated: #f5f6f8;                /* 1887:12349 */
+}
+
+/* ---------------------------------------------------------------------------
+   Тема viewapp — каркас будущего бренда. Значений нет и не выдумываются.
+   Роли перечислены, чтобы было видно, что именно предстоит заполнить.
+   --------------------------------------------------------------------------- */
+[data-theme="viewapp"] {
+    /* TODO: бренд не определён. Заполняется, когда появится палитра VIEWAPP.
+       --primary, --primary-foreground, --secondary, --secondary-foreground,
+       --background, --foreground, --field, --field-elevated,
+       --field-placeholder, --field-foreground, --font-sans. */
 }
 
 /* ---------------------------------------------------------------------------
