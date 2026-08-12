@@ -92,7 +92,8 @@
 
     /* Трекинг. У всех текстовых токенов кита letterSpacing = 0 — проверено по
        Txt/regular13-16, Txt/bold13-16, Txt/regular15-20, Txt/medium15-20,
-       Txt/bold15-20, Txt/bold17-24, txt/bold16-20, Header/bold36-40.
+       Txt/bold15-20, Txt/bold17-24, Header/bold20-24, Header/bold24-28,
+       Header/bold36-40, Txt/bold12-16, Txt/regular12-16 — все 11 стилей.
        Ноль зафиксирован явно, чтобы правка тайлвиндовского дефолта не прошла молча. */
     --text-2xs--letter-spacing: 0;
     --text-xs--letter-spacing: 0;
