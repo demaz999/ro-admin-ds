@@ -252,9 +252,19 @@ provenance описывает выбор **слота**: `прямой` — со
 | Figma | Значение | Слот | Provenance |
 |---|---|---|---|
 | `border/default` | `#ccdef5` | `--border`, `--input` | прямой |
-| `border/secondary` | `#9aacc2` | `--border-secondary` *(расш.)* | прямой |
-| `border/accent` | `#0059cf` | `--border-accent` *(расш.)* | прямой |
-| `border/neutral_soft` | `#d0d4d8` | `--border-neutral` *(расш.)* | прямой |
+| `border/secondary` | `#9aacc2` | `--border-secondary` *(расш.)* · утилита `border-stroke-secondary` | прямой |
+| `border/accent` | `#0059cf` | `--border-accent` *(расш.)* · утилита `border-stroke-accent` | прямой |
+| `border/neutral_soft` | `#d0d4d8` | `--border-neutral` *(расш.)* · утилита `border-stroke-neutral` | прямой |
+
+> **Ловушка имён: `border-border-*` не работает.**
+> CSS-переменные называются `--border-accent` и т.д., но ключ Tailwind у них —
+> `--color-stroke-accent`, поэтому в классах пишется `border-stroke-accent`, а не
+> `border-border-accent`.
+>
+> Причина: в базовом слое стоит `* { @apply border-border }`. Утилита `border-border-accent`
+> с ним конфликтует и **молча не генерируется** — класс висит на элементе, CSS-правила под него
+> нет, рамка остаётся дефолтной. Отлавливается только проверкой вычисленного стиля, поэтому
+> развели префиксы.
 | `neutral/default` | `#6e7885` | `--muted-foreground` | прямой |
 | `neutral/soft` | `#e8e9ec` | `--muted` | прямой |
 | `neutral/disabled` | `#b9bec5` | `--muted-disabled` *(расш.)* | прямой |
