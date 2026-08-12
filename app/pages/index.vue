@@ -233,11 +233,48 @@ const martianWidths = [
           </div>
         </div>
 
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Состояния · спека 237:2820
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            В мастере состояний нет — они живут на странице спецификации того же файла. Наведение
+            уплотняет заливку с 32% до 48%, фокус дополнительно поднимает плейсхолдер наверх
+            подписью. У поля поверх карты меняется не заливка, а тень.
+          </p>
+          <div class="grid gap-6 sm:grid-cols-2">
+            <ShowcaseCell label="Hover" hint="наведите курсор">
+              <Input />
+            </ShowcaseCell>
+            <ShowcaseCell label="Pressed/Active" hint="поставьте каретку">
+              <Input />
+            </ShowcaseCell>
+            <ShowcaseCell label="ErrorDefault">
+              <Input invalid error-text="text about error here" />
+            </ShowcaseCell>
+            <ShowcaseCell label="ErrorFilled">
+              <Input invalid model-value="Input text" error-text="text about error here" />
+            </ShowcaseCell>
+            <ShowcaseCell label="Error · elevated">
+              <Input invalid variant="elevated" error-text="text about error here" />
+            </ShowcaseCell>
+            <ShowcaseCell label="Error · disabled">
+              <Input invalid disabled model-value="Input text" />
+            </ShowcaseCell>
+          </div>
+        </div>
+
         <p class="max-w-2xl rounded-md border border-border p-3 text-sm">
-          <strong>Чего у Атома нет вовсе:</strong> hover, focus, pressed, error, внешней подписи,
-          подсказки и счётчика символов. В документации Атома hover и error нарисованы картинками,
-          вариантами компонента они не являются — перенесён факт, а не картинка.
-          См. <code>docs/open-questions.md</code>, вопрос 26.
+          <strong>Чего у Атома нет вовсе:</strong> внешней подписи над полем, строки подсказки и
+          счётчика символов — ни в мастере, ни в спеке. Это дизайн-долг с источником «архив кита 1»,
+          закрывается в фазе обогащения первым приоритетом.
+          См. <code>docs/design-debt.md</code>.
+        </p>
+
+        <p class="max-w-2xl rounded-md border border-border p-3 text-sm">
+          <strong>Между полями формы — минимум 24px по вертикали.</strong> Правило размётки, снятое
+          со спеки: два соседних поля стоят с зазором 24, метка «min 24px» стоит ровно в этом
+          промежутке. Это правило раскладки, а не проп компонента.
         </p>
       </div>
     </ShowcaseSection>

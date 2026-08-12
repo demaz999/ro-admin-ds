@@ -239,16 +239,28 @@
     /* Атом, MediumShadow — поле, лежащее поверх карты или фото (мастер 297:2316).
        Цвет тот же, что у dropdown, отличается только геометрия: 0/4/16 против 0/8/32. */
     --shadow-elevated: 0 4px 16px 0 #0c10181f;
+    /* Тень поля поверх карты ходит по состояниям: у Атома меняется не заливка,
+       а прозрачность тени — 12% в покое, 16% на наведении, 8% на нажатии.
+       Спека 309:2320, «shadow MediumShadowHover». */
+    --shadow-elevated-hover: 0 4px 16px 0 #0c101829;
+    --shadow-elevated-pressed: 0 4px 16px 0 #0c101814;
 
     /* --- поле ввода ---
        У Атома поле — ЗАЛИТАЯ поверхность без рамки, а не белое поле с обводкой.
        Роли заведены под этот состав; значения на тему — ниже. */
     --color-field: var(--field);
+    --color-field-hover: var(--field-hover);
     --color-field-elevated: var(--field-elevated);
+    --color-field-error: var(--field-error);
+    --color-field-error-hover: var(--field-error-hover);
     --color-field-placeholder: var(--field-placeholder);
+    --color-field-placeholder-hover: var(--field-placeholder-hover);
     --color-field-foreground: var(--field-foreground);
+    --color-field-foreground-hover: var(--field-foreground-hover);
     --color-field-clear: var(--field-clear);
     --color-field-clear-elevated: var(--field-clear-elevated);
+    --color-field-clear-foreground: var(--field-clear-foreground);
+    --color-field-error-foreground: var(--field-error-foreground);
 
     /* Расширения темы как утилиты: bg-primary-hover, text-foreground-secondary… */
     --color-foreground-hover: var(--foreground-hover);
@@ -439,11 +451,18 @@
        строка — решение о том, какая из 78 переменных играет эту роль.
        Разбор — docs/naming.md, раздел 2. */
     --field: var(--muted);                          /* решение: neutral/soft — мягкая нейтральная заливка */
+    --field-hover: var(--border-neutral);           /* решение: ступень темнее neutral/soft — у Атома наведение это та же заливка плотнее */
     --field-elevated: var(--background);            /* решение: bg/page — поле поверх карты остаётся белым */
+    --field-error: var(--destructive-surface);      /* решение: service/error-surface */
+    --field-error-hover: var(--destructive-surface); /* @debt второй ступени error-поверхности в теме нет — см. design-debt.md */
     --field-placeholder: var(--foreground-secondary); /* решение: fg/secondary — роль плейсхолдера */
+    --field-placeholder-hover: var(--foreground);   /* решение: на наведении подпись темнеет до fg/primary */
     --field-foreground: var(--foreground);          /* решение: fg/primary — введённое значение */
+    --field-foreground-hover: var(--foreground);    /* @debt ступени темнее fg/primary в теме нет — см. design-debt.md */
     --field-clear: var(--background);               /* решение: bg/page */
     --field-clear-elevated: var(--accent);          /* решение: bg/surface_hover — светлее белого не бывает, берём ближайшую светлую нейтраль */
+    --field-clear-foreground: var(--foreground-secondary); /* решение: крестик идёт за подписью, не за значением */
+    --field-error-foreground: var(--destructive);   /* решение: service/error-default — строка сообщения об ошибке */
 
     /* Атом гасит выключенное поле прозрачностью всего узла, а не отдельными
        цветами. Это механизм состава, а не цвет, поэтому значение общее для тем. */
@@ -465,13 +484,25 @@
 [data-theme="atom"] {
     --font-sans: 'Golos Text', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
 
-    /* Input, мастер 249:2768 */
-    --field: #d4d5d952;                             /* 249:2769 — заливка 32% */
-    --field-elevated: #ffffff;                      /* 297:2316 */
-    --field-placeholder: #80858e;                   /* 249:2770 — плейсхолдер и подпись */
-    --field-foreground: #525760;                    /* 249:2819 — введённое значение */
-    --field-clear: #ffffff;                         /* 1887:11943 */
+    /* Input: мастер 249:2768 плюс страница спецификации 237:2820.
+       Состояния существуют только в спеке — вариантами мастера они не являются. */
+    --field: #d4d5d952;                             /* 255:2794 — заливка 32% */
+    --field-hover: #d4d5d97a;                       /* 255:2796 — та же заливка, 48% */
+    --field-elevated: #ffffff;                      /* 309:2310 */
+    --field-error: #fb989829;                       /* 255:3442 — 16% */
+    --field-error-hover: #fb98983d;                 /* 255:3454 — 24% */
+    --field-placeholder: #80858e;                   /* 255:2794 — покой */
+    --field-placeholder-hover: #525760;             /* 255:2796 — наведение и фокус */
+    --field-foreground: #525760;                    /* 394:2868 — значение в покое */
+    --field-foreground-hover: #1d222a;              /* 394:2878 — значение под наведением и фокусом */
+    --field-clear: #ffffff;                         /* 249:2838 — подложка крестика */
     --field-clear-elevated: #f5f6f8;                /* 1887:12349 */
+    --field-clear-foreground: #80858e;              /* 249:2838 — крестик */
+    --field-error-foreground: #e35454;              /* 255:2824 — строка сообщения */
+
+    --shadow-elevated: 0 4px 16px 0 #0c10181f;      /* 309:2310 — 12% */
+    --shadow-elevated-hover: 0 4px 16px 0 #0c101829; /* 309:2322 — 16% */
+    --shadow-elevated-pressed: 0 4px 16px 0 #0c101814; /* 309:2324 — 8% */
 }
 
 /* ---------------------------------------------------------------------------

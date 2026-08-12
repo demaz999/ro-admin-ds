@@ -55,10 +55,12 @@ const variants = [
         расхождением цвета. Приёмочный просмотр — в <code>rososmotr</code>, на витрине.
       </p>
       <p class="max-w-3xl rounded-md border border-border bg-secondary p-3 text-sm">
-        <strong>Известное расхождение, намеренное:</strong> кегль значения у Атома 16/20, в коде
-        15/20 — размерная шкала общая и берётся наша (<code>docs/themes.md</code>). Интерлиньяж
-        совпадает, поэтому высоты и отступы не меняются: в режиме «разница» светится только
-        рисунок глифа, не коробка.
+        <strong>Известное исключение, намеренное:</strong> кегль значения у Атома 16/20, в коде
+        15/20 — размерная шкала общая и берётся наша (<code>docs/themes.md</code>, вопрос 27).
+        Интерлиньяж совпадает, поэтому высоты и отступы не меняются.
+        <strong>Следствие: текстовые узлы в режиме «разница» светятся всегда.</strong> Это не
+        дефект переноса и не признак ошибки. Коробки сверяются наложением, а кегль и семейство —
+        автопроверкой шрифтов внизу страницы, по computed-значению.
       </p>
     </header>
 
@@ -89,6 +91,65 @@ const variants = [
           :model-value="v.value ?? ''"
           :disabled="v.disabled ?? false"
         />
+      </CompareFrame>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="text-lg font-bold">
+        Input · состояния · спека 237:2820
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Состояний в мастере нет вовсе — они живут только на странице спецификации, отдельными
+        ячейками с подписями токенов. Эталоны ниже — это сами ячейки спеки, по node id каждая.
+      </p>
+      <p class="max-w-3xl rounded-md border border-border p-3 text-sm">
+        <strong>Наведение и фокус наложением не замораживаются.</strong> Слой кода живой:
+        чтобы совместить его с эталоном, наведите курсор на поле или поставьте в него каретку —
+        и смотрите в режиме «разница». Значения при этом сверены отдельно, по computed-стилям.
+      </p>
+
+      <CompareFrame
+        title="Hover · 255:2796 · наведите курсор на поле"
+        node="255:2796"
+        master="atom/input-hover_255-2796.png"
+        :width="272"
+        :height="40"
+        note="заливка та же, но плотнее: 32% → 48%. Подпись и иконка темнеют"
+      >
+        <Input />
+      </CompareFrame>
+
+      <CompareFrame
+        title="Pressed/Active · 255:2798 · поставьте каретку в поле"
+        node="255:2798"
+        master="atom/input-pressed_255-2798.png"
+        :width="272"
+        :height="40"
+        note="плавающий плейсхолдер: подпись уезжает наверх кеглем 13, хотя значения ещё нет. В ячейке спеки нарисована каретка"
+      >
+        <Input />
+      </CompareFrame>
+
+      <CompareFrame
+        title="HoverFilled · 394:2878 · наведите курсор"
+        node="394:2878"
+        master="atom/input-hover-filled_394-2878.png"
+        :width="272"
+        :height="40"
+        note="заполненное поле под наведением: значение темнеет до самого тёмного"
+      >
+        <Input model-value="Input text" />
+      </CompareFrame>
+
+      <CompareFrame
+        title="ErrorDefault · 255:3442"
+        node="255:3442"
+        master="atom/input-error_255-3442.png"
+        :width="272"
+        :height="40"
+        note="ошибка — не рамка, а подмена заливки на красноватую. Рамки нет и здесь"
+      >
+        <Input invalid />
       </CompareFrame>
     </section>
 
