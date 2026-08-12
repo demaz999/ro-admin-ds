@@ -270,3 +270,269 @@ Uploader, Spinner. Вот там перенос состава из Атома �
 **Иконки — единственный раздел, где пивот сработал на сто процентов**, но не так, как ожидалось:
 библиотека Атома недоступна физически, зато выяснилось, что кит уже почти целиком на Material
 Symbols. Замена превращается в переименование.
+
+---
+
+# Инвентарь Атома
+
+> Всё выше по документу — **этап 0**, сравнение состава Атома с китом 1. Его вывод («из Атома
+> забирать оси, а не геометрию») **отменён** заданием `zadanie-atom.md`: гибрид отклонён, режим —
+> чистый перенос Атома как основы. Раздел выше остаётся историей решения и объясняет, чего мы
+> сознательно лишаемся до фазы обогащения.
+
+Снято 2026-08-12 read-only обходом через Plugin API (`figma.root.children` + `page.loadAsync` +
+`findAllWithCriteria`). `get_metadata` не использовался — по причине, описанной в `CLAUDE.md`.
+
+Файл: `6IKVjTkdtKC232fZ0HR6uU`, наш дубликат community-файла.
+
+**56 страниц · 74 мастера · 874 варианта.**
+
+Мастером считается `COMPONENT_SET` либо одиночный `COMPONENT`, не лежащий внутри сета.
+Подчёркивание в начале имени (`_Tab`, `_Row`, `_MenuItem`) — конвенция Атома для внутренних
+частей, а не самостоятельных компонентов.
+
+## Полный перечень
+
+Столбец «В» — число вариантов. Оси приведены как в файле, вместе с кодовыми именами: они
+**не переносятся в код**, но нужны, чтобы найти вариант в Figma.
+
+### Поля и ввод
+
+| Компонент | node id | Тип | В | Оси | Пропы сверх осей |
+|---|---|---|---|---|---|
+| `Input` | `249:2768` | SET | 16 | Type `default\|map` · Size `eluno\|lanassa` · State `default\|filled` · Rounded · Disabled | Show Icon left, Icon left (SWAP), Show ClearButton, Placeholder, Input text |
+| `InputNumber` | `803:9446` | SET | 3 | State `entered\|default\|disabled` | — |
+| `Textarea` | `282:4688` | SET | 4 | State `default\|filled` · Disabled | Placeholder, Text |
+| `Select` | `434:3074` | SET | 16 | Type `default\|map` · State `default\|filled` · Active · Disabled | Show icon, Icon (SWAP), Select option, Option |
+| `Autocomplete` | `3874:36379` | SET | 8 | Type `default\|map` · State `default\|filled` · Disabled | Show Icon left, Icon left (SWAP), Show ClearButton, Placeholder, Autocomplete text |
+
+### Выпадашка и списки
+
+| Компонент | node id | Тип | В | Оси | Пропы сверх осей |
+|---|---|---|---|---|---|
+| `PopOverList` ⚠ Not DS | `571:4889` | SET | 6 | ListGroup `default\|withIcon\|checked` · Subtitle | Search field, Scroll, Slot |
+| `ListGroup` | `542:4969` | SET | 6 | Type `default\|withIcon\|checked` · Subtitle | Header, Show header |
+| `ListItem` | `2400:14661` | SET | 4 | Active · Disabled | Title, Subtitle, Show subtitle, Show Icon, Checkbox |
+| `_IconListItem` | `6475:86591` | SET | 9 | Color (9 значений) | Icon (SWAP) |
+| `ScrollBar` ⚠ Not DS | `1159:10439` | SET | 4 | Ориентация · Размер (**оси по-русски**) | — |
+| `Popover` | `405:3786` | COMP | 1 | — | — |
+
+### Кнопки
+
+| Компонент | node id | Тип | В | Оси | Пропы сверх осей |
+|---|---|---|---|---|---|
+| `ButtonSimple` | `110:1566` | SET | **186** | Type `primary\|secondary\|light\|transparent` · Size (3) · Rounded · Color (9) · Disabled | Icon (SWAP), Icon 20x20 (SWAP) |
+| `Button` | `57:340` | SET | **118** | Type `primary\|secondary` · Width `content\|wide` · Size (3) · Color (9) · Rounded · Disabled | Show icon, Icon (SWAP), Title |
+| `ButtonAction` | `1028:8221` | SET | 40 | Color (10) · Size (2) · Disabled | Show icon, Show arrow, Show title, Title, Icon (SWAP) |
+| `ButtonAction_` | `6626:56755` | SET | 2 | Size (2) | — |
+| `ButtonTag` | `256:3601` | SET | 18 | Active · Color (9) | Title |
+| `ButtonLink` | `5792:97292` | SET | 16 | Size (2) · Color (8) | — |
+| `ButtonNavigation` | `612:5443` | SET | 14 | Size (7) · Color (2) | Title, Active |
+| `ButtonArrow` | `1938:12858` | SET | 12 | Type `default\|shapeless` · Size (3) · Direction `left\|right` | — |
+| `ButtonPlayer` | `6143:49984` | SET | 12 | Type `play\|pause` · Size (3) · Disabled | — |
+| `ButtonGallery` | `842:13505` | COMP | 1 | — | Title |
+
+### Выбор и переключение
+
+| Компонент | node id | Тип | В | Оси | Пропы сверх осей |
+|---|---|---|---|---|---|
+| `Checkbox` | `486:4733` | SET | 6 | Checked · Partial · Disabled | Show title, Show subtitle, Title, Subtitle |
+| `RadioButton` | `590:5372` | SET | 4 | Checked · Disabled | Show title, Show subtitle, Option text, Secondary text |
+| `Switcher` | `1072:10873` | SET | 4 | Switched · Disabled | Show title, Show subtitle, Primary text, Secondary text |
+| `Fader` | `635:5430` | COMP | 1 | — | — |
+| `_Tab` | `1772:11731` | SET | 8 | Rounded · State `default\|active\|hover\|disabled` | Bulb, Tab title |
+| `Tabs` | `1782:13075` | SET | 2 | Rounded | — |
+
+### Индикаторы и обратная связь
+
+| Компонент | node id | Тип | В | Оси | Пропы сверх осей |
+|---|---|---|---|---|---|
+| `Bulb` | `790:10402` | SET | 47 | Type `shape\|text\|shape+text` · Size (2) · Color (10) | Title |
+| `Avatar` | `3488:24229` | SET | 30 | Type `icon\|letter\|photo` · Size (6) · Color (3) | Letter, Editing |
+| `Badge` | `913:8279` | SET | 20 | Size (2) · Color (10) · Inversion | Title |
+| `Spinner` | `134:1768` | SET | 10 | Color `rocky\|white` · Size (5) | — |
+| `Tooltip` | `834:10127` | SET | 7 | Сorner (7 положений, **С латинская**) | Text |
+| `Timer` | `6344:55714` | SET | 6 | Number · Size (3) | — |
+| `Notification` | `5883:58974` | SET | 3 | Type `default\|timer` · Show icon | Show ButtonAction, Notification text, Icon (SWAP) |
+
+### Навигация
+
+| Компонент | node id | Тип | В | Оси | Пропы сверх осей |
+|---|---|---|---|---|---|
+| `_MenuItem` | `3497:23069` | SET | 8 | Collapse · Selected · Compact | — |
+| `_MenuItemMaster` | `3465:22566` | SET | 6 | Compact · Selected · Disabled | Collapse, Show Bulb, Show Icon, Icon (SWAP), Title |
+| `MenuPopOver` | `3499:27440` | SET | 4 | Icons · Scroll | Show Scroll |
+| `Menu` | `3499:24661` | SET | 2 | Compact | — |
+| `Plank` | `1910:12739` | SET | 9 | Type `arrow\|icon\|number` · Disabled · Active | Primary/Secondary text, Show secondary text, Show Avatar, Show Icon, Icon (SWAP) |
+| `NavigationTile` | `638:5476` | SET | 2 | Breakpoint | Tile text |
+| `BreadCrumbs` | `3880:31214` | COMP | 1 | — | Collapsed |
+| `Pagination` | `4104:36392` | COMP | 1 | — | — |
+
+### Дата, время, файлы
+
+| Компонент | node id | Тип | В | Оси | Пропы сверх осей |
+|---|---|---|---|---|---|
+| `DatePicker` | `1763:10301` | SET | 3 | State `default\|filled\|disabled` | Placeholder, Input text |
+| `DatePickerPopOver` | `1159:10888` | SET | 4 | Range · Popover | — |
+| `TimePicker` | `3871:26784` | SET | 3 | State `default\|filled\|disabled` | Placeholder, Input text |
+| `TimePickerPopOver` | `1161:9805` | SET | 2 | Range | Title, Seconds, Title text |
+| `Uploader` | `1572:10113` | SET | 4 | State `default\|uploaded/disabled\|error\|disabled` | — |
+| `File` | `1931:12249` | SET | 3 | Type `default\|simple` · Size (3) | Title, Subtitle, Image, Icon, Show subtitle |
+
+### Таблица
+
+| Компонент | node id | Тип | В | Оси | Пропы сверх осей |
+|---|---|---|---|---|---|
+| `Cell` | `3349:22376` | SET | **72** | Type (**20 значений**) · Active · Size (4) | Stroke, Cell text, Subtitle, Icon left (SWAP), Number, Editable text |
+| `TableHeader` | `5137:37282` | SET | 6 | Type `simple\|interactive\|active\|checkbox\|expand\|collapse` | Stroke |
+| `_BulbStatus` | `5862:53423` | SET | 8 | Color (8) | Letter |
+| `_TextStatus` | `5868:53919` | SET | 8 | Color (8) | — |
+| `_Row` | `9062:64690` | COMP | 1 | — | — |
+
+Ось `Type` у `Cell`: `16 reg — DS`, `16 reg + sub`, `16 bold`, `16 reg + icon left`,
+`16 reg + icon right`, `16 number`, `13 reg — DS`, `13 bold`, `Input`, `Input + sub`, `dropdown`,
+`dropdown + sub`, `checkbox — DS`, `expand — DS`, `collapse — DS`, `status text`, `status bulb`,
+`context cell`, `bulb cell`, `icon cell`. Пометка `— DS` стоит у шести значений и не расшифрована.
+
+### Контейнеры и оверлеи
+
+| Компонент | node id | Тип | В | Оси | Пропы сверх осей |
+|---|---|---|---|---|---|
+| `Accordion` | `6644:58398` | SET | 30 | Shape · Collapsed · Color shape (3) · Size (5) | Title |
+| `Image` | `174:3128` | SET | 6 | Ratio (6 пропорций) | — |
+| `Announcement` | `149:1663` | SET | 4 | Size (2) · Brakepoint (**опечатка в файле**) | Subtitle, Title, Badge |
+| `Story` | `749:5436` | COMP | 1 | — | Tile text |
+
+### Медиа и сайтовый слой
+
+| Компонент | node id | Тип | В | Оси | Пропы сверх осей |
+|---|---|---|---|---|---|
+| `MediaGallery` | `6734:62674` | SET | 9 | Brakepoint (3) · Size (3) | — |
+| `_MediaGalleryItem` | `6734:62222` | SET | 6 | Type `default\|more` · Size (3) | Video |
+| `Slideshow` | `5946:53926` | SET | 2 | Brakepoint | Preview, Badge, ArrowPreview |
+| `_PreviewItem` | `5946:53594` | SET | 2 | Active | Video |
+| `PlayerAudio` | `6921:57397` | SET | 2 | State `play\|pause` | — |
+| `PlayerVideo` | `6922:58170` | SET | 2 | Size (2) | — |
+
+### Служебное — вне переноса
+
+| Компонент | node id | Тип | В |
+|---|---|---|---|
+| `_Slot` (LayoutDashboard) | `3618:26704` | COMP | 1 |
+| `_MenuPopover` (LayoutSite) | `7295:64410` | COMP | 1 |
+| `Logo_RIR` | `338:3893` | SET | 2 |
+| `Cursor` | `282:5377` | SET | 8 |
+| `_Shadow` | `5583:45242` | COMP | 1 |
+| Логотипы РИР на Guidelines | `1874:11748`, `3360:21074`, `3360:21075`, `3360:21076`, `3360:21077`, `3360:21078` | COMP | 6 |
+
+## Страницы без мастеров
+
+Проверено отдельно: это не пустые страницы, а **композиции из инстансов**. Локального мастера
+у них нет.
+
+| Страница | Что лежит | Из чего собрано |
+|---|---|---|
+| `ModalWindow` | `1156:10007`, `1204:9799` (dark), `6626:56959` | `ButtonSimple` ×17, `ButtonAction_` ×9, `Button` ×2 |
+| `LightBox` | `8862:69945`, `8887:63887` | `Image` ×3, `ButtonArrow` ×4, `Badge` ×4, `ButtonSimple` ×4 |
+| `Shorter` | `6658:55815` | `Tooltip`, `Cursor` |
+| `Title` | `6001:53239` | логотип |
+
+**Модального окна как компонента в Атоме не существует.** Это отсутствие, а не противоречие:
+строка в `design-debt.md`, закрытие — дефолтом shadcn-vue на этапе 2.
+
+---
+
+# Предложение по разбивке на волны
+
+Порядок задан заданием: **поля и кнопки первыми**. Дальше — по зависимостям и по частотности в
+админских экранах. Медиа и сайтовый слой вынесены в конец как кандидаты на исключение.
+
+Внутри волны 1 отдельная стоп-точка после `Input` — как требует задание.
+
+| Волна | Что | Мастеров | Вариантов |
+|---|---|---|---|
+| 1 | Поля ввода и обвязка выпадашки | 11 | 77 |
+| 2 | Кнопки | 10 | 419 |
+| 3 | Выбор и переключение | 6 | 25 |
+| 4 | Индикаторы и обратная связь | 7 | 123 |
+| 5 | Навигация | 8 | 33 |
+| 6 | Дата, время, файлы | 6 | 19 |
+| 7 | Таблица | 5 | 95 |
+| 8 | Контейнеры и оверлеи | 4 | 41 |
+| 9 | Медиа и сайтовый слой | 18 | 54 |
+| | **Итого** | **74** | **874** |
+
+## Волна 1 — поля ввода
+
+`Input` `249:2768` · `InputNumber` `803:9446` · `Textarea` `282:4688` · `Select` `434:3074` ·
+`Autocomplete` `3874:36379` · `PopOverList` `571:4889` · `ListGroup` `542:4969` ·
+`ListItem` `2400:14661` · `_IconListItem` `6475:86591` · `ScrollBar` `1159:10439` ·
+`Popover` `405:3786`
+
+Выпадашка и её строки лежат в этой волне не по смыслу, а по зависимости: `Select` и
+`Autocomplete` без списка не собираются, а у Атома список — отдельные мастера на странице `List`.
+
+## Волна 2 — кнопки
+
+`ButtonSimple` `110:1566` · `Button` `57:340` · `ButtonAction` `1028:8221` ·
+`ButtonAction_` `6626:56755` · `ButtonTag` `256:3601` · `ButtonLink` `5792:97292` ·
+`ButtonNavigation` `612:5443` · `ButtonArrow` `1938:12858` · `ButtonGallery` `842:13505` ·
+`ButtonPlayer` `6143:49984`
+
+Самая тяжёлая волна: **419 вариантов из 874, почти половина файла**. Объём целиком определяется
+цветовой осью — см. вопрос 23. Пока он не решён, оценить волну нельзя.
+
+## Волна 3 — выбор и переключение
+
+`Checkbox` `486:4733` · `RadioButton` `590:5372` · `Switcher` `1072:10873` · `Fader` `635:5430` ·
+`_Tab` `1772:11731` · `Tabs` `1782:13075`
+
+## Волна 4 — индикаторы и обратная связь
+
+`Bulb` `790:10402` · `Badge` `913:8279` · `Avatar` `3488:24229` · `Spinner` `134:1768` ·
+`Tooltip` `834:10127` · `Timer` `6344:55714` · `Notification` `5883:58974`
+
+## Волна 5 — навигация
+
+`Menu` `3499:24661` · `_MenuItem` `3497:23069` · `_MenuItemMaster` `3465:22566` ·
+`MenuPopOver` `3499:27440` · `Plank` `1910:12739` · `NavigationTile` `638:5476` ·
+`BreadCrumbs` `3880:31214` · `Pagination` `4104:36392`
+
+## Волна 6 — дата, время, файлы
+
+`DatePicker` `1763:10301` · `DatePickerPopOver` `1159:10888` · `TimePicker` `3871:26784` ·
+`TimePickerPopOver` `1161:9805` · `Uploader` `1572:10113` · `File` `1931:12249`
+
+Стоит после полей сознательно: пикеры — это поле плюс поповер, оба паттерна к этому моменту уже
+перенесены.
+
+## Волна 7 — таблица
+
+`Cell` `3349:22376` · `TableHeader` `5137:37282` · `_Row` `9062:64690` ·
+`_BulbStatus` `5862:53423` · `_TextStatus` `5868:53919`
+
+Ось `Type` у `Cell` — 20 значений, и шесть из них тянут за собой контролы: `Input`, `Input + sub`,
+`dropdown`, `dropdown + sub`, `checkbox`, `status bulb`. Поэтому таблица не может идти раньше
+волн 1, 3 и 4.
+
+## Волна 8 — контейнеры и оверлеи
+
+`Accordion` `6644:58398` · `Image` `174:3128` · `Announcement` `149:1663` · `Story` `749:5436`
+
+Сюда же — модальное окно и лайтбокс, у которых мастеров нет: строкой в `design-debt.md`.
+
+## Волна 9 — медиа и сайтовый слой
+
+`MediaGallery` `6734:62674` · `_MediaGalleryItem` `6734:62222` · `Slideshow` `5946:53926` ·
+`_PreviewItem` `5946:53594` · `PlayerAudio` `6921:57397` · `PlayerVideo` `6922:58170` ·
+`Logo_RIR` `338:3893` · `Cursor` `282:5377` · `_Shadow` `5583:45242` · логотипы РИР ·
+`_Slot` `3618:26704` · `_MenuPopover` `7295:64410`
+
+**Кандидат на исключение целиком.** Плееры, галерея, слайдшоу, логотипы РИР и курсоры — сайтовый
+слой чужого бренда, в админских экранах Рососмотра им места нет. Решение — за Михаилом.
+
+## Чего в этой разбивке нет
+
+Волны не покрывают то, чего в Атоме не нарисовано вовсе: тосты, скелетоны, степпер, command /
+combobox, пустые состояния. Это отсутствие, оно уходит в `design-debt.md` и закрывается на
+этапе 2, а не подмешивается в перенос.
