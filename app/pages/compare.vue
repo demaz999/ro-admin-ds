@@ -14,6 +14,21 @@ const inputVariants = [
   { title: 'input · label=top, disabled, 44', x: 1777, y: 578, w: 464, h: 92 },
 ]
 
+/** Эталоны целиком. Источник-файл указан там, где он не админский кит. */
+const masters = [
+  { src: 'btn-accent_709-6413.png', cap: 'btn_accent · 709:6413 · 10 вариантов' },
+  { src: 'input_720-11753.png', cap: 'input · 720:11753 · 20 вариантов' },
+  { src: 'select_1929-4067.png', cap: 'select · 1929:4067 · 4 типа' },
+  { src: 'select-dropdown_1059-6225.png', cap: 'выпадающая часть · 1059:6225' },
+  { src: 'tabs_720-9159.png', cap: 'tabs · 720:9159 · два вида вкладок' },
+  { src: 'iconed-tab-list_2181-387.png', cap: 'iconed_tab_list · 2181:387 · вкладки-таблетка' },
+  { src: 'badge_1173-196.png', cap: 'badge · 1173:196 · три цвета, с иконкой' },
+  {
+    src: 'site-button_1314-2350.png',
+    cap: 'большая кнопка · 1314:2350 · сайтовый слой, файл byDGy0Ab4QciP0CHTMLxYv, шрифт Martian Grotesk',
+  },
+]
+
 const badgeVariants = [
   { title: 'badge · violet', x: 16, y: 16, w: 97, h: 24, color: 'violet' as const },
   { title: 'badge · red', x: 16, y: 60, w: 97, h: 24, color: 'red' as const },
@@ -103,12 +118,7 @@ const badgeVariants = [
       </p>
 
       <div class="space-y-6">
-        <figure v-for="m in [
-          { src: 'btn-accent_709-6413.png', cap: 'btn_accent · 709:6413 · 10 вариантов' },
-          { src: 'tabs_720-9159.png', cap: 'tabs · 720:9159' },
-          { src: 'select-dropdown_1059-6225.png', cap: 'select / dropdown · 1059:6225' },
-          { src: 'input_720-11753.png', cap: 'input · 720:11753 · 20 вариантов' },
-        ]" :key="m.src" class="space-y-2">
+        <figure v-for="m in masters" :key="m.src" class="space-y-2">
           <figcaption class="text-xs text-muted-foreground">
             {{ m.cap }}
           </figcaption>
