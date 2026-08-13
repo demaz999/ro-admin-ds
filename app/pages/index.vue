@@ -773,6 +773,89 @@ const martianWidths = [
     </ShowcaseSection>
 
     <ShowcaseSection
+      title="Таблица · волна 7"
+      note="Матрица ячейки урезана решением, а не переносом: у оси Type двадцать значений, перенесено пять плюс слот. Пометка «— DS» означает «дизайн-система даёт готовым» — разбор в docs/table-ds-marker.md."
+    >
+      <div class="space-y-8">
+        <div>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Пять помеченных типов дают <strong>390 инстансов из 436</strong> в демонстрационной
+            раскладке, каждый непомеченный встречается ровно 2 или 4 раза. И тип
+            <code>Input</code> содержит текстовый слой, а не инстанс поля — то есть он рисунок
+            контрола, а не композиция с ним. Всё содержательное кладётся в слот.
+          </p>
+          <p class="mb-3 max-w-2xl rounded-md border border-border p-3 text-sm">
+            <strong>Подсветка живёт на ячейке, а не на строке.</strong> У <code>_Row</code>
+            заливки нет вовсе — ось <code>Active</code> есть у ячейки. Чтобы подсветить строку,
+            её выставляют каждой ячейке. Проверено отдельно, отдано дизайнерам.
+          </p>
+
+          <div class="w-fit overflow-x-auto">
+            <TableRow>
+              <TableHead variant="checkbox" />
+              <TableHead variant="active" class="w-50">
+                Наименование
+              </TableHead>
+              <TableHead variant="interactive" class="w-30">
+                Дата
+              </TableHead>
+              <TableHead variant="simple" class="w-30">
+                Статус
+              </TableHead>
+              <TableHead variant="simple" class="w-30">
+                Ответственный
+              </TableHead>
+            </TableRow>
+
+            <TableRow v-for="r in 3" :key="r">
+              <TableCell variant="checkbox" :active="r === 2" />
+              <TableCell :active="r === 2" class="w-50">
+                Осмотр № {{ 1200 + r }}
+              </TableCell>
+              <TableCell :active="r === 2" class="w-30">
+                13.08.2026
+              </TableCell>
+              <!-- Слот: статус — композиция из перенесённого, а не тип ячейки. -->
+              <TableCell variant="slot" :active="r === 2" class="w-30">
+                <Badge :variant="r === 1 ? 'success' : r === 2 ? 'warning' : 'neutral'" size="sm">
+                  {{ r === 1 ? 'Готов' : r === 2 ? 'В работе' : 'Черновик' }}
+                </Badge>
+              </TableCell>
+              <TableCell variant="slot" :active="r === 2" class="w-30">
+                <span class="flex items-center gap-2">
+                  <Avatar type="letter" letter="И" :size="24" />
+                  <span class="truncate text-base">Иванов</span>
+                </span>
+              </TableCell>
+            </TableRow>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Заголовки колонок · мастер 5137:37282
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Три текстовых типа различаются <strong>начертанием и цветом</strong>, а не размером:
+            по <code>simple</code> не сортируют, у <code>interactive</code> сортировка доступна,
+            <code>active</code> — колонка, по которой сортируют сейчас.
+          </p>
+          <div class="flex flex-wrap gap-8">
+            <TableHead variant="simple">
+              Без сортировки
+            </TableHead>
+            <TableHead variant="interactive">
+              Можно сортировать
+            </TableHead>
+            <TableHead variant="active">
+              Сортируется сейчас
+            </TableHead>
+          </div>
+        </div>
+      </div>
+    </ShowcaseSection>
+
+    <ShowcaseSection
       title="Дата и время · волна 6"
       note="Предсказание подтвердилось наполовину: заливка и геометрия поля совпали с Input бит в бит, но разметка у пикера своя — ему нужны две иконки, а у поля один слот слева и крестик справа."
     >
