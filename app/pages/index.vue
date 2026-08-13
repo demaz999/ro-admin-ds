@@ -827,6 +827,109 @@ const martianWidths = [
 
         <div>
           <h3 class="mb-3 text-sm font-medium">
+            ListRow · мастер 1910:12739
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Заливка устроена наоборот привычного: <strong>в покое плашка приглушённая, а активная
+              — белая</strong>. Активная строка всплывает над фоном, а не подсвечивается.
+            Выключенная гаснет до <strong>0.48</strong>, а не до 0.32 — у Атома два уровня
+            гашения, и строка идёт по тому же, что поля и контролы выбора.
+          </p>
+          <div class="grid max-w-2xl gap-4">
+            <ShowcaseCell label="типы левого слота" hint="стрелка · иконка · число">
+              <div class="flex w-full flex-col gap-2">
+                <ListRow type="arrow">
+                  Заголовок строки
+                  <template #secondary>
+                    Вторая строка подписи
+                  </template>
+                </ListRow>
+                <ListRow type="icon">
+                  Заголовок строки
+                  <template #secondary>
+                    Вторая строка подписи
+                  </template>
+                </ListRow>
+                <ListRow type="number" :number="7">
+                  Заголовок строки
+                  <template #secondary>
+                    Вторая строка подписи
+                  </template>
+                </ListRow>
+              </div>
+            </ShowcaseCell>
+            <ShowcaseCell label="active / disabled" hint="активная белая, выключенная 0.48">
+              <div class="flex w-full flex-col gap-2">
+                <ListRow active>
+                  Активная строка
+                  <template #secondary>
+                    Всплывает белым
+                  </template>
+                </ListRow>
+                <ListRow disabled>
+                  Выключенная строка
+                  <template #secondary>
+                    Прозрачность 0.48
+                  </template>
+                </ListRow>
+              </div>
+            </ShowcaseCell>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Breadcrumb · мастер 3880:31214 · Pagination · мастер 4104:36392
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Оба — <strong>композиции уже перенесённого</strong>, а не новые сущности. У крошек
+            шеврон-разделитель уже входит в <code>ButtonNavigation</code>: отдельный разделитель
+            заводить не нужно, иначе стрелок станет две. У пагинации внутри мастера лежит инстанс
+            <code>Tabs</code> — номера страниц у Атома это вкладки.
+          </p>
+          <div class="space-y-4">
+            <ShowcaseCell label="breadcrumb" hint="зазор 8, свёрнутая середина — кнопка">
+              <Breadcrumb>
+                <li><ButtonNavigation size="sm" muted>
+                  Главная
+                </ButtonNavigation></li>
+                <li><BreadcrumbCollapsed /></li>
+                <li><ButtonNavigation size="sm" muted>
+                  Раздел
+                </ButtonNavigation></li>
+                <li><ButtonNavigation size="sm">
+                  Текущая
+                </ButtonNavigation></li>
+              </Breadcrumb>
+            </ShowcaseCell>
+            <ShowcaseCell label="pagination" hint="номера — это Tabs из волны 3">
+              <Pagination :page="3" :pages="7" />
+            </ShowcaseCell>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            NavigationTile · мастер 638:5476
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Ось <code>Breakpoint</code> — это не размер, а точка перелома: два варианта мастера
+            суть <strong>два снимка одной плитки на разных ширинах окна</strong>. Габариты в код
+            не перенесены сознательно — зашить 153px значило бы воспроизвести отсутствие резиновой
+            раскладки у Figma. Различие вариантов в коде — кегль.
+          </p>
+          <div class="flex flex-wrap gap-4">
+            <NavigationTile class="h-51 w-38 p-4">
+              Мои осмотры
+            </NavigationTile>
+            <NavigationTile size="lg" class="h-70 w-53 p-4">
+              Отчёты и выгрузки
+            </NavigationTile>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
             MenuPopover · мастер 3499:27440
           </h3>
           <p class="mb-3 max-w-2xl text-sm text-muted-foreground">

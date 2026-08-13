@@ -306,6 +306,8 @@
        и не текст — декоративная отметка, которая светлее брендового. */
     --color-accent-soft: var(--accent-soft);
     --color-tag: var(--tag);
+    --color-row: var(--row);
+    --color-row-active: var(--row-active);
 
     --color-list-hover: var(--list-hover);
     --color-list-selected: var(--list-selected);
@@ -519,6 +521,11 @@
     --list-selected: var(--surface-selected);       /* решение: bg/surface_selected — то же */
     --popover-scroll-thumb: var(--border-neutral);  /* решение: border/neutral_soft — серый бегунок на белой плашке */
     --tag: var(--secondary);                        /* решение: accent/surface_soft — подложка неактивного тега */
+    /* Строка-плашка (Plank 1910:12739). У Атома она устроена наоборот привычного:
+       в покое приглушённая, а активная — БЕЛАЯ. Роли поэтому две, а не заливка
+       плюс состояние. */
+    --row: var(--muted);                            /* решение: neutral/soft — плашка в покое */
+    --row-active: var(--card);                      /* решение: bg/page — активная всплывает белым */
     --accent-soft: var(--primary-disabled);         /* @debt пастельной брендовой ступени в теме нет — см. design-debt.md */
 
     /* Атом гасит выключенное поле прозрачностью всего узла, а не отдельными
@@ -663,6 +670,10 @@
     --sidebar-accent-foreground: #1d222a;           /* 1737:12283 — текст темнеет */
     --sidebar-active: #aaaeb61f;                    /* 3465:22585 — выбран, 12% */
     --sidebar-active-foreground: #1d222a;           /* 3465:22588 */
+
+    /* Строка-плашка. Активная белая, покой — приглушённая нейтраль на 32%. */
+    --row: #d4d5d952;                               /* 1910:12740 — 32% */
+    --row-active: #ffffff;                          /* 1910:12780 */
 
     /* Нейтральная роль индикаторов отдельного значения не требует: она совпала
        с уже объявленным приглушённым текстом (`#80858e`) — то же значение
