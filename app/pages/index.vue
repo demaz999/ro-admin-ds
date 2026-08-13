@@ -771,5 +771,122 @@ const martianWidths = [
         </p>
       </div>
     </ShowcaseSection>
+
+    <ShowcaseSection
+      title="Индикаторы и обратная связь · волна 4"
+      note="Состояний у этой группы нет: спека Bulb 1858:11709 подписывает компонент «Неинтерактивный», у таймера и уведомления состояний в мастерах тоже не нарисовано. Показаны формы, размеры и роли."
+    >
+      <div class="space-y-8">
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Indicator · мастер 790:10402
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Три формы: точка-метка, голая цифра и счётчик в плашке. Цветовая ось мастера сведена
+            к семантическим ролям — точка статуса без цвета статуса не работает. Матрица мастера
+            не полный крест: белого нет у точки и счётчика, мелкого размера нет у счётчика.
+          </p>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <ShowcaseCell label="точка · md" hint="12×12, свечение в цвете роли">
+              <Indicator variant="default" />
+              <Indicator variant="success" />
+              <Indicator variant="warning" />
+              <Indicator variant="destructive" />
+              <Indicator variant="neutral" />
+            </ShowcaseCell>
+            <ShowcaseCell label="точка · sm" hint="8×8">
+              <Indicator variant="default" size="sm" />
+              <Indicator variant="success" size="sm" />
+              <Indicator variant="warning" size="sm" />
+              <Indicator variant="destructive" size="sm" />
+              <Indicator variant="neutral" size="sm" />
+            </ShowcaseCell>
+            <ShowcaseCell label="цифра" hint="13/16 Medium и 10/12 Regular">
+              <Indicator type="text">
+                99+
+              </Indicator>
+              <Indicator type="text" variant="destructive">
+                12
+              </Indicator>
+              <Indicator type="text" size="sm">
+                99+
+              </Indicator>
+              <Indicator type="text" size="sm" variant="success">
+                7
+              </Indicator>
+            </ShowcaseCell>
+            <ShowcaseCell label="счётчик" hint="высота 16, размер в мастере один">
+              <Indicator type="counter">
+                9
+              </Indicator>
+              <Indicator type="counter">
+                99+
+              </Indicator>
+              <Indicator type="counter" variant="destructive">
+                3
+              </Indicator>
+              <Indicator type="counter" variant="neutral">
+                12
+              </Indicator>
+            </ShowcaseCell>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Timer · мастер 6344:55714
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Индикатор обратного отсчёта, не спиннер: у спиннера конца нет, у таймера конец и есть
+            смысл. Внутри мастера два вектора — подложка на 12% и заливка отсчёта на 100%,
+            без дырки в середине. Это сектор, а не кольцо.
+          </p>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <ShowcaseCell label="размеры" hint="20 · 32 · 48">
+              <Timer size="sm" :value="0.25" />
+              <Timer size="md" :value="0.5" />
+              <Timer size="lg" :value="0.75" />
+            </ShowcaseCell>
+            <ShowcaseCell label="с цифрой" hint="булев проп Number">
+              <Timer size="lg" show-number :value="0.25">
+                5
+              </Timer>
+              <Timer size="md" show-number :value="0.6">
+                3
+              </Timer>
+            </ShowcaseCell>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Alert · мастер 5883:58974
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Плашка уведомления целиком: 360 шириной, радиус 12, тень выпадашки. Крестик и таймер
+            взаимоисключающи — плашка с отсчётом закрывается сама, и крестика в этом варианте
+            мастера нет. Всплывающего <code>Toast</code> со стеком в Атоме не нарисовано —
+            строка в <code>design-debt.md</code>.
+          </p>
+          <div class="space-y-4">
+            <ShowcaseCell label="default" hint="без иконки, паддинги 20/40">
+              <Alert>
+                Notification text
+              </Alert>
+            </ShowcaseCell>
+            <ShowcaseCell label="с иконкой" hint="паддинги 16/40">
+              <Alert show-icon>
+                Notification text
+              </Alert>
+            </ShowcaseCell>
+            <ShowcaseCell label="timer" hint="паддинги 16/20, крестика нет">
+              <Alert type="timer" :value="0.25">
+                Notification text
+              </Alert>
+            </ShowcaseCell>
+          </div>
+        </div>
+      </div>
+    </ShowcaseSection>
   </main>
 </template>

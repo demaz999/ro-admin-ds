@@ -35,6 +35,58 @@ const variants = [
 ] as const
 
 /**
+ * Indicator, мастер Bulb 790:10402 — 396×200. Смещения сняты через Plugin API
+ * как координаты вариантов относительно фрейма сета.
+ *
+ * Взяты только те цветовые колонки, что легли на семантические роли: точка в
+ * пяти ролях, голая цифра и счётчик — в брендовой. Прочие колонки осью не
+ * переносятся, накладывать их не на что.
+ */
+const indicatorVariants = [
+  // точка, крупная — верхний ряд мастера
+  { t: 'точка · md · default', x: 30, y: 24, w: 12, h: 12, type: 'dot', size: 'md', variant: 'default' },
+  { t: 'точка · md · success', x: 66, y: 24, w: 12, h: 12, type: 'dot', size: 'md', variant: 'success' },
+  { t: 'точка · md · warning', x: 102, y: 24, w: 12, h: 12, type: 'dot', size: 'md', variant: 'warning' },
+  { t: 'точка · md · destructive', x: 138, y: 24, w: 12, h: 12, type: 'dot', size: 'md', variant: 'destructive' },
+  { t: 'точка · md · neutral', x: 210, y: 24, w: 12, h: 12, type: 'dot', size: 'md', variant: 'neutral' },
+  // точка, мелкая — второй ряд
+  { t: 'точка · sm · default', x: 32, y: 52, w: 8, h: 8, type: 'dot', size: 'sm', variant: 'default' },
+  // голая цифра: 13/16 Medium крупная, 10/12 Regular мелкая
+  { t: 'цифра · md · default', x: 24, y: 84, w: 24, h: 16, type: 'text', size: 'md', variant: 'default' },
+  { t: 'цифра · sm · default', x: 27, y: 124, w: 18, h: 12, type: 'text', size: 'sm', variant: 'default' },
+  // счётчик — нижний ряд, размер в мастере один
+  { t: 'счётчик · default', x: 27, y: 160, w: 26, h: 16, type: 'counter', size: 'md', variant: 'default' },
+] as const
+
+/**
+ * Timer, мастер 6344:55714 — 180×160. Полный крест Number × Size, все шесть
+ * вариантов нарисованы, поэтому накладываются все.
+ *
+ * Доля отсчёта в мастере запечена в вектор: у крупного она видна как сектор
+ * примерно в четверть круга. В коде это проп, здесь выставлен в то же значение.
+ */
+const timerCompare = [
+  { t: 'lg · 48', x: 24, y: 24, s: 48, size: 'lg', num: false },
+  { t: 'lg · 48 · с цифрой', x: 24, y: 88, s: 48, size: 'lg', num: true },
+  { t: 'md · 32', x: 88, y: 32, s: 32, size: 'md', num: false },
+  { t: 'md · 32 · с цифрой', x: 88, y: 96, s: 32, size: 'md', num: true },
+  { t: 'sm · 20', x: 136, y: 38, s: 20, size: 'sm', num: false },
+  { t: 'sm · 20 · с цифрой', x: 136, y: 102, s: 20, size: 'sm', num: true },
+] as const
+
+/**
+ * Alert, мастер Notification 5883:58974. Экспорт 424×284 шире бокса сета на 16
+ * по горизонтали — тень плашки выходит за габарит и попадает в рендер. Левый
+ * край карточек поэтому 32, а не 24: смещение замерено по самому экспорту
+ * (первый чисто белый пиксель), а не выведено из габаритов.
+ */
+const alertCompare = [
+  { t: 'default · без иконки', y: 24, type: 'default', icon: false },
+  { t: 'default · с иконкой', y: 100, type: 'default', icon: true },
+  { t: 'timer', y: 176, type: 'timer', icon: true },
+] as const
+
+/**
  * Select, мастер 434:3074 — 616×536. Левая колонка включённые, правая
  * выключенные; внутри колонки по вертикали: default/filled × закрыт/открыт,
  * сначала обычный тип, потом поверх карты.
@@ -538,6 +590,105 @@ const textareaVariants = [
         :height="140"
       >
         <Textarea :model-value="t.value ?? ''" :disabled="t.disabled ?? false" />
+      </CompareFrame>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="text-lg font-bold">
+        Indicator · 790:10402 · срез матрицы
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Спека <code>1858:11709</code> подписывает компонент
+        <strong>«Неинтерактивный»</strong> — состояний у него нет по объявлению, а не по
+        недосмотру. 47 вариантов мастера — не полный крест: у точки девять цветов и два
+        размера, у голой цифры десять цветов (плюс белый) и два размера, у счётчика девять
+        цветов и <strong>только крупный</strong> размер.
+      </p>
+      <p class="max-w-3xl rounded-md border border-border p-3 text-sm">
+        Ниже наложены только те колонки, что легли на наши семантические роли. Остальные
+        цветовые колонки осью не переносятся (решение 23), поэтому в коде 27 достижимых
+        сочетаний против 47 в мастере — расхождение записано в <code>docs/waves.md</code>.
+      </p>
+
+      <CompareFrame
+        v-for="b in indicatorVariants"
+        :key="b.t"
+        :title="b.t"
+        node="790:10402"
+        master="atom/bulb_790-10402.png"
+        :x="b.x"
+        :y="b.y"
+        :width="b.w"
+        :height="b.h"
+      >
+        <Indicator :variant="b.variant" :type="b.type" :size="b.size">
+          99+
+        </Indicator>
+      </CompareFrame>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="text-lg font-bold">
+        Timer · 6344:55714 · все 6 вариантов
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Внутри мастера ровно два вектора: подложка во всю сторону на
+        <strong>12%</strong> и сектор отсчёта на 100%. Дырки в середине нет —
+        это <strong>сектор, а не кольцо</strong>, поэтому в коде конический
+        градиент, а не обводка. Полный крест: обе оси нарисованы целиком.
+      </p>
+
+      <CompareFrame
+        v-for="t in timerCompare"
+        :key="t.t"
+        :title="t.t"
+        node="6344:55714"
+        master="atom/timer_6344-55714.png"
+        :x="t.x"
+        :y="t.y"
+        :width="t.s"
+        :height="t.s"
+      >
+        <Timer :size="t.size" :show-number="t.num" :value="0.25">
+          5
+        </Timer>
+      </CompareFrame>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="text-lg font-bold">
+        Alert · 5883:58974 · все 3 варианта
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Оси <code>Type</code> × <code>Show icon</code> дают формально четыре
+        сочетания, нарисовано три: у <code>timer</code> варианта без иконки не
+        существует — таймер занимает то же место слева. Крестик и таймер
+        взаимоисключающи: плашка с отсчётом закрывается сама, и крестика в
+        мастере там нет.
+      </p>
+      <p class="max-w-3xl rounded-md border border-border p-3 text-sm">
+        <strong>Известное расхождение.</strong> Кегль действия в мастере 16/20, а
+        у перенесённого <code>ButtonAction</code> его нет: внутри уведомления
+        инстанцирован другой мастер — <code>1028:8221</code>, — а не тот, с
+        которого волна 2 переносила компонент. Два живых мастера под одним именем
+        — противоречие, оно уходит в <code>open-questions.md</code>, а не
+        чинится здесь.
+      </p>
+
+      <CompareFrame
+        v-for="a in alertCompare"
+        :key="a.t"
+        :title="a.t"
+        node="5883:58974"
+        master="atom/notification_5883-58974.png"
+        :x="32"
+        :y="a.y"
+        :width="360"
+        :height="68"
+      >
+        <Alert :type="a.type" :show-icon="a.icon" :value="0.25">
+          Notification text
+        </Alert>
       </CompareFrame>
     </section>
 

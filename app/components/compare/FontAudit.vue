@@ -37,8 +37,17 @@ const findings = ref<Finding[]>([])
 const checked = ref(0)
 const allowedFamilies = ref<string[]>([])
 
-/** Кегли шкалы кита. Всё остальное — значение не из темы. */
-const KIT_SIZES = [12, 13, 15, 17, 20, 24, 36]
+/**
+ * Кегли шкалы кита. Список **не задаётся руками**: он читается из объявленных
+ * `--text-*` того же файла токенов — тем же способом, каким витрина берёт
+ * остальные переменные.
+ *
+ * Зашитый список здесь однажды уже разошёлся с темой: шкала расширилась вниз на
+ * ступень `10/12` мастера `Bulb`, а проверка продолжала считать её чужой. Копия
+ * шкалы в коде проверки — это второй источник правды, то есть ровно то, против
+ * чего проверка и заведена.
+ */
+const kitSizes = ref<number[]>([])
 
 function firstFamily(value: string) {
   return value.split(',')[0].replace(/["']/g, '').trim()
@@ -56,10 +65,48 @@ function ownText(el: Element) {
     .trim()
 }
 
+/**
+ * Шкала кита — все объявленные `--text-<ступень>`, кроме производных
+ * `--text-*--line-height` и `--text-*--letter-spacing`. Гасящее объявление
+ * `--text-*: initial` в счёт не идёт: оно снимает шкалу Tailwind, а не задаёт
+ * ступень.
+ */
+function readKitSizes() {
+  const sizes = new Set<number>()
+
+  const walk = (rules: CSSRuleList) => {
+    for (const rule of Array.from(rules)) {
+      if (rule instanceof CSSStyleRule) {
+        for (const prop of Array.from(rule.style)) {
+          if (!prop.startsWith('--text-') || prop.includes('--line-height') || prop.includes('--letter-spacing')) continue
+          const px = Number.parseFloat(rule.style.getPropertyValue(prop))
+          if (Number.isFinite(px)) sizes.add(Math.round(px))
+        }
+      }
+      else if ('cssRules' in rule) {
+        walk((rule as CSSGroupingRule).cssRules)
+      }
+    }
+  }
+
+  for (const sheet of Array.from(document.styleSheets)) {
+    try {
+      walk(sheet.cssRules)
+    }
+    catch {
+      // Стороннюю таблицу стилей читать нельзя — пропускаем.
+    }
+  }
+
+  return [...sizes].sort((a, b) => a - b)
+}
+
 onMounted(() => {
   const out: Finding[] = []
   const seenFamilies = new Set<string>()
   let n = 0
+
+  kitSizes.value = readKitSizes()
 
   for (const host of Array.from(document.querySelectorAll('[data-slot]'))) {
     const nodes = [host, ...Array.from(host.querySelectorAll('*'))]
@@ -84,7 +131,7 @@ onMounted(() => {
       const reasons: string[] = []
 
       if (!allowed.includes(family)) reasons.push('семейство не из темы')
-      if (!KIT_SIZES.includes(size)) reasons.push(`кегль ${size} вне шкалы кита`)
+      if (!kitSizes.value.includes(size)) reasons.push(`кегль ${size} вне шкалы кита`)
 
       if (reasons.length) {
         out.push({
@@ -109,7 +156,7 @@ onMounted(() => {
     <p class="text-sm text-muted-foreground">
       Проверено текстовых узлов внутри компонентов: <strong>{{ checked }}</strong>.
       Разрешённые семейства: {{ allowedFamilies.join(', ') }}.
-      Шкала кегля: {{ KIT_SIZES.join(', ') }}.
+      Шкала кегля (прочитана из токенов): {{ kitSizes.join(', ') }}.
     </p>
 
     <p
