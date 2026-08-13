@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import type { MenuItemVariants } from '.'
+import type { Ref } from 'vue'
+import { computed, inject } from 'vue'
 import { Icon } from '../icon'
 import { Indicator } from '../indicator'
 import { menuItemVariants } from '.'
@@ -9,8 +10,11 @@ import { menuItemVariants } from '.'
  * Состояния сняты с таблицы состояний спеки `832:20679`; разбор — в `index.ts`.
  */
 const props = withDefaults(defineProps<{
-  /** Ось `Compact` мастера: только иконка, без подписи. */
-  compact?: MenuItemVariants['compact']
+  /**
+   * Ось `Compact` мастера: только иконка, без подписи. По умолчанию берётся
+   * у меню — у Атома это свойство всего меню, а не отдельной строки.
+   */
+  compact?: boolean
   /** Ось `Selected`. Выключенного выбранного в мастере нет. */
   selected?: boolean
   disabled?: boolean
@@ -24,13 +28,17 @@ const props = withDefaults(defineProps<{
    */
   hasSubmenu?: boolean
 }>(), {
-  compact: false,
+  compact: undefined,
   selected: false,
   disabled: false,
   showIcon: true,
   showBulb: false,
   hasSubmenu: false,
 })
+
+/** Режим приходит от меню; проп на строке — точечное переопределение. */
+const menuCompact = inject<Ref<boolean> | undefined>('menuCompact', undefined)
+const compact = computed(() => props.compact ?? menuCompact?.value ?? false)
 </script>
 
 <template>
@@ -39,14 +47,14 @@ const props = withDefaults(defineProps<{
     type="button"
     :disabled="props.disabled"
     :aria-current="props.selected ? 'page' : undefined"
-    :class="menuItemVariants({ compact: props.compact, selected: props.selected })"
+    :class="menuItemVariants({ compact, selected: props.selected })"
   >
     <slot v-if="props.showIcon" name="icon">
       <Icon name="check" :size="16" />
     </slot>
 
     <!-- Компактный режим подписи не несёт: там только иконка и точка. -->
-    <template v-if="!props.compact">
+    <template v-if="!compact">
       <span class="flex min-w-0 flex-1 items-start gap-2">
         <span class="min-w-0 flex-1 truncate text-left">
           <slot />

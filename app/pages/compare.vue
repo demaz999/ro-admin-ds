@@ -75,6 +75,20 @@ const menuItemCompare = [
 ] as const
 
 /**
+ * MenuSub, мастер _MenuItem 3497:23069 — 328×680.
+ *
+ * Единственный вариант с раскрытым списком — C=true S=true K=false, высота 228
+ * против 44 у остальных семи. Это и есть уточнение ловушки: `Collapse` означает
+ * «есть подменю», а раскрытым его нарисовали только на выбранной строке.
+ */
+const menuSubCompare = [
+  { t: 'есть подменю · свёрнут', x: 16, y: 16, w: 296, h: 44, open: false, selected: false },
+  { t: 'есть подменю · выбран · РАСКРЫТ', x: 16, y: 76, w: 296, h: 228, open: true, selected: true },
+  { t: 'без подменю', x: 16, y: 320, w: 296, h: 44, open: false, selected: false, plain: true },
+  { t: 'без подменю · выбран', x: 16, y: 380, w: 296, h: 44, open: false, selected: true, plain: true },
+] as const
+
+/**
  * Badge, мастер 913:8279 — 227×432. Крупные в левой колонке, мелкие в правой.
  * Наложены шесть колонок, легших на роли; четыре декоративные не переносятся.
  */
@@ -742,6 +756,48 @@ const textareaVariants = [
         >
           Title
         </MenuItem>
+      </CompareFrame>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="text-lg font-bold">
+        MenuSub · 3497:23069 · раскрытое подменю
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Вложенный список рисуется <strong>только</strong> при <code>Collapse=true</code> вместе с
+        <code>Selected=true</code>: у этой комбинации высота 228, у остальных семи ровно 44.
+        Отсюда уточнение ловушки — <code>Collapse</code> означает «у пункта есть подменю», а
+        раскрытым его нарисовали лишь на выбранной строке.
+      </p>
+      <p class="max-w-3xl rounded-md border border-border p-3 text-sm">
+        Направляющая подменю — <strong>2×174 на мягкой ступени</strong>, шестая её встреча в
+        мастерах Атома. Строки второго уровня начинаются с 29, направляющая с 23, между ними
+        ровно 4. Обе величины вне шкалы кратности четырём, поэтому объявлены отдельными
+        спейсингами: «ближайшее» сдвинуло бы направляющую относительно иконки родителя.
+      </p>
+
+      <CompareFrame
+        v-for="ms in menuSubCompare"
+        :key="ms.t"
+        :title="ms.t"
+        node="3497:23069"
+        master="atom/menusub_3497-23069.png"
+        :x="ms.x"
+        :y="ms.y"
+        :width="ms.w"
+        :height="ms.h"
+      >
+        <MenuItem v-if="ms.plain" :selected="ms.selected">
+          Title
+        </MenuItem>
+        <MenuSub v-else :open="ms.open" :selected="ms.selected">
+          Title
+          <template #items>
+            <MenuItem v-for="n in 4" :key="n">
+              Title
+            </MenuItem>
+          </template>
+        </MenuSub>
       </CompareFrame>
     </section>
 

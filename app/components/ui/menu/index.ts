@@ -1,7 +1,10 @@
 import type { VariantProps } from 'class-variance-authority'
 import { cva } from 'class-variance-authority'
 
+export { default as Menu } from './Menu.vue'
 export { default as MenuItem } from './MenuItem.vue'
+export { default as MenuPopover } from './MenuPopover.vue'
+export { default as MenuSub } from './MenuSub.vue'
 
 /**
  * Пункт меню — мастер `_MenuItemMaster` `3465:22566`, спека `832:20679`,
@@ -46,7 +49,7 @@ export { default as MenuItem } from './MenuItem.vue'
  *
  * | | обычный | компактный |
  * |---|---|---|
- * | ширина | 296 | **56** |
+ * | ширина | по контейнеру: 296 отдельно, **267** внутри подменю | **56** |
  * | высота | 44 | 44 |
  * | паддинги | 16 / 12 | 8 |
  * | зазор | 12 | — |
@@ -58,6 +61,12 @@ export { default as MenuItem } from './MenuItem.vue'
  * Это не два разных пропа, а один `Show Bulb` с двумя отрисовками: в обычном
  * режиме — числовой счётчик 13/16 в брендовом цвете, в компактном — точка 8×8,
  * потому что числу там негде поместиться. Оба — `Indicator` из волны 4.
+ *
+ * > **Что не сверено наложением.** В мастере точка компактного режима лежит
+ * > внутри сетки `Bulb+Arrow` с отступом 4 справа; в коде она позиционирована
+ * > абсолютно. Совпадение по коробке проверено, точное положение точки — нет:
+ * > в наложение вошли варианты без счётчика, потому что в мастере он выключен
+ * > во всех шести. Строка в `docs/waves.md`.
  */
 export const menuItemVariants = cva(
   'group/menu-item relative flex w-full items-center rounded-md text-base font-medium outline-none disabled:pointer-events-none disabled:opacity-[var(--opacity-disabled-strong)]',
@@ -66,7 +75,9 @@ export const menuItemVariants = cva(
       compact: {
         // Компактный режим центрирует иконку: подписи в нём нет. 56 = 8 + 40 + 8.
         true: 'h-11 w-14 justify-center p-2',
-        false: 'h-11 w-74 gap-3 px-4 py-3',
+        // Ширину задаёт контейнер, а не компонент: в мастере одна и та же строка
+        // 296 отдельно и 267 внутри подменю. Зашить 296 значило бы сломать вложенную.
+        false: 'h-11 w-full gap-3 px-4 py-3',
       },
       selected: {
         true: 'bg-sidebar-active text-sidebar-active-foreground',

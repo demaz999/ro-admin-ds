@@ -773,6 +773,84 @@ const martianWidths = [
     </ShowcaseSection>
 
     <ShowcaseSection
+      title="Навигация · волна 5"
+      note="Меню Атома нарисовано на белом — тёмным его делает тема, а не мастер. С мастера пришли состав, геометрия и механика состояний; цвет берётся из sidebar-*."
+    >
+      <div class="space-y-8">
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Menu · мастера 3499:24661, 3465:22566, 3497:23069
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Подложка пункта ходит <strong>плотностью одной нейтрали</strong>: покоя нет вовсе,
+            наведение 8%, выбор 12%. Наведение и выбор различаются только плотностью — подпись у
+            них одна. Направляющая подменю сидит на той же мягкой ступени.
+          </p>
+          <div class="flex flex-wrap items-start gap-6">
+            <Menu>
+              <MenuItem selected>
+                Выбранный пункт
+              </MenuItem>
+              <MenuItem>
+                Обычный пункт
+              </MenuItem>
+              <MenuItem show-bulb>
+                Со счётчиком
+              </MenuItem>
+              <MenuSub open selected>
+                Пункт с подменю
+                <template #items>
+                  <MenuItem>
+                    Второй уровень
+                  </MenuItem>
+                  <MenuItem selected>
+                    Выбранный
+                  </MenuItem>
+                  <MenuItem>
+                    Ещё один
+                  </MenuItem>
+                </template>
+              </MenuSub>
+              <MenuItem disabled>
+                Выключенный
+              </MenuItem>
+            </Menu>
+
+            <Menu compact>
+              <MenuItem selected />
+              <MenuItem />
+              <MenuItem show-bulb />
+              <MenuItem disabled />
+            </Menu>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            MenuPopover · мастер 3499:27440
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            В компактном режиме подменю некуда развернуть внутри полосы 56 шириной — оно уезжает
+            плашкой вбок. <strong>Правило порталов здесь видно буквально:</strong> плашка
+            вылетает из тёмного меню и остаётся светлой. Проверено по мастеру, а не принято по
+            правилу: заливка белая, тень <code>0 / 8 / 32</code> — та же, что у выпадашки.
+          </p>
+          <MenuPopover>
+            <MenuItem selected>
+              Второй уровень
+            </MenuItem>
+            <MenuItem>
+              Ещё пункт
+            </MenuItem>
+            <MenuItem show-bulb>
+              Со счётчиком
+            </MenuItem>
+          </MenuPopover>
+        </div>
+      </div>
+    </ShowcaseSection>
+
+    <ShowcaseSection
       title="Индикаторы и обратная связь · волна 4"
       note="Состояний у этой группы нет: спека Bulb 1858:11709 подписывает компонент «Неинтерактивный», у таймера и уведомления состояний в мастерах тоже не нарисовано. Показаны формы, размеры и роли."
     >
