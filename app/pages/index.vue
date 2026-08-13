@@ -773,6 +773,88 @@ const martianWidths = [
     </ShowcaseSection>
 
     <ShowcaseSection
+      title="Медиа · волна 9 — последняя"
+      note="Хвост переноса: галерея, слайдшоу и два плеера плюс две кнопки, пришедшие из волны 2 как медийные по природе. После неё остаётся этап 2 — то, чего в Атоме нет вовсе."
+    >
+      <div class="space-y-8">
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            MediaGallery · мастера 6734:62674 и 6734:62222
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Три размера плитки — 320×200, 176×110, 112×70 — и <strong>одна пропорция на все
+              три</strong>: деление даёт ровно 1.6, то есть 16:10. Радиус и зазор растут вместе
+            с плиткой (24/16/8), пропорция нет. Габариты не переносятся: ось
+            <code>Brakepoint</code> — снимки, как у плитки и баннера.
+          </p>
+          <p class="mb-3 max-w-2xl rounded-md border border-border p-3 text-sm">
+            <strong>Две странности в самих числах.</strong> У крупного размера
+            <code>middle</code> шире, чем <code>wide</code> — 1064 против 976. А у мелкого
+            брейкпоинт не влияет вовсе: все три значения дают 472×70. Обе отданы дизайнерам.
+          </p>
+          <MediaGallery size="md" class="max-w-2xl">
+            <MediaGalleryItem v-for="i in 4" :key="i" size="md" class="w-44" />
+            <MediaGalleryItem size="md" more class="w-44" />
+          </MediaGallery>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Slideshow · мастера 5946:53926 и 5946:53594
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            <strong>Активное превью выделено высотой, а не рамкой:</strong> 104×73 против 104×65,
+            причём ни заливки, ни обводки у обоих нет — проверено. Превью не подсвечивается, а
+            вырастает до полной высоты ленты.
+          </p>
+          <div class="max-w-lg">
+            <Slideshow :count="5" />
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            PlayerVideo · мастер 6922:58170 · PlayerAudio · мастер 6921:57397
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            <strong>Видео идёт в 16:9, а галерея и слайдшоу — в 16:10.</strong> Проверено
+            делением: 640/360 = 1.778 против 320/200 = 1.6. Две пропорции в одном разделе.
+            Кнопка плеера — белый круг на <strong>88%</strong>: под ней просвечивает кадр.
+          </p>
+          <p class="mb-3 max-w-2xl rounded-md border border-border p-3 text-sm">
+            У аудиоплеера ось <code>State</code> называет <strong>глиф, а не состояние</strong>:
+            <code>State=play</code> — это когда показана кнопка «играть», то есть звук
+            остановлен. В коде проп зовётся <code>playing</code>. Дорожка перемотки появляется
+            только во время воспроизведения — это состав мастера.
+          </p>
+          <div class="grid max-w-3xl gap-4">
+            <div class="w-100">
+              <PlayerVideo size="md" />
+            </div>
+            <ShowcaseCell label="аудио · остановлен">
+              <PlayerAudio>
+                Запись осмотра от 13.08.2026
+              </PlayerAudio>
+            </ShowcaseCell>
+            <ShowcaseCell label="аудио · играет" hint="появляется дорожка перемотки">
+              <PlayerAudio playing time="2:14">
+                Запись осмотра от 13.08.2026
+              </PlayerAudio>
+            </ShowcaseCell>
+            <ShowcaseCell label="кнопка плеера" hint="128 · 80 · 40, белая на 88%">
+              <span class="flex items-center gap-4 rounded-xl bg-muted-foreground/[var(--opacity-soft)] p-4">
+                <PlayerButton size="lg" />
+                <PlayerButton size="md" type="pause" />
+                <PlayerButton size="sm" />
+                <PlayerButton size="sm" disabled />
+              </span>
+            </ShowcaseCell>
+          </div>
+        </div>
+      </div>
+    </ShowcaseSection>
+
+    <ShowcaseSection
       title="Контейнеры и оверлеи · волна 8"
       note="Accordion закрывает старейшую позицию дизайн-долга: он стоял на дефолте shadcn-vue с волны 2 маршрута по киту 1, с пометкой «в ките нет вовсе». В Атоме он есть."
     >
