@@ -819,6 +819,69 @@ const martianWidths = [
 
         <div>
           <h3 class="mb-3 text-sm font-medium">
+            FileUpload · мастер 1572:10113 · File · мастер 1931:12249
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Снаружи все четыре состояния области загрузки <strong>одинаковы</strong>: 320×88,
+            пунктирная рамка 1px со штрихом 2/4. Различие целиком внутри, в двух надписях — и
+            сделано <strong>подменой цвета, а не прозрачностью</strong>. Это третий механизм
+            выключенного состояния у Атома: у кнопок 0.32, у полей 0.48, здесь цвет.
+          </p>
+          <p class="mb-3 max-w-2xl rounded-md border border-border p-3 text-sm">
+            <code>uploaded</code> — не ошибка и не успех, а <strong>исчерпанный лимит</strong>:
+            заголовок приглушён, подпись зелёная. Контрол выключен, но сообщение положительное —
+            загружать больше нельзя, потому что всё уже загружено.
+          </p>
+          <div class="grid max-w-3xl gap-4 sm:grid-cols-2">
+            <ShowcaseCell label="default">
+              <FileUpload />
+            </ShowcaseCell>
+            <ShowcaseCell label="error">
+              <FileUpload state="error">
+                Загрузить файлы
+                <template #hint>
+                  Ошибка загрузки: 2 из 5 файлов
+                </template>
+              </FileUpload>
+            </ShowcaseCell>
+            <ShowcaseCell label="uploaded" hint="лимит исчерпан, подпись зелёная">
+              <FileUpload state="uploaded">
+                Загрузить файлы
+                <template #hint>
+                  Вы уже загрузили максимум файлов
+                </template>
+              </FileUpload>
+            </ShowcaseCell>
+            <ShowcaseCell label="disabled" hint="всё приглушено цветом">
+              <FileUpload state="disabled" />
+            </ShowcaseCell>
+          </div>
+
+          <div class="mt-4 grid max-w-3xl gap-4">
+            <ShowcaseCell label="File" hint="плашка на мягкой ступени · simple без плашки">
+              <div class="flex w-full flex-col gap-2">
+                <File>
+                  Договор оказания услуг.pdf
+                  <template #subtitle>
+                    2,4 МБ
+                  </template>
+                </File>
+                <File size="sm">
+                  Акт сверки.xlsx
+                  <template #subtitle>
+                    880 КБ
+                  </template>
+                </File>
+                <File variant="simple" :show-subtitle="false">
+                  Скан паспорта.jpg
+                </File>
+              </div>
+            </ShowcaseCell>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
             TimePicker · мастера 3871:26784 и 1161:9805
           </h3>
           <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
