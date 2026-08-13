@@ -294,6 +294,45 @@ const martianWidths = [
 
         <div>
           <h3 class="mb-3 text-sm font-medium">
+            ButtonAction · мастер 6626:56755 · ниша ghost
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Текст с иконкой без заливки, радиуса и паддингов — высотой в строку. Описание мастера
+            называет место применения: поповеры и модальные окна. Именно этот компонент занимает
+            нишу <code>ghost</code>, поэтому у <code>Button</code> такого варианта нет.
+          </p>
+          <div class="flex flex-wrap items-center gap-6">
+            <ButtonAction>Назад</ButtonAction>
+            <ButtonAction size="sm">
+              Назад
+            </ButtonAction>
+            <ButtonAction variant="destructive">
+              Удалить
+            </ButtonAction>
+            <ButtonAction disabled>
+              Назад
+            </ButtonAction>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            InputNumber · мастер 803:9446
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Собран из иконочных кнопок типа <code>transparent</code>, поэтому и ждал их переноса.
+            Плашка не залита — только контур 2px с радиусом 6. Ось <code>State</code> мастера
+            это не оформление, а значение: при нуле кнопка уменьшения приглушена.
+          </p>
+          <div class="flex flex-wrap items-center gap-8">
+            <InputNumber />
+            <InputNumber :model-value="3" />
+            <InputNumber :model-value="3" disabled />
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
             IconButton · мастер ButtonSimple 110:1566
           </h3>
           <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
