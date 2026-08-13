@@ -773,6 +773,72 @@ const martianWidths = [
     </ShowcaseSection>
 
     <ShowcaseSection
+      title="Дата и время · волна 6"
+      note="Предсказание подтвердилось наполовину: заливка и геометрия поля совпали с Input бит в бит, но разметка у пикера своя — ему нужны две иконки, а у поля один слот слева и крестик справа."
+    >
+      <div class="space-y-8">
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            DatePicker · мастера 1763:10301 и 1159:10888
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Спека подписывает выключенное состояние дословно —
+            <strong>«text opacity — 0.48, as Select»</strong>: пикер гасится как поле, а не как
+            кнопка. Замер подтверждает. Календарь — только сетка: плашку даёт тот же
+            <code>Popover</code>, что у выпадашки и подменю.
+          </p>
+          <p class="mb-3 max-w-2xl rounded-md border border-border p-3 text-sm">
+            <strong>Иконок пока нет намеренно.</strong> Мастер ставит календарь слева и часы
+            справа; обоих глифов в self-hosted наборе Material Symbols нет, а рисовать контур
+            руками протокол запрещает. Коробки 16×16 стоят на местах и держат раскладку — глиф
+            приедет из официальной выгрузки. Строка в <code>design-debt.md</code>.
+          </p>
+          <div class="grid max-w-xl gap-4 sm:grid-cols-2">
+            <ShowcaseCell label="default" hint="272×40, заливка поля">
+              <DatePicker />
+            </ShowcaseCell>
+            <ShowcaseCell label="disabled" hint="прозрачность 0.48, как поле">
+              <DatePicker disabled />
+            </ShowcaseCell>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Calendar · мастер 1159:10888
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Шесть строк всегда, независимо от месяца: сетка не скачет по высоте при
+            перелистывании. Ось <code>Range</code> на контейнер не влияет — замер дал одинаковые
+            габариты, — она меняет только отрисовку выделения.
+          </p>
+          <div class="w-fit rounded-lg bg-popover p-5 shadow-dropdown">
+            <Calendar />
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            TimePicker · мастера 3871:26784 и 1161:9805
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Поле совпадает с пикером даты полностью. Различие одно и оно в составе:
+            <strong>в заполненном состоянии правая иконка заменяется крестиком очистки</strong> —
+            у пикера даты обе иконки остаются на месте.
+          </p>
+          <div class="grid max-w-xl gap-4 sm:grid-cols-2">
+            <ShowcaseCell label="default">
+              <TimePicker />
+            </ShowcaseCell>
+            <ShowcaseCell label="filled" hint="справа крестик вместо иконки">
+              <TimePicker model-value="09:30" />
+            </ShowcaseCell>
+          </div>
+        </div>
+      </div>
+    </ShowcaseSection>
+
+    <ShowcaseSection
       title="Навигация · волна 5"
       note="Меню Атома нарисовано на белом — тёмным его делает тема, а не мастер. С мастера пришли состав, геометрия и механика состояний; цвет берётся из sidebar-*."
     >
