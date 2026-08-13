@@ -236,6 +236,52 @@ const martianWidths = [
           </ShowcaseCell>
         </div>
 
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Tabs · мастера 1782:13075 и 1772:11731
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Два несводимых вида: подчёркивание с зазором 20 и таблетка с зазором 0. Линия идёт по
+            ширине текста, а не вкладки. У Атома есть <strong>hover и disabled</strong>, которых
+            в ките 1 не было вовсе.
+          </p>
+          <div class="flex flex-col gap-8">
+            <Tabs model-value="all">
+              <TabsList>
+                <TabsTrigger value="all">
+                  Все
+                </TabsTrigger>
+                <TabsTrigger value="mine">
+                  Мои
+                </TabsTrigger>
+                <TabsTrigger value="archive" disabled>
+                  Архив
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="all" class="pt-4 text-sm text-muted-foreground">
+                Все осмотры.
+              </TabsContent>
+              <TabsContent value="mine" class="pt-4 text-sm text-muted-foreground">
+                Осмотры текущего пользователя.
+              </TabsContent>
+            </Tabs>
+
+            <Tabs model-value="list">
+              <TabsList variant="pill">
+                <TabsTrigger value="list" variant="pill">
+                  Списком
+                </TabsTrigger>
+                <TabsTrigger value="cards" variant="pill">
+                  Карточками
+                </TabsTrigger>
+                <TabsTrigger value="map" variant="pill" disabled>
+                  На карте
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+        </div>
+
         <div class="grid gap-6 sm:grid-cols-2">
           <ShowcaseCell label="RadioGroup">
             <RadioGroup model-value="a">
