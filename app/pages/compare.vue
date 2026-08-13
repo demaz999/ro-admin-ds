@@ -269,6 +269,39 @@ const textareaVariants = [
 
     <section class="space-y-2">
       <h2 class="text-lg font-bold">
+        Tag · ButtonTag 256:3601 · брендовая колонка
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Высота 24, радиус 16, паддинги 4/12, зазор 4, кегль 13, маркер-точка 8×8 слева.
+        Крестика и счётчика в мастере нет — снять тег нельзя и он ничего не считает, поэтому это
+        не <code>Chip</code>. Точка в обычном состоянии светлее текста: она пастельная.
+      </p>
+
+      <CompareFrame
+        title="активный · 256:3585"
+        node="256:3585"
+        master="atom/tag-active_256-3585.png"
+        :width="107"
+        :height="24"
+      >
+        <Tag active>
+          Button text
+        </Tag>
+      </CompareFrame>
+
+      <CompareFrame
+        title="обычный · 256:3600"
+        node="256:3600"
+        master="atom/tag_256-3600.png"
+        :width="107"
+        :height="24"
+      >
+        <Tag>Button text</Tag>
+      </CompareFrame>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="text-lg font-bold">
         IconButton · ButtonSimple 110:1566 · брендовая колонка
       </h2>
       <p class="max-w-3xl text-sm text-muted-foreground">

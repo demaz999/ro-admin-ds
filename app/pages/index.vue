@@ -294,6 +294,36 @@ const martianWidths = [
 
         <div>
           <h3 class="mb-3 text-sm font-medium">
+            Tag и Link · мастера 256:3601 и 5792:97292
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Тег снять нельзя и он ничего не считает — крестика и счётчика в мастере нет, поэтому
+            это не чип. У ссылки цветовая ось красит <strong>подчёркивание</strong>, а не текст:
+            во всех восьми колонках текст один и тот же. Подчёркивание — отдельный слой 2px,
+            а не <code>text-decoration</code>.
+          </p>
+          <div class="flex flex-wrap items-center gap-6">
+            <Tag active>
+              Активный
+            </Tag>
+            <Tag>Обычный</Tag>
+            <Tag :show-marker="false">
+              Без точки
+            </Tag>
+            <Tag disabled>
+              Выключен
+            </Tag>
+            <Hyperlink href="https://design.rusatom.dev">
+              Ссылка
+            </Hyperlink>
+            <Hyperlink size="sm">
+              Малая ссылка
+            </Hyperlink>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
             ButtonAction · мастер 6626:56755 · ниша ghost
           </h3>
           <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
