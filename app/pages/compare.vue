@@ -269,6 +269,30 @@ const textareaVariants = [
 
     <section class="space-y-2">
       <h2 class="text-lg font-bold">
+        ButtonArrow · 1938:12858 · вся матрица
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Единственный мастер волны **без цветовой оси**, поэтому переносится целиком: 12 вариантов
+        из 12. Радиус во всех трёх размерах — ровно половина бокса, то есть круг. У залитого типа
+        тень <code>0/4/16</code>, та же что у поля поверх карты: кнопка рассчитана лежать на
+        изображении. Эталон экспортирован с выносом тени, поэтому вырезка со смещением 16.
+      </p>
+
+      <CompareFrame
+        title="md · elevated · 1938:12859"
+        node="1938:12859"
+        master="atom/btnarrow-md_1938-12859.png"
+        :x="16"
+        :y="16"
+        :width="32"
+        :height="32"
+      >
+        <ButtonArrow label="Назад" />
+      </CompareFrame>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="text-lg font-bold">
         Tag · ButtonTag 256:3601 · брендовая колонка
       </h2>
       <p class="max-w-3xl text-sm text-muted-foreground">

@@ -294,6 +294,36 @@ const martianWidths = [
 
         <div>
           <h3 class="mb-3 text-sm font-medium">
+            ButtonArrow и ButtonNavigation · мастера 1938:12858 и 612:5443
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Стрелка — единственный мастер волны без цветовой оси, перенесена целиком.
+            Навигационная надпись перенесена <strong>тремя размерами из семи</strong>: кегли
+            остальных — 28, 32, 40 и 56, таких ступеней в нашей шкале нет вовсе, а округлять
+            нельзя — три разных размера стали бы одним. Вопрос 30.
+          </p>
+          <div class="flex flex-wrap items-center gap-6">
+            <ButtonArrow size="lg" label="Назад" />
+            <ButtonArrow label="Назад" />
+            <ButtonArrow size="sm" label="Назад" />
+            <ButtonArrow variant="ghost" size="lg" direction="right" label="Вперёд" />
+            <ButtonArrow disabled label="Назад" />
+          </div>
+          <div class="mt-4 flex flex-wrap items-baseline gap-8">
+            <ButtonNavigation size="lg">
+              В соседний раздел
+            </ButtonNavigation>
+            <ButtonNavigation>
+              В соседний раздел
+            </ButtonNavigation>
+            <ButtonNavigation size="sm" muted>
+              Приглушённая
+            </ButtonNavigation>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
             Tag и Link · мастера 256:3601 и 5792:97292
           </h3>
           <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
