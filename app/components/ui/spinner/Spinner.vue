@@ -29,7 +29,7 @@ const ring = computed(() => {
   // видимым остаётся только внешнее кольцо шириной `w`.
   const stencil = `radial-gradient(farthest-side, transparent calc(100% - ${w}), black calc(100% - ${w}))`
   return {
-    background: 'conic-gradient(from 0deg, color-mix(in srgb, currentColor 12%, transparent), currentColor)',
+    background: 'conic-gradient(from 0deg, color-mix(in srgb, currentColor var(--opacity-soft), transparent), currentColor)',
     mask: stencil,
     WebkitMask: stencil,
   }

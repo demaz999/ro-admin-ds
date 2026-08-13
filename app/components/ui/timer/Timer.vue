@@ -31,9 +31,9 @@ const turn = computed(() => `${Math.min(Math.max(props.value, 0), 1)}turn`)
     aria-valuemax="100"
     :class="timerVariants({ size })"
   >
-    <!-- Подложка — тот же брендовый цвет на 12%: значение с вектора `Bg` мастера. -->
+    <!-- Подложка — тот же цвет роли на мягкой ступени: вектор `Bg` мастера. -->
     <span
-      class="absolute inset-0 rounded-full bg-current opacity-12"
+      class="absolute inset-0 rounded-full bg-current opacity-[var(--opacity-soft)]"
       aria-hidden="true"
     />
     <!-- Сектор отсчёта. Градиент, а не обводка: в мастере это сплошная заливка. -->

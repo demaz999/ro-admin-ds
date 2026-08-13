@@ -47,9 +47,8 @@ export const avatarVariants = cva(
     variants: {
       variant: {
         solid: 'bg-primary text-primary-foreground',
-        // Брендовый на 12% — то же значение, на котором сидят подложка таймера
-        // и нижний стоп спиннера.
-        soft: 'bg-primary/12 text-primary',
+        // Мягкая ступень — та же, что у подложки таймера и нижнего стопа спиннера.
+        soft: 'bg-primary/[var(--opacity-soft)] text-primary',
       },
       size: {
         24: 'size-6 text-xs',
