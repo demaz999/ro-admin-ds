@@ -209,6 +209,66 @@ const martianWidths = [
     </ShowcaseSection>
 
     <ShowcaseSection
+      title="Выбор и переключение · волна 3"
+      note="Три мастера Атома построены одинаково: контрол в строке высотой 20, зазор 12, заголовок с подписью. Заголовок темнеет, когда контрол включён; выключенное гасит весь узел прозрачностью 0.48 — как у полей, а не как у кнопок."
+    >
+      <div class="space-y-6">
+        <div class="grid gap-6 sm:grid-cols-2">
+          <ShowcaseCell label="Checkbox">
+            <Checkbox subtitle="Подпись строки">
+              Флажок
+            </Checkbox>
+          </ShowcaseCell>
+          <ShowcaseCell label="Checkbox · отмечен">
+            <Checkbox :model-value="true" subtitle="Подпись строки">
+              Отмечен
+            </Checkbox>
+          </ShowcaseCell>
+          <ShowcaseCell label="Checkbox · частичный" hint="ось Partial мастера">
+            <Checkbox indeterminate>
+              Частичный
+            </Checkbox>
+          </ShowcaseCell>
+          <ShowcaseCell label="Checkbox · disabled">
+            <Checkbox :model-value="true" disabled>
+              Недоступен
+            </Checkbox>
+          </ShowcaseCell>
+        </div>
+
+        <div class="grid gap-6 sm:grid-cols-2">
+          <ShowcaseCell label="RadioGroup">
+            <RadioGroup model-value="a">
+              <RadioGroupItem value="a" checked subtitle="Подпись строки">
+                Первый
+              </RadioGroupItem>
+              <RadioGroupItem value="b">
+                Второй
+              </RadioGroupItem>
+              <RadioGroupItem value="c" disabled>
+                Недоступен
+              </RadioGroupItem>
+            </RadioGroup>
+          </ShowcaseCell>
+
+          <ShowcaseCell label="Switch">
+            <div class="flex flex-col gap-3">
+              <Switch subtitle="Подпись строки">
+                Выключен
+              </Switch>
+              <Switch :model-value="true">
+                Включён
+              </Switch>
+              <Switch :model-value="true" disabled>
+                Недоступен
+              </Switch>
+            </div>
+          </ShowcaseCell>
+        </div>
+      </div>
+    </ShowcaseSection>
+
+    <ShowcaseSection
       title="Button · волна 2"
       note="Мастер Атома 57:340, 118 вариантов. В код перенесены 24: цветовая ось не переносится, источником взята брендовая синяя колонка. Rounded отдельной осью не идёт — она связана с размером."
     >
