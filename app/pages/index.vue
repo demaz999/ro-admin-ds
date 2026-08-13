@@ -773,6 +773,124 @@ const martianWidths = [
     </ShowcaseSection>
 
     <ShowcaseSection
+      title="Контейнеры и оверлеи · волна 8"
+      note="Accordion закрывает старейшую позицию дизайн-долга: он стоял на дефолте shadcn-vue с волны 2 маршрута по киту 1, с пометкой «в ките нет вовсе». В Атоме он есть."
+    >
+      <div class="space-y-8">
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Accordion · мастер 6644:58398
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            <code>Collapsed=true</code> снова означает <strong>раскрытое</strong> — третий случай
+            инвертированного имени оси. Доказано высотой: 76 против 120 у крупного размера.
+            Цвет плашки связан с видом намертво, поэтому отдельного пропа нет.
+          </p>
+          <div class="grid max-w-2xl gap-4">
+            <ShowcaseCell label="plain" hint="без плашки, паддингов нет">
+              <Accordion>
+                <template #title>
+                  Заголовок раздела
+                </template>
+                Содержимое раскрытой части.
+              </Accordion>
+            </ShowcaseCell>
+            <ShowcaseCell label="soft · раскрыт" hint="мягкая ступень, радиус 16">
+              <Accordion variant="soft" default-open>
+                <template #title>
+                  Заголовок раздела
+                </template>
+                Содержимое раскрытой части.
+              </Accordion>
+            </ShowcaseCell>
+            <ShowcaseCell label="card · sm" hint="белая плашка, кегль 20">
+              <Accordion variant="card" size="sm">
+                <template #title>
+                  Заголовок раздела
+                </template>
+                Содержимое раскрытой части.
+              </Accordion>
+            </ShowcaseCell>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Image · мастер 174:3128 · Story · мастер 749:5436
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            У всех шести вариантов <code>Image</code> высота одна и та же, 170 — это
+            <strong>один снимок в шести пропорциях</strong>, а не шесть размеров. Переносится
+            пропорция, ширину задаёт раскладка.
+          </p>
+          <div class="flex flex-wrap items-end gap-4">
+            <div class="w-30">
+              <Image ratio="1:1" class="rounded-md bg-muted" />
+            </div>
+            <div class="w-40">
+              <Image ratio="16:10" class="rounded-md bg-muted" />
+            </div>
+            <div class="w-24">
+              <Image ratio="3:4" class="rounded-md bg-muted" />
+            </div>
+            <Story>
+              Длинная подпись сюжета в три строки
+            </Story>
+            <Story>
+              Короткая
+            </Story>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Banner · мастер 149:1663
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Четыре варианта дают <strong>три ступени текста</strong>: у среднего размера широкий
+            и у крупного узкий типографика совпадает, различие только в габарите. Поэтому в коде
+            одна ось из трёх ступеней, а не две по два значения.
+          </p>
+          <div class="flex flex-wrap gap-6">
+            <div class="w-70">
+              <Banner size="lg">
+                <template #media>
+                  <Image ratio="16:10" class="rounded-md bg-muted" />
+                </template>
+                <template #title>
+                  Крупная ступень
+                </template>
+                Заголовок 20, подпись 16
+              </Banner>
+            </div>
+            <div class="w-50">
+              <Banner size="md">
+                <template #media>
+                  <Image ratio="16:10" class="rounded-md bg-muted" />
+                </template>
+                <template #title>
+                  Средняя ступень
+                </template>
+                Заголовок 16, подпись 13
+              </Banner>
+            </div>
+            <div class="w-38">
+              <Banner size="sm">
+                <template #media>
+                  <Image ratio="16:10" class="rounded-md bg-muted" />
+                </template>
+                <template #title>
+                  Мелкая ступень
+                </template>
+                Заголовок 13, подпись 10
+              </Banner>
+            </div>
+          </div>
+        </div>
+      </div>
+    </ShowcaseSection>
+
+    <ShowcaseSection
       title="Таблица · волна 7"
       note="Матрица ячейки урезана решением, а не переносом: у оси Type двадцать значений, перенесено пять плюс слот. Пометка «— DS» означает «дизайн-система даёт готовым» — разбор в docs/table-ds-marker.md."
     >
