@@ -53,7 +53,7 @@ function masterStyle() {
             v-for="m in modes"
             :key="m.value"
             type="button"
-            class="rounded-sm px-2 py-1 text-xs"
+            class="rounded-xs px-2 py-1 text-xs"
             :class="mode === m.value ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'"
             @click="mode = m.value"
           >

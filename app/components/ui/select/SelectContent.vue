@@ -81,6 +81,6 @@ withDefaults(defineProps<{
 
 .popover-scroll::-webkit-scrollbar-thumb {
   background: var(--popover-scroll-thumb);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-2xs);
 }
 </style>

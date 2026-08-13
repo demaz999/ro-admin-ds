@@ -91,6 +91,6 @@ const isFloating = computed(() => focused.value || model.value.length > 0)
 
 .field-scroll::-webkit-scrollbar-thumb {
   background: var(--field-scroll-thumb);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-2xs);
 }
 </style>

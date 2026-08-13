@@ -203,6 +203,72 @@ const textareaVariants = [
 
     <section class="space-y-2">
       <h2 class="text-lg font-bold">
+        Button · 57:340 · брендовая колонка
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        В мастере 118 вариантов, в коде 24: цветовая ось не переносится, источником взята
+        брендовая синяя колонка <code>rocky</code> (<code>#4480f3</code>). Остальные восемь
+        колонок вариантов не дают. <code>Rounded</code> отдельной осью тоже не идёт — она связана
+        с размером, ровно как у <code>Input</code>.
+      </p>
+      <p class="max-w-3xl rounded-md border border-border p-3 text-sm">
+        <strong>Ширина эталона — часть варианта.</strong> В мастере кнопка размера
+        <code>content</code> имеет фиксированную ширину под свой текст: 141 у среднего, 87 у
+        малого, 173 у большого. В коде ширина идёт по содержимому, поэтому совпадение по ширине
+        зависит от подписи — сверяются высота, радиус, паддинги и цвет.
+      </p>
+
+      <CompareFrame
+        title="md · залитая · 57:341"
+        node="57:341"
+        master="atom/btn-md_57-341.png"
+        :width="141"
+        :height="40"
+      >
+        <Button show-icon>
+          Button text
+        </Button>
+      </CompareFrame>
+
+      <CompareFrame
+        title="md · тональная · 174:1900"
+        node="174:1900"
+        master="atom/btn-md-secondary_174-1900.png"
+        :width="141"
+        :height="40"
+      >
+        <Button variant="secondary" show-icon>
+          Button text
+        </Button>
+      </CompareFrame>
+
+      <CompareFrame
+        title="sm · залитая · 57:343 · радиус 6, иконки нет"
+        node="57:343"
+        master="atom/btn-sm_57-343.png"
+        :width="87"
+        :height="24"
+      >
+        <Button size="sm">
+          Button text
+        </Button>
+      </CompareFrame>
+
+      <CompareFrame
+        title="lg · залитая · 606:4957 · радиус 32"
+        node="606:4957"
+        master="atom/btn-lg_606-4957.png"
+        :width="173"
+        :height="64"
+      >
+        <Button size="lg" show-icon>
+          Button text
+        </Button>
+      </CompareFrame>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="text-lg font-bold">
         Select · 434:3074 · все 16 вариантов
       </h2>
       <p class="max-w-3xl text-sm text-muted-foreground">

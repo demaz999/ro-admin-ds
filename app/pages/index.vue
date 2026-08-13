@@ -118,7 +118,7 @@ const martianWidths = [
             :key="t.value"
             type="button"
             :title="t.note"
-            class="rounded-sm px-3 py-1.5 text-sm"
+            class="rounded-xs px-3 py-1.5 text-sm"
             :class="theme === t.value ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'"
             @click="theme = t.value"
           >
@@ -205,6 +205,75 @@ const martianWidths = [
             </p>
           </div>
         </div>
+      </div>
+    </ShowcaseSection>
+
+    <ShowcaseSection
+      title="Button · волна 2"
+      note="Мастер Атома 57:340, 118 вариантов. В код перенесены 24: цветовая ось не переносится, источником взята брендовая синяя колонка. Rounded отдельной осью не идёт — она связана с размером."
+    >
+      <div class="space-y-6">
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Размеры и типы
+          </h3>
+          <div class="flex flex-wrap items-center gap-4">
+            <Button size="lg" show-icon>
+              Большая
+            </Button>
+            <Button show-icon>
+              Средняя
+            </Button>
+            <Button size="sm">
+              Малая
+            </Button>
+            <Button variant="secondary" show-icon>
+              Тональная
+            </Button>
+            <Button variant="secondary" size="sm">
+              Тональная малая
+            </Button>
+          </div>
+        </div>
+
+        <div class="grid gap-6 sm:grid-cols-2">
+          <ShowcaseCell label="hover" hint="наведите — переход 0.1 сек">
+            <Button>Найти</Button>
+          </ShowcaseCell>
+          <ShowcaseCell label="pressed" hint="зажмите — переход мгновенный">
+            <Button>Найти</Button>
+          </ShowcaseCell>
+          <ShowcaseCell label="disabled · залитая" hint="прозрачность 0.32">
+            <Button disabled>
+              Найти
+            </Button>
+          </ShowcaseCell>
+          <ShowcaseCell label="disabled · тональная" hint="прозрачность 0.48">
+            <Button variant="secondary" disabled>
+              Найти
+            </Button>
+          </ShowcaseCell>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Ширина
+          </h3>
+          <div class="max-w-sm space-y-3">
+            <Button wide show-icon>
+              Во всю ширину
+            </Button>
+            <Button variant="secondary" wide>
+              И тональная
+            </Button>
+          </div>
+        </div>
+
+        <p class="max-w-2xl rounded-md border border-border p-3 text-sm">
+          <strong>Чего в мастере нет:</strong> <code>ghost</code> и <code>destructive</code>.
+          Ось <code>Type</code> имеет ровно два значения. Дефолтом shadcn они не подменены —
+          вопрос 29 в <code>docs/open-questions.md</code>.
+        </p>
       </div>
     </ShowcaseSection>
 
