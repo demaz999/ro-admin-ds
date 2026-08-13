@@ -860,6 +860,171 @@ const martianWidths = [
 
         <div>
           <h3 class="mb-3 text-sm font-medium">
+            Badge · мастер 913:8279
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Текстовая метка, и только: иконки у бейджа Атома нет вовсе. Из десяти колонок мастера
+            перенесены шесть, за которыми стоит роль. Розовая, фиолетовая, бирюзовая и жёлтая не
+            перенесены — они различают, а не сообщают; для этого есть расширенная палитра.
+          </p>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <ShowcaseCell label="md" hint="высота 24, кегль 13/16">
+              <Badge>Badge text</Badge>
+              <Badge variant="success">
+                Готово
+              </Badge>
+              <Badge variant="warning">
+                Внимание
+              </Badge>
+              <Badge variant="destructive">
+                Ошибка
+              </Badge>
+              <Badge variant="neutral">
+                Черновик
+              </Badge>
+              <Badge variant="inverse">
+                Инверсия
+              </Badge>
+            </ShowcaseCell>
+            <ShowcaseCell label="sm" hint="высота 16, кегль 10/12">
+              <Badge size="sm">
+                Badge text
+              </Badge>
+              <Badge size="sm" variant="success">
+                Готово
+              </Badge>
+              <Badge size="sm" variant="warning">
+                Внимание
+              </Badge>
+              <Badge size="sm" variant="destructive">
+                Ошибка
+              </Badge>
+              <Badge size="sm" variant="neutral">
+                Черновик
+              </Badge>
+              <Badge size="sm" variant="inverse">
+                Инверсия
+              </Badge>
+            </ShowcaseCell>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Avatar · мастер 3488:24229
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Две колонки цвета здесь не роли, а плотность заливки: брендовая сплошная и она же на
+            12%. Содержимое идёт за заливкой. Лестницы глифа и кегля непропорциональны стороне —
+            сняты поштучно. Буква есть у трёх младших размеров: у крупных её ступени это
+            display-кегли, под которые шкала не расширяется.
+          </p>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <ShowcaseCell label="иконка · solid" hint="24 · 32 · 40 · 56 · 72 · 104">
+              <Avatar :size="24" />
+              <Avatar :size="32" />
+              <Avatar :size="40" />
+              <Avatar :size="56" />
+              <Avatar :size="72" />
+              <Avatar :size="104" />
+            </ShowcaseCell>
+            <ShowcaseCell label="иконка · soft" hint="брендовый на 12%">
+              <Avatar variant="soft" :size="24" />
+              <Avatar variant="soft" :size="32" />
+              <Avatar variant="soft" :size="40" />
+              <Avatar variant="soft" :size="56" />
+              <Avatar variant="soft" :size="72" />
+              <Avatar variant="soft" :size="104" />
+            </ShowcaseCell>
+            <ShowcaseCell label="буква" hint="только 24, 32 и 40">
+              <Avatar type="letter" letter="А" :size="24" />
+              <Avatar type="letter" letter="Б" :size="32" />
+              <Avatar type="letter" letter="В" :size="40" />
+              <Avatar type="letter" letter="Г" variant="soft" :size="40" />
+            </ShowcaseCell>
+            <ShowcaseCell label="фотография" hint="заливка — само изображение">
+              <Avatar type="photo" :size="40" />
+              <Avatar type="photo" :size="72" />
+            </ShowcaseCell>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Spinner · мастер 134:1768
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Ожидание без известного конца — этим и отличается от таймера. Кольцо с угловой
+            заливкой: стопы сняты с мастера, брендовый на 12% → он же на 100%. Толщина кольца
+            непропорциональна стороне, замерена по экспорту.
+          </p>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <ShowcaseCell label="размеры" hint="16 · 20 · 32 · 48 · 72">
+              <Spinner size="xs" />
+              <Spinner size="sm" />
+              <Spinner size="md" />
+              <Spinner size="lg" />
+              <Spinner size="xl" />
+            </ShowcaseCell>
+            <ShowcaseCell label="inverse" hint="белая колонка мастера, показана на тёмном">
+              <span class="flex items-center gap-3 rounded-md bg-sidebar p-3">
+                <Spinner variant="inverse" size="sm" />
+                <Spinner variant="inverse" size="md" />
+                <Spinner variant="inverse" size="lg" />
+              </span>
+            </ShowcaseCell>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Tooltip · мастер 834:10127
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Семь вариантов оси — это семь положений хвостика, а не семь стилей. Разложены на
+            <code>side</code> × <code>align</code> плюс булев «хвостик есть»: набор достижимых
+            положений совпадает с мастером. Тень у подсказки средняя, не как у выпадашки.
+          </p>
+          <TooltipProvider>
+            <div class="flex flex-wrap gap-3">
+              <Tooltip>
+                <TooltipTrigger class="rounded-md border border-border px-3 py-2 text-sm">
+                  снизу слева
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="start">
+                  Tooltip text here
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger class="rounded-md border border-border px-3 py-2 text-sm">
+                  сверху справа
+                </TooltipTrigger>
+                <TooltipContent side="top" align="end">
+                  Tooltip text here
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger class="rounded-md border border-border px-3 py-2 text-sm">
+                  сбоку
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  Tooltip text here
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger class="rounded-md border border-border px-3 py-2 text-sm">
+                  без хвостика
+                </TooltipTrigger>
+                <TooltipContent side="top" :show-arrow="false">
+                  Tooltip text here
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          </TooltipProvider>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
             Alert · мастер 5883:58974
           </h3>
           <p class="mb-3 max-w-2xl text-sm text-muted-foreground">

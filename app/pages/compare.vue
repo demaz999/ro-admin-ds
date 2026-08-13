@@ -59,6 +59,70 @@ const indicatorVariants = [
 ] as const
 
 /**
+ * Badge, мастер 913:8279 — 227×432. Крупные в левой колонке, мелкие в правой.
+ * Наложены шесть колонок, легших на роли; четыре декоративные не переносятся.
+ */
+const badgeCompare = [
+  { t: 'md · default', x: 24, y: 24, w: 92, h: 24, size: 'md', variant: 'default' },
+  { t: 'md · success', x: 24, y: 64, w: 92, h: 24, size: 'md', variant: 'success' },
+  { t: 'md · warning', x: 24, y: 104, w: 92, h: 24, size: 'md', variant: 'warning' },
+  { t: 'md · destructive', x: 24, y: 144, w: 92, h: 24, size: 'md', variant: 'destructive' },
+  { t: 'md · neutral', x: 24, y: 344, w: 92, h: 24, size: 'md', variant: 'neutral' },
+  { t: 'md · inverse', x: 24, y: 384, w: 92, h: 24, size: 'md', variant: 'inverse' },
+  { t: 'sm · default', x: 132, y: 28, w: 69, h: 16, size: 'sm', variant: 'default' },
+  { t: 'sm · success', x: 132, y: 68, w: 69, h: 16, size: 'sm', variant: 'success' },
+  { t: 'sm · warning', x: 132, y: 108, w: 69, h: 16, size: 'sm', variant: 'warning' },
+  { t: 'sm · destructive', x: 132, y: 148, w: 69, h: 16, size: 'sm', variant: 'destructive' },
+  { t: 'sm · neutral', x: 132, y: 348, w: 69, h: 16, size: 'sm', variant: 'neutral' },
+  { t: 'sm · inverse', x: 132, y: 388, w: 69, h: 16, size: 'sm', variant: 'inverse' },
+] as const
+
+/**
+ * Avatar, мастер 3488:24229 — 472×680. Размеры идут по горизонтали от крупного
+ * к мелкому, типы — по вертикали: иконка плотная, иконка мягкая, буква плотная,
+ * буква мягкая, фотография.
+ */
+const avatarCompare = [
+  { t: 'иконка · 104', x: 32, y: 32, s: 104, size: 104, variant: 'solid', type: 'icon' },
+  { t: 'иконка · 72', x: 152, y: 48, s: 72, size: 72, variant: 'solid', type: 'icon' },
+  { t: 'иконка · 56', x: 240, y: 56, s: 56, size: 56, variant: 'solid', type: 'icon' },
+  { t: 'иконка · 40', x: 312, y: 64, s: 40, size: 40, variant: 'solid', type: 'icon' },
+  { t: 'иконка · 32', x: 368, y: 68, s: 32, size: 32, variant: 'solid', type: 'icon' },
+  { t: 'иконка · 24', x: 416, y: 72, s: 24, size: 24, variant: 'solid', type: 'icon' },
+  { t: 'иконка · 40 · soft', x: 312, y: 192, s: 40, size: 40, variant: 'soft', type: 'icon' },
+  { t: 'иконка · 104 · soft', x: 32, y: 160, s: 104, size: 104, variant: 'soft', type: 'icon' },
+  // Буква — только три младших размера: у крупных ступени display, решение 30.
+  { t: 'буква · 40', x: 312, y: 320, s: 40, size: 40, variant: 'solid', type: 'letter' },
+  { t: 'буква · 32', x: 368, y: 324, s: 32, size: 32, variant: 'solid', type: 'letter' },
+  { t: 'буква · 24', x: 416, y: 328, s: 24, size: 24, variant: 'solid', type: 'letter' },
+  { t: 'буква · 40 · soft', x: 312, y: 448, s: 40, size: 40, variant: 'soft', type: 'letter' },
+] as const
+
+/**
+ * Spinner, мастер 134:1768 — 568×104. Брендовая колонка слева, белая справа;
+ * белую накладывать не на что светлом фоне, поэтому взята только брендовая.
+ */
+const spinnerCompare = [
+  { t: '72', x: 16, y: 16, s: 72, size: 'xl' },
+  { t: '48', x: 104, y: 40, s: 48, size: 'lg' },
+  { t: '32', x: 168, y: 56, s: 32, size: 'md' },
+  { t: '20', x: 216, y: 68, s: 20, size: 'sm' },
+  { t: '16', x: 252, y: 72, s: 16, size: 'xs' },
+] as const
+
+/**
+ * Tooltip, мастер 834:10127 — 314×228. Семь положений хвостика; в наложение
+ * идёт сама плашка, положение проверяется отдельно — оно задаётся примитивом.
+ */
+const tooltipCompare = [
+  { t: 'left-bottom → side=top align=start', x: 24, y: 24, w: 119, h: 30 },
+  { t: 'left-up → side=bottom align=start', x: 24, y: 70, w: 119, h: 30 },
+  { t: 'right-bottom → side=top align=end', x: 171, y: 24, w: 119, h: 30 },
+  { t: 'right-up → side=bottom align=end', x: 171, y: 70, w: 119, h: 30 },
+  { t: 'none → без хвостика', x: 24, y: 180, w: 119, h: 24 },
+] as const
+
+/**
  * Timer, мастер 6344:55714 — 180×160. Полный крест Number × Size, все шесть
  * вариантов нарисованы, поэтому накладываются все.
  *
@@ -624,6 +688,127 @@ const textareaVariants = [
         <Indicator :variant="b.variant" :type="b.type" :size="b.size">
           99+
         </Indicator>
+      </CompareFrame>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="text-lg font-bold">
+        Badge · 913:8279 · шесть колонок из десяти
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Ось <code>Inversion</code> не независима: белый вариант существует только при
+        <code>true</code>, остальные девять только при <code>false</code> — та же связка, что у
+        <code>Size</code> и <code>Rounded</code> у поля ввода. Поэтому отдельного пропа нет,
+        инверсия это роль. Начертание <strong>Regular</strong>, не Bold, как было в ките 1.
+      </p>
+      <p class="max-w-3xl rounded-md border border-border p-3 text-sm">
+        Четыре колонки — розовая, фиолетовая, бирюзовая и жёлтая — не перенесены: роли за ними
+        не стоит, это различение, а не сообщение. Накладывать их не на что, и это не пропуск.
+      </p>
+
+      <CompareFrame
+        v-for="b in badgeCompare"
+        :key="b.t"
+        :title="b.t"
+        node="913:8279"
+        master="atom/badge_913-8279.png"
+        :x="b.x"
+        :y="b.y"
+        :width="b.w"
+        :height="b.h"
+      >
+        <Badge :variant="b.variant" :size="b.size">
+          Badge text
+        </Badge>
+      </CompareFrame>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="text-lg font-bold">
+        Avatar · 3488:24229 · срез матрицы
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Ни глиф, ни кегль не масштабируются долей от стороны — обе лестницы сняты поштучно:
+        иконка 16 / 16 / 16 / 20 / 32 / 56, буква 13 / 16 / 20 / 28 / 40 / 56. Радиус во всех
+        вариантах заведомо больше половины стороны, то есть это круг.
+      </p>
+      <p class="max-w-3xl rounded-md border border-border p-3 text-sm">
+        <strong>Буква есть только у трёх младших размеров.</strong> Ступени 28/32, 40/44 и 56/56
+        — это стили <code>ricotta</code>, <code>cheddar</code> и <code>gouda</code>, те самые,
+        что решение 30 объявило сайтовым слоем на <code>ButtonNavigation</code>. Применён его
+        прецедент: перенесены размеры, легшие в шкалу точно.
+      </p>
+
+      <CompareFrame
+        v-for="a in avatarCompare"
+        :key="a.t"
+        :title="a.t"
+        node="3488:24229"
+        master="atom/avatar_3488-24229.png"
+        :x="a.x"
+        :y="a.y"
+        :width="a.s"
+        :height="a.s"
+      >
+        <Avatar :type="a.type" :variant="a.variant" :size="a.size" letter="А" />
+      </CompareFrame>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="text-lg font-bold">
+        Spinner · 134:1768 · брендовая колонка
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Кольцо с угловой заливкой, стопы с мастера: брендовый на <strong>12%</strong> →
+        он же на 100%. То есть кольцо не исчезает совсем, а гаснет до того же уровня, на котором
+        сидит подложка таймера. Толщина непропорциональна стороне — 4 / 4 / 4 / 5 / 6, замерено
+        по экспорту.
+      </p>
+
+      <CompareFrame
+        v-for="s in spinnerCompare"
+        :key="s.t"
+        :title="s.t"
+        node="134:1768"
+        master="atom/spinner_134-1768.png"
+        :x="s.x"
+        :y="s.y"
+        :width="s.s"
+        :height="s.s"
+      >
+        <Spinner :size="s.size" />
+      </CompareFrame>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="text-lg font-bold">
+        Tooltip · 834:10127 · плашка
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Семь значений оси — это положения хвостика, а не стили; разложены на <code>side</code> ×
+        <code>align</code>. Имена оси читаются наоборот привычного: <code>left-up</code> — это
+        хвостик сверху слева, то есть плашка стоит <strong>под</strong> областью.
+      </p>
+      <p class="max-w-3xl rounded-md border border-border p-3 text-sm">
+        Накладывается сама плашка: положение относительно области задаёт примитив, и на статичной
+        витрине его не показать. Тень у подсказки средняя (<code>0 / 4 / 16</code>), а не как у
+        выпадашки — подсказка лежит ниже плашки списка.
+      </p>
+
+      <CompareFrame
+        v-for="tt in tooltipCompare"
+        :key="tt.t"
+        :title="tt.t"
+        node="834:10127"
+        master="atom/tooltip_834-10127.png"
+        :x="tt.x"
+        :y="tt.y"
+        :width="tt.w"
+        :height="tt.h"
+      >
+        <div class="w-[119px] rounded-md bg-popover px-2 py-1 text-xs text-popover-foreground shadow-elevated">
+          Tooltip text here
+        </div>
       </CompareFrame>
     </section>
 

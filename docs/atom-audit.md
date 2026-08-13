@@ -325,6 +325,13 @@ Symbols. Замена превращается в переименование.
 | `Button` | `57:340` | SET | **118** | Type `primary\|secondary` · Width `content\|wide` · Size (3) · Color (9) · Rounded · Disabled | Show icon, Icon (SWAP), Title |
 | `ButtonAction` | `1028:8221` | SET | 40 | Color (10) · Size (2) · Disabled | Show icon, Show arrow, Show title, Title, Icon (SWAP) |
 | `ButtonAction_` | `6626:56755` | SET | 2 | Size (2) | — |
+
+> **Эти два узла — один компонент, а не дубль** (решение от 2026-08-13). Оба живых: младший
+> инстанцирован в модалках, старший — внутри `Notification` `5883:58974`. Размерный ряд у них
+> **совпадает**: `suluguni` 16/20 и `briscola` 13/16 есть у каждого, третьего размера нет ни у
+> одного — проверено замером, а не по описанию. Разница ровно в осях: старший добавляет `Color`
+> (не переносится) и **`Disabled`**, которая и закрывает долг младшего. В коде это один
+> `ButtonAction` с двумя размерами и выключенным состоянием.
 | `ButtonTag` | `256:3601` | SET | 18 | Active · Color (9) | Title |
 | `ButtonLink` | `5792:97292` | SET | 16 | Size (2) · Color (8) | — |
 | `ButtonNavigation` | `612:5443` | SET | 14 | Size (7) · Color (2) | Title, Active |
