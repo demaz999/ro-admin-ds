@@ -59,6 +59,22 @@ const indicatorVariants = [
 ] as const
 
 /**
+ * MenuItem, мастер _MenuItemMaster 3465:22566 — 328×376.
+ *
+ * Наведение в мастере не нарисовано: оно живёт в таблице состояний спеки
+ * 832:20679, колонка на x=468. Оттуда же снято, что подложка ходит плотностью
+ * одной нейтрали — 8% на наведении, 12% на выборе, — а подпись у них одна.
+ */
+const menuItemCompare = [
+  { t: 'покой', x: 16, y: 16, w: 296, h: 44, compact: false, selected: false, disabled: false },
+  { t: 'выбран', x: 16, y: 76, w: 296, h: 44, compact: false, selected: true, disabled: false },
+  { t: 'компактный', x: 16, y: 136, w: 56, h: 44, compact: true, selected: false, disabled: false },
+  { t: 'компактный · выбран', x: 16, y: 196, w: 56, h: 44, compact: true, selected: true, disabled: false },
+  { t: 'выключен', x: 16, y: 256, w: 296, h: 44, compact: false, selected: false, disabled: true },
+  { t: 'компактный · выключен', x: 16, y: 316, w: 56, h: 44, compact: true, selected: false, disabled: true },
+] as const
+
+/**
  * Badge, мастер 913:8279 — 227×432. Крупные в левой колонке, мелкие в правой.
  * Наложены шесть колонок, легших на роли; четыре декоративные не переносятся.
  */
@@ -688,6 +704,44 @@ const textareaVariants = [
         <Indicator :variant="b.variant" :type="b.type" :size="b.size">
           99+
         </Indicator>
+      </CompareFrame>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="text-lg font-bold">
+        MenuItem · 3465:22566 · все 6 вариантов
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Оси <code>Compact</code> × <code>Selected</code> × <code>Disabled</code> дают формально
+        восемь сочетаний, нарисовано шесть: <strong>выключенного выбранного не бывает</strong> ни
+        в одном режиме. Компактный пункт — 56 шириной, не по содержимому.
+      </p>
+      <p class="max-w-3xl rounded-md border border-border p-3 text-sm">
+        <strong>Меню Атома светлое — правило тёмного сайдбара это не отменяет.</strong> С мастера
+        берутся состав и геометрия, цвет приходит из темы: в rososmotr меню тёмное, а сверочные
+        значения Атома лежат в теме <code>atom</code>, чтобы наложение шло на родных цветах.
+        Подложка ходит <strong>плотностью одной нейтрали</strong>: покоя нет вовсе, наведение 8%,
+        выбор 12% — та же мягкая ступень, что у строки списка.
+      </p>
+
+      <CompareFrame
+        v-for="mi in menuItemCompare"
+        :key="mi.t"
+        :title="mi.t"
+        node="3465:22566"
+        master="atom/menuitem_3465-22566.png"
+        :x="mi.x"
+        :y="mi.y"
+        :width="mi.w"
+        :height="mi.h"
+      >
+        <MenuItem
+          :compact="mi.compact"
+          :selected="mi.selected"
+          :disabled="mi.disabled"
+        >
+          Title
+        </MenuItem>
       </CompareFrame>
     </section>
 
