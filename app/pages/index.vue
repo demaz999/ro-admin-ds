@@ -383,9 +383,14 @@ const martianWidths = [
                 </template>
                 Поиск
               </SelectItem>
+              <!--
+                Крестик в строке списка идёт с оптической поправкой 0.75:
+                сплошной диагональный X при полном боксе тяжелее соседей.
+                Крестик очистки в поле поправку НЕ получает — там 8×8 из мастера.
+              -->
               <SelectItem show-icon selected>
                 <template #icon>
-                  <Icon name="close" :size="16" />
+                  <Icon name="close" :size="16" :scale="0.75" />
                 </template>
                 Выбранная
               </SelectItem>
