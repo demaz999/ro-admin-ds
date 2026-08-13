@@ -237,6 +237,44 @@ const textareaVariants = [
 
     <section class="space-y-2">
       <h2 class="text-lg font-bold">
+        Select · большой размер · «Другие селекты», спека 444:3849
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Раздел спеки для лендингов, панелей и мобильных: 272×64, радиус 32, паддинги 22/24 в
+        пустом и 14/24 в заполненном, зазор 8. Это ровно лесенка размера <code>lanassa</code> у
+        <code>Input</code>, поэтому большой селект сел на те же роли и тот же радиус
+        <code>--radius-3xl</code>. Состояния те же: 32% покой, 48% наведение, 32% нажатие.
+      </p>
+      <p class="max-w-3xl rounded-md border border-border p-3 text-sm">
+        <strong>Мастера этих селектов осиротевшие.</strong> Инстансы ведут в компоненты
+        <code>3447:22552</code>, <code>3447:22560</code>, <code>3447:22590</code> с именами вида
+        <code>Select/default/filled/false/false</code> — у них нет родителя и они не входят ни в
+        один сет, поэтому в инвентарь файла не попали. Источником взяты ячейки спеки.
+      </p>
+
+      <CompareFrame
+        title="большой · пусто · 3873:39061"
+        node="3873:39061"
+        master="atom/select-lg_3873-39061.png"
+        :width="272"
+        :height="64"
+      >
+        <SelectTrigger size="lg" :show-icon="false" />
+      </CompareFrame>
+
+      <CompareFrame
+        title="большой · заполнено · 3873:39473"
+        node="3873:39473"
+        master="atom/select-lg-filled_3873-39473.png"
+        :width="272"
+        :height="64"
+      >
+        <SelectTrigger size="lg" :show-icon="false" label="Option" />
+      </CompareFrame>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="text-lg font-bold">
         Autocomplete · 3874:36379 · все 8 вариантов
       </h2>
       <p class="max-w-3xl text-sm text-muted-foreground">

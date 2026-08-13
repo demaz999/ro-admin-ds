@@ -336,6 +336,26 @@ const martianWidths = [
             <ShowcaseCell label="триггер отдельно" hint="презентационный, для наложения">
               <SelectTrigger open label="Option" />
             </ShowcaseCell>
+            <ShowcaseCell label="большой · 64" hint="«Другие селекты»: радиус 32">
+              <SelectTrigger size="lg" :show-icon="false" />
+            </ShowcaseCell>
+            <ShowcaseCell label="большой · заполнен">
+              <SelectTrigger size="lg" :show-icon="false" label="Option" />
+            </ShowcaseCell>
+          </div>
+
+          <p class="mt-4 mb-3 max-w-2xl text-sm text-muted-foreground">
+            Иконка слева — слот со свопом, как у поля ввода: в мастере это
+            <code>link</code>, но глиф подменяется. Ниже — список с иконками строк по
+            держателю <code>_IconListItem</code> 16×20.
+          </p>
+          <div class="grid gap-6 sm:grid-cols-2">
+            <ShowcaseCell label="триггер с иконкой">
+              <SelectTrigger label="Option" />
+            </ShowcaseCell>
+            <ShowcaseCell label="триггер без иконки">
+              <SelectTrigger :show-icon="false" label="Option" />
+            </ShowcaseCell>
           </div>
         </div>
 
@@ -353,22 +373,30 @@ const martianWidths = [
             <template #search>
               <Input placeholder="Search" :style="{ width: '312px' }" />
             </template>
-            <SelectGroup header="Группа">
+            <SelectGroup header="С иконками">
               <SelectItem show-icon>
-                Первый
+                Ссылка
               </SelectItem>
-              <SelectItem subtitle="Подпись строки">
-                Второй
+              <SelectItem show-icon subtitle="Подпись строки">
+                <template #icon>
+                  <Icon name="search" :size="16" />
+                </template>
+                Поиск
               </SelectItem>
-              <SelectItem selected>
-                Выбранный
+              <SelectItem show-icon selected>
+                <template #icon>
+                  <Icon name="close" :size="16" />
+                </template>
+                Выбранная
               </SelectItem>
-              <SelectItem disabled>
-                Недоступный
+              <SelectItem show-icon disabled>
+                Недоступная
               </SelectItem>
             </SelectGroup>
-            <SelectGroup header="Вторая группа">
-              <SelectItem>Ещё один</SelectItem>
+            <SelectGroup header="Без иконок">
+              <SelectItem subtitle="Подпись строки">
+                Ещё один
+              </SelectItem>
               <SelectItem>И ещё</SelectItem>
             </SelectGroup>
           </SelectContent>

@@ -49,20 +49,42 @@ export { default as SelectTrigger } from './SelectTrigger.vue'
 // Зазор 8 во ВСЕХ шестнадцати вариантах — в отличие от Input, где заполненное
 // состояние раздвигает контейнер до 12. Сверено по мастеру, оси под это нет.
 export const selectTriggerVariants = cva(
-  'group/field relative flex h-10 w-full items-center gap-2 rounded-md px-4 py-2.5 outline-none',
+  'group/field relative flex w-full items-center gap-2 outline-none',
   {
     variants: {
       variant: {
         filled: 'bg-field hover:bg-field-hover',
         elevated: 'bg-field-elevated shadow-elevated hover:shadow-elevated-hover',
       },
+      /**
+       * Размер. `md` — мастер `434:3074`, 40px и радиус 8. `lg` — раздел
+       * «Другие селекты» спеки `444:3849`: 64px и радиус 32, та же лесенка
+       * состояний. Совпадает с размером `lanassa` у `Input` до значения.
+       */
+      size: {
+        md: 'h-10 rounded-md px-4 py-2.5',
+        lg: 'h-16 rounded-3xl px-6',
+      },
+      /** Наличие выбранного значения: у большого размера от него зависит паддинг. */
+      floating: {
+        true: '',
+        false: '',
+      },
       disabled: {
         true: 'pointer-events-none opacity-[var(--opacity-disabled)]',
         false: '',
       },
     },
+    compoundVariants: [
+      // У размера 40 паддинг одинаковый во всех шестнадцати вариантах мастера,
+      // а у размера 64 он меняется с 22 на 14, ровно как у Input размера lanassa.
+      { size: 'lg', floating: false, class: 'py-5.5' },
+      { size: 'lg', floating: true, class: 'py-3.5' },
+    ],
     defaultVariants: {
       variant: 'filled',
+      size: 'md',
+      floating: false,
       disabled: false,
     },
   },

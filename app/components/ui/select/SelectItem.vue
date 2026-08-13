@@ -55,13 +55,21 @@ const props = withDefaults(defineProps<{
       disabled ? 'pointer-events-none opacity-[var(--opacity-disabled)]' : '',
     ]"
   >
-    <slot v-if="props.showIcon" name="icon">
-      <Icon
-        name="link"
-        :size="16"
-        class="opacity-[var(--opacity-icon-muted)] group-hover/item:opacity-100"
-      />
-    </slot>
+    <!--
+      Держатель иконки — мастер `_IconListItem` `6475:86591`: бокс 16×20, то есть
+      глиф 16 по центру строки высотой 20. Единственная ось того мастера —
+      цветовая, а она не переносится (решение 23), поэтому самостоятельным
+      компонентом он не заводится и живёт здесь слотом.
+    -->
+    <span
+      v-if="props.showIcon"
+      data-slot="list-item-icon"
+      class="flex h-5 w-4 shrink-0 items-center justify-center opacity-[var(--opacity-icon-muted)] group-hover/item:opacity-100"
+    >
+      <slot name="icon">
+        <Icon name="link" :size="16" />
+      </slot>
+    </span>
 
     <span class="flex min-w-0 flex-1 flex-col">
       <span

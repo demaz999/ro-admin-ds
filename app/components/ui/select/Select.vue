@@ -39,6 +39,8 @@ import type { SelectTriggerVariants } from '.'
  */
 const props = withDefaults(defineProps<{
   variant?: NonNullable<SelectTriggerVariants['variant']>
+  /** `md` — мастер 434:3074 (40). `lg` — «Другие селекты» спеки 444:3849 (64, радиус 32). */
+  size?: NonNullable<SelectTriggerVariants['size']>
   /** Текстовый проп мастера `Select option` — подпись поля. */
   placeholder?: string
   items?: { value: string, label: string, subtitle?: string, disabled?: boolean }[]
@@ -51,6 +53,7 @@ const props = withDefaults(defineProps<{
   disabled?: boolean
 }>(), {
   variant: 'filled',
+  size: 'md',
   placeholder: 'Select option',
   items: () => [],
   searchable: true,
@@ -69,6 +72,7 @@ const selected = computed(() => props.items.find(i => i.value === model.value))
       <ComboboxTrigger as-child>
         <SelectTrigger
           :variant="props.variant"
+          :size="props.size"
           :placeholder="props.placeholder"
           :label="selected?.label ?? ''"
           :show-icon="props.showIcon"

@@ -17,24 +17,32 @@ import { autocompleteVariants, type AutocompleteVariants } from '.'
  * Поле со свободным вводом и подсказками — мастер `Autocomplete` `3874:36379`,
  * спека `3874:30988`, тёмный набор `3961:46520`.
  *
- * Механика общая с `Select`: оба на примитиве `Combobox` Reka. Различие —
- * поведение, а не вид: здесь пользователь вводит текст сам, и введённое может
- * не совпасть ни с одной строкой списка.
+ * ## Чем отличается от `Select` на уровне триггера
+ *
+ * Механика общая — оба на `Combobox` Reka. Но **поле ввода здесь и есть
+ * триггер**: пользователь печатает прямо в него, текст виден в поле, а список
+ * фильтруется по набранному. У `Select` наоборот: триггер презентационный, а
+ * поиск живёт отдельным полем внутри плашки.
+ *
+ * Отсюда три обязательные настройки корня, без которых поведение ломается:
+ *
+ * - `resetSearchTermOnBlur = false` — иначе набранное **стирается при потере
+ *   фокуса**, и поле выглядит пустым;
+ * - `resetSearchTermOnSelect = false` — иначе выбранная строка не остаётся
+ *   в поле;
+ * - `ignoreFilter` — список фильтруем сами, чтобы Reka не фильтровала повторно.
+ *
+ * Отдельная ловушка: `v-model` вешается на сам `ComboboxInput`, а не на
+ * вложенный `input`. `ComboboxInput` держит набранный текст своим `modelValue`
+ * и прокидывает его в потомка через `as-child`; своё `v-model` на потомке
+ * перебивает это и уводит ввод мимо поля.
  *
  * ## Геометрия — это `Input`, один в один
  *
- * Мастер даёт 8 вариантов: Type `default|map` × State `default|filled` ×
- * Disabled. Коробка 272×40, паддинги 10/16 в пустом и 2/16 в заполненном,
- * зазор 8 и 12, радиус 8, рамки нет, заливка `#d4d5d9` 32% либо белая с тенью
- * 12%. Всё совпадает с полем ввода, поэтому роли те же `--field-*`.
- *
- * Отличие от `Input` одно: **в заполненном состоянии в мастере нарисован
- * крестик очистки** — у `Input` он есть, но по умолчанию выключен, здесь же
- * присутствует во всех заполненных вариантах.
- *
- * Своего списка у мастера нет: подсказки показываются в той же плашке
- * `PopOverList` `571:4889`. Поиска внутри плашки здесь нет — полем поиска
- * работает само поле.
+ * 8 вариантов: Type `default|map` × State `default|filled` × Disabled. Коробка
+ * 272×40, паддинги 10/16 в пустом и 2/16 в заполненном, зазоры 8 и 12, радиус 8,
+ * рамки нет. Отличие от `Input` одно: **крестик очистки нарисован во всех
+ * заполненных вариантах**, тогда как у поля ввода он по умолчанию выключен.
  */
 const props = withDefaults(defineProps<{
   /** Ось `Type` мастера: `filled` — залитое поле, `elevated` — белое с тенью поверх карты. */
@@ -55,22 +63,39 @@ const props = withDefaults(defineProps<{
   disabled: false,
 })
 
+/** Модель компонента — введённый ТЕКСТ: значение может не совпасть ни с одной строкой. */
 const model = defineModel<string>({ default: '' })
+
+/** Выбранная строка корня Combobox — отдельно от текста, её задаёт клик по подсказке. */
+const picked = ref<string>('')
 
 const focused = ref(false)
 /** Подпись всплывает при фокусе или при значении — как у поля ввода. */
 const isFloating = computed(() => focused.value || model.value.length > 0)
 
-/** Подсказки фильтруются по введённому — это и есть смысл компонента. */
+/** Подсказки фильтруются по набранному — это и есть смысл компонента. */
 const matches = computed(() => {
   const q = model.value.trim().toLowerCase()
   if (!q) return props.items
   return props.items.filter(i => i.label.toLowerCase().includes(q))
 })
+
+function pick(label: string) {
+  model.value = label
+}
 </script>
 
 <template>
-  <ComboboxRoot v-model="model" :disabled="props.disabled" ignore-filter class="w-full">
+  <ComboboxRoot
+    v-model="picked"
+    :disabled="props.disabled"
+    ignore-filter
+    open-on-focus
+    open-on-click
+    :reset-search-term-on-blur="false"
+    :reset-search-term-on-select="false"
+    class="w-full"
+  >
     <ComboboxAnchor as-child>
       <div
         data-slot="field"
@@ -89,9 +114,10 @@ const matches = computed(() => {
             >
               {{ props.placeholder }}
             </span>
-            <ComboboxInput as-child>
+
+            <!-- v-model на самом ComboboxInput: он держит набранный текст. -->
+            <ComboboxInput v-model="model" as-child>
               <input
-                v-model="model"
                 data-slot="field-input"
                 :placeholder="isFloating ? undefined : props.placeholder"
                 :disabled="props.disabled"
@@ -127,11 +153,19 @@ const matches = computed(() => {
             <ComboboxItem
               v-for="item in matches"
               :key="item.value"
-              :value="item.label"
+              :value="item.value"
               :disabled="item.disabled"
               as-child
+              @select="pick(item.label)"
             >
-              <SelectItem :subtitle="item.subtitle" :disabled="item.disabled">
+              <SelectItem
+                :subtitle="item.subtitle"
+                :show-icon="Boolean($slots['item-icon'])"
+                :disabled="item.disabled"
+              >
+                <template v-if="$slots['item-icon']" #icon>
+                  <slot name="item-icon" />
+                </template>
                 {{ item.label }}
               </SelectItem>
             </ComboboxItem>

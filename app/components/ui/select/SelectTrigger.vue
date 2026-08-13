@@ -14,6 +14,8 @@ import { selectTriggerVariants, type SelectTriggerVariants } from '.'
  */
 const props = withDefaults(defineProps<{
   variant?: NonNullable<SelectTriggerVariants['variant']>
+  /** `md` — мастер 434:3074 (40). `lg` — «Другие селекты» спеки 444:3849 (64, радиус 32). */
+  size?: NonNullable<SelectTriggerVariants['size']>
   /** Ось `Active` мастера: меняет только направление шеврона. */
   open?: boolean
   /** Текстовый проп мастера `Select option`. */
@@ -25,6 +27,7 @@ const props = withDefaults(defineProps<{
   disabled?: boolean
 }>(), {
   variant: 'filled',
+  size: 'md',
   open: false,
   placeholder: 'Select option',
   label: '',
@@ -42,7 +45,7 @@ const isFilled = computed(() => props.label.length > 0)
     type="button"
     :disabled="props.disabled"
     :data-state="props.open ? 'open' : 'closed'"
-    :class="selectTriggerVariants({ variant, disabled })"
+    :class="selectTriggerVariants({ variant, size, floating: isFilled, disabled })"
   >
     <slot v-if="props.showIcon" name="icon">
       <Icon name="link" :size="16" />
