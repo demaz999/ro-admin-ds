@@ -399,7 +399,10 @@ Symbols. Замена превращается в переименование.
 Ось `Type` у `Cell`: `16 reg — DS`, `16 reg + sub`, `16 bold`, `16 reg + icon left`,
 `16 reg + icon right`, `16 number`, `13 reg — DS`, `13 bold`, `Input`, `Input + sub`, `dropdown`,
 `dropdown + sub`, `checkbox — DS`, `expand — DS`, `collapse — DS`, `status text`, `status bulb`,
-`context cell`, `bulb cell`, `icon cell`. Пометка `— DS` стоит у шести значений и не расшифрована.
+`context cell`, `bulb cell`, `icon cell`.
+
+> **Поправка от 2026-08-13.** Пометка `— DS` стоит у **пяти** значений, а не у шести: `16 reg`,
+> `13 reg`, `checkbox`, `expand`, `collapse`. Расшифровка — в `docs/table-ds-marker.md`.
 
 ### Контейнеры и оверлеи
 
