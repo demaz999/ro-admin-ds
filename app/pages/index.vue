@@ -269,11 +269,50 @@ const martianWidths = [
           </div>
         </div>
 
-        <p class="max-w-2xl rounded-md border border-border p-3 text-sm">
-          <strong>Чего в мастере нет:</strong> <code>ghost</code> и <code>destructive</code>.
-          Ось <code>Type</code> имеет ровно два значения. Дефолтом shadcn они не подменены —
-          вопрос 29 в <code>docs/open-questions.md</code>.
-        </p>
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            destructive · из колонки fargo
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Исключение из решения по цветовой оси: исключалась ось выбора цвета, а не семантика.
+            Покой снят с мастера, наведение и нажатие выведены по механике брендовой колонки —
+            светлота ±10/255. <code>ghost</code> у текстовой кнопки не заводится: такого типа
+            в мастере нет.
+          </p>
+          <div class="flex flex-wrap items-center gap-4">
+            <Button variant="destructive">
+              Удалить
+            </Button>
+            <Button variant="destructive" size="sm">
+              Удалить
+            </Button>
+            <Button variant="destructive" disabled>
+              Удалить
+            </Button>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            IconButton · мастер ButtonSimple 110:1566
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Отдельный компонент, а не кнопка без подписи: текстового пропа у мастера нет.
+            Боксы 40, 32, 24; глиф 20 у большого и 16 у остальных. У иконочной
+            <code>ghost</code> законен — он есть в мастере отдельным типом
+            <code>transparent</code>.
+          </p>
+          <div class="flex flex-wrap items-center gap-4">
+            <IconButton size="lg" label="Метка" />
+            <IconButton label="Метка" />
+            <IconButton size="sm" label="Метка" />
+            <IconButton variant="secondary" size="lg" label="Метка" />
+            <IconButton variant="ghost" size="lg" label="Метка" />
+            <IconButton variant="elevated" size="lg" label="Метка" />
+            <IconButton size="lg" rounded label="Метка" />
+            <IconButton size="lg" disabled label="Метка" />
+          </div>
+        </div>
       </div>
     </ShowcaseSection>
 

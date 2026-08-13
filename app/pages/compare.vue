@@ -269,6 +269,48 @@ const textareaVariants = [
 
     <section class="space-y-2">
       <h2 class="text-lg font-bold">
+        IconButton · ButtonSimple 110:1566 · брендовая колонка
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Самый крупный мастер файла — 186 вариантов, в коде 42. Это отдельный компонент, а не
+        <code>Button</code> без подписи: текстового пропа у мастера нет вовсе. Заливка лежит на
+        вложенном прямоугольнике, а у типа <code>transparent</code> его нет — не задан прозрачным,
+        а отсутствует.
+      </p>
+
+      <CompareFrame
+        title="lg · залитая · 110:1565 · бокс 40, глиф 20"
+        node="110:1565"
+        master="atom/iconbtn-lg_110-1565.png"
+        :width="40"
+        :height="40"
+      >
+        <IconButton size="lg" label="Метка" />
+      </CompareFrame>
+
+      <CompareFrame
+        title="md · залитая · 110:1567 · бокс 32, глиф 16, радиус 6"
+        node="110:1567"
+        master="atom/iconbtn-md_110-1567.png"
+        :width="32"
+        :height="32"
+      >
+        <IconButton label="Метка" />
+      </CompareFrame>
+
+      <CompareFrame
+        title="lg · тональная · 197:1582"
+        node="197:1582"
+        master="atom/iconbtn-lg-secondary_197-1582.png"
+        :width="40"
+        :height="40"
+      >
+        <IconButton size="lg" variant="secondary" label="Метка" />
+      </CompareFrame>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="text-lg font-bold">
         Select · 434:3074 · все 16 вариантов
       </h2>
       <p class="max-w-3xl text-sm text-muted-foreground">

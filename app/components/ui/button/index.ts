@@ -58,8 +58,22 @@ export { default as Button } from './Button.vue'
  * Спека впервые задаёт **время**: наведение 0.1 сек, нажатие 0 сек. У полей
  * времени не указано нигде, поэтому там переходов нет — здесь есть.
  *
- * Чего в мастере нет: `ghost` и `destructive`. См. `docs/open-questions.md`,
- * вопрос 29.
+ * ## `destructive` — исключение из решения 23
+ *
+ * Оси `Type` со значением «удалить» в мастере нет: удаление у Атома несёт
+ * **красная колонка `fargo`** той же цветовой оси. Решением от 2026-08-13 она
+ * взята как исключение: исключали ось выбора цвета, а не семантику — красная
+ * кнопка удаления это роль, а не оттенок на выбор.
+ *
+ * Состав и геометрия у неё общие с залитой, отличаются только значения.
+ * Покой снят с мастера (`2583:14964`). Наведение и нажатие в файле не
+ * нарисованы ни для одной колонки, кроме брендовой, поэтому **выведены** по
+ * механике, снятой с неё: светлота ±10/255 при неизменных тоне и насыщенности.
+ * На брендовой колонке механика воспроизводит эталон бит в бит.
+ *
+ * `ghost` **не заводится**: кнопок без мастера не выдумываем. Его нишу у Атома
+ * занимает `ButtonAction` — соответствие фиксируется в `docs/naming.md` после
+ * его переноса.
  */
 export const buttonVariants = cva(
   'group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap font-medium outline-none select-none disabled:pointer-events-none',
@@ -68,6 +82,7 @@ export const buttonVariants = cva(
       variant: {
         default: 'bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-pressed',
         secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary-hover active:bg-secondary-pressed',
+        destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive-hover active:bg-destructive-pressed',
       },
       size: {
         lg: 'h-16 gap-1.5 rounded-3xl px-8 text-sm',
@@ -83,7 +98,9 @@ export const buttonVariants = cva(
     },
     compoundVariants: [
       // Выключенное состояние гасится по-разному у залитой и тональной — так в спеке.
+      // Удаление залитое, поэтому идёт с залитой.
       { variant: 'default', class: 'disabled:opacity-[var(--opacity-disabled-strong)]' },
+      { variant: 'destructive', class: 'disabled:opacity-[var(--opacity-disabled-strong)]' },
       { variant: 'secondary', class: 'disabled:opacity-[var(--opacity-disabled)]' },
     ],
     defaultVariants: {

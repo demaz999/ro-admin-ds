@@ -304,6 +304,7 @@
 
     --color-muted-disabled: var(--muted-disabled);
 
+    --color-destructive-foreground: var(--destructive-foreground);
     --color-destructive-hover: var(--destructive-hover);
     --color-destructive-pressed: var(--destructive-pressed);
     --color-destructive-surface: var(--destructive-surface);
@@ -435,6 +436,7 @@
     --muted-disabled: #b9bec5;                      /* neutral/disabled */
 
     /* служебные состояния */
+    --destructive-foreground: var(--primary-foreground); /* решение: текст на красной заливке — тот же, что на брендовой */
     --destructive-hover: #ff6874;                   /* service/error-hover */
     --destructive-pressed: #e92837;                 /* service/error-pressed */
     --destructive-surface: #fff0f1;                 /* service/error-surface */
@@ -551,6 +553,19 @@
     --secondary-hover: #4480f314;                   /* 8% — наведение ОСВЕТЛЯЕТ */
     --secondary-pressed: #4480f329;                 /* 16% */
     --secondary-foreground: #4480f3;
+
+    /* Удаление. Колонка `fargo` того же мастера — исключение из решения 23:
+       семантическая роль может брать значения из исключённой колонки.
+       Покой снят с мастера (2583:14964). Наведение и нажатие в файле НЕ
+       нарисованы ни для одной колонки, кроме брендовой, поэтому выведены по
+       механике, снятой с неё: светлота ±10/255 при неизменных тоне и
+       насыщенности. На `rocky` механика воспроизводит #578df4 и #3173f2
+       бит в бит — проверено. Рампа Атома построена при постоянной светлоте
+       (у `rocky` и `fargo` она одна и та же, 0.6098), поэтому сдвиг переносится. */
+    --destructive: #e35454;                         /* 2583:14964 — с мастера */
+    --destructive-hover: #e66565;                   /* выведено по механике */
+    --destructive-pressed: #e04343;                 /* выведено по механике */
+    --destructive-foreground: #ffffff;
 
     --shadow-elevated: 0 4px 16px 0 #0c10181f;      /* 309:2310 — 12% */
     --shadow-elevated-hover: 0 4px 16px 0 #0c101829; /* 309:2322 — 16% */
