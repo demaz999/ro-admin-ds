@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { nextTick, onMounted, ref } from 'vue'
 
 /**
  * Автопроверка текстовых ролей: ловит провал шрифта в системный дефолт.
@@ -101,7 +101,7 @@ function readKitSizes() {
   return [...sizes].sort((a, b) => a - b)
 }
 
-onMounted(() => {
+function run() {
   const out: Finding[] = []
   const seenFamilies = new Set<string>()
   let n = 0
@@ -148,6 +148,22 @@ onMounted(() => {
   allowedFamilies.value = [...seenFamilies]
   checked.value = n
   findings.value = out
+}
+
+/**
+ * Проверка ждёт кадр отрисовки, а не только монтирование страницы.
+ *
+ * Слепое пятно, найденное в очереди 3: модальное окно и лайтбокс появляются
+ * через `Presence` Reka, то есть **после** `onMounted`. Проверка, запущенная
+ * сразу, их не видела, и счётчик просто не менялся — а выглядело это как
+ * «новых узлов нет», а не как «узлы не проверены». Ровно тот класс дефекта,
+ * против которого проверка и заведена.
+ */
+onMounted(async () => {
+  await nextTick()
+  // Именно таймер, а не requestAnimationFrame: rAF не срабатывает во вкладке,
+  // которую браузер не отрисовывает, и обе проверки молча показывали ноль.
+  setTimeout(run, 0)
 })
 </script>
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { nextTick, onMounted, ref } from 'vue'
 
 /**
  * Автопроверка оптики иконок: ловит подмену пикты глифом другого визуального поля.
@@ -31,7 +31,7 @@ const checked = ref(0)
 /** Ниже этого отношения видимого глифа к боксу считаем, что глиф не дотягивает. */
 const MIN_RATIO = 0.98
 
-onMounted(() => {
+function run() {
   const out: Finding[] = []
   let n = 0
 
@@ -57,6 +57,15 @@ onMounted(() => {
 
   checked.value = n
   findings.value = out
+}
+
+/**
+ * Ждём кадр отрисовки: содержимое модального окна и лайтбокса появляется через
+ * `Presence` Reka, уже после `onMounted`. Разбор — в `FontAudit.vue`.
+ */
+onMounted(async () => {
+  await nextTick()
+  setTimeout(run, 0)
 })
 </script>
 
