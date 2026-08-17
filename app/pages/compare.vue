@@ -274,6 +274,73 @@ const textareaVariants = [
       </p>
     </header>
 
+    <!--
+      Страница «Мои осмотры» — приёмка сборки. Эталон здесь не мастер Атома, а
+      макет страницы из файла дашборда, поэтому секция идёт в теме rososmotr:
+      макет нарисован в ней.
+    -->
+    <section data-theme="rososmotr" class="space-y-2 bg-background font-sans text-foreground">
+      <h2 class="text-lg font-bold">
+        Страница «Мои осмотры» · макет 20304:54594 · сборка из реестра
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Эталон — экспорт кадра 1x, 1280×1764. Страница вставлена рамкой на ту же ширину, поэтому
+        сверяется ровно та раскладка, что нарисована. Разбор каждого расхождения по категориям —
+        <code>docs/page-my-inspections.md</code>.
+      </p>
+      <p class="max-w-3xl rounded-md border border-border p-3 text-sm">
+        <strong>Весь контент сдвинут влево на 28px, и это одна дыра, а не сто.</strong> Рельс
+        меню у Атома 56 шириной, на макете 84 — разница уходит в общий сдвиг колонок. Второй
+        кадр ниже сдвигает страницу на те же 28px, чтобы за этим смещением стали видны
+        остальные расхождения.
+      </p>
+
+      <div class="overflow-x-auto">
+        <CompareFrame
+          title="страница целиком · как есть"
+          node="20304:54594"
+          master="page/my-inspections_20304-54594.png"
+          :width="1280"
+          :height="1764"
+          note="Сдвиг 28px по горизонтали — ширина рельса. Всё остальное сверяется на втором кадре."
+        >
+          <!--
+            Рамка выше кадра и обрезана снаружи: иначе внутри появляется
+            вертикальный скроллбар, съедает 15px ширины и вся раскладка внутри
+            считается не по той ширине.
+          -->
+          <div style="width: 1280px; height: 1764px; overflow: hidden">
+            <iframe
+              src="/my-inspections"
+              title="Мои осмотры"
+              class="border-0"
+              style="width: 1280px; height: 2100px"
+            />
+          </div>
+        </CompareFrame>
+      </div>
+
+      <div class="overflow-x-auto">
+        <CompareFrame
+          title="страница целиком · с компенсацией рельса"
+          node="20304:54594"
+          master="page/my-inspections_20304-54594.png"
+          :width="1280"
+          :height="1764"
+          note="Дыра рельса скомпенсирована дважды: рамка уже на 44 — тогда гибкая колонка возвращается к 744 — и сдвинута вправо на 28. Всё, что светится здесь, уже не рельс."
+        >
+          <div style="width: 1280px; height: 1764px; overflow: hidden">
+            <iframe
+              src="/my-inspections"
+              title="Мои осмотры со сдвигом"
+              class="border-0"
+              style="width: 1236px; height: 2100px; margin-left: 28px"
+            />
+          </div>
+        </CompareFrame>
+      </div>
+    </section>
+
     <section class="space-y-2">
       <h2 class="text-lg font-bold">
         Input · 249:2768 · все 16 вариантов
@@ -773,6 +840,226 @@ const textareaVariants = [
         >
           <Input :model-value="f.value ?? ''" placeholder="Placeholder" :invalid="f.invalid" />
         </Field>
+      </CompareFrame>
+    </section>
+
+    <!--
+      Очередь 2 обогащения. Эталоны здесь из КИТА 1, а не из Атома, поэтому
+      секция идёт в теме rososmotr: в теме atom заливки поехали бы, и
+      расхождение состава смешалось бы с расхождением цвета.
+    -->
+    <section data-theme="rososmotr" class="space-y-2 bg-background font-sans text-foreground">
+      <h2 class="text-lg font-bold">
+        Chip · кит 1, 747:2464 · очередь 2
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Задание предполагало реконструкцию по справочнику значений: исходника нет. Замер показал
+        обратное — мастер жив, лежит на странице «Badge», 149×32. Поэтому здесь обычный перенос
+        с наложением. Ширина складывается ровно: 16 + (73 + 4 + 16) + 8 + 16 + 16 = 149.
+      </p>
+      <p class="max-w-3xl rounded-md border border-border p-3 text-sm">
+        <strong>Крестик — исключение из правила глифа.</strong> У Атома пикта заполняет свой бокс
+        по доминирующей стороне; у кита 1 пикта <code>20_ic_close</code> живёт в коробке 16×16, а
+        её видимый контур — 9.4. Поэтому размер иконки задан по контуру эталона, а не по коробке.
+      </p>
+
+      <CompareFrame
+        title="как в мастере: подпись, счётчик, крестик"
+        node="747:2464"
+        master="kit1/chip_747-2464.png"
+        :width="149"
+        :height="32"
+      >
+        <Chip count="8">
+          Badge text
+        </Chip>
+      </CompareFrame>
+    </section>
+
+    <section data-theme="rososmotr" class="space-y-2 bg-background font-sans text-foreground">
+      <h2 class="text-lg font-bold">
+        Slider · кит 1, 2034:5889 · очередь 2
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Эталон 75×12: сама дорожка 4, но бегунок 12 выступает над ней на 4 сверху и снизу, и
+        отрисованные границы считаются по нему. Бегунок в мастере стоит на 8…20 из 75 — это
+        12.7% хода при ширине бегунка 12.
+      </p>
+      <p class="max-w-3xl rounded-md border border-border p-3 text-sm">
+        <strong>Слева наложение разойдётся, и это ожидаемо.</strong> В мастере обе половины
+        дорожки одного серого — залитой части нет вовсе. Восемь пикселей брендовой заливки до
+        бегунка добавлены дефолтом и помечены <code>@debt</code>: без них контрол не сообщает
+        значение.
+      </p>
+
+      <CompareFrame
+        title="дорожка 4, бегунок 12"
+        node="2034:5889"
+        master="kit1/range-slider_2034-5889.png"
+        :width="75"
+        :height="12"
+      >
+        <!--
+          Отступ 4 сверху: у эталона отрисовка 75×12 считается по бегунку, и
+          сама дорожка лежит на 4…8. Корень слайдера высотой 4, бегунок
+          выступает за него, поэтому опускаем на те же 4.
+
+          18.7% — не «на глаз»: центр бегунка в мастере приходится на 14 из 75,
+          а Reka ставит бегунок центром на процент хода, без поправки на ширину.
+        -->
+        <div class="pt-1">
+          <Slider :model-value="[18.7]" :step="0.1" class="w-full" />
+        </div>
+      </CompareFrame>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="text-lg font-bold">
+        StatusLetter · _BulbStatus 5862:53423 · очередь 2
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Мастер разобран ещё волной 7 и тогда же сознательно не заведён компонентом: единственная
+        ось у него цветовая. Очередь 2 снимает возражение — цвет здесь данные, а не ось, ровно
+        как у <code>StatusBadge</code>.
+      </p>
+      <p class="max-w-3xl rounded-md border border-border p-3 text-sm">
+        <strong>Наложение проверяет геометрию и букву, а не цвет.</strong> Заливка эталона —
+        пастельная колонка Атома <code>#7daffc</code>, у нас расширенная палитра: цвет статуса
+        приходит с сервера и темой не задаётся. Совпасть обязаны круг 20×20, кегль 13/16 Bold и
+        положение буквы.
+      </p>
+
+      <CompareFrame
+        title="метка 20×20, буква по центру"
+        node="5862:53422"
+        master="atom/bulbstatus_5862-53422.png"
+        :width="20"
+        :height="20"
+      >
+        <StatusLetter letter="А" color="cyan" />
+      </CompareFrame>
+    </section>
+
+    <!--
+      Очередь 3. Провенанс здесь слабее обычного: у модального окна и лайтбокса
+      мастеров нет, состав снят с композиций. Поэтому в кадре стоят конкретные
+      узлы композиций, а не «модальное окно вообще».
+    -->
+    <section class="space-y-2">
+      <h2 class="text-lg font-bold">
+        Dialog · композиция 6626:56959 · очередь 3
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Живой пример окна на широком экране. Колонка контента — 8 колонок из 12 с гуттером 32:
+        при 1360 это ровно 842. Ритм колонки — иконка → заголовок 24, заголовок → текст 16,
+        текст → кнопки 32; кнопки делят колонку пополам с тем же гуттером.
+      </p>
+      <p class="max-w-3xl rounded-md border border-border p-3 text-sm">
+        <strong>Окно во весь экран, подложки нет.</strong> Так написано на странице спеки, и так
+        собрано в коде. На витрине окно занимает браузер целиком — сюда оно положено
+        <code>inline</code>, то есть без портала и во весь кадр: иначе <code>fixed</code> унёс бы
+        его из наложения на страницу.
+      </p>
+
+      <div class="overflow-x-auto">
+        <CompareFrame
+          title="окно целиком · wide 1360"
+          node="6626:56959"
+          master="atom/modal_6626-56959.png"
+          :width="1360"
+          :height="780"
+        >
+          <Dialog :open="true" :modal="false">
+            <DialogContent inline back="К контрольной точке" :trap-focus="false">
+              <DialogHeader class="pt-35">
+                <!-- Держатель 56×56 с композиции: галочка внутри рисует 56×40. -->
+                <span data-slot="dialog-icon" class="flex size-14 items-start text-success">
+                  <Icon name="check" :size="56" />
+                </span>
+                <DialogTitle>Заголовок в форме вопроса или утверждения</DialogTitle>
+                <DialogDescription>
+                  Функциональность решения покрывает практически все задачи, выполняемые
+                  оперативным персоналом крупных промышленных объектов, связанных с опасным
+                  производством: от формирования рабочих сменных бригад, подготовки расписания их
+                  работы до составления маршрутов обходов, выполнения, анализа их результатов и
+                  ведения многочисленных оперативных журналов
+                </DialogDescription>
+                <div class="mt-4 grid grid-cols-2 gap-8">
+                  <Button variant="secondary" class="w-full">
+                    Отменить
+                  </Button>
+                  <Button class="w-full">
+                    Подтвердить
+                  </Button>
+                </div>
+              </DialogHeader>
+            </DialogContent>
+          </Dialog>
+        </CompareFrame>
+      </div>
+
+      <p class="max-w-3xl pt-4 text-sm text-muted-foreground">
+        Вторая сверка — раскладочная схема на средней ширине. Здесь проверяются те величины,
+        которые на широком экране другие: шапка 44 вместо 60, боковой паддинг 32 вместо 40,
+        крестик в 2 от края вместо 10, и блок кнопок 96 внизу. Плашки «Content area» и
+        «Controls area» — разметка самой схемы, в коде им ничего не соответствует.
+      </p>
+
+      <CompareFrame
+        title="схема со скроллом · middle 598"
+        node="1156:10272"
+        master="atom/modal-scroll_1156-10272.png"
+        :width="598"
+        :height="480"
+        note="Совпасть обязаны шапка, положение возврата и крестика, боковые паддинги и блок кнопок. Заливки плашек — разметка схемы."
+      >
+        <Dialog :open="true" :modal="false">
+          <DialogContent inline back="Button text" :trap-focus="false">
+            <div class="h-full" />
+            <template #footer>
+              <DialogFooter layout="full">
+                <Button class="w-full">
+                  Controls area
+                </Button>
+              </DialogFooter>
+            </template>
+          </DialogContent>
+        </Dialog>
+      </CompareFrame>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="text-lg font-bold">
+        Lightbox · композиция 8867:69956 · очередь 3
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Полосы 56 и 64, кадр с боковым паддингом 48, счётчик <code>Badge</code> в 16 от края,
+        крестик в 8. Стрелки прижаты к краям и центрируются <strong>по кадру</strong>: при высоте
+        640 их центр приходится на 316, то есть на середину области между полосами, а не окна.
+      </p>
+      <p class="max-w-3xl rounded-md border border-border p-3 text-sm">
+        <strong>Дефект, найденный этой сверкой.</strong> Лайтбокс инстанцирует крупную
+        <code>ButtonArrow</code>, и наложение показало, что шеврон у неё короче эталона на 8px.
+        Причина в волне 5: с мастера сняли <strong>ширину</strong> глифа (12 против 6) и
+        подставили её как размер, а размер у <code>Icon</code> — это доминирующая сторона, то есть
+        высота. Замер всех шести вариантов `1938:12858` даёт 32 / 16 / 12. Исправлено.
+      </p>
+
+      <CompareFrame
+        title="кадр целиком · wide 1024"
+        node="8867:69956"
+        master="atom/lightbox_8867-69956.png"
+        :width="1024"
+        :height="640"
+        note="Фотография эталона в коде не воспроизводится — вместо неё пустая рамка кадра. Сверяются полосы, счётчик, крестик, стрелки и подпись."
+      >
+        <Lightbox
+          inline
+          :open="true"
+          :index="1"
+          :total="3"
+          caption="«50 лет Победы» — самый большой и современный из арктических атомоходов"
+        />
       </CompareFrame>
     </section>
 

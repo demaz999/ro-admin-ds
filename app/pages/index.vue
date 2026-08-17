@@ -74,6 +74,66 @@ const martianWeights = [
   { value: 1000, name: 'Ultra Black' },
 ]
 
+/**
+ * Очередь 2. Чипы живые: крестик действительно убирает фильтр, потому что иначе
+ * не видно, что компонент интерактивный, — этим он и отличается от `Tag`.
+ */
+const chips = ref([
+  { id: 'region', label: 'Московская область', count: '' },
+  { id: 'type', label: 'Плановый', count: 8 },
+  { id: 'status', label: 'Черновик', count: 2 },
+])
+
+const activeChips = ref<string[]>(['type'])
+
+function toggleChip(id: string) {
+  const i = activeChips.value.indexOf(id)
+  if (i === -1) activeChips.value.push(id)
+  else activeChips.value.splice(i, 1)
+}
+
+function removeChip(id: string) {
+  chips.value = chips.value.filter(c => c.id !== id)
+}
+
+function restoreChips() {
+  chips.value = [
+    { id: 'region', label: 'Московская область', count: '' },
+    { id: 'type', label: 'Плановый', count: 8 },
+    { id: 'status', label: 'Черновик', count: 2 },
+  ]
+}
+
+const sliderValue = ref([40])
+const sliderRange = ref([20, 70])
+
+/** Очередь 3: состояния демонстраций — окно, лайтбокс, стек уведомлений, шаги. */
+const dialogOpen = ref(false)
+const dialogScrollOpen = ref(false)
+const lightboxOpen = ref(false)
+const lightboxIndex = ref(1)
+const step = ref(2)
+
+/** Уведомления живут списком: стек — это как раз то, чего у Атома нет. */
+const toasts = ref<{ id: number, text: string }[]>([])
+let toastId = 0
+
+function pushToast() {
+  toastId += 1
+  toasts.value.push({ id: toastId, text: `Осмотр № ${1200 + toastId} сохранён` })
+}
+
+function dropToast(id: number) {
+  toasts.value = toasts.value.filter(t => t.id !== id)
+}
+
+/** Буквенные метки статуса в ячейке: буква и цвет приходят из данных, не из вёрстки. */
+const letterRows = [
+  { letter: 'П', color: 'violet', title: 'Плановый', name: 'Осмотр № 1201' },
+  { letter: 'В', color: 'orange', title: 'Внеплановый', name: 'Осмотр № 1202' },
+  { letter: 'З', color: 'green', title: 'Завершён', name: 'Осмотр № 1203' },
+] as const
+
 const martianWidths = [
   { value: 75, name: 'Condensed' },
   { value: 87.5, name: 'Narrow' },
@@ -108,6 +168,14 @@ const martianWidths = [
         2026-08-12. Компоненты волны 0, собранные по составам кита 1, отложены в
         <code>archive/kit1-components</code> до фазы обогащения. Разбивка по волнам —
         <code>docs/atom-audit.md</code>, наложение на эталоны — <code>/compare</code>.
+      </p>
+
+      <p class="max-w-2xl rounded-md border border-border p-3 text-sm">
+        <strong>Собрана пилотная страница:</strong>
+        <a href="/my-inspections" class="underline underline-offset-4">«Мои осмотры»</a> —
+        только из компонентов реестра, ноль новых сущностей. Наложение на макет и таблица
+        расхождений по категориям — на <code>/compare</code> и в
+        <code>docs/page-my-inspections.md</code>.
       </p>
 
       <div class="flex flex-wrap items-center gap-3 pt-2">
@@ -859,6 +927,353 @@ const martianWidths = [
               Отменён
             </StatusBadge>
           </ShowcaseCell>
+        </div>
+      </div>
+    </ShowcaseSection>
+
+    <ShowcaseSection
+      title="Обогащение · очередь 2"
+      note="Чип, слайдер и буквенная метка статуса. Два источника из трёх оказались живыми мастерами кита 1 — реконструировать по справочнику не потребовалось."
+    >
+      <div class="space-y-8">
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Chip · мастер кита 1 747:2464 + ось <code>active</code> из ButtonTag Атома
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            <strong>Чип — не тег и не бейдж.</strong> Его можно снять крестиком, и он умеет
+            считать: высота 32 против 24 у обоих соседей. У Атома такой сущности нет —
+            <code>ButtonTag</code> нельзя снять и он ничего не считает. Оттуда взяты только ось
+            <code>active</code> и маркер-точка: фильтр без включённого состояния не работает.
+          </p>
+          <p class="mb-3 max-w-2xl rounded-md border border-border p-3 text-sm">
+            <strong>Счётчик не переиспользует <code>Indicator</code>.</strong> Плашка похожа —
+            те же 16 высоты и паддинг 4, — но типографика у неё атомовская, 13/16 Medium, а у
+            чипа кита 1 стоит 12/16 Bold. Подстановка утащила бы кегль Атома в компонент кита 1.
+          </p>
+          <div class="grid max-w-3xl gap-6 sm:grid-cols-2">
+            <ShowcaseCell label="как в мастере" hint="подпись, счётчик, крестик">
+              <Chip count="8">
+                Badge text
+              </Chip>
+            </ShowcaseCell>
+            <ShowcaseCell label="без счётчика" hint="гейт Show bulb выключен">
+              <Chip>
+                Московская область
+              </Chip>
+            </ShowcaseCell>
+            <ShowcaseCell label="включён" hint="ось из ButtonTag: заливка брендовая">
+              <Chip active count="8">
+                Badge text
+              </Chip>
+            </ShowcaseCell>
+            <ShowcaseCell label="с маркером" hint="точка 8×8 из ButtonTag, по умолчанию выключена">
+              <Chip marker count="2">
+                Черновик
+              </Chip>
+              <Chip marker active>
+                Плановый
+              </Chip>
+            </ShowcaseCell>
+          </div>
+
+          <div class="mt-4">
+            <ShowcaseCell label="живой фильтр" hint="клик по подписи включает, крестик убирает">
+              <Chip
+                v-for="c in chips"
+                :key="c.id"
+                :count="c.count"
+                :active="activeChips.includes(c.id)"
+                @remove="removeChip(c.id)"
+              >
+                <button type="button" class="outline-none" @click="toggleChip(c.id)">
+                  {{ c.label }}
+                </button>
+              </Chip>
+              <ButtonAction v-if="chips.length < 3" @click="restoreChips()">
+                Вернуть
+              </ButtonAction>
+            </ShowcaseCell>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Slider · мастер кита 1 2034:5889
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Порядок источников был «архив кита 1, а при его отсутствии — дефолт shadcn с долгом».
+            Кода в архиве нет, зато <strong>жив сам мастер</strong>: <code>range_slider</code> на
+            странице «Other (scrolls, loader)», 75×4. Дорожка 4 и бегунок 12 сняты с него,
+            дефолтом компонент не берётся.
+          </p>
+          <p class="mb-3 max-w-2xl rounded-md border border-border p-3 text-sm">
+            <strong>Залитой части в мастере нет</strong> — обе половины дорожки одного серого,
+            и второго бегунка тоже нет, хотя имя <code>range_slider</code> его обещает. Заливка
+            добавлена дефолтом по аналогии с брендовой заливкой выбранного: без неё контрол не
+            сообщает значение вовсе. Помечено <code>@debt</code>, просьба дизайнерам — в
+            <code>figma-fixes.md</code>. У Атома альтернативы нет: <code>Fader</code> 635:5430 —
+            пустой узел.
+          </p>
+          <div class="grid max-w-3xl gap-6 sm:grid-cols-2">
+            <ShowcaseCell label="один бегунок" hint="как в мастере">
+              <Slider v-model="sliderValue" class="w-64" />
+            </ShowcaseCell>
+            <ShowcaseCell label="два бегунка" hint="@debt в мастере не нарисован">
+              <Slider v-model="sliderRange" class="w-64" />
+            </ShowcaseCell>
+            <ShowcaseCell label="шаг 10" hint="поведение примитива Reka">
+              <Slider :model-value="[50]" :step="10" class="w-64" />
+            </ShowcaseCell>
+            <ShowcaseCell label="выключен" hint="@debt состояния в мастере нет">
+              <Slider :model-value="[30]" disabled class="w-64" />
+            </ShowcaseCell>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            StatusLetter · мастер Атома _BulbStatus 5862:53423
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Волна 7 разобрала этот мастер и <strong>сознательно не завела</strong> его
+            компонентом: единственная ось у него цветовая, а без цветовой оси остаётся буква.
+            Очередь 2 снимает возражение, не отменяя решения: цвет здесь не ось и не вариант, а
+            <strong>данные</strong> — ровно как у <code>StatusBadge</code>.
+          </p>
+          <p class="mb-3 max-w-2xl rounded-md border border-border p-3 text-sm">
+            <strong>Цвета иллюстративные.</strong> Восьми вариантам мастера отвечают шесть рамп
+            расширенной палитры: в продукте статусов больше шести, они заводятся в справочнике и
+            приходят <strong>с сервера вместе с данными</strong>. Дорисовывать две рампы под
+            восьмёрку Атома значило бы выдумать цвет — расхождение записано строкой в
+            <code>waves.md</code>.
+          </p>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Размер <strong>диктует ячейка</strong>, а не лесенка аватара: 20×20 в ней
+            отсутствует (24 / 32 / 40 / 56 / 72 / 104), и растягивать лесенку под один случай не
+            стали — это мелкая дыра, записанная ещё волной 7.
+          </p>
+
+          <ShowcaseCell label="цвета" hint="круг 20×20, буква 13/16 Bold">
+            <StatusLetter letter="З" color="green" />
+            <StatusLetter letter="П" color="cyan" />
+            <StatusLetter letter="Н" color="violet" />
+            <StatusLetter letter="О" color="magenta" />
+            <StatusLetter letter="В" color="orange" />
+            <StatusLetter letter="А" color="red" />
+          </ShowcaseCell>
+
+          <div class="mt-4 w-fit overflow-x-auto">
+            <TableRow>
+              <TableHead variant="simple" class="w-12" />
+              <TableHead variant="active" class="w-50">
+                Наименование
+              </TableHead>
+              <TableHead variant="simple" class="w-40">
+                Статус
+              </TableHead>
+            </TableRow>
+            <TableRow v-for="row in letterRows" :key="row.letter">
+              <TableCell variant="slot" class="w-12">
+                <StatusLetter :letter="row.letter" :color="row.color" />
+              </TableCell>
+              <TableCell class="w-50">
+                {{ row.name }}
+              </TableCell>
+              <TableCell variant="slot" class="w-40">
+                <StatusBadge :color="row.color">
+                  {{ row.title }}
+                </StatusBadge>
+              </TableCell>
+            </TableRow>
+          </div>
+        </div>
+      </div>
+    </ShowcaseSection>
+
+    <ShowcaseSection
+      title="Обогащение · очередь 3"
+      note="То, чего нет мастерами. Сначала снят состав с композиций Атома — модальное окно и лайтбокс, — и только потом взяты дефолты: уведомление со стеком, скелетон, шаги, пустое состояние."
+    >
+      <div class="space-y-8">
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Dialog · композиция ModalWindow 6626:56959 и спека 1156:10007
+          </h3>
+          <p class="mb-3 max-w-2xl rounded-md border border-border p-3 text-sm">
+            <strong>Окно занимает экран целиком.</strong> Это не наше решение и не дефолт: на
+            странице спеки написано дословно — «Модальные окна отображаются в полный экран на
+            белом непрозрачном фоне». Ни карточки по центру, ни затемняющей подложки в композиции
+            нет, поэтому <code>DialogOverlay</code> не рисуется вовсе.
+          </p>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            <code>wide</code>, <code>middle</code>, <code>narrow</code> в спеке — это
+            <strong>ширины экрана</strong>, а не размеры окна: рядом подписано «Всегда вся ширина
+            экрана». Оси размера у компонента поэтому нет, а вместе с шириной меняются три
+            величины: боковой паддинг 24 / 32 / 40, высота шапки 44 / 44 / 60 и отступ крестика,
+            равный <code>(шапка − 40) / 2</code>.
+          </p>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Колонка контента — <strong>8 колонок из 12</strong> с гуттером 32. Проверено на двух
+            ширинах: при 1360 это 842, при 1024 — 618, обе сходятся без подгонки. Поэтому в коде
+            стоит настоящая сетка, а не выведенный процент.
+          </p>
+
+          <ShowcaseCell label="окно" hint="возврат, крестик, колонка на 8 колонок">
+            <Dialog v-model:open="dialogOpen">
+              <DialogTrigger>
+                <Button>Открыть окно</Button>
+              </DialogTrigger>
+              <DialogContent back="К контрольной точке" @back="dialogOpen = false">
+                <DialogHeader class="pt-25">
+                  <span data-slot="dialog-icon" class="flex size-14 items-start text-success">
+                    <Icon name="check" :size="56" />
+                  </span>
+                  <DialogTitle>Заголовок в форме вопроса или утверждения</DialogTitle>
+                  <DialogDescription>
+                    Функциональность решения покрывает практически все задачи, выполняемые
+                    оперативным персоналом крупных промышленных объектов, связанных с опасным
+                    производством: от формирования рабочих сменных бригад, подготовки расписания
+                    их работы до составления маршрутов обходов, выполнения, анализа их результатов
+                    и ведения многочисленных оперативных журналов
+                  </DialogDescription>
+                  <div class="mt-4 grid grid-cols-2 gap-8">
+                    <DialogClose>
+                      <Button variant="secondary" class="w-full">
+                        Отменить
+                      </Button>
+                    </DialogClose>
+                    <Button class="w-full">
+                      Подтвердить
+                    </Button>
+                  </div>
+                </DialogHeader>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog v-model:open="dialogScrollOpen">
+              <DialogTrigger>
+                <Button variant="secondary">
+                  Окно с футером
+                </Button>
+              </DialogTrigger>
+              <DialogContent back="Назад" @back="dialogScrollOpen = false">
+                <DialogHeader class="pb-6">
+                  <DialogTitle>Длинная форма</DialogTitle>
+                  <DialogDescription>
+                    Блок кнопок прижат к низу и лежит поверх прокручиваемого тела — так нарисовано
+                    в четырёх схемах из восьми.
+                  </DialogDescription>
+                </DialogHeader>
+                <div class="space-y-4 pb-6">
+                  <Field v-for="i in 8" :key="i" :label="`Поле ${i}`" class="w-full">
+                    <Input placeholder="Значение" />
+                  </Field>
+                </div>
+                <template #footer>
+                  <DialogFooter>
+                    <DialogClose>
+                      <Button variant="secondary">
+                        Отменить
+                      </Button>
+                    </DialogClose>
+                    <Button>Сохранить</Button>
+                  </DialogFooter>
+                </template>
+              </DialogContent>
+            </Dialog>
+          </ShowcaseCell>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Lightbox · композиция LightBox 8867:69956
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Тот же полноэкранный слой: «Полноэкранный режим просмотра фото и видео». Полосы 56 и
+            64, кадр с боковым паддингом 48, стрелки прижаты к краям. Стрелки центрируются
+            <strong>по кадру, а не по окну</strong> — замер дал центр 316 при высоте 640, то есть
+            ровно середину области между полосами.
+          </p>
+          <p class="mb-3 max-w-2xl rounded-md border border-border p-3 text-sm">
+            <strong>Границы диапазона видны по отрисовке, а не по флагам.</strong> У тёмной
+            композиции правая стрелка помечена видимой, а <code>absoluteRenderBounds</code> у неё
+            <code>null</code> — то есть на последнем кадре её просто нет. В коде стрелки скрыты на
+            границах.
+          </p>
+
+          <ShowcaseCell label="лайтбокс" hint="счётчик, слот действий, крестик, подпись">
+            <Button variant="secondary" @click="lightboxOpen = true">
+              Открыть лайтбокс
+            </Button>
+            <Lightbox
+              v-model:open="lightboxOpen"
+              v-model:index="lightboxIndex"
+              :total="3"
+              caption="«50 лет Победы» — самый большой и современный из арктических атомоходов"
+            >
+              <div class="flex size-full items-center justify-center bg-muted text-muted-foreground">
+                Кадр {{ lightboxIndex }}
+              </div>
+            </Lightbox>
+          </ShowcaseCell>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Дефолты со статусом долга
+          </h3>
+          <p class="mb-3 max-w-2xl rounded-md border border-border p-3 text-sm">
+            Четыре сущности, которых нет ни мастером, ни композицией. Каждая помечена
+            <code>@debt</code> в шапке файла и строкой в <code>design-debt.md</code>. Вид собран не
+            из значений Tailwind, а <strong>по аналогии с уже перенесённым</strong> — источник
+            аналогии назван в <code>index.ts</code> каждого компонента.
+          </p>
+
+          <div class="grid max-w-3xl gap-6 sm:grid-cols-2">
+            <ShowcaseCell label="Toast" hint="плашка — перенесённый Alert, дефолт только стек">
+              <Button variant="secondary" @click="pushToast()">
+                Показать уведомление
+              </Button>
+            </ShowcaseCell>
+
+            <ShowcaseCell label="Skeleton" hint="заливка --muted, радиус из шкалы">
+              <div class="w-full space-y-2">
+                <Skeleton class="h-5 w-2/3" />
+                <Skeleton class="h-4 w-full" />
+                <Skeleton class="h-4 w-4/5" />
+              </div>
+            </ShowcaseCell>
+
+            <ShowcaseCell label="Stepper" hint="кружок 24, галочка у пройденного">
+              <Stepper v-model="step" class="w-full">
+                <StepperItem :step="1" :current="step">
+                  Данные
+                </StepperItem>
+                <StepperItem :step="2" :current="step">
+                  Проверка
+                </StepperItem>
+                <StepperItem :step="3" :current="step" last>
+                  Готово
+                </StepperItem>
+              </Stepper>
+            </ShowcaseCell>
+
+            <ShowcaseCell label="Empty state" hint="иконка, заголовок, пояснение, действие">
+              <Empty
+                title="Осмотров пока нет"
+                description="Здесь появятся осмотры, назначенные на вас."
+                class="w-full"
+              >
+                <template #icon>
+                  <Icon name="draft" :size="40" />
+                </template>
+                <template #action>
+                  <Button>Создать осмотр</Button>
+                </template>
+              </Empty>
+            </ShowcaseCell>
+          </div>
         </div>
       </div>
     </ShowcaseSection>
@@ -1745,5 +2160,18 @@ const martianWidths = [
         </div>
       </div>
     </ShowcaseSection>
+
+    <!-- Область показа уведомлений: одна на страницу, как и положено стеку. -->
+    <Toaster>
+      <Toast
+        v-for="t in toasts"
+        :key="t.id"
+        :open="true"
+        show-icon
+        @update:open="dropToast(t.id)"
+      >
+        {{ t.text }}
+      </Toast>
+    </Toaster>
   </main>
 </template>
