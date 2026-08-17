@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { Calendar } from '../calendar'
+import { Icon } from '../icon'
 import { pickerFieldVariants } from '.'
 
 /**
@@ -39,9 +40,10 @@ const text = computed(() =>
       :class="pickerFieldVariants({ filled })"
       @click="open = !open"
     >
-      <!-- Коробка 16×16 держит раскладку. Глиф календаря в набор ещё не добавлен. -->
       <span class="flex size-4 shrink-0 items-center justify-center">
-        <slot name="icon" />
+        <slot name="icon">
+          <Icon name="calendar-month" :size="16" />
+        </slot>
       </span>
 
       <span class="flex min-w-0 flex-1 flex-col items-start">
@@ -56,7 +58,9 @@ const text = computed(() =>
       </span>
 
       <span class="flex size-4 shrink-0 items-center justify-center">
-        <slot name="trailing" />
+        <slot name="trailing">
+          <Icon name="schedule" :size="16" />
+        </slot>
       </span>
     </button>
 

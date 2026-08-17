@@ -61,8 +61,9 @@ const title = computed(() => `${MONTHS[cursor.value.getMonth()]} ${cursor.value.
 
 <template>
   <div data-slot="calendar" class="flex w-60 flex-col gap-2">
-    <!-- Шапка: стрелки по краям, подпись посередине. -->
-    <div class="flex flex-col gap-1">
+    <!-- Шапка: стрелки по краям, подпись посередине. Зазор между строкой месяца
+         и строкой дней недели — 16, снят с мастера (itemSpacing шапки). -->
+    <div class="flex flex-col gap-4">
       <div class="flex h-5 items-center justify-between">
         <button
           type="button"

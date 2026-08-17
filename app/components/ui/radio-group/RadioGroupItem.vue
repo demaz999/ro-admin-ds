@@ -6,6 +6,12 @@ import { choiceRowVariants, choiceTitleVariants } from '../checkbox'
 /**
  * Пункт группы — мастер `RadioButton` `590:5372`.
  * Контрол круглый: в мастере это эллипс, а не квадрат с радиусом.
+ *
+ * > **Сознательное отклонение от Атома.** Отмеченное состояние собрано по
+ * > традиционной анатомии радио: тонкое кольцо 2px, как у `Checkbox`, плюс
+ * > внутренняя брендовая точка. У Атома круг заливается целиком, а точка внутри
+ * > белая. Цвета и размер бокса при этом прежние, из темы. Решение Михаила,
+ * > запись в `docs/figma-fixes.md`.
  */
 const props = withDefaults(defineProps<{
   value: string
@@ -28,10 +34,15 @@ const forwarded = useForwardProps(computed(() => ({ value: props.value, disabled
       <RadioGroupItem
         v-bind="forwarded"
         data-slot="choice-control"
-        class="group/radio flex size-4 items-center justify-center rounded-full border-2 border-primary bg-transparent outline-none data-[state=checked]:bg-primary"
+        class="group/radio flex size-4 items-center justify-center rounded-full border-2 border-primary bg-transparent outline-none"
       >
-        <!-- Точка 8×8 внутри залитого круга — так в мастере. -->
-        <span class="hidden size-2 rounded-full bg-primary-foreground group-data-[state=checked]/radio:block" />
+        <!--
+          Традиционная анатомия: кольцо остаётся тонким и в отмеченном состоянии,
+          внутри загорается брендовая точка. У Атома иначе — там круг заливается
+          целиком, а точка внутри белая. Сознательное отклонение, решение
+          Михаила; запись в docs/figma-fixes.md.
+        -->
+        <span class="hidden size-2 rounded-full bg-primary group-data-[state=checked]/radio:block" />
       </RadioGroupItem>
     </span>
 

@@ -1071,11 +1071,23 @@ const martianWidths = [
             <code>Popover</code>, что у выпадашки и подменю.
           </p>
           <p class="mb-3 max-w-2xl rounded-md border border-border p-3 text-sm">
-            <strong>Иконок пока нет намеренно.</strong> Мастер ставит календарь слева и часы
-            справа; обоих глифов в self-hosted наборе Material Symbols нет, а рисовать контур
-            руками протокол запрещает. Коробки 16×16 стоят на местах и держат раскладку — глиф
-            приедет из официальной выгрузки. Строка в <code>design-debt.md</code>.
+            <strong>Выбор глифа календаря за вами.</strong> Слева стоит
+            <code>calendar_month</code> — с сеткой дней внутри. Рядом альтернатива
+            <code>calendar_today</code>: та же рамка, но без сетки, ближе к пикте Атома по
+            количеству чернил. Оба из официальной выгрузки, границы сняты через
+            <code>getBBox</code>.
           </p>
+          <div class="mb-4 flex items-center gap-6 rounded-md border border-border p-4">
+            <span class="flex items-center gap-2 text-sm">
+              <Icon name="calendar-month" :size="16" /> calendar_month
+            </span>
+            <span class="flex items-center gap-2 text-sm">
+              <Icon name="calendar-today" :size="16" /> calendar_today
+            </span>
+            <span class="flex items-center gap-2 text-sm">
+              <Icon name="schedule" :size="16" /> schedule
+            </span>
+          </div>
           <div class="grid max-w-xl gap-4 sm:grid-cols-2">
             <ShowcaseCell label="default" hint="272×40, заливка поля">
               <DatePicker />
@@ -1330,12 +1342,26 @@ const martianWidths = [
             не перенесены сознательно — зашить 153px значило бы воспроизвести отсутствие резиновой
             раскладки у Figma. Различие вариантов в коде — кегль.
           </p>
-          <div class="flex flex-wrap gap-4">
-            <NavigationTile class="h-51 w-38 p-4">
+          <p class="mb-3 max-w-2xl rounded-md border border-border p-3 text-sm">
+            <strong>Это плитка-ссылка в раздел, а не карточка с текстом.</strong> В первом
+            переносе от неё остался белый прямоугольник: не переехали фотография во всю коробку
+            и шторка-градиент снизу, а подпись должна лежать поверх них белой. Ниже — в
+            реалистичном контейнере, сеткой по три, с подложкой вместо фото.
+          </p>
+          <div class="grid max-w-2xl grid-cols-3 gap-4">
+            <NavigationTile class="h-51 bg-muted-foreground">
               Мои осмотры
             </NavigationTile>
-            <NavigationTile size="lg" class="h-70 w-53 p-4">
+            <NavigationTile class="h-51 bg-muted-foreground">
               Отчёты и выгрузки
+            </NavigationTile>
+            <NavigationTile class="h-51 bg-muted-foreground">
+              Справочники
+            </NavigationTile>
+          </div>
+          <div class="mt-4 max-w-2xl">
+            <NavigationTile size="lg" class="h-70 w-53 bg-muted-foreground">
+              Крупная ступень
             </NavigationTile>
           </div>
         </div>

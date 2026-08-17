@@ -26,7 +26,11 @@ export { default as NavigationTile } from './NavigationTile.vue'
  * > (`Announcement` `149:1663`, `MediaGallery` `6734:62674`). Здесь написание
  * > верное; разнобой отдан дизайнерам.
  *
- * Радиус 16, заливка белая, собственных паддингов у контейнера нет.
+ * Радиус 16, собственных паддингов у контейнера нет — отступ 20 несёт подпись.
+ *
+ * **Белая заливка мастера — подложка под фотографию, а не фон карточки.**
+ * Плитка состоит из трёх слоёв: фото во всю коробку, шторка-градиент снизу
+ * (чёрный от прозрачного на 51% до 72% на 100%) и белая подпись поверх них.
  *
  * ## Габариты не переносятся, и это решение, а не пропуск
  *
@@ -42,7 +46,8 @@ export { default as NavigationTile } from './NavigationTile.vue'
  * Отклонение сознательное, записано в `docs/figma-fixes.md`.
  */
 export const navigationTileVariants = cva(
-  'flex flex-col justify-end rounded-xl bg-card text-left font-bold text-card-foreground outline-none',
+  // Подпись белая: она лежит поверх фотографии и шторки, а не на белой карточке.
+  'relative flex flex-col justify-end overflow-hidden rounded-xl bg-card text-left font-bold text-primary-foreground outline-none',
   {
     variants: {
       size: {

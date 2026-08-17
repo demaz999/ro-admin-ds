@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { onBeforeUnmount, computed, onMounted, ref } from 'vue'
 import { Icon } from '../icon'
 import { pickerFieldVariants } from '.'
 
@@ -43,13 +43,37 @@ const minutes = computed(() =>
 
 const parts = computed(() => model.value.split(':'))
 
-function pick(h: string, m: string) {
+const root = ref<HTMLElement | null>(null)
+
+/**
+ * Что считать завершённым выбором.
+ *
+ * Отслеживаются **названные пользователем** разряды, а не содержимое значения:
+ * при выборе часа минуты подставляются нулями, и если считать по значению, то
+ * плашка закроется сразу после часа — минуты выбрать будет нечем.
+ *
+ * В спеке `1159:12640` про закрытие не сказано ничего: там нарисованы только
+ * состояния поля и сама плашка. Поэтому поведение взято стандартное для
+ * поповера — закрытие по завершению выбора и по клику вне.
+ */
+const chosen = ref({ h: false, m: false })
+
+function pick(h: string, m: string, part: 'h' | 'm') {
   model.value = `${h}:${m}`
+  chosen.value[part] = true
+  if (chosen.value.h && chosen.value.m) open.value = false
 }
+
+function onOutside(e: MouseEvent) {
+  if (open.value && root.value && !root.value.contains(e.target as Node)) open.value = false
+}
+
+onMounted(() => document.addEventListener('pointerdown', onOutside))
+onBeforeUnmount(() => document.removeEventListener('pointerdown', onOutside))
 </script>
 
 <template>
-  <div data-slot="time-picker" class="relative w-full">
+  <div ref="root" data-slot="time-picker" class="relative w-full">
     <button
       type="button"
       :disabled="props.disabled"
@@ -57,9 +81,10 @@ function pick(h: string, m: string) {
       :class="pickerFieldVariants({ filled })"
       @click="open = !open"
     >
-      <!-- Коробка 16×16 держит раскладку; глиф часов в набор ещё не добавлен. -->
       <span v-if="!filled" class="flex size-4 shrink-0 items-center justify-center">
-        <slot name="icon" />
+        <slot name="icon">
+          <Icon name="schedule" :size="16" />
+        </slot>
       </span>
 
       <span class="flex min-w-0 flex-1 flex-col items-start">
@@ -84,17 +109,20 @@ function pick(h: string, m: string) {
         <Icon name="close" :size="8" />
       </span>
       <span v-else class="flex size-4 shrink-0 items-center justify-center">
-        <slot name="trailing" />
+        <slot name="trailing">
+          <Icon name="schedule" :size="16" />
+        </slot>
       </span>
     </button>
 
     <div
       v-if="open"
       data-slot="time-picker-popover"
-      class="absolute z-50 mt-1 flex w-42 flex-col gap-2 rounded-lg bg-popover px-2 py-5 shadow-dropdown"
+      class="absolute z-50 mt-1 flex w-42 flex-col gap-3 rounded-lg bg-popover px-2 py-5 shadow-dropdown"
     >
       <span class="px-2 text-xs font-medium text-muted-foreground">Время</span>
-      <div class="flex gap-2">
+      <!-- Зазор колонок 4, зазор заголовок→колонки 12 — оба с мастера. -->
+      <div class="flex gap-1">
         <div class="flex max-h-55 flex-1 flex-col overflow-y-auto">
           <button
             v-for="h in hours"
@@ -102,7 +130,7 @@ function pick(h: string, m: string) {
             type="button"
             class="rounded-md py-1 text-xs font-medium outline-none"
             :class="parts[0] === h ? 'bg-primary text-primary-foreground' : ''"
-            @click="pick(h, parts[1] || '00')"
+            @click="pick(h, parts[1] || '00', 'h')"
           >{{ h }}</button>
         </div>
         <div class="flex max-h-55 flex-1 flex-col overflow-y-auto">
@@ -112,7 +140,7 @@ function pick(h: string, m: string) {
             type="button"
             class="rounded-md py-1 text-xs font-medium outline-none"
             :class="parts[1] === m ? 'bg-primary text-primary-foreground' : ''"
-            @click="pick(parts[0] || '00', m)"
+            @click="pick(parts[0] || '00', m, 'm')"
           >{{ m }}</button>
         </div>
       </div>

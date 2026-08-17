@@ -36,7 +36,20 @@ const props = withDefaults(defineProps<{
 }>(), { size: 24, scale: 1 })
 
 const glyph = computed(() => {
-  const [x, y, w, h] = icons[props.name].box
+  const def = icons[props.name]
+
+  /**
+   * Имени нет в наборе — падаем понятно. Без этой проверки ошибка выглядит как
+   * «Cannot read properties of undefined (reading 'box')» и не называет ни
+   * иконку, ни место: искать приходится по всему дереву.
+   */
+  if (!def) {
+    throw new Error(
+      `Icon: глифа «${props.name}» нет в наборе. Доступны: ${Object.keys(icons).join(', ')}`,
+    )
+  }
+
+  const [x, y, w, h] = def.box
   const long = Math.max(w, h)
   const s = props.scale
 

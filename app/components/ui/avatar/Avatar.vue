@@ -52,6 +52,8 @@ const showsLetter = computed(
     >
     <template v-else-if="showsLetter">{{ props.letter }}</template>
     <!-- Глиф заполняет свой бокс целиком, как пикта Атома. -->
-    <Icon v-else name="check" :size="iconSize" />
+    <slot v-else name="icon">
+      <Icon name="person" :size="iconSize" />
+    </slot>
   </span>
 </template>

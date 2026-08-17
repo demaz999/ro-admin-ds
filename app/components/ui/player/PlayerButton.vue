@@ -27,10 +27,12 @@ const props = withDefaults(defineProps<{
     :aria-label="props.type === 'play' ? 'Воспроизвести' : 'Пауза'"
     :class="playerButtonVariants({ size: props.size })"
   >
-    <!-- Глифов play и pause в self-hosted наборе нет: коробка держит место.
-         Строка в docs/design-debt.md вместе с календарём и часами. -->
+    <!-- Глиф масштабируется вместе с кругом: 16 / 32 / 48 при 40 / 80 / 128. -->
     <slot>
-      <Icon name="chevron-right" :size="props.size === 'sm' ? 16 : 24" />
+      <Icon
+        :name="props.type"
+        :size="props.size === 'sm' ? 16 : props.size === 'md' ? 32 : 48"
+      />
     </slot>
   </button>
 </template>

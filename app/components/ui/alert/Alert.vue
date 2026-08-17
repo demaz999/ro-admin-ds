@@ -40,7 +40,13 @@ const withIcon = computed(() => props.type === 'timer' || props.showIcon)
   >
     <!-- Слева либо таймер 20×20, либо иконка 16×16 в рамке 2. -->
     <Timer v-if="props.type === 'timer'" size="sm" :value="props.value" />
-    <span v-else-if="props.showIcon" class="flex shrink-0 items-center justify-center p-0.5">
+    <!--
+      Держатель ровно 20×20 — как в мастере. Иконка там 16 в рамке 2, и высота
+      держателя совпадает с интерлиньяжем первой строки (20), поэтому глиф
+      встаёт с ней на одну ось. Держатель по содержимому давал 20×16, и иконка
+      уезжала на 2px вверх.
+    -->
+    <span v-else-if="props.showIcon" class="flex size-5 shrink-0 items-center justify-center">
       <slot name="icon">
         <Icon name="check" :size="16" />
       </slot>
