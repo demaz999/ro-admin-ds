@@ -773,6 +773,97 @@ const martianWidths = [
     </ShowcaseSection>
 
     <ShowcaseSection
+      title="Обогащение · очередь 1"
+      note="Этап 2. Атомовское ядро остаётся ядром, наши расширения из архива кита 1 надстраиваются над ним по одному. Это то, без чего «Мои осмотры» не собираются."
+    >
+      <div class="space-y-8">
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            Field · мастер кита 1 720:11753
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            У Атома <strong>нет ни подписи, ни подсказки, ни счётчика</strong> — ни в мастере,
+            ни в спеке. Их вообще нет как сущностей, это показала разведка этапа 0. Обвязка даёт
+            их <strong>любому</strong> контролу и ничего не знает о том, что внутри: поле,
+            селект, пикер даты или времени.
+          </p>
+          <div class="grid max-w-3xl gap-6 sm:grid-cols-2">
+            <ShowcaseCell label="подпись сверху" hint="зазор 8, подсказка через 4">
+              <Field label="Наименование" hint="До 25 символов" counter="10/25" class="w-full">
+                <Input placeholder="Введите наименование" />
+              </Field>
+            </ShowcaseCell>
+            <ShowcaseCell label="подпись слева" hint="по центру высоты поля, не блока">
+              <Field label="Дата" orientation="left" hint="Формат ДД.ММ.ГГГГ" class="w-full">
+                <DatePicker />
+              </Field>
+            </ShowcaseCell>
+            <ShowcaseCell label="ошибка" hint="краснеют подсказка и счётчик">
+              <Field label="Наименование" hint="Поле обязательно" counter="0/25" invalid class="w-full">
+                <Input placeholder="Введите наименование" invalid />
+              </Field>
+            </ShowcaseCell>
+            <ShowcaseCell label="выключено" hint="гаснут подпись и строка подсказки">
+              <Field label="Наименование" hint="До 25 символов" counter="10/25" disabled class="w-full">
+                <Input placeholder="Введите наименование" disabled />
+              </Field>
+            </ShowcaseCell>
+            <ShowcaseCell label="над селектом" hint="обвязка не знает, что внутри">
+              <Field label="Тип осмотра" hint="Выберите из справочника" class="w-full">
+                <Select />
+              </Field>
+            </ShowcaseCell>
+            <ShowcaseCell label="без подсказки" hint="строка не рисуется вовсе">
+              <Field label="Комментарий" class="w-full">
+                <Input placeholder="Необязательно" />
+              </Field>
+            </ShowcaseCell>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
+            StatusBadge · компонент `status` кита 1
+          </h3>
+          <p class="mb-3 max-w-2xl rounded-md border border-border p-3 text-sm">
+            <strong>Цвета иллюстративные.</strong> Раскладка повторяет текущие макеты, чтобы
+            прототипы рендерились цветными. В продукте статусные цвета приходят
+            <strong>с сервера вместе с данными</strong> — при интеграции здесь будет мапинг из
+            данных, а не выбор цвета руками. Поэтому цвет вынесен отдельным пропом, а не значением
+            <code>variant</code>: <code>variant</code> означал бы, что вид выбирает автор
+            страницы.
+          </p>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Значения сидят на расширенной палитре, а не на семантических ролях: статусов в
+            продукте больше шести, они заводятся в справочнике, и семантики
+            <code>success</code> / <code>warning</code> за ними нет. Это тот самый случай
+            «различение, а не сообщение».
+          </p>
+          <ShowcaseCell label="цвета" hint="точка 8×8, радиус 2, кегль 15/20">
+            <StatusBadge color="green">
+              Завершён
+            </StatusBadge>
+            <StatusBadge color="cyan">
+              На проверке
+            </StatusBadge>
+            <StatusBadge color="violet">
+              Запланирован
+            </StatusBadge>
+            <StatusBadge color="magenta">
+              Отложен
+            </StatusBadge>
+            <StatusBadge color="orange">
+              Требует внимания
+            </StatusBadge>
+            <StatusBadge color="red">
+              Отменён
+            </StatusBadge>
+          </ShowcaseCell>
+        </div>
+      </div>
+    </ShowcaseSection>
+
+    <ShowcaseSection
       title="Медиа · волна 9 — последняя"
       note="Хвост переноса: галерея, слайдшоу и два плеера плюс две кнопки, пришедшие из волны 2 как медийные по природе. После неё остаётся этап 2 — то, чего в Атоме нет вовсе."
     >

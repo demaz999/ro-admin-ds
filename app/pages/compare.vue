@@ -59,6 +59,22 @@ const indicatorVariants = [
 ] as const
 
 /**
+ * Field, мастер `input` 720:11753 КИТА 1 — 2429×757. Эталон из архива:
+ * archive/kit1-components/reference/input_720-11753.png.
+ *
+ * Наложение здесь проверяет **обвязку, а не контрол**: подпись, зазоры и строку
+ * подсказки. Само поле внутри — атомовское, и выглядит иначе, чем в ките 1:
+ * у Атома залитая поверхность без рамки, у кита 1 белое поле с обводкой 1px.
+ * Это ожидаемо и не является расхождением — ядро мы не трогаем.
+ */
+const fieldCompare = [
+  { t: 'подпись сверху · 40', x: 614, y: 16, w: 464, h: 88, orientation: 'top', invalid: false },
+  { t: 'подпись сверху · заполнено', x: 610, y: 295, w: 464, h: 88, orientation: 'top', invalid: false, value: 'Input text' },
+  { t: 'подпись слева · 40', x: 16, y: 44, w: 544, h: 60, orientation: 'left', invalid: false },
+  { t: 'подпись слева · ошибка', x: 16, y: 449, w: 544, h: 60, orientation: 'left', invalid: true },
+] as const
+
+/**
  * MenuItem, мастер _MenuItemMaster 3465:22566 — 328×376.
  *
  * Наведение в мастере не нарисовано: оно живёт в таблице состояний спеки
@@ -718,6 +734,45 @@ const textareaVariants = [
         <Indicator :variant="b.variant" :type="b.type" :size="b.size">
           99+
         </Indicator>
+      </CompareFrame>
+    </section>
+
+    <section class="space-y-2">
+      <h2 class="text-lg font-bold">
+        Field · кит 1, 720:11753 · фаза обогащения
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Первый компонент фазы обогащения. У Атома нет ни подписи, ни подсказки, ни счётчика —
+        ни в мастере <code>249:2768</code>, ни в спеке. Обвязка приехала из архива кита 1 и
+        надстроена <strong>над</strong> атомовским ядром, а не вместо него.
+      </p>
+      <p class="max-w-3xl rounded-md border border-border p-3 text-sm">
+        <strong>Наложение проверяет обвязку, а не контрол.</strong> Подпись, зазоры (8 до поля,
+        4 до подсказки) и строка подсказки высотой 16 обязаны совпасть. Само поле внутри —
+        атомовское, и выглядит иначе: у Атома залитая поверхность без рамки, у кита 1 белое поле
+        с обводкой 1px. Это ожидаемо, ядро мы не трогаем.
+      </p>
+
+      <CompareFrame
+        v-for="f in fieldCompare"
+        :key="f.t"
+        :title="f.t"
+        node="720:11753"
+        master="kit1/input_720-11753.png"
+        :x="f.x"
+        :y="f.y"
+        :width="f.w"
+        :height="f.h"
+      >
+        <Field
+          label="Подпись"
+          :orientation="f.orientation"
+          hint="Подсказка под полем"
+          counter="10/25"
+          :invalid="f.invalid"
+        >
+          <Input :model-value="f.value ?? ''" placeholder="Placeholder" :invalid="f.invalid" />
+        </Field>
       </CompareFrame>
     </section>
 
