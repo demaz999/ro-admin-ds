@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { PlayerButtonVariants } from '.'
+import { computed } from 'vue'
 import { Icon } from '../icon'
 import { playerButtonVariants } from '.'
 
@@ -17,6 +18,27 @@ const props = withDefaults(defineProps<{
   size: 'md',
   disabled: false,
 })
+
+/**
+ * Оптическая поправка треугольника — **сознательное отклонение**.
+ *
+ * Механика та же, что у шеврона `ButtonArrow`: коробка центрирована
+ * геометрически, а глаз видит глиф сдвинутым. У треугольника причина считается
+ * прямо — центр тяжести лежит на трети от основания, то есть **левее** центра
+ * описывающего прямоугольника. При геометрическом центрировании чернил слева
+ * больше, и глиф выглядит подпёртым к основанию.
+ *
+ * Компенсируется сдвигом вправо, в сторону острия. Величина взята по равновесию
+ * видимых полей, а не по полной компенсации центра тяжести: полная дала бы
+ * 2 / 4 / 6px и увела бы треугольник к правому краю круга.
+ *
+ * Паузы это не касается: две одинаковые полосы симметричны и оптически, и
+ * геометрически.
+ */
+const opticalShift = computed(() => {
+  if (props.type !== 'play') return '0px'
+  return props.size === 'sm' ? '1px' : '2px'
+})
 </script>
 
 <template>
@@ -32,6 +54,7 @@ const props = withDefaults(defineProps<{
       <Icon
         :name="props.type"
         :size="props.size === 'sm' ? 16 : props.size === 'md' ? 32 : 48"
+        :style="{ transform: `translateX(${opticalShift})` }"
       />
     </slot>
   </button>

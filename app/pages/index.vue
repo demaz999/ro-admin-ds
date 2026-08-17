@@ -1070,24 +1070,6 @@ const martianWidths = [
             кнопка. Замер подтверждает. Календарь — только сетка: плашку даёт тот же
             <code>Popover</code>, что у выпадашки и подменю.
           </p>
-          <p class="mb-3 max-w-2xl rounded-md border border-border p-3 text-sm">
-            <strong>Выбор глифа календаря за вами.</strong> Слева стоит
-            <code>calendar_month</code> — с сеткой дней внутри. Рядом альтернатива
-            <code>calendar_today</code>: та же рамка, но без сетки, ближе к пикте Атома по
-            количеству чернил. Оба из официальной выгрузки, границы сняты через
-            <code>getBBox</code>.
-          </p>
-          <div class="mb-4 flex items-center gap-6 rounded-md border border-border p-4">
-            <span class="flex items-center gap-2 text-sm">
-              <Icon name="calendar-month" :size="16" /> calendar_month
-            </span>
-            <span class="flex items-center gap-2 text-sm">
-              <Icon name="calendar-today" :size="16" /> calendar_today
-            </span>
-            <span class="flex items-center gap-2 text-sm">
-              <Icon name="schedule" :size="16" /> schedule
-            </span>
-          </div>
           <div class="grid max-w-xl gap-4 sm:grid-cols-2">
             <ShowcaseCell label="default" hint="272×40, заливка поля">
               <DatePicker />
