@@ -1413,13 +1413,13 @@ const martianWidths = [
           </p>
           <div class="flex flex-wrap items-end gap-4">
             <div class="w-30">
-              <Image ratio="1:1" class="rounded-md bg-muted" />
+              <Image ratio="1:1" class="rounded-md" />
             </div>
             <div class="w-40">
-              <Image ratio="16:10" class="rounded-md bg-muted" />
+              <Image ratio="16:10" class="rounded-md" />
             </div>
             <div class="w-24">
-              <Image ratio="3:4" class="rounded-md bg-muted" />
+              <Image ratio="3:4" class="rounded-md" />
             </div>
             <Story>
               Длинная подпись сюжета в три строки
@@ -1443,7 +1443,7 @@ const martianWidths = [
             <div class="w-70">
               <Banner size="lg">
                 <template #media>
-                  <Image ratio="16:10" class="rounded-md bg-muted" />
+                  <Image ratio="16:10" class="rounded-md" />
                 </template>
                 <template #title>
                   Крупная ступень
@@ -1454,7 +1454,7 @@ const martianWidths = [
             <div class="w-50">
               <Banner size="md">
                 <template #media>
-                  <Image ratio="16:10" class="rounded-md bg-muted" />
+                  <Image ratio="16:10" class="rounded-md" />
                 </template>
                 <template #title>
                   Средняя ступень
@@ -1465,7 +1465,7 @@ const martianWidths = [
             <div class="w-38">
               <Banner size="sm">
                 <template #media>
-                  <Image ratio="16:10" class="rounded-md bg-muted" />
+                  <Image ratio="16:10" class="rounded-md" />
                 </template>
                 <template #title>
                   Мелкая ступень

@@ -87,5 +87,15 @@ const props = withDefaults(defineProps<{
         {{ props.subtitle }}
       </span>
     </span>
+
+    <!--
+      Хвостовой слот — **наше расширение**: у мастера `ListItem` `2400:14661`
+      правой части нет вовсе, там только чекбокс, левый держатель и текст.
+      Понадобился строке снятого значения в чипе применённого фильтра: у неё
+      справа крестик. Строка в `docs/page-my-inspections.md`.
+    -->
+    <span v-if="$slots.trailing" data-slot="list-item-trailing" class="flex shrink-0 items-center">
+      <slot name="trailing" />
+    </span>
   </div>
 </template>

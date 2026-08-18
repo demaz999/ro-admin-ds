@@ -57,8 +57,11 @@ export const iconButtonVariants = cva(
       variant: {
         default: 'bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-pressed',
         secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary-hover active:bg-secondary-pressed',
-        elevated: 'bg-field-elevated text-secondary-foreground',
-        ghost: 'bg-transparent text-secondary-foreground',
+        // Наведение у этих двух в мастере не нарисовано — добавлено решением
+        // владельца от 2026-08-17 «у всего интерактивного системное наведение».
+        // Ступень взята у тональной кнопки: та же поверхность, что у secondary.
+        elevated: 'bg-field-elevated text-secondary-foreground hover:bg-secondary-hover',
+        ghost: 'bg-transparent text-secondary-foreground hover:bg-secondary',
       },
       size: {
         lg: 'size-10',

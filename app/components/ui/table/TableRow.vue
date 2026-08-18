@@ -1,19 +1,48 @@
 <script setup lang="ts">
+import { tableRowVariants, type TableRowVariants } from '.'
+
 /**
- * Строка таблицы — мастер `_Row` `9062:64690`.
+ * Строка таблицы — мастер `_Row` `9062:64690` Атома.
  *
- * Контейнер и только: 904 шириной в мастере, **заливки нет вовсе**, зазора
- * между ячейками тоже нет. Ширина в код не переносится — её задаёт таблица.
+ * ## Подсветка живёт на двух уровнях, и это две разные системы
  *
- * > **Подсветка живёт не здесь.** Ось `Active` есть у ячейки, а не у строки:
- * > `fills` у `_Row` пустой. Чтобы подсветить строку, `active` выставляется
- * > каждой ячейке. Проверено отдельно, отдано дизайнерам как
- * > непоследовательность.
+ * У **Атома** заливки у строки нет вовсе: ось `Active` есть у ячейки, и чтобы
+ * подсветить строку, её выставляют каждой ячейке. Это записано волной 7 и
+ * отдано дизайнерам как непоследовательность.
+ *
+ * У **кита 1** наоборот: мастер `table_line` `19524:9679` несёт четыре
+ * состояния целиком на строке — `Default`, `hover`, `new`, `selected`.
+ *
+ * В коде есть оба механизма: ось `active` у ячейки (Атом) и проп `state`
+ * здесь (кит 1). Заливки взяты с мастера кита 1 и легли на существующие роли,
+ * новых токенов не потребовалось:
+ *
+ * | Состояние | В макете | Роль |
+ * |---|---|---|
+ * | `default` | `#ffffff` | `--card` |
+ * | `hover` | `#f7f9fc` | `--accent` (bg/surface_hover) |
+ * | `new` | `#fff3ee` | `--surface-new` |
+ * | `selected` | `#edf3fc` | `--secondary` (accent/surface_soft) |
  */
+const props = withDefaults(defineProps<{
+  /** Состояние строки с мастера кита 1. `hover` отдельным значением не нужен — он живёт наведением. */
+  state?: NonNullable<TableRowVariants['state']>
+  /** Строка кликабельна: тогда у неё есть наведение и курсор. */
+  interactive?: boolean
+}>(), {
+  state: 'default',
+  interactive: false,
+})
 </script>
 
 <template>
-  <div data-slot="table-row" class="flex w-full items-stretch" role="row">
+  <div
+    data-slot="table-row"
+    role="row"
+    :data-state="props.state"
+    :class="tableRowVariants({ state: props.state, interactive: props.interactive })"
+    :style="{ transitionDuration: 'var(--duration-hover)' }"
+  >
     <slot />
   </div>
 </template>

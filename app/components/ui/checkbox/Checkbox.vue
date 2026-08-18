@@ -23,10 +23,23 @@ const props = withDefaults(defineProps<{
   indeterminate?: boolean
   subtitle?: string
   disabled?: boolean
+  /**
+   * Контрол лежит **поверх изображения**.
+   *
+   * Невыбранный получает **непрозрачную заливку** `--field-elevated` — ту же
+   * роль, которой у Атома залито поле поверх карты, — плюс тень-отрыв
+   * `--shadow-on-image`. Выбранный не меняется: заливка `primary` и так
+   * непрозрачна.
+   *
+   * Отдельной подложки под контролом нет: заливка живёт на самом контроле, с
+   * его родным радиусом и рамкой. Решение владельца от 2026-08-18, правка 11-б.
+   */
+  onImage?: boolean
 }>(), {
   indeterminate: false,
   subtitle: '',
   disabled: false,
+  onImage: false,
 })
 
 const model = defineModel<boolean>({ default: false })
@@ -42,8 +55,14 @@ const filled = computed(() => model.value || props.indeterminate)
         v-model="model"
         :disabled="props.disabled"
         data-slot="choice-control"
-        class="flex size-4 items-center justify-center rounded-xs border-2 border-primary text-primary-foreground outline-none"
-        :class="filled ? 'bg-primary' : 'bg-transparent'"
+        class="flex size-4 items-center justify-center rounded-xs border-2 border-primary text-primary-foreground outline-none transition-colors"
+        :class="[
+          filled
+            ? 'bg-primary hover:bg-primary-hover hover:border-primary-hover'
+            : props.onImage ? 'bg-field-elevated hover:border-primary-hover' : 'bg-transparent hover:border-primary-hover',
+          props.onImage ? 'shadow-on-image' : '',
+        ]"
+        :style="{ transitionDuration: 'var(--duration-hover)' }"
       >
         <CheckboxIndicator force-mount>
           <Icon v-if="props.indeterminate" name="remove" :size="12" />

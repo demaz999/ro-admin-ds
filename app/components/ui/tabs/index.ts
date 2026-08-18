@@ -58,7 +58,10 @@ export const tabsTriggerVariants = cva(
         // Высота 32 = текст 20 + зазор 8 + линия 4. Паддингов у мастера нет.
         line: 'h-8 flex-col justify-start text-field-foreground hover:text-field-foreground-hover data-[state=active]:text-field-foreground-hover',
         // Радиус 20 при высоте 40 — ровно половина, то есть пилюля.
-        pill: 'h-10 justify-center rounded-full px-4 text-field-foreground hover:text-field-foreground-hover data-[state=active]:bg-primary data-[state=active]:text-primary-foreground',
+        // Наведение у невыбранной таблетки — поверхность, а не только текст:
+        // правило владельца «у всего интерактивного системное наведение»
+        // (2026-08-18). У выбранной наведения нет: она уже брендовая.
+        pill: 'h-10 justify-center rounded-full px-4 text-field-foreground transition-colors hover:text-field-foreground-hover data-[state=inactive]:hover:bg-secondary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground',
       },
     },
     defaultVariants: { variant: 'line' },

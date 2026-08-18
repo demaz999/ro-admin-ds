@@ -34,23 +34,34 @@ export { default as StatusBadge } from './StatusBadge.vue'
  * Имя `cyan` вместо китового `grey` — в ките 1 ошибка: вариант с именем `grey`
  * красится в бирюзовый. Разбор — `docs/open-questions.md`, вопрос 12.
  */
+/**
+ * Цвет статуса красит **и точку, и подпись** — так в обоих макетах: в карточке
+ * «Экспертиза» набрана 15 Medium `#806aea`, в строке таблицы «Требуется
+ * повторить осмотр» — 15 Medium `#c91826`. Тёмная подпись была дефектом
+ * переноса: цвет доставался только точке.
+ *
+ * Роль живёт на корне, а точка берёт её через `bg-current` — тот же приём, что
+ * у счётчика `Indicator`: цвет задаётся в одном месте и не дублируется.
+ */
 export const statusBadgeVariants = cva(
-  'inline-flex h-5 w-fit shrink-0 items-center gap-2 text-sm font-medium whitespace-nowrap text-foreground',
+  'inline-flex h-5 w-fit shrink-0 items-center gap-2 text-sm font-medium whitespace-nowrap',
+  {
+    variants: {
+      color: {
+        green: 'text-palette-01',
+        cyan: 'text-palette-02',
+        violet: 'text-palette-03',
+        magenta: 'text-palette-04',
+        orange: 'text-palette-05',
+        red: 'text-palette-06',
+      },
+    },
+    defaultVariants: { color: 'green' },
+  },
 )
 
-export const statusDotVariants = cva('size-2 shrink-0 rounded-2xs', {
-  variants: {
-    color: {
-      green: 'bg-palette-01',
-      cyan: 'bg-palette-02',
-      violet: 'bg-palette-03',
-      magenta: 'bg-palette-04',
-      orange: 'bg-palette-05',
-      red: 'bg-palette-06',
-    },
-  },
-  defaultVariants: { color: 'green' },
-})
+/** Точка берёт цвет роли у корня: `bg-current`, а не второй набор классов. */
+export const statusDotVariants = cva('size-2 shrink-0 rounded-2xs bg-current')
 
 export type StatusDotVariants = VariantProps<typeof statusDotVariants>
 

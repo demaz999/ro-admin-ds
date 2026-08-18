@@ -23,9 +23,9 @@ const props = withDefaults(defineProps<{
   <span
     data-slot="status-badge"
     :data-color="props.color"
-    :class="statusBadgeVariants()"
+    :class="statusBadgeVariants({ color: props.color })"
   >
-    <span :class="statusDotVariants({ color: props.color })" aria-hidden="true" />
+    <span :class="statusDotVariants()" aria-hidden="true" />
     <slot />
   </span>
 </template>

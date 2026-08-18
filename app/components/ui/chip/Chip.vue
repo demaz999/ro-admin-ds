@@ -19,13 +19,25 @@ const props = withDefaults(defineProps<{
   count?: string | number
   /** Маркер-точка 8×8 слева, из `ButtonTag`. У чипа кита 1 её нет — по умолчанию выключен. */
   marker?: boolean
+  /**
+   * Хвостовой контрол. У мастера он один — крестик, и его глиф подменяемый
+   * (`icon#748:0`, INSTANCE_SWAP). Ось **наша**: чип применённого фильтра со
+   * счётчиком не снимается крестиком, а раскрывает список значений, и подмена
+   * одного глифа этого не описывает — у кнопки другое действие и другая
+   * подпись. `none` — чип без действия вовсе.
+   */
+  trailing?: 'remove' | 'expand' | 'none'
+  /** Список раскрыт: шеврон повёрнут. Значимо при `trailing="expand"`. */
+  expanded?: boolean
 }>(), {
   active: false,
   count: '',
   marker: false,
+  trailing: 'remove',
+  expanded: false,
 })
 
-const emit = defineEmits<{ remove: [] }>()
+const emit = defineEmits<{ remove: [], toggle: [] }>()
 
 /** Ноль — значащее значение счётчика, поэтому проверяем на пустую строку, а не на falsy. */
 const hasCount = () => props.count !== '' && props.count !== undefined && props.count !== null
@@ -65,15 +77,23 @@ const hasCount = () => props.count !== '' && props.count !== undefined && props.
       Свойство `icon#748:0` мастера — INSTANCE_SWAP, поэтому глиф слотом.
     -->
     <button
-      data-slot="chip-remove"
+      v-if="props.trailing !== 'none'"
+      :data-slot="props.trailing === 'expand' ? 'chip-expand' : 'chip-remove'"
       type="button"
-      class="flex size-4 shrink-0 items-center justify-center outline-none"
-      :class="props.active ? 'text-primary-foreground' : 'text-foreground-secondary'"
-      aria-label="Убрать"
-      @click="emit('remove')"
+      class="flex size-4 shrink-0 items-center justify-center outline-none transition-transform"
+      :class="[
+        props.active ? 'text-primary-foreground' : 'text-foreground-secondary',
+        props.trailing === 'expand' && props.expanded ? 'rotate-180' : '',
+      ]"
+      :aria-label="props.trailing === 'expand' ? 'Показать значения' : 'Убрать'"
+      :aria-expanded="props.trailing === 'expand' ? props.expanded : undefined"
+      :style="{ transitionDuration: 'var(--duration-hover)' }"
+      @click="props.trailing === 'expand' ? emit('toggle') : emit('remove')"
     >
       <slot name="icon">
-        <Icon name="close" :size="9.4" />
+        <!-- Крестик 9.4 — с мастера; шеврон 11 — тот же, что у массовых действий. -->
+        <Icon v-if="props.trailing === 'expand'" name="chevron-down" :size="11" />
+        <Icon v-else name="close" :size="9.4" />
       </slot>
     </button>
   </span>
