@@ -180,27 +180,30 @@ if (route.query.q) search.value = String(route.query.q)
       компонент TableToolbar и правило не трогаю: после решения владельца это
       либо закрепляется в naming.md, либо откатывается на прежний порядок.
 
-      Такт 15: отдельный текст «Найдено N» убран владельцем — счётчик ушёл
-      внутрь поля поиска (рекомендация чата, вариант владельца «внутрь поля»).
-      У Input штатного слота под это нет, компонент не трогаю: обёртка на
-      странице — `relative` вокруг Input, число абсолютом у правого края той
-      же позиции, что раньше занимал текст подписи (`px-4` поля). Реагирует
-      на тот же `total`, что и раньше.
+      Такт 15: отдельный текст «Найдено N» уходил внутрь поля обёрткой с
+      абсолютом — откачен тактом 16, владелец выбрал другой вариант.
+
+      Такт 16: счётчик обратно снаружи, но не как в такте 13 — та версия
+      сидела по центру всего блока шапки (`items-center` у `TableToolbar`),
+      а не по базовой линии текста поля, и читалась отдельной подписью, а не
+      продолжением строки поиска. Здесь `TableToolbar` получает
+      `items-baseline` через мердж `class` (twMerge меняет только
+      `align-items`, компонент не трогаю) — выравнивание идёт по настоящей
+      базовой линии текста через вложенные блоки `Input`, не по вычисленному
+      вручную отступу. Зазор от поля — тоже через `class`: `gap-3` (12)
+      вместо штатных 16 у `TableToolbar`; на зазор до «Добавить» это не
+      влияет, там `ml-auto` и так забирает всё свободное место.
     -->
-    <TableToolbar>
-      <div class="relative w-full max-w-110 min-w-0">
-        <Input
-          v-model="search"
-          variant="elevated"
-          placeholder="Поиск по наименованию"
-          @update:model-value="onSearch"
-        />
-        <span
-          class="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-sm font-medium text-muted-foreground"
-        >
-          {{ total }}
-        </span>
-      </div>
+    <TableToolbar class="items-baseline gap-3">
+      <Input
+        v-model="search"
+        variant="elevated"
+        placeholder="Поиск по наименованию"
+        class="max-w-110 min-w-0"
+        @update:model-value="onSearch"
+      />
+
+      <span class="shrink-0 text-sm text-muted-foreground whitespace-nowrap">Найдено {{ total }}</span>
 
       <!-- Заглушка: обработчика нет, кнопка показывает вид и состояния. -->
       <Button show-icon class="ml-auto">
