@@ -84,19 +84,19 @@ const current = computed(() => route.path)
       <MenuSection first>
         <MenuItem :selected="current === '/'">
           <template #icon>
-            <Icon name="home" :size="24" />
+            <Icon name="home" :size="20" />
           </template>
           Главная
         </MenuItem>
         <MenuItem>
           <template #icon>
-            <Icon name="payments" :size="24" />
+            <Icon name="payments" :size="20" />
           </template>
           Billing
         </MenuItem>
         <MenuItem>
           <template #icon>
-            <Icon name="monitoring" :size="24" />
+            <Icon name="monitoring" :size="20" />
           </template>
           Построить отчёт
         </MenuItem>
@@ -105,19 +105,19 @@ const current = computed(() => route.path)
       <MenuSection title="Осмотры">
         <MenuItem :selected="current === '/my-inspections'">
           <template #icon>
-            <Icon name="view-list" :size="24" />
+            <Icon name="view-list" :size="20" />
           </template>
           Мои осмотры
         </MenuItem>
         <MenuItem>
           <template #icon>
-            <Icon name="draft" :size="24" />
+            <Icon name="draft" :size="20" />
           </template>
           Все осмотры
         </MenuItem>
         <MenuItem>
           <template #icon>
-            <Icon name="list" :size="24" />
+            <Icon name="list" :size="20" />
           </template>
           Очередь на проверку
         </MenuItem>
@@ -128,7 +128,7 @@ const current = computed(() => route.path)
         -->
         <MenuSub :open="open.projects" :compact="compact" @toggle="open.projects = !open.projects">
           <template #icon>
-            <Icon name="account-tree" :size="24" />
+            <Icon name="account-tree" :size="20" />
           </template>
           Проекты осмотров
           <template #items>
@@ -147,7 +147,7 @@ const current = computed(() => route.path)
 
         <MenuItem>
           <template #icon>
-            <Icon name="hourglass" :size="24" />
+            <Icon name="hourglass" :size="20" />
           </template>
           Незавершённые осмотры
         </MenuItem>
@@ -156,7 +156,7 @@ const current = computed(() => route.path)
       <MenuSection title="Инструменты">
         <MenuSub :open="open.admin" :compact="compact" @toggle="open.admin = !open.admin">
           <template #icon>
-            <Icon name="admin" :size="24" />
+            <Icon name="admin" :size="20" />
           </template>
           Администрирование
           <template #items>

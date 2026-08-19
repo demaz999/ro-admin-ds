@@ -227,12 +227,14 @@ if (route.query.q) search.value = String(route.query.q)
           <Icon :name="row.icon" :size="24" />
         </TableCell>
 
-        <!-- Наименование — ссылка: строка ведёт на карточку схемы. Href-заглушка. -->
+        <!--
+          Наименование — плоский текст, не ссылка: решение владельца, такт 12,
+          откат рекомендации такта 10. Ховер строки остаётся штатным, у самого
+          текста никакого интерактива нет.
+        -->
         <TableCell variant="slot" :size="56" class="flex-1 px-4">
-          <TableCellText class="flex-1 text-sm">
-            <Hyperlink href="#">
-              {{ row.name }}
-            </Hyperlink>
+          <TableCellText class="flex-1 text-sm text-foreground">
+            {{ row.name }}
           </TableCellText>
         </TableCell>
 
