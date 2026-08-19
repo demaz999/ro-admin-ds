@@ -1,75 +1,53 @@
-# Nuxt Minimal Starter
+# ro-admin-ds — кит 2
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+Кодовая версия дизайн-системы Рососмотра: перенос дизайн-системы Атом в код (компоненты на
+shadcn-vue поверх Reka UI, тема на токенах Tailwind) плюс обогащение из кита 1 Figma. Источник
+визуала — кит 1 в Figma; интеграция с прод-фронтом — отдельная будущая задача.
 
-## Setup
+Стек: Nuxt · Vue · Tailwind v4 (CSS-first, `@theme`) · shadcn-vue / Reka UI.
 
-Make sure to install dependencies:
+Рабочая ветка — `atom-base`. На `main` лежит тег `pre-atom` — снимок репозитория до перехода на
+кит 2.
+
+## Быстрый старт
 
 ```bash
-# npm
 npm install
-
-# pnpm
-pnpm install
-
-# yarn
-yarn install
-
-# bun
-bun install
-```
-
-## Development Server
-
-Start the development server on `http://localhost:3000`:
-
-```bash
-# npm
 npm run dev
-
-# pnpm
-pnpm dev
-
-# yarn
-yarn dev
-
-# bun
-bun run dev
 ```
 
-## Production
+Дев-сервер поднимается на `http://localhost:3000`.
 
-Build the application for production:
+Что смотреть:
 
-```bash
-# npm
-npm run build
+| Роут | Что там |
+|---|---|
+| `/` | витрина реестра — 41+ перенесённый компонент, два тематических режима: `rososmotr` (рабочая тема, в ней идёт приёмка) и `atom` (сверочная — родные цвета и гарнитура эталона) |
+| `/compare` | наложение текущей сборки на экспорт мастеров Атома 1x, плюс автопроверки шрифтов и оптики иконок |
+| `/my-inspections` | тестовая страница «Мои осмотры» — карточный и табличный вид |
+| `/insure-types` | «Типы схем осмотров» — типовая страница-таблица админки на общем каркасе (`app/layouts/admin.vue`) |
 
-# pnpm
-pnpm build
+## Документация — `docs/`
 
-# yarn
-yarn build
+- **`naming.md`** — правила и прецеденты системы, мапинг имён «кит 1 → код».
+- **`figma-fixes.md`** — сознательные отклонения от макета и просьбы к дизайнерам.
+- **`design-debt.md`** — что стоит на дефолте shadcn-vue и ждёт отрисовки в ките 1.
+- **`atom-audit.md`** — аудит исходной дизайн-системы Атом: что и как переносится.
+- **`page-*.md`** (`page-my-inspections.md`, `page-insure-types.md`) — разбор тестовых страниц:
+  покрытие реестром, таблицы расхождений с мастерами по категориям.
+- **`handoff.md`** — текущее состояние проекта для продолжения работы в новой сессии.
+- **`CLAUDE.md`** (в корне репозитория) — правила и пойманные ловушки для агентной разработки:
+  протокол переноса компонента, протокол иконок, работа с токенами, нейминг.
 
-# bun
-bun run build
-```
+## Приёмочная оснастка
 
-Locally preview production build:
+Часть страниц принимает служебные query-параметры для снятия состояний headless-браузером при
+приёмке — `?open=`, `?view=`, `?filters=`, `?selected=`, `?rows=`, `?scroll=`, `?q=` и подобные.
+Это инструменты приёмки, не продуктовый функционал: при интеграции их предстоит снять или спрятать
+за флагом сборки.
 
-```bash
-# npm
-npm run preview
+## Статус
 
-# pnpm
-pnpm preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
-```
-
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+Первая итерация — перенос Атома, обогащение из кита 1, тест кита на двух живых страницах —
+завершена. Идёт обсуждение мержа `atom-base` в общую ветку и способа потребления кита фронтом;
+подробности и открытые вопросы — в `docs/handoff.md`.
