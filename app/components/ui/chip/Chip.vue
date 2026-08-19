@@ -139,7 +139,7 @@ function onRootKeydown(event: KeyboardEvent) {
       v-if="props.trailing === 'remove'"
       data-slot="chip-remove"
       type="button"
-      class="relative flex size-4 shrink-0 items-center justify-center outline-none transition-colors after:absolute after:-inset-1 after:rounded-full after:transition-colors after:content-['']"
+      class="relative flex size-4 shrink-0 items-center justify-center outline-none transition-colors after:absolute after:-inset-1 after:-z-10 after:rounded-full after:transition-colors after:content-['']"
       :class="[
         props.active
           ? 'text-primary-foreground hover:after:bg-primary'
