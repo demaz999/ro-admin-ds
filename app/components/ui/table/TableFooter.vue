@@ -12,6 +12,11 @@ import { SelectItem } from '../select'
  * справа переключатель размера страницы. Рамка та же, что у таблицы,
  * заливка белая, высота 92 вместе с полосой прокрутки сверху.
  *
+ * Подвал **примыкает к таблице**: в макете это один контейнер `table`
+ * `19601:29061` — шапка, тело и подвал внутри одной рамки со скруглением 16.
+ * Поэтому у подвала нет верхней рамки (её роль играет нижняя рамка таблицы) и
+ * есть нижние скругления.
+ *
  * | Часть | С макета |
  * |---|---|
  * | счётчик | «1 – 15 из 64787», 16 Regular, основной текст |
@@ -29,12 +34,19 @@ const props = withDefaults(defineProps<{
   total?: number
   /** Варианты размера страницы. */
   pageSizes?: number[]
+  /**
+   * Подвал примыкает к таблице сверху: своей верхней рамки у него тогда нет,
+   * скруглены только нижние углы. Отдельно стоящий подвал — под плиткой —
+   * замыкает рамку сам.
+   */
+  attached?: boolean
 }>(), {
   page: 1,
   pages: 1,
   pageSize: 15,
   total: 0,
   pageSizes: () => [15, 30, 50],
+  attached: true,
 })
 
 const emit = defineEmits<{
@@ -51,16 +63,30 @@ const range = computed(() => {
   return `${from} – ${to} из ${props.total}`
 })
 
+/**
+ * Смена размера страницы **пересчитывает и номер страницы**. Без этого выбор
+ * более крупного размера оставляет номер за пределами набора: со второй
+ * страницы по 25 строк переход на 50 давал «51 – 50 из 50» и пустую таблицу.
+ *
+ * Номер не сбрасывается в первый, а прижимается к последнему существующему:
+ * если страница ещё есть — пользователь остаётся на ней.
+ */
 function pick(size: number) {
   open.value = false
   emit('update:pageSize', size)
+
+  const last = Math.max(1, Math.ceil(props.total / size))
+  if (props.page > last) emit('update:page', last)
 }
 </script>
 
 <template>
   <div
     data-slot="table-footer"
-    class="flex items-center gap-4 border border-t-0 border-border-soft bg-card p-4"
+    :class="[
+      'flex items-center gap-4 border border-border-soft bg-card p-4',
+      props.attached ? 'rounded-b-xl border-t-0' : 'rounded-xl',
+    ]"
   >
     <Pagination :page="props.page" :pages="props.pages" @update:page="emit('update:page', $event)" />
 

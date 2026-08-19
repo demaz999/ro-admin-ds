@@ -18,6 +18,17 @@ import { tableHeadVariants } from '.'
  * Поэтому проп `sort` — **наше расширение** с провенансом «макет дашборда,
  * `columns_name` `19601:29064`»: он добавляет стрелку и делает заголовок
  * кнопкой. Направление отражается поворотом того же глифа, второго в ките нет.
+ *
+ * ## Применённый параметр красится брендовым
+ *
+ * Такт 11, решение владельца: колонка, по которой список отсортирован сейчас,
+ * показывает это цветом — подпись и стрелка уходят в `--primary`. Значение
+ * `none` (сортировка доступна, но не применена) остаётся нейтральным: иначе
+ * «можно отсортировать» и «отсортировано» читались бы одинаково.
+ *
+ * У Атома в мастере это выражено **вариантом** `active` (подпись брендовая), то
+ * есть механика не выдумана — здесь она просто выводится из состояния `sort`,
+ * а не выставляется вторым пропом руками.
  */
 const props = withDefaults(defineProps<{
   variant?: TableHeadVariants['variant']
@@ -32,6 +43,16 @@ const props = withDefaults(defineProps<{
 }>(), { variant: 'simple', sort: null, sticky: false, divider: false })
 
 defineEmits<{ sort: [] }>()
+
+/**
+ * К колонке применён параметр — сортировка активна. Тогда подпись и стрелка
+ * красятся брендовым: столбец сообщает, что список выстроен по нему, а не
+ * ждёт нажатия. Решение владельца, такт 11.
+ *
+ * `none` — колонка сортируемая, но не отсортированная: это не применённый
+ * параметр, красить нечего.
+ */
+const isApplied = computed(() => props.sort === 'asc' || props.sort === 'desc')
 
 const ariaSort = computed(() => {
   if (props.sort === 'asc') return 'ascending'
@@ -58,7 +79,8 @@ const ariaSort = computed(() => {
     <button
       v-if="props.sort !== null"
       type="button"
-      class="inline-flex items-center gap-1 outline-none transition-colors hover:text-field-foreground-hover"
+      class="inline-flex items-center gap-1 outline-none transition-colors"
+      :class="isApplied ? 'text-primary hover:text-primary-hover' : 'hover:text-field-foreground-hover'"
       :style="{ transitionDuration: 'var(--duration-hover)' }"
       @click="$emit('sort')"
     >
@@ -70,6 +92,7 @@ const ariaSort = computed(() => {
         :class="[
           props.sort === 'desc' ? 'rotate-180' : '',
           props.sort === 'none' ? 'opacity-[var(--opacity-icon-muted)]' : '',
+        
         ]"
       />
     </button>

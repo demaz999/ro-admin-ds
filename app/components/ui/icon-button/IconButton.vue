@@ -35,7 +35,7 @@ const glyphSize = computed(() => (props.size === 'lg' ? 20 : 16))
     :disabled="props.disabled"
     :aria-label="props.label"
     :class="iconButtonVariants({ variant, size, rounded })"
-    :style="{ transitionProperty: 'background-color', transitionDuration: 'var(--duration-hover)' }"
+    :style="{ transitionProperty: 'background-color, color', transitionDuration: 'var(--duration-hover)' }"
   >
     <slot>
       <Icon name="location" :size="glyphSize" />

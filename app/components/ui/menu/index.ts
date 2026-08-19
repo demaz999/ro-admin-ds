@@ -4,6 +4,7 @@ import { cva } from 'class-variance-authority'
 export { default as Menu } from './Menu.vue'
 export { default as MenuItem } from './MenuItem.vue'
 export { default as MenuPopover } from './MenuPopover.vue'
+export { default as MenuSection } from './MenuSection.vue'
 export { default as MenuSub } from './MenuSub.vue'
 
 /**
@@ -68,27 +69,78 @@ export { default as MenuSub } from './MenuSub.vue'
  * > в наложение вошли варианты без счётчика, потому что в мастере он выключен
  * > во всех шести. Строка в `docs/waves.md`.
  */
+/**
+ * ## Второй мастер: `left_menu` кита 1
+ *
+ * Такт 9. У сайдбара **два источника**, и они расходятся не в мелочах:
+ *
+ * | | Атом `_MenuItemMaster` `3465:22566` | кит 1 `menu_item` в `left_menu` `643:3053` |
+ * |---|---|---|
+ * | ширина полосы | 296 · компакт **56** | 256 · компакт **84** |
+ * | высота пункта | 44 | **48** |
+ * | радиус | 8 | **12** |
+ * | паддинги | 16 / 12 | 8 снаружи + 4 внутри |
+ * | зазор «иконка — подпись» | 12 | **8** |
+ * | иконка | 16 | **20** |
+ * | подпись | 16/20 Medium | **15/20**, Regular; выбранный — **Bold** |
+ * | компактный режим | только иконка | иконка **и подпись 13/16** под ней |
+ * | заливка выбранного | на самой кнопке | на **внутреннем узле** `it_content`, то есть с отступом 8 по бокам |
+ *
+ * Это не уточнение и не дубль: два кита рисуют меню по-разному. Поэтому в
+ * коде **обе подачи живые**, ось `variant` — тот же приём, что у `TableHead`
+ * с вариантом `column` кита 1 рядом с атомовскими и у `Hyperlink` с `accent`.
+ *
+ * Дефолт остаётся атомовским: на него сходится наложение волны 5. Каркас
+ * админки собран на `kit1` — решение владельца, такт 9.
+ *
+ * Вопрос «схлопнуть ли две подачи в одну» — в `docs/open-questions.md`.
+ */
 export const menuItemVariants = cva(
-  'group/menu-item relative flex w-full items-center rounded-md text-base font-medium outline-none disabled:pointer-events-none disabled:opacity-[var(--opacity-disabled-strong)]',
+  'group/menu-item relative flex w-full items-center outline-none disabled:pointer-events-none disabled:opacity-[var(--opacity-disabled-strong)]',
   {
     variants: {
-      compact: {
-        // Компактный режим центрирует иконку: подписи в нём нет. 56 = 8 + 40 + 8.
-        true: 'h-11 w-14 justify-center p-2',
-        // Ширину задаёт контейнер, а не компонент: в мастере одна и та же строка
-        // 296 отдельно и 267 внутри подменю. Зашить 296 значило бы сломать вложенную.
-        false: 'h-11 w-full gap-3 px-4 py-3',
+      /** Источник подачи: перенос Атома либо мастер кита 1. */
+      variant: {
+        atom: 'rounded-md text-base font-medium',
+        // Заливка у кита 1 живёт на внутреннем узле, поэтому здесь только
+        // коробка: высота 48, паддинг 8, радиус 12.
+        kit1: 'h-12 rounded-lg px-2',
       },
-      selected: {
-        true: 'bg-sidebar-active text-sidebar-active-foreground',
-        false: 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-      },
+      compact: { true: '', false: '' },
+      selected: { true: '', false: '' },
     },
+    compoundVariants: [
+      // Атом: заливка и размеры на самой кнопке.
+      { variant: 'atom', compact: true, class: 'h-11 w-14 justify-center p-2' },
+      { variant: 'atom', compact: false, class: 'h-11 w-full gap-3 px-4 py-3' },
+      { variant: 'atom', selected: true, class: 'bg-sidebar-active text-sidebar-active-foreground' },
+      { variant: 'atom', selected: false, class: 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground' },
+    ],
     defaultVariants: {
+      variant: 'atom',
       compact: false,
       selected: false,
     },
   },
 )
 
+/**
+ * Внутренняя часть пункта у кита 1 — узел `it_content`. Именно она несёт
+ * заливку, поэтому выбранная строка не доходит до краёв полосы на 8px с
+ * каждой стороны. У Атома такого узла нет вовсе.
+ */
+export const menuItemContent = cva(
+  'flex h-full min-w-0 flex-1 items-center justify-center rounded-lg px-1 transition-colors',
+  {
+    variants: {
+      compact: { true: '', false: 'gap-2' },
+      selected: {
+        true: 'bg-sidebar-active font-bold text-sidebar-active-foreground',
+        false: 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+      },
+    },
+    defaultVariants: { compact: false, selected: false },
+  },
+)
 export type MenuItemVariants = VariantProps<typeof menuItemVariants>
+export type MenuItemContentVariants = VariantProps<typeof menuItemContent>

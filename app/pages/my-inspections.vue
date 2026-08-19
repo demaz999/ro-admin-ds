@@ -304,6 +304,8 @@ const selectedCount = computed(() => Object.values(selected).filter(Boolean).len
 const route = useRoute()
 if (route.query.open === 'bulk') bulkOpen.value = true
 const chipOpen = computed(() => route.query.open === 'chip')
+/** `?open=tip` — раскрытая подсказка обрезанной ячейки для снимка приёмки. */
+const tipOpen = computed(() => route.query.open === 'tip')
 
 /**
  * Та же оснастка: `?only=8` оставляет в списке одну карточку. Нужна снимкам
@@ -446,17 +448,16 @@ function selectAll(list: readonly string[]) {
             Автообновление списка
           </Switch>
 
-          <!-- Текст подсказки — с макета: инстанс Tooltip 19512:17509 на соседнем кадре. -->
+          <!--
+            Текст подсказки — с макета: инстанс Tooltip 19512:17509 на соседнем кадре.
+            Сама кнопка — btn_service 20304:54644: бокс 24, глиф 20, fg/secondary.
+          -->
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger as-child>
-                <button
-                  type="button"
-                  aria-label="Подсказка"
-                  class="flex text-foreground-secondary outline-none transition-colors hover:text-foreground"
-                >
-                  <Icon name="help" :size="24" />
-                </button>
+                <IconButton variant="service" size="sm" label="Подсказка">
+                  <Icon name="help" :size="20" />
+                </IconButton>
               </TooltipTrigger>
               <TooltipContent>
                 Список осмотров обновляется каждые 60 секунд
@@ -570,8 +571,9 @@ function selectAll(list: readonly string[]) {
                 placeholder="Наименование объекта или схемы, компания, агент, номеру телефона, имя пользователя"
                 class="min-w-0 flex-1"
               />
-              <IconButton variant="ghost" size="lg" label="Обновить">
-                <Icon name="refresh" :size="20" />
+              <!-- btn_service I19601:29062;814:28510: бокс 24, глиф 16, fg/secondary. -->
+              <IconButton variant="service" size="sm" label="Обновить список">
+                <Icon name="refresh" :size="16" />
               </IconButton>
             </div>
 
@@ -621,6 +623,13 @@ function selectAll(list: readonly string[]) {
             </IconButton>
           </div>
         </div>
+
+        <!--
+          Список и подвал — один блок. В табличном виде подвал примыкает к
+          таблице вплотную: в макете это один контейнер table 19601:29061.
+          В плитке между сеткой и подвалом остаётся обычный зазор колонки.
+        -->
+        <div class="flex min-w-0 flex-col" :class="view === 'cards' ? 'gap-6' : ''">
 
         <!-- Сетка карточек: две колонки, зазор 24. -->
         <!--
@@ -675,7 +684,7 @@ function selectAll(list: readonly string[]) {
             <div class="flex flex-col gap-1">
               <span class="flex items-center gap-1">
                 <Icon v-if="card.locked" name="lock" :size="14" class="text-primary" />
-                <Hyperlink href="#" variant="accent">Номер оферты: 6323756800-нкл</Hyperlink>
+                <Hyperlink href="#" variant="accent" size="lg">Номер оферты: 6323756800-нкл</Hyperlink>
               </span>
 
               <div class="flex items-start gap-9">
@@ -687,12 +696,16 @@ function selectAll(list: readonly string[]) {
                   <span class="text-sm text-foreground-secondary">3 фев, 2023 (пт), 06:49</span>
                 </div>
 
-                <span class="flex shrink-0 items-center gap-1 text-sm text-foreground-secondary">
-                  ID 186 243
-                  <IconButton variant="ghost" size="sm" label="Скопировать ID">
-                    <Icon name="copy" :size="16" />
-                  </IconButton>
-                </span>
+                <!--
+                  Идентификатор всегда идёт со службой копирования — системное
+                  правило владельца, такт 11. Кнопка приезжает из компонента,
+                  а не собирается здесь: см. naming.md.
+                -->
+                <CopyableId
+                  label="ID"
+                  value="186 243"
+                  class="shrink-0 text-sm text-foreground-secondary"
+                />
               </div>
 
               <span class="truncate text-sm text-foreground-secondary">
@@ -723,7 +736,7 @@ function selectAll(list: readonly string[]) {
           Первые две колонки зафиксированы, остальные уезжают под горизонтальный
           скролл: сумма ширин 1776 при видимой области 1372 — так и в макете.
         -->
-        <Table v-else data-slot="table-view">
+        <Table v-else attached data-slot="table-view">
             <TableRow>
               <!-- В шапке на месте чекбокса — кнопка настройки колонок, как в макете. -->
               <!--
@@ -732,13 +745,10 @@ function selectAll(list: readonly string[]) {
                 свой бокс 24, иначе её режет край колонки.
               -->
               <TableHead variant="column" :sticky="0" class="w-12 shrink-0 items-center pr-0 pl-4">
-                <button
-                  type="button"
-                  aria-label="Настроить колонки"
-                  class="flex size-6 items-center justify-center text-primary outline-none"
-                >
-                  <Icon name="settings" :size="20" />
-                </button>
+                <!-- btn_service I19849:48088;957:5257;325:7207: бокс 24, глиф 17.997×19. -->
+                <IconButton variant="service" size="sm" label="Настроить колонки">
+                  <Icon name="settings" :size="19" />
+                </IconButton>
               </TableHead>
 
               <TableHead
@@ -756,7 +766,7 @@ function selectAll(list: readonly string[]) {
             </TableRow>
 
             <TableRow
-              v-for="row in tableRows"
+              v-for="(row, ri) in tableRows"
               :key="row.id"
               interactive
               :state="selected[row.id] ? 'selected' : 'default'"
@@ -770,23 +780,31 @@ function selectAll(list: readonly string[]) {
               <TableCell variant="slot" :size="72" :sticky="48" divider class="w-70 gap-4 px-4">
                 <Image ratio="1:1" :src="row.cover || undefined" alt="" class="w-14 shrink-0 rounded-md" />
                 <!-- Три строки: в макете текстовый узел ячейки 184×60, то есть три строки по 20. -->
-                <span class="line-clamp-3 text-sm">{{ row.name }}, {{ row.address }}</span>
+                <TableCellText :lines="3" class="flex-1 text-sm" :default-open="tipOpen && ri === 1">
+                  {{ row.name }}, {{ row.address }}
+                </TableCellText>
               </TableCell>
 
               <TableCell variant="slot" :size="72" class="w-60 px-4">
-                <span v-if="row.lockedBy" class="line-clamp-2 text-sm">{{ row.lockedBy }}</span>
+                <TableCellText v-if="row.lockedBy" :lines="2" class="flex-1 text-sm">
+                  {{ row.lockedBy }}
+                </TableCellText>
                 <Button v-else variant="secondary" :show-icon="false">
                   Заблокировать за мной
                 </Button>
               </TableCell>
 
               <TableCell variant="slot" :size="72" class="w-60 px-4">
-                <span class="line-clamp-2 text-sm">{{ row.scheme }}</span>
+                <TableCellText :lines="2" class="flex-1 text-sm">
+                  {{ row.scheme }}
+                </TableCellText>
               </TableCell>
 
               <TableCell variant="slot" :size="72" class="w-33 px-4">
                 <span class="flex flex-col text-sm">
-                  <span v-for="a in row.attribute" :key="a.text" :class="attributeTone[a.tone]">{{ a.text }}</span>
+                  <TableCellText v-for="a in row.attribute" :key="a.text" :copy="false" :class="attributeTone[a.tone]">
+                    {{ a.text }}
+                  </TableCellText>
                 </span>
               </TableCell>
 
@@ -798,16 +816,21 @@ function selectAll(list: readonly string[]) {
                 <span class="text-sm text-foreground-secondary">{{ row.date }}</span>
               </TableCell>
 
+              <!-- ID осмотра — идентификатор, значит со службой копирования. -->
               <TableCell variant="slot" :size="72" class="w-33 px-4">
-                <span class="text-sm">{{ row.inspectionId }}</span>
+                <CopyableId :value="row.inspectionId" class="text-sm" />
               </TableCell>
 
               <TableCell variant="slot" :size="72" class="w-60 px-4">
-                <span class="line-clamp-2 text-sm">{{ row.comment }}</span>
+                <TableCellText :lines="2" class="flex-1 text-sm">
+                  {{ row.comment }}
+                </TableCellText>
               </TableCell>
 
               <TableCell variant="slot" :size="72" class="w-60 px-4">
-                <span class="line-clamp-2 text-sm">{{ row.note }}</span>
+                <TableCellText :lines="2" class="flex-1 text-sm">
+                  {{ row.note }}
+                </TableCellText>
               </TableCell>
             </TableRow>
         </Table>
@@ -821,19 +844,27 @@ function selectAll(list: readonly string[]) {
           v-model:page-size="pageSize"
           :pages="Math.ceil(TOTAL / pageSize)"
           :total="TOTAL"
+          :attached="view === 'table'"
         />
+        </div>
 
         </div>
 
         <!-- Колонка фильтров: ширина 348 с макета, не резиновая. -->
         <FilterPanel v-model:collapsed="filtersCollapsed">
-          <section class="flex flex-col gap-6 rounded-xl bg-card p-4">
+          <FilterPanelSection>
             <div class="flex flex-col gap-2">
               <div class="flex items-center justify-between gap-2">
-                <h2 class="text-lg font-bold">
+                <!--
+                  В мастере saved_filter 23952:86296 заголовок 17/24 Bold. Поднят
+                  на 20/24 решением владельца от 2026-08-18: иначе заголовок
+                  блока мельче заголовков групп внутри соседнего блока.
+                -->
+                <h2 class="text-xl font-bold">
                   Сохраненные отборы
                 </h2>
-                <Icon name="chevron-up" :size="24" class="text-foreground-secondary" />
+                <!-- Шеврон той же ступени, что у групп фильтров: у аккордеона он 16. -->
+                <Icon name="chevron-up" :size="16" class="text-foreground-secondary" />
               </div>
               <p class="text-sm text-foreground-secondary">
                 Сохранённых поисков пока нет
@@ -843,9 +874,9 @@ function selectAll(list: readonly string[]) {
             <Button variant="secondary" wide :show-icon="false">
               Сохранить текущий поиск
             </Button>
-          </section>
+          </FilterPanelSection>
 
-          <section class="flex flex-col gap-6 rounded-xl bg-card p-4">
+          <FilterPanelSection>
             <div class="flex items-center justify-between gap-3">
               <!--
                 Ступень выше заголовков групп: у групп 20 (аккордеон sm), значит
@@ -982,7 +1013,7 @@ function selectAll(list: readonly string[]) {
                 </ButtonAction>
               </div>
             </Accordion>
-          </section>
+          </FilterPanelSection>
         </FilterPanel>
         </div>
       </div>

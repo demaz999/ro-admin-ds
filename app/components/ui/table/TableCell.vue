@@ -2,6 +2,7 @@
 import type { TableCellVariants } from '.'
 import { Checkbox } from '../checkbox'
 import { Icon } from '../icon'
+import TableCellText from './TableCellText.vue'
 import { cn } from '@/lib/utils'
 import { tableCellVariants } from '.'
 
@@ -79,13 +80,14 @@ const emit = defineEmits<{ toggle: [] }>()
     </button>
 
     <!--
-      Текст обрезается многоточием — так в мастере. Слот **не оборачивается**:
-      в него кладут композицию, и обёртка с `truncate` ломала бы её раскладку.
-      Ячейка названия в макете — это превью плюс две строки подписи рядом.
+      Текст обрезается многоточием — так в мастере, — и при настоящем обрезании
+      сам показывает подсказку с полным содержимым. Слот **не оборачивается**:
+      в него кладут композицию, и обёртка с `truncate` ломала бы её раскладку;
+      для композиции подсказку ставят `TableCellText` вокруг нужной строки.
     -->
-    <span v-else-if="props.variant === 'text'" class="min-w-0 flex-1 truncate text-field-foreground">
+    <TableCellText v-else-if="props.variant === 'text'" class="flex-1 text-field-foreground">
       <slot />
-    </span>
+    </TableCellText>
     <slot v-else />
   </div>
 </template>

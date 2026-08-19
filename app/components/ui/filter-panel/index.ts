@@ -1,4 +1,5 @@
 export { default as FilterPanel } from './FilterPanel.vue'
+export { default as FilterPanelSection } from './FilterPanelSection.vue'
 export { default as FilterPanelToggle } from './FilterPanelToggle.vue'
 
 /**
@@ -24,6 +25,7 @@ export { default as FilterPanelToggle } from './FilterPanelToggle.vue'
  * |---|---|---|
  * | `FilterPanelToggle` | строка шапки | кнопка 348, подпись и шеврон по состоянию |
  * | `FilterPanel` | колонка справа | панель шириной 348; свёрнутая не рисуется вовсе |
+ * | `FilterPanelSection` | внутри панели | блок колонки: заливка, обводка, скругление, паддинг |
  *
  * ## Что происходит с шириной
  *

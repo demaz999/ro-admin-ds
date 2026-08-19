@@ -49,6 +49,36 @@ export { default as IconButton } from './IconButton.vue'
  * `ghost` здесь законен, в отличие от текстовой кнопки: у иконочной он **есть
  * в мастере** отдельным типом. Решение «ghost не заводить» касалось `Button`,
  * где такого типа нет и выдумывать его было бы нечем.
+ *
+ * ## Пятый тип пришёл из кита 1: `service`
+ *
+ * У Атома все четыре типа красят глиф **брендовым**. Сервисная кнопка кита 1 —
+ * `btn_service` — не такая: фона нет, глиф на `fg/secondary` `#567499`. Это не
+ * акцент, а служебное действие рядом с содержимым.
+ *
+ * Замер по трём инстансам одного и того же `btn_service` в дашборде
+ * (`U829JoK7KMZV8do3KNkWBh`): бокс везде **24**, меняется только глиф.
+ *
+ * | Где | node id | глиф | видимый контур |
+ * |---|---|---|---|
+ * | подсказка у «Автообновление списка» | `20304:54644` | `24_ic_help` | 20×20 |
+ * | обновление списка у поиска | `I19601:29062;814:28510` | `24_ic_refresh` | 16×16 |
+ * | настройка колонок в шапке таблицы | `I19849:48088;957:5257;325:7207` | `24_settings` | 17.997×**19** |
+ *
+ * Цвет снят не с подписи, а из самих выгруженных глифов: `fill="#567499"` во
+ * всех трёх. Описание держателя в файле — «для сервисных кнопок».
+ *
+ * Наведения макет не рисует. Взята ступень эталонной кнопки «?» со страницы:
+ * глиф уходит на `--foreground`. Решение владельца от 2026-08-18, такт 7 — то
+ * же правило «у всего интерактивного системное наведение».
+ *
+ * ## Шестой тип — для тёмного сайдбара
+ *
+ * `sidebar` заведён тактом 8 под кнопку-бургер у логотипа. Отдельный тип нужен
+ * не ради вида, а ради **правила порталов сайдбара**: внутри тёмной полосы
+ * легальны только `sidebar-*`-токены, а все пять типов выше стоят на светлых.
+ * Заливка и цвет наведения взяты у соседнего пункта меню, чтобы кнопка не
+ * заводила собственную ступень.
  */
 export const iconButtonVariants = cva(
   'group/button inline-flex shrink-0 items-center justify-center outline-none select-none disabled:pointer-events-none',
@@ -62,6 +92,18 @@ export const iconButtonVariants = cva(
         // Ступень взята у тональной кнопки: та же поверхность, что у secondary.
         elevated: 'bg-field-elevated text-secondary-foreground hover:bg-secondary-hover',
         ghost: 'bg-transparent text-secondary-foreground hover:bg-secondary',
+        /**
+         * `btn_service` кита 1: фона нет, глиф служебный, а не брендовый.
+         * Наведение — ступень основного текста, эталон кнопки «?».
+         */
+        service: 'bg-transparent text-foreground-secondary hover:text-foreground',
+        /**
+         * Иконочная кнопка **внутри тёмного сайдбара**: там легальны только
+         * `sidebar-*`-токены. Ступень наведения не выдумана — она снята с
+         * состояний `_MenuItemMaster` `3465:22566`, то есть кнопка ведёт себя
+         * ровно как соседний пункт меню.
+         */
+        sidebar: 'bg-transparent text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
       },
       size: {
         lg: 'size-10',
@@ -84,6 +126,8 @@ export const iconButtonVariants = cva(
       { variant: 'secondary', class: 'disabled:opacity-[var(--opacity-disabled)]' },
       { variant: 'elevated', class: 'disabled:opacity-[var(--opacity-disabled)]' },
       { variant: 'ghost', class: 'disabled:opacity-[var(--opacity-disabled)]' },
+      { variant: 'service', class: 'disabled:opacity-[var(--opacity-disabled)]' },
+      { variant: 'sidebar', class: 'disabled:opacity-[var(--opacity-disabled)]' },
     ],
     defaultVariants: {
       variant: 'default',

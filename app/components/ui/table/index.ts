@@ -3,9 +3,12 @@ import { cva } from 'class-variance-authority'
 
 export { default as Table } from './Table.vue'
 export { default as TableCell } from './TableCell.vue'
+export { default as TableCellText } from './TableCellText.vue'
 export { default as TableFooter } from './TableFooter.vue'
 export { default as TableHead } from './TableHead.vue'
 export { default as TableRow } from './TableRow.vue'
+export { default as TableRowAction } from './TableRowAction.vue'
+export { default as TableToolbar } from './TableToolbar.vue'
 
 /**
  * Таблица — мастера `Cell` `3349:22376`, `TableHeader` `5137:37282`,
@@ -123,7 +126,17 @@ export const tableHeadVariants = cva('flex h-8 shrink-0 items-center bg-card tex
  * Заливка строки целиком — мастер `table_line` `19524:9679` кита 1, четыре
  * состояния. У Атома этого нет: там подсветка на ячейке. Разбор — в `TableRow.vue`.
  */
-export const tableRowVariants = cva('flex w-full items-stretch border-b border-border-soft transition-colors last:border-b-0', {
+/**
+ * `group/table-row` — именованная группа для ховера строки. Пришла с
+ * такта 10: колонка «Действия» разворачивает подпись у сервисной иконки не
+ * по своему наведению, а по наведению **всей строки** — тот же приём, что у
+ * `group/card` в карточке осмотра (заголовок уходит в ховер при наведении на
+ * всю карточку, не только на текст). Живёт на строке всегда, независимо от
+ * того, есть ли в ней раскрывающееся действие: маркер без потребителя ничего
+ * не стоит, а отсутствие маркера там, где он вдруг понадобится, — молчаливый
+ * дефект сборки.
+ */
+export const tableRowVariants = cva('group/table-row flex w-full items-stretch border-b border-border-soft transition-colors last:border-b-0', {
   variants: {
     state: {
       default: 'bg-card',

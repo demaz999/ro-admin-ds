@@ -1,8 +1,13 @@
 <!--
   @debt Состояний в мастере нет: `747:2464` — одиночный компонент кита 1 без
-  вариантов, спек-страниц кит 1 не ведёт. Наведение, нажатие и выключенное
-  состояние здесь не заведены; инверсия счётчика на включённом чипе выведена по
-  механике маркера `Tag`, а не нарисована. См. docs/design-debt.md.
+  вариантов, спек-страниц кит 1 не ведёт. Нажатие и выключенное состояние здесь
+  не заведены; инверсия счётчика на включённом чипе выведена по механике маркера
+  `Tag`, а не нарисована. См. docs/design-debt.md.
+
+  Наведение заведено тактом 11 — по общему правилу «у всего интерактивного
+  системное наведение», а не по мастеру. У чипа **две независимые цели**:
+  сама пилюля и хвостовой контрол. Их наведения поэтому не совпадают —
+  разбор в `index.ts` и `docs/naming.md`.
 -->
 <script setup lang="ts">
 import { Icon } from '../icon'
@@ -80,9 +85,11 @@ const hasCount = () => props.count !== '' && props.count !== undefined && props.
       v-if="props.trailing !== 'none'"
       :data-slot="props.trailing === 'expand' ? 'chip-expand' : 'chip-remove'"
       type="button"
-      class="flex size-4 shrink-0 items-center justify-center outline-none transition-transform"
+      class="flex size-4 shrink-0 items-center justify-center rounded-full outline-none transition-[transform,background-color,color]"
       :class="[
-        props.active ? 'text-primary-foreground' : 'text-foreground-secondary',
+        props.active
+          ? 'text-primary-foreground hover:bg-primary'
+          : 'text-foreground-secondary hover:bg-chip hover:text-foreground',
         props.trailing === 'expand' && props.expanded ? 'rotate-180' : '',
       ]"
       :aria-label="props.trailing === 'expand' ? 'Показать значения' : 'Убрать'"

@@ -69,7 +69,7 @@ export { default as Chip } from './Chip.vue'
  * перенесённым, помечено `@debt` в `Chip.vue`.
  */
 export const chipVariants = cva(
-  'inline-flex h-8 w-fit shrink-0 items-center gap-2 rounded-2xl px-4 text-sm whitespace-nowrap select-none',
+  'inline-flex h-8 w-fit shrink-0 items-center gap-2 rounded-2xl px-4 text-sm whitespace-nowrap transition-colors select-none',
   {
     variants: {
       /**
@@ -78,8 +78,14 @@ export const chipVariants = cva(
        * заливка становится брендовой, подпись белой.
        */
       active: {
-        true: 'bg-primary text-primary-foreground',
-        false: 'bg-chip text-foreground',
+        // Наведение включённого чипа — штатная ступень бренда, как у кнопки.
+        true: 'bg-primary text-primary-foreground hover:bg-primary-hover',
+        // Наведение выключенного **осветляет**: ступени темнее `accent/surface_bright`
+        // в ките нет вовсе (проверено по всем светлым токенам темы), а соседняя
+        // снизу — `accent/surface_soft`. Осветление при наведении — не выдумка:
+        // тем же способом ходит наведение в тёмной теме (`--secondary-hover` 8%)
+        // и в меню Атома, где ховер светлее выбранного. Дыра записана в долг.
+        false: 'bg-chip text-foreground hover:bg-secondary',
       },
     },
     defaultVariants: { active: false },

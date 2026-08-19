@@ -573,7 +573,11 @@ const martianWidths = [
             Отдельный компонент, а не кнопка без подписи: текстового пропа у мастера нет.
             Боксы 40, 32, 24; глиф 20 у большого и 16 у остальных. У иконочной
             <code>ghost</code> законен — он есть в мастере отдельным типом
-            <code>transparent</code>.
+            <code>transparent</code>. Пятый тип <code>service</code> пришёл из кита 1
+            (<code>btn_service</code>): фона нет, глиф служебный <code>fg/secondary</code>,
+            а не брендовый — подсказка, обновление списка, настройка колонок. Шестой тип
+            <code>sidebar</code> — для тёмной полосы: там легальны только <code>sidebar-*</code>-токены,
+            ступени взяты у пункта меню.
           </p>
           <div class="flex flex-wrap items-center gap-4">
             <IconButton size="lg" label="Метка" />
@@ -582,6 +586,14 @@ const martianWidths = [
             <IconButton variant="secondary" size="lg" label="Метка" />
             <IconButton variant="ghost" size="lg" label="Метка" />
             <IconButton variant="elevated" size="lg" label="Метка" />
+            <IconButton variant="service" size="sm" label="Служебное действие">
+              <Icon name="help" :size="20" />
+            </IconButton>
+            <span class="flex items-center rounded-md bg-sidebar p-1">
+              <IconButton variant="sidebar" size="lg" label="Кнопка в сайдбаре">
+                <Icon name="menu" :size="24" />
+              </IconButton>
+            </span>
             <IconButton size="lg" rounded label="Метка" />
             <IconButton size="lg" disabled label="Метка" />
           </div>
@@ -1539,6 +1551,33 @@ const martianWidths = [
 
         <div>
           <h3 class="mb-3 text-sm font-medium">
+            TableCellText · подсказка обрезанного текста
+          </h3>
+          <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
+            Обрезка и подсказка живут в механике таблицы, а не в данных страницы. Плашка
+            появляется <strong>только при настоящем обрезании</strong> — признак замеряется,
+            а не угадывается по длине строки. Внутри плашки — та же сервисная кнопка
+            копирования, что у ID в карточке. Наведите на первую строку: у второй текст
+            помещается, и подсказки у неё нет.
+          </p>
+          <div class="w-fit overflow-x-auto">
+            <TableRow>
+              <TableCell variant="slot" :size="72" class="w-60 px-4">
+                <TableCellText :lines="2" class="flex-1 text-sm">
+                  Kantonsschule Stadelhofen, Schanzengasse 5, Швейцария, Цюрих, Schanzengasse 5, стр. 2
+                </TableCellText>
+              </TableCell>
+              <TableCell variant="slot" :size="72" class="w-60 px-4">
+                <TableCellText :lines="2" class="flex-1 text-sm">
+                  Замечаний нет
+                </TableCellText>
+              </TableCell>
+            </TableRow>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="mb-3 text-sm font-medium">
             Заголовки колонок · мастер 5137:37282
           </h3>
           <p class="mb-3 max-w-2xl text-sm text-muted-foreground">
@@ -1697,9 +1736,21 @@ const martianWidths = [
             Подложка пункта ходит <strong>плотностью одной нейтрали</strong>: покоя нет вовсе,
             наведение 8%, выбор 12%. Наведение и выбор различаются только плотностью — подпись у
             них одна. Направляющая подменю сидит на той же мягкой ступени.
+            <strong>Раздел с подписью</strong> (<code>MenuSection</code>) мастера не имеет: собран
+            разделителем рельса и подписью на ступень мельче пункта, метка <code>@debt</code>.
           </p>
           <div class="flex flex-wrap items-start gap-6">
             <Menu>
+              <MenuSection first>
+                <MenuItem selected>
+                  Выбранный пункт
+                </MenuItem>
+              </MenuSection>
+              <MenuSection title="Раздел">
+                <MenuItem>
+                  Первый пункт раздела
+                </MenuItem>
+              </MenuSection>
               <MenuItem selected>
                 Выбранный пункт
               </MenuItem>

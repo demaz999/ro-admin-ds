@@ -11,7 +11,12 @@ const props = withDefaults(defineProps<{
   size?: NonNullable<ButtonNavigationVariants['size']>
   /** Ось `Color` мастера: приглушённый оттенок вместо тёмного. */
   muted?: boolean
-  direction?: 'left' | 'right'
+  /**
+   * Сторона шеврона. `none` — шеврона нет вовсе: у последнего уровня крошек
+   * стрелке указывать некуда, а в мастере она нарисована у всех десяти —
+   * это демонстрационная начинка, отмеченная ещё волной 2.
+   */
+  direction?: 'left' | 'right' | 'none'
   disabled?: boolean
   type?: 'button' | 'submit' | 'reset'
 }>(), {
