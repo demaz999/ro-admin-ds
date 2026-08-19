@@ -46,13 +46,40 @@ const emit = defineEmits<{ remove: [], toggle: [] }>()
 
 /** Ноль — значащее значение счётчика, поэтому проверяем на пустую строку, а не на falsy. */
 const hasCount = () => props.count !== '' && props.count !== undefined && props.count !== null
+
+/**
+ * Такт «Области клика чипа», решение владельца: у счётчикового чипа кликается
+ * **вся пилюля**, а не только шеврон в её углу — целиться в 11×11 было
+ * неверно. Раскрытие поэтому переехало на корень, а бывший шеврон-кнопка стал
+ * декоративной иконкой внутри уже кликабельной поверхности.
+ *
+ * У чипа с крестиком (`remove`) раскрывать нечего — снятие остаётся личным
+ * действием крестика, корень его не перехватывает.
+ */
+function onRootClick() {
+  if (props.trailing === 'expand') emit('toggle')
+}
+
+function onRootKeydown(event: KeyboardEvent) {
+  if (props.trailing !== 'expand') return
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault()
+    emit('toggle')
+  }
+}
 </script>
 
 <template>
   <span
     data-slot="chip"
     :data-active="props.active ? '' : undefined"
-    :class="chipVariants({ active: props.active })"
+    :class="[chipVariants({ active: props.active }), props.trailing === 'expand' ? 'cursor-pointer' : '']"
+    :role="props.trailing === 'expand' ? 'button' : undefined"
+    :tabindex="props.trailing === 'expand' ? 0 : undefined"
+    :aria-expanded="props.trailing === 'expand' ? props.expanded : undefined"
+    :aria-label="props.trailing === 'expand' ? 'Показать значения' : undefined"
+    @click="onRootClick"
+    @keydown="onRootKeydown"
   >
     <!-- Внутренняя группа `txt_bulb` мастера: зазор 4, а не 8. -->
     <span class="flex items-center gap-1">
@@ -77,30 +104,54 @@ const hasCount = () => props.count !== '' && props.count !== undefined && props.
     </span>
 
     <!--
-      Коробка крестика 16×16 с мастера, глиф внутри 9.4 — тоже с мастера:
-      пикта `20_ic_close` кита 1 свой бокс не заполняет.
-      Свойство `icon#748:0` мастера — INSTANCE_SWAP, поэтому глиф слотом.
+      Шеврон раскрытия — декоративная иконка, не отдельная кнопка: он лежит
+      внутри уже кликабельной пилюли, второй хит-зоны ему не требуется.
+      Коробка 16×16 и глиф 11 — с прежнего замера, только без интерактивности.
     -->
-    <button
-      v-if="props.trailing !== 'none'"
-      :data-slot="props.trailing === 'expand' ? 'chip-expand' : 'chip-remove'"
-      type="button"
-      class="flex size-4 shrink-0 items-center justify-center rounded-full outline-none transition-[transform,background-color,color]"
+    <span
+      v-if="props.trailing === 'expand'"
+      data-slot="chip-expand"
+      aria-hidden="true"
+      class="flex size-4 shrink-0 items-center justify-center transition-transform"
       :class="[
-        props.active
-          ? 'text-primary-foreground hover:bg-primary'
-          : 'text-foreground-secondary hover:bg-chip hover:text-foreground',
-        props.trailing === 'expand' && props.expanded ? 'rotate-180' : '',
+        props.active ? 'text-primary-foreground' : 'text-foreground-secondary',
+        props.expanded ? 'rotate-180' : '',
       ]"
-      :aria-label="props.trailing === 'expand' ? 'Показать значения' : 'Убрать'"
-      :aria-expanded="props.trailing === 'expand' ? props.expanded : undefined"
-      :style="{ transitionDuration: 'var(--duration-hover)' }"
-      @click="props.trailing === 'expand' ? emit('toggle') : emit('remove')"
     >
       <slot name="icon">
-        <!-- Крестик 9.4 — с мастера; шеврон 11 — тот же, что у массовых действий. -->
-        <Icon v-if="props.trailing === 'expand'" name="chevron-down" :size="11" />
-        <Icon v-else name="close" :size="9.4" />
+        <Icon name="chevron-down" :size="11" />
+      </slot>
+    </span>
+
+    <!--
+      Крестик снятия — самостоятельная цель, отдельная от пилюли: клик по нему
+      снимает чип и не раскрывает ничего (а раскрывать здесь и нечего — этот
+      вид у трейлинга не бывает вместе с expand).
+
+      Коробка визуально та же 16×16 с мастера (глиф 9.4), но хит-зона и ховер
+      расширены **невидимо** до 24×24 псевдоэлементом `after`: сама кнопка не
+      растёт и раскладку пилюли не сдвигает, а лишний `4px` на сторону только
+      расширяет то, что реагирует на курсор и клик. Промах на несколько
+      пикселей рядом с 16px-глифом — обычное дело, отдельная точная цель уже
+      требуется по правилу «хит-зона служебной иконки ≥24×24» (`naming.md`).
+    -->
+    <button
+      v-if="props.trailing === 'remove'"
+      data-slot="chip-remove"
+      type="button"
+      class="relative flex size-4 shrink-0 items-center justify-center outline-none transition-colors after:absolute after:-inset-1 after:rounded-full after:transition-colors after:content-['']"
+      :class="[
+        props.active
+          ? 'text-primary-foreground hover:after:bg-primary'
+          : 'text-foreground-secondary hover:text-foreground hover:after:bg-chip',
+      ]"
+      aria-label="Убрать"
+      :style="{ transitionDuration: 'var(--duration-hover)' }"
+      @click.stop="emit('remove')"
+    >
+      <slot name="icon">
+        <!-- Крестик 9.4 — с мастера. -->
+        <Icon name="close" :size="9.4" />
       </slot>
     </button>
   </span>
