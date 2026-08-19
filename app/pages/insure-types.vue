@@ -110,7 +110,7 @@ const columns = [
   { key: 'id', title: 'Id', width: 'w-24' },
   { key: 'icon', title: 'Иконка', width: 'w-24' },
   { key: 'name', title: 'Наименование', width: 'flex-1' },
-  { key: 'actions', title: 'Действия', width: 'w-14' },
+  { key: 'actions', title: 'Действия', width: 'w-44' },
 ] as const
 
 /**
@@ -240,25 +240,34 @@ if (route.query.q) search.value = String(route.query.q)
         </TableCell>
 
         <!--
-          Такт 13, превью для приёмки владельца: раскрытие подписи по ховеру
-          строки убрано, карандаш тихий и всегда виден, имя действия ушло в
-          тултип на самой иконке. Колонка сужена до 56 и прижата к правому
-          краю. TableRowAction и правило такта 10 не трогаю — компонент
-          остаётся в реестре нетронутым на случай отката.
+          Такт 14, превью для приёмки владельца, часть 2 такта 13 продолжается:
+          тултип с такта 13 снят владельцем, подпись вернулась — но по-другому,
+          чем в каноне такта 10. Там подпись шла ПОСЛЕ иконки и раскрывала
+          колонку слева направо; здесь карандаш прижат к правому краю и не
+          двигается, подпись раскрывается СЛЕВА от него. Порядок в разметке —
+          подпись первой, иконка последней: раскладка `justify-end` держит
+          иконку у правого края всегда, а подпись — тот же приём, что у
+          `TableRowAction` (`opacity` 0→1, место в потоке зарезервировано
+          всегда, ширина не участвует), просто с другой стороны. Общая цель
+          клика — одна кнопка на оба, как и просил такт 14.
+
+          TableRowAction и канон такта 10 не трогаю: компонент остаётся в
+          реестре нетронутым на случай отката.
         -->
-        <TableCell variant="slot" :size="56" class="w-14 justify-end px-4">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <IconButton variant="service" size="sm" label="Редактировать">
-                  <Icon name="edit" :size="16" />
-                </IconButton>
-              </TooltipTrigger>
-              <TooltipContent>
-                Редактировать
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+        <TableCell variant="slot" :size="56" class="w-44 justify-end px-4">
+          <button
+            type="button"
+            class="inline-flex h-5 w-fit shrink-0 items-center gap-1.5 bg-transparent text-foreground-secondary outline-none transition-colors select-none hover:text-foreground"
+            :style="{ transitionDuration: 'var(--duration-hover)' }"
+          >
+            <span
+              class="overflow-hidden text-sm whitespace-nowrap opacity-0 transition-opacity group-hover/table-row:opacity-100 [@media(hover:none)]:opacity-100"
+              :style="{ transitionDuration: 'var(--duration-hover)' }"
+            >
+              Редактировать
+            </span>
+            <Icon name="edit" :size="16" />
+          </button>
         </TableCell>
       </TableRow>
     </Table>
