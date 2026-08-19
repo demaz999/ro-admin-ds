@@ -175,22 +175,32 @@ if (route.query.q) search.value = String(route.query.q)
   -->
   <div class="flex min-w-0 flex-col">
     <!--
-      Такт 13, превью для приёмки владельца: поиск и счётчик слева, «Добавить»
-      справа — раскладка, обратная канону такта 10 (naming.md). Композиция
-      страницы, компонент TableToolbar и правило не трогаю: после решения
-      владельца это либо закрепляется в naming.md, либо откатывается на
-      прежний порядок.
+      Такт 13, превью для приёмки владельца: поиск слева, «Добавить» справа —
+      раскладка, обратная канону такта 10 (naming.md). Композиция страницы,
+      компонент TableToolbar и правило не трогаю: после решения владельца это
+      либо закрепляется в naming.md, либо откатывается на прежний порядок.
+
+      Такт 15: отдельный текст «Найдено N» убран владельцем — счётчик ушёл
+      внутрь поля поиска (рекомендация чата, вариант владельца «внутрь поля»).
+      У Input штатного слота под это нет, компонент не трогаю: обёртка на
+      странице — `relative` вокруг Input, число абсолютом у правого края той
+      же позиции, что раньше занимал текст подписи (`px-4` поля). Реагирует
+      на тот же `total`, что и раньше.
     -->
     <TableToolbar>
-      <Input
-        v-model="search"
-        variant="elevated"
-        placeholder="Поиск по наименованию"
-        class="max-w-110 min-w-0"
-        @update:model-value="onSearch"
-      />
-
-      <span class="shrink-0 text-sm font-bold whitespace-nowrap">Найдено {{ total }}</span>
+      <div class="relative w-full max-w-110 min-w-0">
+        <Input
+          v-model="search"
+          variant="elevated"
+          placeholder="Поиск по наименованию"
+          @update:model-value="onSearch"
+        />
+        <span
+          class="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 text-sm font-medium text-muted-foreground"
+        >
+          {{ total }}
+        </span>
+      </div>
 
       <!-- Заглушка: обработчика нет, кнопка показывает вид и состояния. -->
       <Button show-icon class="ml-auto">
@@ -251,13 +261,18 @@ if (route.query.q) search.value = String(route.query.q)
           всегда, ширина не участвует), просто с другой стороны. Общая цель
           клика — одна кнопка на оба, как и просил такт 14.
 
+          Такт 15: зазор подпись—иконка 4 → 8 (решение владельца, было тесно).
+          Карандаш и на это не сдвигается — он всегда у правого края
+          (`justify-end`), зазор увеличивает только то, что слева от него, а
+          резерв ширины колонки (w-44) держит это с запасом.
+
           TableRowAction и канон такта 10 не трогаю: компонент остаётся в
           реестре нетронутым на случай отката.
         -->
         <TableCell variant="slot" :size="56" class="w-44 justify-end px-4">
           <button
             type="button"
-            class="inline-flex h-5 w-fit shrink-0 items-center gap-1.5 bg-transparent text-foreground-secondary outline-none transition-colors select-none hover:text-foreground"
+            class="inline-flex h-5 w-fit shrink-0 items-center gap-2 bg-transparent text-foreground-secondary outline-none transition-colors select-none hover:text-foreground"
             :style="{ transitionDuration: 'var(--duration-hover)' }"
           >
             <span
