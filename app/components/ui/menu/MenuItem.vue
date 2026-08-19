@@ -66,6 +66,14 @@ const variant = computed(() => props.variant ?? menuVariant?.value ?? 'atom')
 
 /** Шеврон `more_less` мастера кита 1: видимый контур 9.31×5.49, доминирует ширина. */
 const CHEVRON_KIT1 = 9.31
+
+/**
+ * Такт 13: размер шеврона был снят с мастера верно (9.31 — коробка, не
+ * контур, здесь и не путались), а вот сам глиф `chevron-down` — общий с
+ * атомовским выпадающим списком, начертание `wght 200`. У кита 1 штрих
+ * заметно тяжелее: волосяная линия была ошибкой переноса. Разбор
+ * начертания — в `icon/icons.ts`, у `chevron-down-kit1`.
+ */
 </script>
 
 <template>
@@ -97,7 +105,7 @@ const CHEVRON_KIT1 = 9.31
 
         <Icon
           v-if="props.hasSubmenu"
-          name="chevron-down"
+          name="chevron-down-kit1"
           :size="CHEVRON_KIT1"
           class="shrink-0 transition-transform"
           :class="props.expanded ? 'rotate-180' : ''"
@@ -112,7 +120,7 @@ const CHEVRON_KIT1 = 9.31
           </slot>
           <Icon
             v-if="props.hasSubmenu"
-            name="chevron-down"
+            name="chevron-down-kit1"
             :size="CHEVRON_KIT1"
             class="shrink-0 transition-transform"
             :class="props.expanded ? 'rotate-180' : ''"

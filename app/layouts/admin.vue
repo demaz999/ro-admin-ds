@@ -105,7 +105,7 @@ const current = computed(() => route.path)
       <MenuSection title="Осмотры">
         <MenuItem :selected="current === '/my-inspections'">
           <template #icon>
-            <Icon name="view-list" :size="20" />
+            <Icon name="article" :size="20" />
           </template>
           Мои осмотры
         </MenuItem>

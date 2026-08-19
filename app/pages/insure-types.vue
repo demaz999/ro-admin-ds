@@ -110,7 +110,7 @@ const columns = [
   { key: 'id', title: 'Id', width: 'w-24' },
   { key: 'icon', title: 'Иконка', width: 'w-24' },
   { key: 'name', title: 'Наименование', width: 'flex-1' },
-  { key: 'actions', title: 'Действия', width: 'w-44' },
+  { key: 'actions', title: 'Действия', width: 'w-14' },
 ] as const
 
 /**
@@ -175,29 +175,30 @@ if (route.query.q) search.value = String(route.query.q)
   -->
   <div class="flex min-w-0 flex-col">
     <!--
-      Шапка типовой страницы-таблицы: Добавить слева, поиск и счётчик правее.
-      Решение владельца, такт 10 — состав канонизирован в naming.md. Строка
-      растёт второй при появлении фильтров — на этой странице фильтров нет,
-      второй ряд не собираем.
+      Такт 13, превью для приёмки владельца: поиск и счётчик слева, «Добавить»
+      справа — раскладка, обратная канону такта 10 (naming.md). Композиция
+      страницы, компонент TableToolbar и правило не трогаю: после решения
+      владельца это либо закрепляется в naming.md, либо откатывается на
+      прежний порядок.
     -->
     <TableToolbar>
+      <Input
+        v-model="search"
+        variant="elevated"
+        placeholder="Поиск по наименованию"
+        class="max-w-110 min-w-0"
+        @update:model-value="onSearch"
+      />
+
+      <span class="shrink-0 text-sm font-bold whitespace-nowrap">Найдено {{ total }}</span>
+
       <!-- Заглушка: обработчика нет, кнопка показывает вид и состояния. -->
-      <Button show-icon>
+      <Button show-icon class="ml-auto">
         <template #icon>
           <Icon name="add-circle" :size="20" />
         </template>
         Добавить
       </Button>
-
-      <Input
-        v-model="search"
-        variant="elevated"
-        placeholder="Поиск по наименованию"
-        class="max-w-87 min-w-0"
-        @update:model-value="onSearch"
-      />
-
-      <span class="shrink-0 text-sm font-bold whitespace-nowrap">Найдено {{ total }}</span>
     </TableToolbar>
 
     <!-- Закрепления колонок нет: таблица помещается в ширину без прокрутки. -->
@@ -207,7 +208,7 @@ if (route.query.q) search.value = String(route.query.q)
           v-for="col in columns"
           :key="col.key"
           variant="column"
-          :class="[col.width, 'px-4']"
+          :class="[col.width, 'px-4', col.key === 'actions' ? 'justify-end' : '']"
         >
           {{ col.title }}
         </TableHead>
@@ -239,14 +240,25 @@ if (route.query.q) search.value = String(route.query.q)
         </TableCell>
 
         <!--
-          Действия — карандаш всегда виден, подпись разворачивается по
-          наведению на строку и не сдвигает раскладку: ширина колонки
-          фиксированная под развёрнутое состояние. Заглушка: обработчика нет.
+          Такт 13, превью для приёмки владельца: раскрытие подписи по ховеру
+          строки убрано, карандаш тихий и всегда виден, имя действия ушло в
+          тултип на самой иконке. Колонка сужена до 56 и прижата к правому
+          краю. TableRowAction и правило такта 10 не трогаю — компонент
+          остаётся в реестре нетронутым на случай отката.
         -->
-        <TableCell variant="slot" :size="56" class="w-44 px-4">
-          <TableRowAction>
-            Редактировать
-          </TableRowAction>
+        <TableCell variant="slot" :size="56" class="w-14 justify-end px-4">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <IconButton variant="service" size="sm" label="Редактировать">
+                  <Icon name="edit" :size="16" />
+                </IconButton>
+              </TooltipTrigger>
+              <TooltipContent>
+                Редактировать
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </TableCell>
       </TableRow>
     </Table>
