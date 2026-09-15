@@ -45,9 +45,59 @@ export function useDesignTokens(selector = ':root') {
   return { tokens }
 }
 
+/**
+ * Сравнивается каждый селектор из списка, а не строка целиком.
+ *
+ * Ловушка: блок темы объявлен как `:root, [data-theme="rososmotr"]`, а `@theme` Tailwind
+ * выпускает `:root, :host`. Строгое `selectorText === ':root'` не находило ни того, ни
+ * другого — на витрине оставались 21 токен палитры из 120 цветовых, а «Радиусы» и
+ * «Типографика» показывали «Токенов нет».
+ */
+function matchesSelector(selectorText: string, selector: string) {
+  return selectorText.split(',').some(part => part.trim() === selector)
+}
+
+/**
+ * Все кастомные свойства корня и блоков тем: имя → { селектор: объявленное значение }.
+ * Нужно, чтобы отличить значение, объявленное темой, от унаследованного с корня.
+ */
+export function collectThemeDeclarations(): Map<string, Record<string, string>> {
+  const out = new Map<string, Record<string, string>>()
+
+  const walk = (rules: CSSRuleList) => {
+    for (const rule of Array.from(rules)) {
+      if (rule instanceof CSSStyleRule) {
+        const parts = rule.selectorText.split(',').map(s => s.trim())
+          .filter(s => s === ':root' || s.startsWith('[data-theme='))
+        if (!parts.length) continue
+        for (const prop of Array.from(rule.style)) {
+          if (!prop.startsWith('--')) continue
+          const entry = out.get(prop) ?? {}
+          for (const part of parts) entry[part] = rule.style.getPropertyValue(prop).trim()
+          out.set(prop, entry)
+        }
+      }
+      else if ('cssRules' in rule) {
+        walk((rule as CSSGroupingRule).cssRules)
+      }
+    }
+  }
+
+  for (const sheet of Array.from(document.styleSheets)) {
+    try {
+      walk(sheet.cssRules)
+    }
+    catch {
+      // Стороннюю таблицу стилей читать нельзя — пропускаем.
+    }
+  }
+
+  return out
+}
+
 function collectFromRules(rules: CSSRuleList, selector: string, out: Map<string, string>) {
   for (const rule of Array.from(rules)) {
-    if (rule instanceof CSSStyleRule && rule.selectorText === selector) {
+    if (rule instanceof CSSStyleRule && matchesSelector(rule.selectorText, selector)) {
       const style = rule.style
       for (const prop of Array.from(style)) {
         if (prop.startsWith('--')) {

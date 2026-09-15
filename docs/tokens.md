@@ -207,8 +207,10 @@
 - **Только `btn_txt` и `badge` имеют собственную покраску палитрой.** Попадания в `list_item`,
   `filter_checkbox`, `filter_date`, `table_line` — это вложенные экземпляры `btn_txt` и `status`;
   своего цвета эти компоненты не задают. В коде палитра нужна ровно двум компонентам.
-- **Полный набор состояний есть только у `status-01` и `status-06`.** У 02–05 в ките нарисован
-  один `default`. Значит `--palette-02-hover` и подобные взять неоткуда — см. долг.
+- **Столбец «Состояния» выше — это употребление в компонентах, а не набор переменных.**
+  Переменных в `mode` больше: у 02–05 есть `default`, `hover`, `pressed`; нет только `disabled`
+  и `bg`. У 06 нет `bg`. Полный набор из пяти — только у 01. Прежняя формулировка «у 02–05 в ките
+  один `default`» была ошибкой, поправлено сверкой такта 19 (раздел 11, Plugin API, 2026-09-15).
 - **`status-04` не используется ничем.** Переносим ради полноты палитры, но в мапинг-таблице
   помечаем как неупотребляемую.
 
@@ -620,3 +622,184 @@ font-stretch property specifications».
 Скруглений в стиле Apple («сквиркл») в ките нет — везде обычная круговая дуга, которую CSS
 `border-radius` воспроизводит точно. Ограничения веба по этому пункту не возникает,
 в открытые вопросы заводить нечего.
+
+## 11. Сверка палитры с источником (такт 19, 2026-09-15)
+
+Раздел «Палитра» витрины перестроен по ролям (правило раскладки — `naming.md`, «Витрина: палитра
+разложена по ролям»), и одновременно все цветовые токены сверены с китом 1. **Тема при этом не
+менялась** — задача сверки выявить и записать.
+
+![Палитра на витрине, rososmotr, 1280](showcase-palette-1280.png)
+
+### Как снято
+
+| Сторона | Способ |
+|---|---|
+| кит 1 | Plugin API, файл `uG3HTIcMwr2jI2d7YEYPs2`: все переменные коллекций `mode` (69) и `menu` (9), алиасы разрешены до `theme(primitives)`; локальные эффект-стили (3) и цветовые стили (4) |
+| тема | разбор `tailwind.css` плюс чтение в браузере: значение каждого токена через пробный узел **внутри** `[data-theme]`, то есть с учётом наследования от корня |
+| соответствие | по имени переменной Figma в комментарии к токену; для производных (`var(--x)`) — по цепочке до переменной |
+
+**Итог по rososmotr: 119 цветовых токенов, расхождений hex нет.** 89 совпадают с переменной
+напрямую, 29 — через производную роль (выбор слота — решение, значение из файла), у одного
+(`--border-soft`) значение совпадает, но источник вне `mode`. Все 78 переменных `mode`/`menu`
+использованы — ни одна не потеряна.
+
+Тема `atom` — сверочная, её значения сняты с мастеров Атома (node id в комментариях), а не с
+кита 1: для неё колонка «кит 1» не применяется. Своих значений у неё 46, остальные 73 роли
+наследуются от rososmotr.
+
+### Тени и цветовые стили
+
+| Токен или стиль | Тема | Кит 1 | Вердикт |
+|---|---|---|---|
+| `--shadow-dropdown` | `0 8 32 0 #0c10181f` | эффект-стиль `BigShadow` — то же | совпадает |
+| `--shadow-button` | `0 1 2 0 #0000000d` | `Button Shadow` — **внешний** стиль (`remote`), висит на мастере `iconed_tab_list` `2181:387` | совпадает · в локальных стилях кита его нет |
+| `--shadow-elevated` · `-hover` · `-pressed` | `0 4 16 0` при 12 / 16 / 8% | нет — MediumShadow Атома, `309:2310` | вне кита 1 |
+| `--shadow-on-image` | `0 1 2 0 #0c10182e` | нет | решение владельца, 2026-08-18 |
+| `--shadow-indicator` | `0 2 8 0`, `currentColor` 64% | нет — мастер `Bulb` Атома `790:10402` | вне кита 1 |
+| `menu_shadow` | — | `5 0 25 0 #0e1e3340`, вариант `type=with shadow` `643:3051` сета `left_menu` | не перенесён, см. п. 6 ниже |
+| `modal_cards_shadow` | — | `0 4 20 0 #0e1e331a` | не перенесён: модальное окно собрано по Атому |
+| `gradient_default` · `_hover` · `_new` · `_selected` | — | цветовые стили: затухание от прозрачного к `bg/page`, `bg/surface_hover`, `bg/surface_new`, `bg/surface_selected`; по одному потребителю | не перенесены; конечные цвета в теме есть, употребление не снималось |
+
+### Таблица расхождений
+
+| # | Что | Где | Категория | Что сделано |
+|---|---|---|---|---|
+| 1 | Витрина показывала **21 цвет из 119**; «Радиусы» и «Типографика» пусты; hex не следовал переключателю темы | `useDesignTokens.ts`, раздел «Палитра» | дефект сборки (витрина) | **исправлено**: селектор сравнивается по частям списка, значение читается внутри узла с темой. Ловушка — в `CLAUDE.md` |
+| 2 | «У рамп 02–05 только `default`» — в `mode` у 02–05 есть `hover` и `pressed`, нет только `disabled` и `bg`; у 06 нет `bg`, а не «полный набор» | `open-questions.md` №13, раздел 6 выше, `naming.md`, `design-debt.md`, `figma-fixes.md` §5 | дефект документа | **исправлено** во всех пяти, с пометкой поправки |
+| 3 | Та же ошибка в комментариях темы (`tailwind.css`, блок палитры и `@theme inline`), утилиты `bg-palette-0{2..5}-hover`/`-pressed` не заведены, хотя переменные есть | `tailwind.css` | следствие п. 2 | **не трогали** — правка темы только по отдельной команде; компонентам утилиты сейчас не нужны |
+| 4 | `--border-soft` снят с узла, привязанного к `border/primary` — внешней переменной коллекции `tokens_final`; в `mode` кита такой нет | дашборд `19601:29063` | расхождение источника (значение совпадает) | факт добавлен к вопросу 14 |
+| 5 | `status-06/disabled` алиасит в ступень `/100` — ту же, что `status-01/bg`; `status-01/disabled` — в `/200` | `mode` кита 1 | непоследовательность кита 1 | предложение в `figma-fixes.md` §4 |
+| 6 | Вариант `type=with shadow` `643:3051` сета `left_menu` и его `menu_shadow` в коде не отражены, срез матрицы нигде не записан | сайдбар, такт 9 | срез матрицы без записи | **записано здесь**; разбор — отдельным тактом по сайдбару, в палитру не подмешивается |
+| 7 | `[data-theme="atom"]` переопределяет `--shadow-elevated*`, но утилиты из `@theme inline` собраны литералом — переопределение не действует | `tailwind.css` | дефект темы (мёртвый код) | **не трогали**, ждёт команды; значения совпадают, визуально не проявляется. Ловушка — в `CLAUDE.md` |
+| 8 | `--shadow-button` не применяется ни одним компонентом | тема | наблюдение | остался от таблетки `Tabs` кита 1 (`archive/kit1-components`); текущие `Tabs` перенесены с Атома и тени не имеют |
+
+Не расхождение, но видно на витрине: **45 цветовых токенов из 119 в компонентах не применяются** —
+у свотча так и подписано. Роли у них есть в ките, употребления пока нет.
+
+### Полная таблица сверки
+
+Колонка «atom»: `своё` — значение объявлено темой atom (мастер Атома), `из rososmotr` — роль
+наследуется. Сгенерирована из `tailwind.css` и выгрузки `mode`/`menu`, не набрана руками.
+
+| Токен | rososmotr | atom | Кит 1: переменная · hex | Вердикт по rososmotr |
+|---|---|---|---|---|
+| `--accent` | #f7f9fc | #f7f9fc · из rososmotr | `bg/surface_hover` #f7f9fc | совпадает |
+| `--accent-foreground` | #0e1e33 | #0e1e33 · из rososmotr | `fg/primary` #0e1e33 | совпадает |
+| `--accent-soft` | #80ace7 | #7daffc · своё | через `--primary-disabled` → `accent/disabled` #80ace7 | совпадает · слот — решение |
+| `--background` | #ffffff | #ffffff · из rososmotr | `bg/page` #ffffff | совпадает |
+| `--border` | #ccdef5 | #ccdef5 · из rososmotr | `border/default` #ccdef5 | совпадает |
+| `--border-accent` | #0059cf | #0059cf · из rososmotr | `border/accent` #0059cf | совпадает |
+| `--border-neutral` | #d0d4d8 | #d0d4d8 · из rososmotr | `border/neutral_soft` #d0d4d8 | совпадает |
+| `--border-secondary` | #9aacc2 | #9aacc2 · из rososmotr | `border/secondary` #9aacc2 | совпадает |
+| `--border-soft` | #d9e8fc | #d9e8fc · из rososmotr | `border/primary` #d9e8fc — библиотека `tokens_final` дашборда, не `mode` | значение совпадает · источник вне `mode` |
+| `--card` | #ffffff | #ffffff · из rososmotr | `bg/page` #ffffff | совпадает |
+| `--card-foreground` | #0e1e33 | #0e1e33 · из rososmotr | `fg/primary` #0e1e33 | совпадает |
+| `--chart-1` | #1bb149 | #1bb149 · из rososmotr | через `--palette-01` → `status-01/default` #1bb149 | совпадает · слот — решение |
+| `--chart-2` | #1192bb | #1192bb · из rososmotr | через `--palette-02` → `status-02/default` #1192bb | совпадает · слот — решение |
+| `--chart-3` | #806aea | #806aea · из rososmotr | через `--palette-03` → `status-03/default` #806aea | совпадает · слот — решение |
+| `--chart-4` | #d461ba | #d461ba · из rososmotr | через `--palette-04` → `status-04/default` #d461ba | совпадает · слот — решение |
+| `--chart-5` | #ff8552 | #ff8552 · из rososmotr | через `--palette-05` → `status-05/default` #ff8552 | совпадает · слот — решение |
+| `--chip` | #d9e8fc | #d9e8fc · из rososmotr | `accent/surface_bright` #d9e8fc | совпадает |
+| `--destructive` | #fa3948 | #e35454 · своё | `service/error-default` #fa3948 | совпадает |
+| `--destructive-disabled` | #ff9fa6 | #ff9fa6 · из rososmotr | `service/error-fg_disabled` #ff9fa6 | совпадает |
+| `--destructive-foreground` | #ffffff | #ffffff · своё | через `--primary-foreground` → `fg/default_on-accent` #ffffff | совпадает · слот — решение |
+| `--destructive-hover` | #ff6874 | #e66565 · своё | `service/error-hover` #ff6874 | совпадает |
+| `--destructive-pressed` | #e92837 | #e04343 · своё | `service/error-pressed` #e92837 | совпадает |
+| `--destructive-surface` | #fff0f1 | #fff0f1 · из rososmotr | `service/error-surface` #fff0f1 | совпадает |
+| `--dialog` | #ffffff | #f5f6f8 · своё | через `--background` → `bg/page` #ffffff | совпадает · слот — решение |
+| `--field` | #e8e9ec | #d4d5d952 · своё | через `--muted` → `neutral/soft` #e8e9ec | совпадает · слот — решение |
+| `--field-clear` | #ffffff | #ffffff · своё | через `--background` → `bg/page` #ffffff | совпадает · слот — решение |
+| `--field-clear-elevated` | #f7f9fc | #f5f6f8 · своё | через `--accent` → `bg/surface_hover` #f7f9fc | совпадает · слот — решение |
+| `--field-clear-foreground` | #567499 | #80858e · своё | через `--foreground-secondary` → `fg/secondary` #567499 | совпадает · слот — решение |
+| `--field-elevated` | #ffffff | #ffffff · своё | через `--background` → `bg/page` #ffffff | совпадает · слот — решение |
+| `--field-error` | #fff0f1 | #fb989829 · своё | через `--destructive-surface` → `service/error-surface` #fff0f1 | совпадает · слот — решение |
+| `--field-error-foreground` | #fa3948 | #e35454 · своё | через `--destructive` → `service/error-default` #fa3948 | совпадает · слот — решение |
+| `--field-error-hover` | #fff0f1 | #fb98983d · своё | через `--destructive-surface` → `service/error-surface` #fff0f1 | совпадает · слот — решение |
+| `--field-foreground` | #0e1e33 | #525760 · своё | через `--foreground` → `fg/primary` #0e1e33 | совпадает · слот — решение |
+| `--field-foreground-hover` | #0e1e33 | #1d222a · своё | через `--foreground` → `fg/primary` #0e1e33 | совпадает · слот — решение |
+| `--field-hover` | #d0d4d8 | #d4d5d97a · своё | через `--border-neutral` → `border/neutral_soft` #d0d4d8 | совпадает · слот — решение |
+| `--field-placeholder` | #567499 | #80858e · своё | через `--foreground-secondary` → `fg/secondary` #567499 | совпадает · слот — решение |
+| `--field-placeholder-hover` | #0e1e33 | #525760 · своё | через `--foreground` → `fg/primary` #0e1e33 | совпадает · слот — решение |
+| `--field-scroll-thumb` | #ffffff | #ffffff · своё | через `--background` → `bg/page` #ffffff | совпадает · слот — решение |
+| `--foreground` | #0e1e33 | #1d222a · своё | `fg/primary` #0e1e33 | совпадает |
+| `--foreground-disabled` | #8b939e | #8b939e · из rososmotr | `fg/primary_disabled` #8b939e | совпадает |
+| `--foreground-hover` | #003881 | #003881 · из rososmotr | `fg/primary_hover` #003881 | совпадает |
+| `--foreground-secondary` | #567499 | #525760 · своё | `fg/secondary` #567499 · `secondary/default` #567499 | совпадает |
+| `--foreground-secondary-disabled` | #bccbe0 | #bccbe0 · из rososmotr | `fg/secondary_disabled` #bccbe0 · `secondary/disabled` #bccbe0 | совпадает |
+| `--foreground-secondary-hover` | #669be2 | #669be2 · из rososmotr | `fg/secondary_hover` #669be2 | совпадает |
+| `--foreground-secondary-pressed` | #455f84 | #455f84 · из rososmotr | `fg/secondary_pressed` #455f84 | совпадает |
+| `--input` | #ccdef5 | #ccdef5 · из rososmotr | `border/default` #ccdef5 | совпадает |
+| `--list-hover` | #f7f9fc | #aaaeb614 · своё | через `--accent` → `bg/surface_hover` #f7f9fc | совпадает · слот — решение |
+| `--list-selected` | #edf3fc | #aaaeb61f · своё | через `--surface-selected` → `bg/surface_selected` #edf3fc | совпадает · слот — решение |
+| `--muted` | #e8e9ec | #d4d5d9 · своё | `neutral/soft` #e8e9ec | совпадает |
+| `--muted-disabled` | #b9bec5 | #b9bec5 · из rososmotr | `neutral/disabled` #b9bec5 | совпадает |
+| `--muted-foreground` | #6e7885 | #80858e · своё | `neutral/default` #6e7885 | совпадает |
+| `--overlay` | #edf3fc80 | #edf3fc80 · из rososmotr | `bg/overlay` #edf3fc80 | совпадает |
+| `--palette-01` | #1bb149 | #1bb149 · из rososmotr | `status-01/default` #1bb149 | совпадает |
+| `--palette-01-disabled` | #a1cda1 | #a1cda1 · из rososmotr | `status-01/disabled` #a1cda1 | совпадает |
+| `--palette-01-hover` | #2fc55d | #2fc55d · из rososmotr | `status-01/hover` #2fc55d | совпадает |
+| `--palette-01-pressed` | #11a73f | #11a73f · из rososmotr | `status-01/pressed` #11a73f | совпадает |
+| `--palette-01-surface` | #d1ead9 | #d1ead9 · из rososmotr | `status-01/bg` #d1ead9 | совпадает |
+| `--palette-02` | #1192bb | #1192bb · из rososmotr | `status-02/default` #1192bb | совпадает |
+| `--palette-02-hover` | #41a8c9 | #41a8c9 · из rososmotr | `status-02/hover` #41a8c9 | совпадает |
+| `--palette-02-pressed` | #0e7c9f | #0e7c9f · из rososmotr | `status-02/pressed` #0e7c9f | совпадает |
+| `--palette-03` | #806aea | #806aea · из rososmotr | `status-03/default` #806aea | совпадает |
+| `--palette-03-hover` | #9287f2 | #9287f2 · из rososmotr | `status-03/hover` #9287f2 | совпадает |
+| `--palette-03-pressed` | #724edd | #724edd · из rososmotr | `status-03/pressed` #724edd | совпадает |
+| `--palette-04` | #d461ba | #d461ba · из rososmotr | `status-04/default` #d461ba | совпадает |
+| `--palette-04-hover` | #e185cf | #e185cf · из rososmotr | `status-04/hover` #e185cf | совпадает |
+| `--palette-04-pressed` | #c0429d | #c0429d · из rososmotr | `status-04/pressed` #c0429d | совпадает |
+| `--palette-05` | #ff8552 | #ff8552 · из rososmotr | `status-05/default` #ff8552 | совпадает |
+| `--palette-05-hover` | #ff9d75 | #ff9d75 · из rososmotr | `status-05/hover` #ff9d75 | совпадает |
+| `--palette-05-pressed` | #cc6a42 | #cc6a42 · из rososmotr | `status-05/pressed` #cc6a42 | совпадает |
+| `--palette-06` | #c91826 | #c91826 · из rososmotr | `status-06/default` #c91826 | совпадает |
+| `--palette-06-disabled` | #f4d1d4 | #f4d1d4 · из rososmotr | `status-06/disabled` #f4d1d4 | совпадает |
+| `--palette-06-hover` | #d44651 | #d44651 · из rososmotr | `status-06/hover` #d44651 | совпадает |
+| `--palette-06-pressed` | #a1131e | #a1131e · из rososmotr | `status-06/pressed` #a1131e | совпадает |
+| `--popover` | #ffffff | #ffffff · из rososmotr | `bg/page` #ffffff | совпадает |
+| `--popover-foreground` | #0e1e33 | #0e1e33 · из rososmotr | `fg/primary` #0e1e33 | совпадает |
+| `--popover-scroll-thumb` | #d0d4d8 | #d4d5d9 · своё | через `--border-neutral` → `border/neutral_soft` #d0d4d8 | совпадает · слот — решение |
+| `--primary` | #0059cf | #4480f3 · своё | `accent/default` #0059cf | совпадает |
+| `--primary-disabled` | #80ace7 | #80ace7 · из rososmotr | `accent/disabled` #80ace7 | совпадает |
+| `--primary-foreground` | #ffffff | #ffffff · своё | `fg/default_on-accent` #ffffff | совпадает |
+| `--primary-hover` | #337ad9 | #578df4 · своё | `accent/hover` #337ad9 | совпадает |
+| `--primary-pressed` | #004eb5 | #3173f2 · своё | `accent/pressed` #004eb5 | совпадает |
+| `--ring` | #0059cf | #0059cf · из rososmotr | `accent/default` #0059cf | совпадает |
+| `--row` | #e8e9ec | #d4d5d952 · своё | через `--muted` → `neutral/soft` #e8e9ec | совпадает · слот — решение |
+| `--row-active` | #ffffff | #ffffff · своё | через `--card` → `bg/page` #ffffff | совпадает · слот — решение |
+| `--scrim-dark` | #000000b2 | #000000b2 · из rososmotr | `bg/neutral_black70%` #000000b2 | совпадает |
+| `--scrim-light` | #ffffff66 | #ffffff66 · из rososmotr | `bg/neutral_white40%` #ffffff66 | совпадает |
+| `--secondary` | #edf3fc | #4480f31f · своё | `accent/surface_soft` #edf3fc | совпадает |
+| `--secondary-disabled` | #f7f9fc | #f7f9fc · из rososmotr | `accent/surface_disabled` #f7f9fc | совпадает |
+| `--secondary-foreground` | #0059cf | #4480f3 · своё | `accent/default` #0059cf | совпадает |
+| `--secondary-hover` | #d9e8fc | #4480f314 · своё | `accent/surface_bright` #d9e8fc | совпадает |
+| `--secondary-pressed` | #d9e8fc | #4480f329 · своё | через `--secondary-hover` → `accent/surface_bright` #d9e8fc | совпадает · слот — решение |
+| `--sidebar` | #0e1e33 | #ffffff · своё | `menu/bg/default` #0e1e33 | совпадает |
+| `--sidebar-accent` | #1a293d | #aaaeb614 · своё | `menu/bg/layer_hover` #1a293d | совпадает |
+| `--sidebar-accent-foreground` | #ffffff | #1d222a · своё | `menu/fg/activ` #ffffff | совпадает |
+| `--sidebar-active` | #263547 | #aaaeb61f · своё | `menu/bg/layer_activ` #263547 | совпадает |
+| `--sidebar-active-foreground` | #ffffff | #1d222a · своё | `menu/fg/activ` #ffffff | совпадает |
+| `--sidebar-border` | #a2a9b2 | #a2a9b2 · из rososmotr | `menu/devider/default` #a2a9b2 | совпадает |
+| `--sidebar-disabled` | #6e7885 | #6e7885 · из rososmotr | `menu/fg/disabled` #6e7885 | совпадает |
+| `--sidebar-foreground` | #d9e8fc | #525760 · своё | `menu/fg/default` #d9e8fc | совпадает |
+| `--sidebar-primary` | #669be2 | #669be2 · из rososmotr | `fg/secondary_hover` #669be2 | совпадает |
+| `--sidebar-primary-foreground` | #0e1e33 | #0e1e33 · из rososmotr | `menu/bg/default` #0e1e33 | совпадает |
+| `--sidebar-ring` | #d9e8fc | #d9e8fc · из rososmotr | `menu/fg/default` #d9e8fc | совпадает |
+| `--sidebar-scroll-thumb` | #6e7885 | #6e7885 · из rososmotr | `menu/scroll/fg` #6e7885 | совпадает |
+| `--sidebar-scroll-track` | #223247 | #223247 · из rososmotr | `menu/scroll/bg` #223247 | совпадает |
+| `--success` | #00b288 | #5fad05 · своё | `service/success-default` #00b288 | совпадает |
+| `--success-hover` | #14cba3 | #14cba3 · из rososmotr | `service/success-hover` #14cba3 | совпадает |
+| `--success-pressed` | #009774 | #009774 · из rososmotr | `service/success-pressed` #009774 | совпадает |
+| `--success-surface` | #e6f7f3 | #e6f7f3 · из rososmotr | `service/success-surface` #e6f7f3 | совпадает |
+| `--surface-contrast` | #0e1e33 | #0e1e33 · из rososmotr | `bg/contrast` #0e1e33 | совпадает |
+| `--surface-disabled` | #d0d4d8 | #d0d4d8 · из rososmotr | `bg/disabled` #d0d4d8 | совпадает |
+| `--surface-new` | #fff3ee | #fff3ee · из rososmotr | `bg/surface_new` #fff3ee | совпадает |
+| `--surface-selected` | #edf3fc | #edf3fc · из rososmotr | `bg/surface_selected` #edf3fc | совпадает |
+| `--surface-selected-hover` | #d9e8fc | #d9e8fc · из rososmotr | `bg/surface_hover_selected` #d9e8fc | совпадает |
+| `--tag` | #edf3fc | #e2ecfd · своё | через `--secondary` → `accent/surface_soft` #edf3fc | совпадает · слот — решение |
+| `--warning` | #e98326 | #e78018 · своё | `service/warning-default` #e98326 | совпадает |
+| `--warning-disabled` | #f3c27e | #f3c27e · из rososmotr | `service/warning-disabled` #f3c27e | совпадает |
+| `--warning-hover` | #ed9e4a | #ed9e4a · из rososmotr | `service/warning-hover` #ed9e4a | совпадает |
+| `--warning-pressed` | #da6a1c | #da6a1c · из rososmotr | `service/warning-pressed` #da6a1c | совпадает |
+| `--warning-surface` | #fcefd8 | #fcefd8 · из rososmotr | `service/warning-surface` #fcefd8 | совпадает |

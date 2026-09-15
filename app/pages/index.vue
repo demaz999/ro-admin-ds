@@ -201,9 +201,9 @@ const martianWidths = [
 
     <ShowcaseSection
       title="Палитра"
-      note="Все цветовые токены темы. Свотч залит через var(), то есть показывает ровно то, что применится в компонентах."
+      note="Цветовые токены темы по ролям: база, бренд, роли сообщений, акцентная палитра, сайдбар, служебные. Свотч залит через var(), hex читается в выбранной теме; «из rososmotr» — роль, которую тема не переопределяет. Сверка значений с китом 1 — docs/tokens.md, раздел 11."
     >
-      <ShowcaseTokens kind="color" />
+      <ShowcasePalette :theme="theme" />
     </ShowcaseSection>
 
     <ShowcaseSection
