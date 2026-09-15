@@ -2,7 +2,7 @@
  * Раскладка раздела «Палитра» на витрине.
  *
  * Порядок групп — `docs/naming.md`, раздел 2 «Цветовые роли», подраздел в подраздел, плюс
- * тени из раздела 4. Своей таксономии витрина не заводит.
+ * девятой группой все семь теней темы по разделу 4. Своей таксономии витрина не заводит.
  *
  * Единица подачи — строка таблицы (решение владельца, 2026-09-15). Два вида таблиц:
  * таблица ролей (`tokens`, `shadows`) и матрица состояний (`ramps`). Набор осей матрицы
@@ -175,11 +175,6 @@ export const paletteGroups: PaletteGroup[] = [
       { name: '--field-error-foreground', role: 'Текст ошибки', where: 'поле, textarea' },
       { name: '--field-scroll-thumb', role: 'Бегунок в поле', where: 'textarea' },
     ],
-    shadows: [
-      { name: '--shadow-elevated', utility: 'shadow-elevated', role: 'Тень поля поверх карты', where: 'поле, селект, стрелка, тултип' },
-      { name: '--shadow-elevated-hover', utility: 'shadow-elevated-hover', role: 'Она же при наведении', where: 'поле, селект, автокомплит' },
-      { name: '--shadow-elevated-pressed', utility: 'shadow-elevated-pressed', role: 'Она же при нажатии', where: 'поле, автокомплит' },
-    ],
   },
   {
     id: 'sidebar',
@@ -227,6 +222,9 @@ export const paletteGroups: PaletteGroup[] = [
     shadows: [
       { name: '--shadow-button', utility: 'shadow-button', role: 'Активная таблетка вкладки', where: unused },
       { name: '--shadow-dropdown', utility: 'shadow-dropdown', role: 'Всплывающая плашка', where: 'селект, поповер, меню, выбор даты, Alert' },
+      { name: '--shadow-elevated', utility: 'shadow-elevated', role: 'Поле поверх карты', where: 'поле, селект, стрелка, тултип' },
+      { name: '--shadow-elevated-hover', utility: 'shadow-elevated-hover', role: 'Поле поверх карты, наведение', where: 'поле, селект, автокомплит' },
+      { name: '--shadow-elevated-pressed', utility: 'shadow-elevated-pressed', role: 'Поле поверх карты, нажатие', where: 'поле, автокомплит' },
       { name: '--shadow-on-image', utility: 'shadow-on-image', role: 'Контрол поверх фото', where: 'чекбокс на превью' },
       { name: '--shadow-indicator', utility: 'shadow-indicator', role: 'Свечение точки', where: 'индикатор', tone: 'text-primary' },
     ],

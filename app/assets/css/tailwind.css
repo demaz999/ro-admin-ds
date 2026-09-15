@@ -167,8 +167,10 @@
    При сборке страниц дефолт — семантические токены. Палитра берётся только по
    явному указанию макета или человека.
 
-   Полный набор состояний в ките есть только у рамп 01 и 06; у 02–05 нарисован
-   один default — см. docs/design-debt.md.
+   Состояния — по факту коллекции mode (сверка 2026-09-15): у 01 пять (default,
+   hover, pressed, surface, disabled); у 02–05 default, hover, pressed — без
+   disabled и surface; у 06 default, hover, pressed, disabled — без surface.
+   Недостающие — см. docs/design-debt.md.
    --------------------------------------------------------------------------- */
 :root {
     --palette-01: #1bb149;
@@ -207,12 +209,20 @@
     --color-palette-05: var(--palette-05);
     --color-palette-06: var(--palette-06);
 
-    /* Состояния рамп. Полный набор в ките есть только у 01 и 06 — у 02–05
-       нарисован один default, поэтому и утилит под них нет. */
+    /* Состояния рамп — ровно те, что есть в mode: у всех шести hover и pressed,
+       у 01 ещё surface и disabled, у 06 ещё disabled. Под отсутствующие утилит нет. */
     --color-palette-01-hover: var(--palette-01-hover);
     --color-palette-01-pressed: var(--palette-01-pressed);
     --color-palette-01-surface: var(--palette-01-surface);
     --color-palette-01-disabled: var(--palette-01-disabled);
+    --color-palette-02-hover: var(--palette-02-hover);
+    --color-palette-02-pressed: var(--palette-02-pressed);
+    --color-palette-03-hover: var(--palette-03-hover);
+    --color-palette-03-pressed: var(--palette-03-pressed);
+    --color-palette-04-hover: var(--palette-04-hover);
+    --color-palette-04-pressed: var(--palette-04-pressed);
+    --color-palette-05-hover: var(--palette-05-hover);
+    --color-palette-05-pressed: var(--palette-05-pressed);
     --color-palette-06-hover: var(--palette-06-hover);
     --color-palette-06-pressed: var(--palette-06-pressed);
     --color-palette-06-disabled: var(--palette-06-disabled);
@@ -299,13 +309,18 @@
        задаётся в одном месте, а не дублируется отдельным токеном на каждую. */
     --shadow-indicator: 0 2px 8px 0 color-mix(in srgb, currentColor 64%, transparent);
     /* Атом, MediumShadow — поле, лежащее поверх карты или фото (мастер 297:2316).
-       Цвет тот же, что у dropdown, отличается только геометрия: 0/4/16 против 0/8/32. */
-    --shadow-elevated: 0 4px 16px 0 #0c10181f;
+       Цвет тот же, что у dropdown, отличается только геометрия: 0/4/16 против 0/8/32.
+
+       Утилита ссылается на переменную темы, а не на литерал: литерал из @theme inline
+       тема не переопределяет, и значение в [data-theme="atom"] не действовало. @theme
+       без inline тень тоже не спасает — утилита тени вшивает значение, чтобы подменять
+       цвет. Значения — в блоке темы ниже. */
+    --shadow-elevated: var(--shadow-elevated);
     /* Тень поля поверх карты ходит по состояниям: у Атома меняется не заливка,
        а прозрачность тени — 12% в покое, 16% на наведении, 8% на нажатии.
        Спека 309:2320, «shadow MediumShadowHover». */
-    --shadow-elevated-hover: 0 4px 16px 0 #0c101829;
-    --shadow-elevated-pressed: 0 4px 16px 0 #0c101814;
+    --shadow-elevated-hover: var(--shadow-elevated-hover);
+    --shadow-elevated-pressed: var(--shadow-elevated-pressed);
     /* Контрол, лежащий поверх изображения: чекбокс на превью, кнопка на фото.
        У Атома такого случая нет — на его поверхностях контролы всегда на плашке.
 
@@ -574,6 +589,9 @@
     --field-clear-foreground: var(--foreground-secondary); /* решение: крестик идёт за подписью, не за значением */
     --field-error-foreground: var(--destructive);   /* решение: service/error-default — строка сообщения об ошибке */
     --field-scroll-thumb: var(--background);        /* решение: bg/page — бегунок скролла внутри поля */
+    --shadow-elevated: 0 4px 16px 0 #0c10181f;      /* Атом 297:2316 — 12%, значение общее с atom */
+    --shadow-elevated-hover: 0 4px 16px 0 #0c101829; /* 16% */
+    --shadow-elevated-pressed: 0 4px 16px 0 #0c101814; /* 8% */
     --list-hover: var(--accent);                    /* решение: bg/surface_hover — роль совпадает буквально */
     --list-selected: var(--surface-selected);       /* решение: bg/surface_selected — то же */
     --popover-scroll-thumb: var(--border-neutral);  /* решение: border/neutral_soft — серый бегунок на белой плашке */

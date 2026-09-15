@@ -33,7 +33,7 @@ interface Reading {
 const root = ref<HTMLElement>()
 const probe = ref<HTMLElement>()
 const readings = ref<Record<string, Reading | null>>({})
-const shadowHex = ref<Record<string, string>>({})
+const shadowValue = ref<Record<string, string>>({})
 const unlisted = ref<PaletteToken[]>([])
 
 function toHex(value: string): { hex: string, alpha: number } | null {
@@ -61,6 +61,18 @@ function read(name: string, declarations: Map<string, Record<string, string>>): 
   }
 }
 
+/**
+ * Значение тени так, как оно пишется в теме: смещения, размытие, разлёт, цвет. Берётся
+ * последний слой вычисленного `box-shadow` — до него Tailwind ставит пустые кольца.
+ */
+function shadowOf(el: HTMLElement) {
+  const layers = getComputedStyle(el).boxShadow.split(/,(?![^(]*\))/)
+  const layer = (layers[layers.length - 1] ?? '').trim()
+  const color = layer.match(/color\([^)]*\)|rgba?\([^)]*\)/)?.[0] ?? ''
+  const lengths = layer.replace(color, '').trim().split(/\s+/).map(l => (l === '0px' ? '0' : l))
+  return `${lengths.join(' ')} ${toHex(color)?.hex ?? ''}`.trim()
+}
+
 function measure() {
   const declarations = collectThemeDeclarations()
   const listed = listedTokenNames()
@@ -82,11 +94,9 @@ function measure() {
 
   const shadows: Record<string, string> = {}
   root.value?.querySelectorAll<HTMLElement>('[data-shadow]').forEach((el) => {
-    // Последний слой — сама тень; до него Tailwind ставит пустые кольца.
-    const layers = getComputedStyle(el).boxShadow.split(/,(?![^(]*\))/)
-    shadows[el.dataset.shadow!] = toHex(layers[layers.length - 1] ?? '')?.hex ?? ''
+    shadows[el.dataset.shadow!] = shadowOf(el)
   })
-  shadowHex.value = shadows
+  shadowValue.value = shadows
 }
 
 onMounted(async () => {
@@ -197,8 +207,8 @@ function suffix(r: PaletteRamp, name: string) {
         </TableRow>
       </Table>
 
-      <!-- Таблица ролей: одиночные токены и тени -->
-      <Table v-if="group.tokens || group.shadows" class="mt-4 rounded-none border-0 bg-transparent">
+      <!-- Таблица ролей: одиночные токены -->
+      <Table v-if="group.tokens" class="mt-4 rounded-none border-0 bg-transparent">
         <TableRow class="border-stroke-neutral bg-transparent">
           <TableHead class="w-60 px-4">
             Роль
@@ -243,6 +253,30 @@ function suffix(r: PaletteRamp, name: string) {
             </TableCellText>
           </TableCell>
         </TableRow>
+      </Table>
+
+      <!--
+        Тени — таблица ролей на подложке: тень на белом не читается. Единственная
+        группа с подложкой, по назначению. Образец — плитка карточки с этой тенью.
+      -->
+      <Table v-if="group.shadows" class="mt-4 rounded-none border-0 bg-muted p-4">
+        <TableRow class="border-stroke-neutral bg-transparent">
+          <TableHead class="w-60 bg-transparent px-4">
+            Роль
+          </TableHead>
+          <TableHead class="w-24 bg-transparent px-4">
+            Образец
+          </TableHead>
+          <TableHead class="w-50 bg-transparent px-4">
+            Токен
+          </TableHead>
+          <TableHead class="w-48 bg-transparent px-4">
+            Значение
+          </TableHead>
+          <TableHead class="min-w-0 flex-1 bg-transparent px-4">
+            Где применяется
+          </TableHead>
+        </TableRow>
 
         <TableRow v-for="s in group.shadows" :key="s.name" data-palette-row="shadow" class="border-stroke-neutral bg-transparent">
           <TableCell variant="slot" class="w-60 px-4">
@@ -256,8 +290,10 @@ function suffix(r: PaletteRamp, name: string) {
               {{ s.name }}
             </TableCellText>
           </TableCell>
-          <TableCell variant="slot" class="w-24 px-4">
-            <span class="font-mono text-xs whitespace-nowrap text-muted-foreground">{{ shadowHex[s.name] }}</span>
+          <TableCell variant="slot" class="w-48 px-4">
+            <TableCellText :copy="false" class="font-mono text-xs text-muted-foreground">
+              {{ shadowValue[s.name] }}
+            </TableCellText>
           </TableCell>
           <TableCell variant="slot" class="min-w-0 flex-1 shrink px-4 [contain:inline-size]">
             <TableCellText :copy="false" class="text-xs text-foreground-secondary">
