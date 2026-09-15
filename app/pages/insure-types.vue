@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { TABLE_ROW_ACTIONS_COLUMN, type TableRowActionItem } from '@/components/ui/table'
+import { tableRowActionsColumn, type TableRowActionItem } from '@/components/ui/table'
 
 /**
  * Вторая тестовая страница — «Типы схем осмотров» (`insure-types`) текущей
@@ -110,19 +110,51 @@ const TYPES = [
 /**
  * Колонки. Макета нет: ширины — решение сборки, содержательная колонка резиновая.
  * Колонки «Иконка» нет с такта 20: эмблема живёт в «Наименовании» блоком
- * идентичности. Ширина «Действий» одна на всю админку — `TABLE_ROW_ACTIONS_COLUMN`
- * (такт 22): подпись, карандаш и всегда зарезервированный вторичный слот. Страница её
- * не пересчитывает.
+ * идентичности. Ширину «Действий» выбирает кит — `tableRowActionsColumn` по набору
+ * действий страницы (такт 27): в дефолте только карандаш, в демо — со вторичным слотом.
  *
  * Такт 23: у колонки действий заголовка нет — решение владельца. Текст прижимался к
  * правому краю и висел над зарезервированным вторичным слотом, левее которого стоит
  * карандаш. Колонка и её ширина остаются; название уходит в `aria-label`, чтобы у
  * заголовка колонки было имя для вспомогательных технологий.
  */
+const route = useRoute()
+
+/**
+ * Приёмочная оснастка `?actions=demo` — такт 20. В продукт не идёт.
+ *
+ * Канон — одно действие у всех строк: карандаш с подписью по наведению. Набор
+ * действий у всех строк страницы один (D6 такта 20), поэтому смешанные строки бывают
+ * только здесь. Такт 22: строка 1 — только карандаш, строка 2 — карандаш и копировать,
+ * строка 3 — карандаш и кебаб. Подпись по наведению — у всех трёх. Такт 27: на демо у
+ * страницы есть вторичные действия — колонка со слотом, у строки 1 слот пустой.
+ */
+const demoActions = route.query.actions === 'demo'
+
+const COPY: TableRowActionItem = { key: 'copy', label: 'Копировать', icon: 'copy' }
+const ARCHIVE: TableRowActionItem = { key: 'archive', label: 'Архивировать', icon: 'archive' }
+const EXPORT: TableRowActionItem = { key: 'export', label: 'Экспортировать', icon: 'download' }
+const REMOVE: TableRowActionItem = { key: 'delete', label: 'Удалить', icon: 'delete', destructive: true }
+
+/** Порядок в кебабе задаёт компонент, не страница, — поэтому в массиве он намеренно другой. */
+const DEMO_ROWS: TableRowActionItem[][] = [
+  [],
+  [COPY],
+  [REMOVE, EXPORT, ARCHIVE, COPY],
+]
+
+/** Набор вторичных действий страницы: в дефолте пустой. */
+const PAGE_ACTIONS = demoActions ? DEMO_ROWS.flat() : []
+const ACTIONS_COLUMN = tableRowActionsColumn(PAGE_ACTIONS)
+
+function actionsFor(index: number): TableRowActionItem[] {
+  return demoActions ? (DEMO_ROWS[index] ?? []) : []
+}
+
 const columns = [
   { key: 'id', title: 'Id', label: 'Id', width: 'w-24' },
   { key: 'name', title: 'Наименование', label: 'Наименование', width: 'flex-1' },
-  { key: 'actions', title: '', label: 'Действия', width: TABLE_ROW_ACTIONS_COLUMN },
+  { key: 'actions', title: '', label: 'Действия', width: ACTIONS_COLUMN },
 ] as const
 
 /**
@@ -156,35 +188,8 @@ function onSearch() {
  * Приёмочная оснастка, та же, что у «Мои осмотры»: `?rows=` задаёт размер
  * страницы, `?q=` — поисковый запрос для снимка. В продукт не идёт.
  */
-const route = useRoute()
 if (route.query.rows) pageSize.value = Number(route.query.rows)
 if (route.query.q) search.value = String(route.query.q)
-
-/**
- * Приёмочная оснастка `?actions=demo` — такт 20. В продукт не идёт.
- *
- * Канон — одно действие у всех строк: карандаш с подписью по наведению. Набор
- * действий у всех строк страницы один (D6 такта 20), поэтому смешанные строки бывают
- * только здесь. Такт 22: строка 1 — только карандаш, строка 2 — карандаш и копировать,
- * строка 3 — карандаш и кебаб. Подпись по наведению — у всех трёх.
- */
-const demoActions = route.query.actions === 'demo'
-
-const COPY: TableRowActionItem = { key: 'copy', label: 'Копировать', icon: 'copy' }
-const ARCHIVE: TableRowActionItem = { key: 'archive', label: 'Архивировать', icon: 'archive' }
-const EXPORT: TableRowActionItem = { key: 'export', label: 'Экспортировать', icon: 'download' }
-const REMOVE: TableRowActionItem = { key: 'delete', label: 'Удалить', icon: 'delete', destructive: true }
-
-/** Порядок в кебабе задаёт компонент, не страница, — поэтому в массиве он намеренно другой. */
-const DEMO_ROWS: TableRowActionItem[][] = [
-  [],
-  [COPY],
-  [REMOVE, EXPORT, ARCHIVE, COPY],
-]
-
-function actionsFor(index: number): TableRowActionItem[] {
-  return demoActions ? (DEMO_ROWS[index] ?? []) : []
-}
 </script>
 
 <template>
@@ -275,8 +280,8 @@ function actionsFor(index: number): TableRowActionItem[] {
         </TableCell>
 
         <!-- Колонка действий — компонент кита (такт 20, D): раскладку страница не повторяет. -->
-        <TableCell variant="slot" :size="56" class="justify-end px-4" :class="TABLE_ROW_ACTIONS_COLUMN">
-          <TableRowActions :actions="actionsFor(index)" />
+        <TableCell variant="slot" :size="56" class="justify-end px-4" :class="ACTIONS_COLUMN">
+          <TableRowActions :actions="actionsFor(index)" :reserve-secondary="PAGE_ACTIONS.length > 0" />
         </TableCell>
       </TableRow>
     </Table>

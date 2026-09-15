@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { TABLE_ROW_ACTIONS_COLUMN } from '@/components/ui/table'
+import { tableRowActionsColumn } from '@/components/ui/table'
 
 /**
  * Стенд «Статусы» — список статусных моделей справочника, такты 24 и 26.
@@ -20,8 +20,8 @@ import { TABLE_ROW_ACTIONS_COLUMN } from '@/components/ui/table'
  * - **Эмблемы нет:** блок идентичности — только имя.
  * - **Многозначная ячейка «Компании»:** нейтральные метки инлайном с переносом, без потолка
  *   и «+N»; у компании со знаком — логотип 16×16.
- * - **Колонка действий — только карандаш** (такт 26): правый слот зарезервирован пустым,
- *   «Сделать копию» живёт в форме справочника.
+ * - **Колонка действий — только карандаш** (такт 26): «Сделать копию» живёт в форме
+ *   справочника. С такта 27 вторичного слота нет, карандаш у правого края ячейки.
  *
  * ## Что живое, а что заглушка
  *
@@ -93,11 +93,16 @@ const models = computed(() => {
   return MODELS.map(m => (m.name === 'Особый словарь' ? { ...m, companies: many } : m))
 })
 
-/** Колонки: Id нет, у колонки действий заголовка нет — канон, такты 23–24. */
+/**
+ * Колонки: Id нет, у колонки действий заголовка нет — канон, такты 23–24. Вторичных
+ * действий у страницы нет, поэтому колонка — только карандаш (такт 27).
+ */
+const ACTIONS_COLUMN = tableRowActionsColumn([])
+
 const columns = [
   { key: 'name', title: 'Наименование', label: 'Наименование', width: 'w-60' },
   { key: 'companies', title: 'Компании', label: 'Компании', width: 'flex-1 min-w-0' },
-  { key: 'actions', title: '', label: 'Действия', width: TABLE_ROW_ACTIONS_COLUMN },
+  { key: 'actions', title: '', label: 'Действия', width: ACTIONS_COLUMN },
 ] as const
 
 /**
@@ -213,8 +218,8 @@ if (route.query.q) search.value = String(route.query.q)
           </Chip>
         </TableCell>
 
-        <!-- Только карандаш: вторичный слот зарезервирован пустым — правило такта 22. -->
-        <TableCell variant="slot" :size="56" align="start" class="justify-end px-4" :class="TABLE_ROW_ACTIONS_COLUMN">
+        <!-- Только карандаш у правого края ячейки: вторичных действий нет — такт 27. -->
+        <TableCell variant="slot" :size="56" align="start" class="justify-end px-4" :class="ACTIONS_COLUMN">
           <TableRowActions />
         </TableCell>
       </TableRow>
