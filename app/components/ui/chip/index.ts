@@ -78,17 +78,31 @@ export const chipVariants = cva(
        * заливка становится брендовой, подпись белой.
        */
       active: {
-        // Наведение включённого чипа — штатная ступень бренда, как у кнопки.
-        true: 'bg-primary text-primary-foreground hover:bg-primary-hover',
-        // Наведение выключенного **осветляет**: ступени темнее `accent/surface_bright`
-        // в ките нет вовсе (проверено по всем светлым токенам темы), а соседняя
-        // снизу — `accent/surface_soft`. Осветление при наведении — не выдумка:
-        // тем же способом ходит наведение в тёмной теме (`--secondary-hover` 8%)
-        // и в меню Атома, где ховер светлее выбранного. Дыра записана в долг.
-        false: 'bg-chip text-foreground hover:bg-secondary',
+        true: 'bg-primary text-primary-foreground',
+        false: 'bg-chip text-foreground',
+      },
+      /**
+       * Такт 24: наведение — только у интерактивного чипа. Метка без действия
+       * (`trailing="none"`) на курсор не откликается: иначе неинтерактивная метка
+       * в ячейке таблицы читалась бы как кнопка. Правило то же, что «у всего
+       * интерактивного системное наведение», с обратной стороны.
+       */
+      interactive: {
+        true: '',
+        false: '',
       },
     },
-    defaultVariants: { active: false },
+    compoundVariants: [
+      // Наведение включённого чипа — штатная ступень бренда, как у кнопки.
+      { active: true, interactive: true, class: 'hover:bg-primary-hover' },
+      // Наведение выключенного **осветляет**: ступени темнее `accent/surface_bright`
+      // в ките нет вовсе (проверено по всем светлым токенам темы), а соседняя
+      // снизу — `accent/surface_soft`. Осветление при наведении — не выдумка:
+      // тем же способом ходит наведение в тёмной теме (`--secondary-hover` 8%)
+      // и в меню Атома, где ховер светлее выбранного. Дыра записана в долг.
+      { active: false, interactive: true, class: 'hover:bg-secondary' },
+    ],
+    defaultVariants: { active: false, interactive: true },
   },
 )
 

@@ -21,15 +21,20 @@ import { cn } from '@/lib/utils'
  * полного текста — механика `TableCellText`.
  */
 const props = withDefaults(defineProps<{
-  icon: IconName
+  /**
+   * Эмблема сущности. Необязательна — такт 24, правило канона «эмблема в блоке
+   * идентичности — если у сущности она есть»: у статусной модели своей иконки нет,
+   * и блок тогда — только имя, без пустого бокса.
+   */
+  icon?: IconName
   /** Класс снаружи — слиянием. */
   class?: string
-}>(), { class: undefined })
+}>(), { icon: undefined, class: undefined })
 </script>
 
 <template>
   <span data-slot="table-cell-identity" :class="cn('flex min-w-0 flex-1 items-center gap-2 text-foreground', props.class)">
-    <span data-slot="table-cell-identity-icon" class="inline-flex size-5 shrink-0 items-center justify-center">
+    <span v-if="props.icon" data-slot="table-cell-identity-icon" class="inline-flex size-5 shrink-0 items-center justify-center">
       <Icon :name="props.icon" :size="20" />
     </span>
     <TableCellText class="flex-1 text-sm font-medium">

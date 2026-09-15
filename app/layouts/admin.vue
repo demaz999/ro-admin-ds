@@ -178,7 +178,7 @@ const current = computed(() => route.path)
             <MenuItem :show-icon="false">
               Типы объектов съёмки
             </MenuItem>
-            <MenuItem :show-icon="false">
+            <MenuItem :show-icon="false" :selected="current === '/statuses'">
               Статусы
             </MenuItem>
           </template>

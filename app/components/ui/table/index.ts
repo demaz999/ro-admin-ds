@@ -62,6 +62,18 @@ export const tableCellVariants = cva('flex shrink-0 items-center', {
       collapse: 'w-16 justify-center px-6',
       /** Пустая ячейка: всё содержательное кладётся сюда композицией. */
       slot: 'pr-6',
+      /**
+       * Многозначная ячейка — канон, такт 24: метки значений инлайном с переносом,
+       * зазор 8 по обеим осям, без потолка и без «+N». Мастера нет; решение владельца.
+       *
+       * `[contain:inline-size]` обязателен: контейнер таблицы стоит на `min-w-max` и
+       * без него считает ширину ячейки как одну длинную строку меток — таблица
+       * распухала вбок, метки не переносились, колонка действий уезжала за экран.
+       *
+       * Высота растёт с числом линий: фиксированная высота размера снята в compound
+       * ниже, от неё остаётся минимум. `py-3` — под метку 32 в строке 56: 12 + 32 + 12.
+       */
+      values: 'flex-wrap content-center gap-2 py-3 [contain:inline-size]',
     },
     /** Ось `Active` мастера: подсветка. У Атома она на ячейке, а не на строке. */
     active: {
@@ -81,6 +93,11 @@ export const tableCellVariants = cva('flex shrink-0 items-center', {
     { variant: 'text', size: 56, class: 'text-base' },
     { variant: 'text', size: 48, class: 'text-xs' },
     { variant: 'text', size: 40, class: 'text-xs' },
+    // Многозначная ячейка растёт с числом линий: высота размера становится минимумом.
+    { variant: 'values', size: 72, class: 'h-auto min-h-18' },
+    { variant: 'values', size: 56, class: 'h-auto min-h-14' },
+    { variant: 'values', size: 48, class: 'h-auto min-h-12' },
+    { variant: 'values', size: 40, class: 'h-auto min-h-10' },
   ],
   defaultVariants: {
     variant: 'text',

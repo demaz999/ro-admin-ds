@@ -73,7 +73,7 @@ function onRootKeydown(event: KeyboardEvent) {
   <span
     data-slot="chip"
     :data-active="props.active ? '' : undefined"
-    :class="[chipVariants({ active: props.active }), props.trailing === 'expand' ? 'cursor-pointer' : '']"
+    :class="[chipVariants({ active: props.active, interactive: props.trailing !== 'none' }), props.trailing === 'expand' ? 'cursor-pointer' : '']"
     :role="props.trailing === 'expand' ? 'button' : undefined"
     :tabindex="props.trailing === 'expand' ? 0 : undefined"
     :aria-expanded="props.trailing === 'expand' ? props.expanded : undefined"
@@ -81,6 +81,16 @@ function onRootKeydown(event: KeyboardEvent) {
     @click="onRootClick"
     @keydown="onRootKeydown"
   >
+    <!--
+      Ведущая иконка — такт 24, слот нашего конвейера: у мастера `747:2464` его нет.
+      Нужен метке значения (логотип компании в ячейке справочника). Стоит на корне
+      пилюли, поэтому от подписи отходит на корневой зазор мастера 8 — тот же, что
+      между текстом и хвостовым контролом. Иконка идёт за цветом, который ей задали.
+    -->
+    <span v-if="$slots.leading" data-slot="chip-leading" class="flex size-4 shrink-0 items-center justify-center">
+      <slot name="leading" />
+    </span>
+
     <!-- Внутренняя группа `txt_bulb` мастера: зазор 4, а не 8. -->
     <span class="flex items-center gap-1">
       <span
