@@ -113,11 +113,16 @@ const TYPES = [
  * идентичности. Ширина «Действий» одна на всю админку — `TABLE_ROW_ACTIONS_COLUMN`
  * (такт 22): подпись, карандаш и всегда зарезервированный вторичный слот. Страница её
  * не пересчитывает.
+ *
+ * Такт 23: у колонки действий заголовка нет — решение владельца. Текст прижимался к
+ * правому краю и висел над зарезервированным вторичным слотом, левее которого стоит
+ * карандаш. Колонка и её ширина остаются; название уходит в `aria-label`, чтобы у
+ * заголовка колонки было имя для вспомогательных технологий.
  */
 const columns = [
-  { key: 'id', title: 'Id', width: 'w-24' },
-  { key: 'name', title: 'Наименование', width: 'flex-1' },
-  { key: 'actions', title: 'Действия', width: TABLE_ROW_ACTIONS_COLUMN },
+  { key: 'id', title: 'Id', label: 'Id', width: 'w-24' },
+  { key: 'name', title: 'Наименование', label: 'Наименование', width: 'flex-1' },
+  { key: 'actions', title: '', label: 'Действия', width: TABLE_ROW_ACTIONS_COLUMN },
 ] as const
 
 /**
@@ -238,6 +243,7 @@ function actionsFor(index: number): TableRowActionItem[] {
           v-for="col in columns"
           :key="col.key"
           variant="column"
+          :aria-label="col.title ? undefined : col.label"
           :class="[col.width, 'px-4', col.key === 'actions' ? 'justify-end' : '']"
         >
           {{ col.title }}
