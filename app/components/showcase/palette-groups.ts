@@ -1,13 +1,16 @@
 /**
  * Раскладка раздела «Палитра» на витрине.
  *
- * Структура и порядок групп — `docs/naming.md`, раздел 2 «Цветовые роли», подраздел в
- * подраздел: Основа · Бренд и действия · Служебные состояния · Расширения под состояния ·
- * Поле ввода · Сайдбар · Расширенная палитра · Иконки. Своей таксономии витрина не заводит.
+ * Порядок групп — `docs/naming.md`, раздел 2 «Цветовые роли», подраздел в подраздел, плюс
+ * тени из раздела 4. Своей таксономии витрина не заводит.
  *
- * Роль у свотча — фраза из `naming.md` (раздел 2), из мапинг-таблицы `docs/tokens.md`
- * (раздел 7) или из кода, где токен употреблён. «В компонентах не применяется» — результат
- * поиска по `app/components/ui`, а не оценка.
+ * Единица подачи — строка таблицы (решение владельца, 2026-09-15). Два вида таблиц:
+ * таблица ролей (`tokens`, `shadows`) и матрица состояний (`ramps`). Набор осей матрицы
+ * выводится из того, какие состояния в группе есть на самом деле.
+ *
+ * Копирайт — для читателя-фронта и дизайнера: без имён переменных Figma, без ссылок на
+ * документы. «Где применяется» — до 60 знаков, по фактам `naming.md` и поиска по
+ * `app/components/ui`; «в компонентах не применяется» — тоже результат поиска.
  *
  * Значений здесь нет: витрина читает их из таблиц стилей в выбранной теме. Цветовой токен
  * темы, которого нет ни в одной группе, витрина покажет сама в «Не разложено».
@@ -26,31 +29,38 @@ export const paletteStates: { key: PaletteState, label: string }[] = [
   { key: 'surface', label: 'surface' },
 ]
 
+/** Строка таблицы ролей. */
 export interface PaletteToken {
   /** Имя CSS-переменной с двумя дефисами. */
   name: string
-  /** Роль одной фразой — из naming.md, tokens.md или кода. */
+  /** Имя роли — первая колонка. */
   role: string
+  /** Пояснение одной строкой, если без него роль читается неверно. */
+  note?: string
+  /** Где применяется: до 60 знаков, в именительном. */
+  where: string
 }
 
-/** Строка «база → состояния» слева направо. */
+/** Строка матрицы состояний: база и её нарисованные состояния слева направо. */
 export interface PaletteRamp {
-  label: string
-  note: string
-  steps: Partial<Record<PaletteState, PaletteToken>>
-  /** Подпись пустой ячейки: чего именно нет. */
-  gap: string
+  role: string
+  where: string
+  steps: Partial<Record<PaletteState, string>>
 }
 
 export interface PaletteShadow {
   name: string
-  utility: string
   role: string
+  where: string
+  utility: string
+  /** Цвет образца — нужен тени, которая берёт `currentColor`. */
+  tone?: string
 }
 
 export interface PaletteGroup {
   id: string
   title: string
+  /** Одна фраза о назначении группы. */
   note: string
   ramps?: PaletteRamp[]
   tokens?: PaletteToken[]
@@ -59,240 +69,176 @@ export interface PaletteGroup {
 
 const unused = 'в компонентах не применяется'
 
-function paletteRamp(n: string, note: string, baseRole: string, has: PaletteState[]): PaletteRamp {
-  const suffix: Record<PaletteState, string> = { base: '', hover: '-hover', pressed: '-pressed', disabled: '-disabled', surface: '-surface' }
+/** Рампа с именами по схеме `--x`, `--x-hover`, `--x-pressed`… */
+function ramp(role: string, base: string, where: string, has: PaletteState[]): PaletteRamp {
   const steps: PaletteRamp['steps'] = {}
-  for (const state of has) {
-    steps[state] = { name: `--palette-${n}${suffix[state]}`, role: state === 'base' ? baseRole : `status-${n}/${state === 'surface' ? 'bg' : state}; ${unused}` }
-  }
-  return { label: `palette-${n}`, note, gap: 'в ките нет', steps }
+  for (const state of has) steps[state] = state === 'base' ? base : `${base}-${state}`
+  return { role, where, steps }
 }
 
 export const paletteGroups: PaletteGroup[] = [
   {
     id: 'base',
     title: 'Основа',
-    note: 'Одна светлая тема. Тёмная приедет переопределением этих же имён, а не вторым набором.',
+    note: 'Фон, текст и поверхности, на которых лежит любой экран.',
     tokens: [
-      { name: '--background', role: 'фон страницы. Дефолт для всего, что не карточка и не плашка' },
-      { name: '--foreground', role: 'основной текст. Дефолт для любой надписи, пока не доказано обратное' },
-      { name: '--card', role: 'карточка. Своей поверхности в ките нет — сидит на фоне страницы, отделяется рамкой' },
-      { name: '--card-foreground', role: `текст карточки (fg/primary); ${unused}` },
-      { name: '--popover', role: 'всё, что всплывает: выпадашка, тултип, поповер. Светлое даже из тёмного сайдбара' },
-      { name: '--popover-foreground', role: 'текст всплывающего (fg/primary): Alert, Tooltip' },
+      { name: '--background', role: 'Фон страницы', where: 'страница, каркас админки' },
+      { name: '--foreground', role: 'Основной текст', where: 'любая надпись по умолчанию' },
+      { name: '--card', role: 'Карточка', note: 'отделяется от фона рамкой', where: 'таблица, панель фильтров, аккордеон' },
+      { name: '--card-foreground', role: 'Текст карточки', where: unused },
+      { name: '--popover', role: 'Всплывающее', note: 'светлое даже из тёмного меню', where: 'выпадающий список, тултип, поповер, меню' },
+      { name: '--popover-foreground', role: 'Текст всплывающего', where: 'Alert, Tooltip' },
     ],
   },
   {
     id: 'brand',
     title: 'Бренд и действия',
-    note: 'Ловушка имени: в shadcn accent — поверхность наведения, бренд живёт в primary.',
+    note: 'Цвета действий, наведения и рамок.',
     tokens: [
-      { name: '--primary', role: 'бренд. Главное действие экрана, активная вкладка, фокусное кольцо. На экране обычно одна' },
-      { name: '--primary-foreground', role: 'текст и иконка на брендовой заливке' },
-      { name: '--secondary', role: 'фон второстепенного действия — светло-синяя плашка, не серая' },
-      { name: '--secondary-foreground', role: 'текст на ней; остаётся брендовым' },
-      { name: '--destructive', role: 'действие удаляет или необратимо меняет данные. Не «просто красный»' },
-      { name: '--accent', role: 'поверхность наведения, а не бренд' },
-      { name: '--accent-foreground', role: 'текст на ней' },
-      { name: '--muted', role: 'приглушённое: неактивная подложка' },
-      { name: '--muted-foreground', role: 'приглушённое: вторичная подпись, плейсхолдер' },
-      { name: '--muted-disabled', role: 'neutral/disabled: выключенная нейтраль — Image, Slider' },
-      { name: '--border', role: 'рамка по умолчанию' },
-      { name: '--input', role: 'рамка поля' },
-      { name: '--ring', role: `кольцо фокуса; ${unused}` },
+      { name: '--primary', role: 'Бренд', note: 'главное действие экрана', where: 'кнопка, вкладка, чекбокс, переключатель' },
+      { name: '--primary-foreground', role: 'Текст на бренде', where: 'кнопка, чекбокс, аватар, бейдж' },
+      { name: '--secondary', role: 'Второстепенное действие', note: 'светло-синяя плашка, не серая', where: 'кнопка, IconButton, пагинация, вкладки' },
+      { name: '--secondary-foreground', role: 'Текст второстепенного', where: 'кнопка, IconButton, тег' },
+      { name: '--destructive', role: 'Удаление', note: 'необратимо меняет данные', where: 'кнопка, бейдж, поле, индикатор' },
+      { name: '--accent', role: 'Поверхность наведения', note: 'не бренд', where: 'пункт меню, строка таблицы, IconButton' },
+      { name: '--accent-foreground', role: 'Текст на наведении', where: 'пункт меню, IconButton' },
+      { name: '--muted', role: 'Приглушённая подложка', where: 'скелетон, переключатель, заглушка изображения' },
+      { name: '--muted-foreground', role: 'Вторичная подпись', where: 'хлебные крошки, пустое состояние, календарь' },
+      { name: '--muted-disabled', role: 'Выключенная нейтраль', where: 'слайдер, заглушка изображения' },
+      { name: '--border', role: 'Рамка', where: 'шапка колонок, панель фильтров, меню' },
+      { name: '--input', role: 'Рамка поля', where: unused },
+      { name: '--ring', role: 'Кольцо фокуса', where: unused },
     ],
   },
   {
     id: 'service',
     title: 'Служебные состояния',
-    note: 'Три семантических цвета. Берутся по смыслу сообщения, а не по желаемому цвету. -surface — бледная подложка под плашку сообщения, не для текста.',
+    note: 'Сообщают об успехе, предупреждении и ошибке — по смыслу, а не по цвету.',
     ramps: [
-      {
-        label: 'success',
-        note: 'операция завершилась, проверка пройдена',
-        gap: 'в ките нет',
-        steps: {
-          base: { name: '--success', role: 'service/success-default: Badge, Indicator, FileUpload' },
-          hover: { name: '--success-hover', role: `service/success-hover; ${unused}` },
-          pressed: { name: '--success-pressed', role: `service/success-pressed; ${unused}` },
-          surface: { name: '--success-surface', role: `service/success-surface; ${unused}` },
-        },
-      },
-      {
-        label: 'warning',
-        note: 'требуется внимание, но работа не сломана',
-        gap: 'в ките нет',
-        steps: {
-          base: { name: '--warning', role: 'service/warning-default: Badge, Indicator' },
-          hover: { name: '--warning-hover', role: `service/warning-hover; ${unused}` },
-          pressed: { name: '--warning-pressed', role: `service/warning-pressed; ${unused}` },
-          disabled: { name: '--warning-disabled', role: `service/warning-disabled; ${unused}` },
-          surface: { name: '--warning-surface', role: `service/warning-surface; ${unused}` },
-        },
-      },
-      {
-        label: 'destructive',
-        note: 'ошибка либо необратимое действие',
-        gap: 'в ките нет',
-        steps: {
-          base: { name: '--destructive', role: 'service/error-default: Button, Badge, Field, Indicator' },
-          hover: { name: '--destructive-hover', role: 'service/error-hover: Button, ButtonAction' },
-          pressed: { name: '--destructive-pressed', role: 'service/error-pressed: Button, ButtonAction' },
-          disabled: { name: '--destructive-disabled', role: `service/error-fg_disabled; ${unused}` },
-          surface: { name: '--destructive-surface', role: 'service/error-surface; в поле — через field-error' },
-        },
-      },
+      ramp('Успех', '--success', 'бейдж, индикатор, загрузка файла', ['base', 'hover', 'pressed', 'surface']),
+      ramp('Предупреждение', '--warning', 'бейдж, индикатор', ['base', 'hover', 'pressed', 'disabled', 'surface']),
+      ramp('Ошибка', '--destructive', 'кнопка, ButtonAction, бейдж, поле', ['base', 'hover', 'pressed', 'disabled', 'surface']),
     ],
     tokens: [
-      { name: '--destructive-foreground', role: 'текст на красной заливке — решение: тот же, что на брендовой. Button' },
+      { name: '--destructive-foreground', role: 'Текст на ошибке', where: 'кнопка удаления' },
     ],
   },
   {
     id: 'extensions',
     title: 'Расширения под состояния',
-    note: 'Состояния в ките нарисованы руками: hover — это другой цвет, а не прозрачность поверх подложки. Схлопывать в bg-primary/90 нельзя.',
+    note: 'Нарисованные состояния ролей и подложки компонентов.',
     ramps: [
-      {
-        label: 'primary-*',
-        note: 'бренд',
-        gap: 'нет токена',
-        steps: {
-          base: { name: '--primary', role: 'accent/default' },
-          hover: { name: '--primary-hover', role: 'accent/hover: Button, ButtonAction, Chip, Hyperlink' },
-          pressed: { name: '--primary-pressed', role: 'accent/pressed: Button, ButtonAction, IconButton' },
-          disabled: { name: '--primary-disabled', role: 'accent/disabled; напрямую не применяется — на нём accent-soft' },
-        },
-      },
-      {
-        label: 'secondary-*',
-        note: 'вторичная кнопка',
-        gap: 'нет токена',
-        steps: {
-          base: { name: '--secondary', role: 'accent/surface_soft' },
-          hover: { name: '--secondary-hover', role: 'accent/surface_bright: Button, IconButton, Pagination' },
-          pressed: { name: '--secondary-pressed', role: 'третьей ступени в теме нет — сидит на hover (design-debt.md)' },
-          disabled: { name: '--secondary-disabled', role: 'accent/surface_disabled: Pagination' },
-        },
-      },
-      {
-        label: 'foreground-*',
-        note: 'текст',
-        gap: 'нет токена',
-        steps: {
-          base: { name: '--foreground', role: 'fg/primary' },
-          hover: { name: '--foreground-hover', role: 'fg/primary_hover: Hyperlink, значения полей, вкладки' },
-          disabled: { name: '--foreground-disabled', role: 'fg/primary_disabled: Field' },
-        },
-      },
-      {
-        label: 'foreground-secondary-*',
-        note: 'второй уровень текста',
-        gap: 'нет токена',
-        steps: {
-          base: { name: '--foreground-secondary', role: 'fg/secondary: подписи таблицы, чипа, окна' },
-          hover: { name: '--foreground-secondary-hover', role: `fg/secondary_hover; ${unused}` },
-          pressed: { name: '--foreground-secondary-pressed', role: `fg/secondary_pressed; ${unused}` },
-          disabled: { name: '--foreground-secondary-disabled', role: 'fg/secondary_disabled: Pagination' },
-        },
-      },
+      ramp('Бренд', '--primary', 'кнопка, ButtonAction, чип, ссылка', ['base', 'hover', 'pressed', 'disabled']),
+      ramp('Второстепенное действие', '--secondary', 'кнопка, IconButton, пагинация', ['base', 'hover', 'pressed', 'disabled']),
+      ramp('Основной текст', '--foreground', 'ссылка, значения полей, вкладки', ['base', 'hover', 'disabled']),
+      ramp('Второй уровень текста', '--foreground-secondary', 'таблица, чип, окно, пагинация', ['base', 'hover', 'pressed', 'disabled']),
     ],
     tokens: [
-      { name: '--surface-contrast', role: `surface-*: bg/contrast; ${unused}` },
-      { name: '--surface-disabled', role: `surface-*: bg/disabled; ${unused}` },
-      { name: '--surface-new', role: 'surface-*: bg/surface_new — строка таблицы' },
-      { name: '--surface-selected', role: 'surface-*: bg/surface_selected — в Select через list-selected' },
-      { name: '--surface-selected-hover', role: `surface-*: bg/surface_hover_selected; ${unused}` },
-      { name: '--border-secondary', role: `stroke-*: рамка сверх дефолтной (border/secondary); ${unused}` },
-      { name: '--border-accent', role: `stroke-*: рамка сверх дефолтной (border/accent); ${unused}` },
-      { name: '--border-neutral', role: 'stroke-*: рамка сверх дефолтной (border/neutral_soft) — InputNumber' },
-      { name: '--overlay', role: `затемнение и осветление под модалками (bg/overlay); ${unused}` },
-      { name: '--scrim-light', role: `осветление поверх фото (bg/neutral_white40%); ${unused}` },
-      { name: '--scrim-dark', role: 'затемнение поверх фото (bg/neutral_black70%) — NavigationTile' },
-      { name: '--dialog', role: 'поверхность полноэкранного слоя: модальное окно и лайтбокс' },
-      { name: '--chip', role: 'подложка чипа в покое — роль, а не состояние: Chip, FilterChip' },
-      { name: '--tag', role: 'подложка неактивного тега: Tag' },
-      { name: '--row', role: 'строка-плашка в покое (Plank 1910:12739): ListRow, строка таблицы' },
-      { name: '--row-active', role: 'активная строка-плашка — всплывает белым: ListRow' },
-      { name: '--list-hover', role: 'строка выпадающего списка под наведением: Select' },
-      { name: '--list-selected', role: 'выбранная строка выпадающего списка: Select' },
-      { name: '--accent-soft', role: 'маркер тега и подчёркивание ссылки; сидит на primary-disabled (design-debt.md)' },
-      { name: '--border-soft', role: 'граница таблицы: контейнер, строки, подвал' },
-      { name: '--popover-scroll-thumb', role: 'бегунок скролла на белой плашке: Select' },
+      { name: '--surface-contrast', role: 'Контрастная поверхность', where: unused },
+      { name: '--surface-disabled', role: 'Выключенная поверхность', where: unused },
+      { name: '--surface-new', role: 'Новое', where: 'строка таблицы' },
+      { name: '--surface-selected', role: 'Выбранное', where: 'выбранная строка выпадающего списка' },
+      { name: '--surface-selected-hover', role: 'Наведение на выбранное', where: unused },
+      { name: '--border-secondary', role: 'Вторичная рамка', where: unused },
+      { name: '--border-accent', role: 'Акцентная рамка', where: unused },
+      { name: '--border-neutral', role: 'Нейтральная рамка', where: 'InputNumber' },
+      { name: '--overlay', role: 'Подложка под модалкой', where: unused },
+      { name: '--scrim-light', role: 'Осветление поверх фото', where: unused },
+      { name: '--scrim-dark', role: 'Затемнение поверх фото', where: 'плитка навигации' },
+      { name: '--dialog', role: 'Полноэкранный слой', where: 'модальное окно, лайтбокс' },
+      { name: '--chip', role: 'Подложка чипа', where: 'чип, чип фильтра' },
+      { name: '--tag', role: 'Подложка тега', where: 'тег' },
+      { name: '--row', role: 'Строка-плашка', note: 'приглушённая в покое', where: 'строка списка, строка таблицы' },
+      { name: '--row-active', role: 'Активная строка-плашка', note: 'всплывает белым', where: 'строка списка' },
+      { name: '--list-hover', role: 'Наведение в списке', where: 'выпадающий список' },
+      { name: '--list-selected', role: 'Выбор в списке', where: 'выпадающий список' },
+      { name: '--accent-soft', role: 'Мягкий бренд', note: 'светлее бренда, не выключенный', where: 'маркер тега, подчёркивание ссылки' },
+      { name: '--border-soft', role: 'Граница таблицы', where: 'контейнер, строки и подвал таблицы' },
+      { name: '--popover-scroll-thumb', role: 'Бегунок на плашке', where: 'выпадающий список' },
     ],
   },
   {
     id: 'field',
     title: 'Поле ввода',
-    note: 'У Атома поле — залитая поверхность без рамки, а не белое поле с обводкой. Под этот состав заведены отдельные роли.',
+    note: 'Поле — залитая поверхность без рамки.',
+    ramps: [
+      ramp('Заливка поля', '--field', 'поле, селект, автокомплит, выбор даты', ['base', 'hover']),
+      ramp('Заливка с ошибкой', '--field-error', 'поле, textarea', ['base', 'hover']),
+      ramp('Плейсхолдер и подпись', '--field-placeholder', 'поле, селект, чекбокс, переключатель', ['base', 'hover']),
+      ramp('Введённое значение', '--field-foreground', 'поле, селект, вкладки, таблица', ['base', 'hover']),
+    ],
     tokens: [
-      { name: '--field', role: 'заливка поля в покое. Дефолт для любого контрола ввода' },
-      { name: '--field-hover', role: 'заливка под наведением и под кареткой' },
-      { name: '--field-elevated', role: 'заливка поля, лежащего поверх карты или фото: белая плюс тень' },
-      { name: '--field-error', role: 'заливка поля с ошибкой. Ошибка — не рамка, а подмена заливки' },
-      { name: '--field-error-hover', role: 'она же под наведением' },
-      { name: '--field-placeholder', role: 'плейсхолдер, во всплывшем состоянии — подпись; тем же цветом иконка' },
-      { name: '--field-placeholder-hover', role: 'она же под наведением и фокусом: подпись темнеет' },
-      { name: '--field-foreground', role: 'введённое значение в покое; им же иконка заполненного поля' },
-      { name: '--field-foreground-hover', role: 'значение под наведением и фокусом — на ступень темнее' },
-      { name: '--field-clear', role: 'подложка кнопки очистки на обычном поле' },
-      { name: '--field-clear-elevated', role: 'подложка кнопки очистки на поле поверх карты' },
-      { name: '--field-clear-foreground', role: 'сам крестик. Идёт за подписью, а не за значением' },
-      { name: '--field-error-foreground', role: 'строка сообщения об ошибке под полем' },
-      { name: '--field-scroll-thumb', role: 'бегунок скролла внутри поля: Textarea' },
+      { name: '--field-elevated', role: 'Поле поверх карты', note: 'белое плюс тень', where: 'поле, селект, стрелка, чекбокс' },
+      { name: '--field-clear', role: 'Подложка очистки', where: 'поле, автокомплит' },
+      { name: '--field-clear-elevated', role: 'Очистка поверх карты', where: 'поле, автокомплит' },
+      { name: '--field-clear-foreground', role: 'Крестик очистки', where: 'поле, автокомплит, выбор даты' },
+      { name: '--field-error-foreground', role: 'Текст ошибки', where: 'поле, textarea' },
+      { name: '--field-scroll-thumb', role: 'Бегунок в поле', where: 'textarea' },
     ],
     shadows: [
-      { name: '--shadow-elevated', utility: 'shadow-elevated', role: 'тень поля поверх карты: 12% в покое' },
-      { name: '--shadow-elevated-hover', utility: 'shadow-elevated-hover', role: '16% на наведении' },
-      { name: '--shadow-elevated-pressed', utility: 'shadow-elevated-pressed', role: '8% на нажатии' },
+      { name: '--shadow-elevated', utility: 'shadow-elevated', role: 'Тень поля поверх карты', where: 'поле, селект, стрелка, тултип' },
+      { name: '--shadow-elevated-hover', utility: 'shadow-elevated-hover', role: 'Она же при наведении', where: 'поле, селект, автокомплит' },
+      { name: '--shadow-elevated-pressed', utility: 'shadow-elevated-pressed', role: 'Она же при нажатии', where: 'поле, автокомплит' },
     ],
   },
   {
     id: 'sidebar',
     title: 'Сайдбар',
-    note: 'Сайдбар тёмный при светлом интерфейсе. Это не тёмная тема и не второй мод. Внутри — только sidebar-*; всё, что вылетает порталом, живёт на светлых токенах.',
+    note: 'Тёмное меню при светлом интерфейсе.',
     tokens: [
-      { name: '--sidebar', role: 'подложка меню' },
-      { name: '--sidebar-foreground', role: 'текст меню' },
-      { name: '--sidebar-accent', role: 'наведение на пункт' },
-      { name: '--sidebar-accent-foreground', role: 'текст пункта под наведением' },
-      { name: '--sidebar-active', role: 'выбранный пункт' },
-      { name: '--sidebar-active-foreground', role: 'текст выбранного пункта' },
-      { name: '--sidebar-border', role: 'разделитель' },
-      { name: '--sidebar-disabled', role: `выключенный пункт; ${unused}` },
-      { name: '--sidebar-scroll-track', role: `свой скроллбар меню — дорожка; ${unused}` },
-      { name: '--sidebar-scroll-thumb', role: `свой скроллбар меню — бегунок; ${unused}` },
-      { name: '--sidebar-primary', role: `fg/secondary_hover — решение, см. вопрос 15; ${unused}` },
-      { name: '--sidebar-primary-foreground', role: `menu/bg/default — решение, контраст 5.9:1; ${unused}` },
-      { name: '--sidebar-ring', role: `menu/fg/default — решение, контраст 13.5:1; ${unused}` },
+      { name: '--sidebar', role: 'Подложка меню', where: 'меню, каркас админки' },
+      { name: '--sidebar-foreground', role: 'Текст меню', where: 'пункт меню' },
+      { name: '--sidebar-accent', role: 'Наведение на пункт', where: 'пункт меню, IconButton в меню' },
+      { name: '--sidebar-accent-foreground', role: 'Текст под наведением', where: 'пункт меню, IconButton в меню' },
+      { name: '--sidebar-active', role: 'Выбранный пункт', where: 'пункт меню' },
+      { name: '--sidebar-active-foreground', role: 'Текст выбранного пункта', where: 'пункт меню, каркас админки' },
+      { name: '--sidebar-border', role: 'Разделитель', where: 'меню' },
+      { name: '--sidebar-disabled', role: 'Выключенный пункт', where: unused },
+      { name: '--sidebar-scroll-track', role: 'Дорожка скролла', where: unused },
+      { name: '--sidebar-scroll-thumb', role: 'Бегунок скролла', where: unused },
+      { name: '--sidebar-primary', role: 'Акцент меню', where: unused },
+      { name: '--sidebar-primary-foreground', role: 'Текст на акценте меню', where: unused },
+      { name: '--sidebar-ring', role: 'Кольцо фокуса в меню', where: unused },
     ],
   },
   {
     id: 'palette',
     title: 'Расширенная палитра',
-    note: 'Шесть дополнительных рамп. Это не статусы и не семантика, несмотря на имя status-01..06 в Figma. Дефолт — семантические роли; палитра — только по явному указанию макета или человека. Категориальные графики сидят на палитре осознанно.',
+    note: 'Шесть рамп без смысла — берутся только по явному указанию макета.',
     ramps: [
-      paletteRamp('01', '#1bb149 зелёная', 'StatusBadge', ['base', 'hover', 'pressed', 'disabled', 'surface']),
-      paletteRamp('02', '#1192bb бирюзовая', 'StatusBadge', ['base', 'hover', 'pressed']),
-      paletteRamp('03', '#806aea фиолетовая', 'StatusBadge', ['base', 'hover', 'pressed']),
-      paletteRamp('04', '#d461ba розовая · ни одним компонентом кита не используется', 'StatusBadge', ['base', 'hover', 'pressed']),
-      paletteRamp('05', '#ff8552 оранжевая', 'StatusBadge', ['base', 'hover', 'pressed']),
-      paletteRamp('06', '#c91826 красная', 'StatusBadge; признак на «Мои осмотры»', ['base', 'hover', 'pressed', 'disabled']),
+      ramp('Зелёная', '--palette-01', 'статус-бейдж', ['base', 'hover', 'pressed', 'disabled', 'surface']),
+      ramp('Бирюзовая', '--palette-02', 'статус-бейдж', ['base', 'hover', 'pressed']),
+      ramp('Фиолетовая', '--palette-03', 'статус-бейдж', ['base', 'hover', 'pressed']),
+      ramp('Розовая', '--palette-04', 'статус-бейдж', ['base', 'hover', 'pressed']),
+      ramp('Оранжевая', '--palette-05', 'статус-бейдж', ['base', 'hover', 'pressed']),
+      ramp('Красная', '--palette-06', 'статус-бейдж, признак в «Мои осмотры»', ['base', 'hover', 'pressed', 'disabled']),
     ],
-    tokens: [1, 2, 3, 4, 5].map(i => ({ name: `--chart-${i}`, role: `категориальный график — сидит на palette-0${i}; ${unused}` })),
+    tokens: [1, 2, 3, 4, 5].map(i => ({ name: `--chart-${i}`, role: `График, категория ${i}`, where: unused })),
   },
   {
     id: 'icons',
     title: 'Иконки',
-    note: 'Своих цветовых токенов нет: цвет у Icon не задаётся никогда — глиф идёт за цветом текста родителя.',
+    note: 'Своего цвета нет — иконка берёт цвет текста вокруг.',
+  },
+  {
+    id: 'shadows',
+    title: 'Тени',
+    note: 'Отрывают плашки и контролы от поверхности.',
+    shadows: [
+      { name: '--shadow-button', utility: 'shadow-button', role: 'Активная таблетка вкладки', where: unused },
+      { name: '--shadow-dropdown', utility: 'shadow-dropdown', role: 'Всплывающая плашка', where: 'селект, поповер, меню, выбор даты, Alert' },
+      { name: '--shadow-on-image', utility: 'shadow-on-image', role: 'Контрол поверх фото', where: 'чекбокс на превью' },
+      { name: '--shadow-indicator', utility: 'shadow-indicator', role: 'Свечение точки', where: 'индикатор', tone: 'text-primary' },
+    ],
   },
 ]
 
-/** Все имена, разложенные по группам, — чтобы найти неразложенные. */
+/** Все цветовые имена, разложенные по группам, — чтобы найти неразложенные. */
 export function listedTokenNames(): Set<string> {
   const names = new Set<string>()
   for (const group of paletteGroups) {
     group.tokens?.forEach(t => names.add(t.name))
-    group.ramps?.forEach(r => Object.values(r.steps).forEach(t => t && names.add(t.name)))
+    group.ramps?.forEach(r => Object.values(r.steps).forEach(n => n && names.add(n)))
   }
   return names
 }

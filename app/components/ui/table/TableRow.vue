@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { cn } from '@/lib/utils'
 import { tableRowVariants, type TableRowVariants } from '.'
 
 /**
@@ -29,9 +30,16 @@ const props = withDefaults(defineProps<{
   state?: NonNullable<TableRowVariants['state']>
   /** Строка кликабельна: тогда у неё есть наведение и курсор. */
   interactive?: boolean
+  /**
+   * Класс снаружи — слиянием, как у `Table`, `TableHead` и `TableCell`. Без слияния
+   * внешний цвет разделителя приклеивался бы рядом с вариантным и побеждал бы по
+   * порядку в таблице стилей, а не по намерению.
+   */
+  class?: string
 }>(), {
   state: 'default',
   interactive: false,
+  class: undefined,
 })
 </script>
 
@@ -40,7 +48,7 @@ const props = withDefaults(defineProps<{
     data-slot="table-row"
     role="row"
     :data-state="props.state"
-    :class="tableRowVariants({ state: props.state, interactive: props.interactive })"
+    :class="cn(tableRowVariants({ state: props.state, interactive: props.interactive }), props.class)"
     :style="{ transitionDuration: 'var(--duration-hover)' }"
   >
     <slot />

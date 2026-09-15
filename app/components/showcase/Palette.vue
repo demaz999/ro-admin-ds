@@ -1,12 +1,23 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { collectThemeDeclarations } from '~/composables/useDesignTokens'
-import { listedTokenNames, paletteGroups, paletteStates, type PaletteToken } from './palette-groups'
+import {
+  listedTokenNames,
+  paletteGroups,
+  paletteStates,
+  type PaletteGroup,
+  type PaletteRamp,
+  type PaletteState,
+  type PaletteToken,
+} from './palette-groups'
 
 /**
- * Палитра по ролям. Значение каждого свотча читается в ТЕКУЩЕЙ теме: пробный узел лежит
- * внутри витрины и наследует её `data-theme`, а не корня документа. Иначе переключатель
- * менял бы свотчи (они залиты через var()), но подписи hex оставались бы от rososmotr.
+ * Палитра по ролям. Единица — строка таблицы, карточек нет (решение владельца,
+ * 2026-09-15). Таблицы собраны из компонентов кита; контейнер без скругления и рамки,
+ * между строками — волосяная нейтральная линия: это документ, а не страница-таблица.
+ *
+ * Значение каждого свотча читается в ТЕКУЩЕЙ теме: пробный узел лежит внутри витрины и
+ * наследует её `data-theme`, а не корня документа.
  */
 const props = defineProps<{
   /** Текущая тема витрины — только как сигнал перечитать значения. */
@@ -15,9 +26,6 @@ const props = defineProps<{
 
 interface Reading {
   hex: string
-  alpha: number
-  /** Относительная яркость после наложения на белый — выбирает подложку свотча. */
-  luminance: number
   /** Значение объявлено самой темой, а не унаследовано от rososmotr. */
   own: boolean
 }
@@ -25,23 +33,18 @@ interface Reading {
 const root = ref<HTMLElement>()
 const probe = ref<HTMLElement>()
 const readings = ref<Record<string, Reading | null>>({})
-const shadows = ref<Record<string, string>>({})
+const shadowHex = ref<Record<string, string>>({})
 const unlisted = ref<PaletteToken[]>([])
 
-function parseColor(value: string): [number, number, number, number] | null {
-  const srgb = value.match(/^color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)(?: \/ ([\d.]+))?\)$/)
-  if (srgb) return [Number(srgb[1]) * 255, Number(srgb[2]) * 255, Number(srgb[3]) * 255, srgb[4] === undefined ? 1 : Number(srgb[4])]
-  const rgb = value.match(/^rgba?\(([\d.]+), ([\d.]+), ([\d.]+)(?:, ([\d.]+))?\)$/)
-  if (rgb) return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3]), rgb[4] === undefined ? 1 : Number(rgb[4])]
-  return null
-}
-
-function luminanceOver(r: number, g: number, b: number, a: number) {
-  const channel = (c: number) => {
-    const v = (a * c + (1 - a) * 255) / 255
-    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4
-  }
-  return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b)
+function toHex(value: string): { hex: string, alpha: number } | null {
+  const srgb = value.match(/color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)(?: \/ ([\d.]+))?\)/)
+  const rgb = value.match(/rgba?\(([\d.]+), ([\d.]+), ([\d.]+)(?:, ([\d.]+))?\)/)
+  let c: number[]
+  if (srgb) c = [Number(srgb[1]) * 255, Number(srgb[2]) * 255, Number(srgb[3]) * 255, srgb[4] === undefined ? 1 : Number(srgb[4])]
+  else if (rgb) c = [Number(rgb[1]), Number(rgb[2]), Number(rgb[3]), rgb[4] === undefined ? 1 : Number(rgb[4])]
+  else return null
+  const h = (v: number) => Math.round(v).toString(16).padStart(2, '0')
+  return { hex: `#${h(c[0]!)}${h(c[1]!)}${h(c[2]!)}${c[3]! < 1 ? h(c[3]! * 255) : ''}`, alpha: c[3]! }
 }
 
 function read(name: string, declarations: Map<string, Record<string, string>>): Reading | null {
@@ -49,25 +52,19 @@ function read(name: string, declarations: Map<string, Record<string, string>>): 
   if (!el) return null
   el.style.backgroundColor = ''
   el.style.backgroundColor = `var(${name})`
-  const parsed = parseColor(getComputedStyle(el).backgroundColor)
+  const parsed = toHex(getComputedStyle(el).backgroundColor)
   // Незаданная переменная даёт прозрачный фон. Полностью прозрачных цветов в теме нет.
-  if (!parsed || parsed[3] === 0) return null
-  const [r, g, b, a] = parsed
-  const hex = (v: number) => Math.round(v).toString(16).padStart(2, '0')
-  const declared = declarations.get(name) ?? {}
+  if (!parsed || parsed.alpha === 0) return null
   return {
-    hex: `#${hex(r)}${hex(g)}${hex(b)}${a < 1 ? hex(a * 255) : ''}`,
-    alpha: a,
-    luminance: luminanceOver(r, g, b, a),
-    own: props.theme === 'rososmotr' || `[data-theme="${props.theme}"]` in declared,
+    hex: parsed.hex,
+    own: props.theme === 'rososmotr' || `[data-theme="${props.theme}"]` in (declarations.get(name) ?? {}),
   }
 }
 
 function measure() {
   const declarations = collectThemeDeclarations()
-  const next: Record<string, Reading | null> = {}
   const listed = listedTokenNames()
-
+  const next: Record<string, Reading | null> = {}
   for (const name of listed) next[name] = read(name, declarations)
 
   // Всё цветовое, что объявлено в теме, но ни в одну группу не попало. Зеркала
@@ -78,19 +75,18 @@ function measure() {
     const reading = read(name, declarations)
     if (!reading) continue
     next[name] = reading
-    extra.push({ name, role: 'роль не записана — разложить в palette-groups.ts по naming.md' })
+    extra.push({ name, role: 'Не разложено', where: 'роль не записана' })
   }
-
   readings.value = next
   unlisted.value = extra.sort((a, b) => a.name.localeCompare(b.name))
 
-  const shadowValues: Record<string, string> = {}
+  const shadows: Record<string, string> = {}
   root.value?.querySelectorAll<HTMLElement>('[data-shadow]').forEach((el) => {
     // Последний слой — сама тень; до него Tailwind ставит пустые кольца.
     const layers = getComputedStyle(el).boxShadow.split(/,(?![^(]*\))/)
-    shadowValues[el.dataset.shadow!] = layers[layers.length - 1]!.trim()
+    shadows[el.dataset.shadow!] = toHex(layers[layers.length - 1] ?? '')?.hex ?? ''
   })
-  shadows.value = shadowValues
+  shadowHex.value = shadows
 }
 
 onMounted(async () => {
@@ -100,95 +96,176 @@ onMounted(async () => {
 
 watch(() => props.theme, measure, { flush: 'post' })
 
-const groups = computed(() => unlisted.value.length
-  ? [...paletteGroups, { id: 'unlisted', title: 'Не разложено', note: 'Цветовые токены темы, которых нет ни в одной группе. Появились здесь сами — значит, в palette-groups.ts их пора разложить.', tokens: unlisted.value }]
+const groups = computed<PaletteGroup[]>(() => unlisted.value.length
+  ? [...paletteGroups, { id: 'unlisted', title: 'Не разложено', note: 'Цветовые токены темы, которых нет ни в одной группе.', tokens: unlisted.value }]
   : paletteGroups)
 
-/** Тёмный цвет — на светлой подложке, светлый — на тёмной, полупрозрачный — на обеих. */
-function plate(reading: Reading | null | undefined) {
-  if (!reading) return 'none'
-  if (reading.alpha < 1) return 'split'
-  return reading.luminance > 0.7 ? 'dark' : 'light'
+/** Оси матрицы — только те состояния, что в группе есть на самом деле. */
+function axesOf(group: PaletteGroup) {
+  return paletteStates.filter(s => group.ramps?.some(r => r.steps[s.key]))
+}
+
+/** Ширина полосы: клетки 64 впритык. Классы статичны — собранную строку Tailwind не увидит. */
+const stripWidth: Record<number, string> = { 1: 'w-16 grid-cols-1', 2: 'w-32 grid-cols-2', 3: 'w-48 grid-cols-3', 4: 'w-64 grid-cols-4', 5: 'w-80 grid-cols-5' }
+
+/**
+ * Клетка полосы. Соседние клетки без зазора; внешний край отрезка скруглён и обведён
+ * полупрозрачной нейтральной линией, как одиночный свотч; между соседями — 1px
+ * нейтральной рамки, чтобы белое отличалось от белого. Пустое состояние разрывает
+ * отрезок и не рисует ничего.
+ */
+function stripCell(r: PaletteRamp, axes: { key: PaletteState }[], i: number) {
+  const has = (j: number) => j >= 0 && j < axes.length && !!r.steps[axes[j]!.key]
+  if (!has(i)) return ''
+  return [
+    'border-y border-y-stroke-neutral/50',
+    has(i - 1) ? 'border-l border-l-stroke-neutral' : 'rounded-l-md border-l border-l-stroke-neutral/50',
+    has(i + 1) ? '' : 'rounded-r-md border-r border-r-stroke-neutral/50',
+  ].join(' ')
+}
+
+/** Под клеткой — хвост токена: база стоит в колонке «Роль», целиком токен в 64 не помещается. */
+function suffix(r: PaletteRamp, name: string) {
+  const base = r.steps.base
+  return base && name !== base && name.startsWith(base) ? name.slice(base.length) : ''
 }
 </script>
 
 <template>
-  <div ref="root" class="space-y-10">
+  <div ref="root" class="space-y-12">
     <span ref="probe" aria-hidden="true" class="hidden" />
 
-    <div v-for="group in groups" :key="group.id" class="space-y-4">
-      <header class="space-y-1">
-        <h3 class="text-sm font-bold">
+    <section v-for="group in groups" :key="group.id" :data-palette-group="group.id">
+      <header>
+        <h3 class="text-lg font-medium text-foreground">
           {{ group.title }}
         </h3>
-        <p class="max-w-3xl text-sm text-muted-foreground">
+        <p class="text-sm text-foreground-secondary">
           {{ group.note }}
         </p>
       </header>
 
-      <div v-if="group.ramps" class="overflow-x-auto">
-        <table class="w-full min-w-3xl table-fixed border-collapse text-left">
-          <thead>
-            <tr class="text-xs text-muted-foreground">
-              <th class="w-40 py-2 pr-3 font-normal" />
-              <th v-for="s in paletteStates" :key="s.key" class="py-2 pr-3 font-mono font-normal">
-                {{ s.label }}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="r in group.ramps" :key="r.label" class="border-t border-border align-top">
-              <th class="py-3 pr-3 font-normal">
-                <code class="block text-xs font-bold">{{ r.label }}</code>
-                <span class="block text-xs text-muted-foreground">{{ r.note }}</span>
-              </th>
-              <td v-for="s in paletteStates" :key="s.key" class="py-3 pr-3">
-                <template v-if="r.steps[s.key]">
-                  <ShowcasePaletteSwatch
-                    :token="r.steps[s.key]!"
-                    :reading="readings[r.steps[s.key]!.name]"
-                    :plate="plate(readings[r.steps[s.key]!.name])"
-                    :theme="theme"
-                    stacked
-                  />
-                </template>
-                <span v-else class="flex size-12 items-center justify-center rounded-md border border-dashed border-border text-2xs text-muted-foreground">
-                  —
+      <!-- Матрица состояний -->
+      <Table v-if="group.ramps" class="mt-4 rounded-none border-0 bg-transparent">
+        <TableRow class="border-stroke-neutral bg-transparent">
+          <TableHead class="w-60 px-4">
+            Роль
+          </TableHead>
+          <TableHead class="px-4">
+            <span class="grid" :class="stripWidth[axesOf(group).length]">
+              <span v-for="a in axesOf(group)" :key="a.key">{{ a.label }}</span>
+            </span>
+          </TableHead>
+          <TableHead class="min-w-0 flex-1 px-4">
+            Где применяется
+          </TableHead>
+        </TableRow>
+
+        <TableRow v-for="r in group.ramps" :key="r.role" data-palette-row="ramp" class="border-stroke-neutral bg-transparent">
+          <TableCell variant="slot" class="h-auto w-60 items-start px-4 py-4">
+            <span class="flex min-w-0 flex-col">
+              <span class="text-sm font-medium text-foreground">{{ r.role }}</span>
+              <span class="truncate font-mono text-xs text-muted-foreground">{{ r.steps.base }}</span>
+            </span>
+          </TableCell>
+
+          <TableCell variant="slot" class="h-auto items-start px-4 py-4">
+            <div class="grid" :class="stripWidth[axesOf(group).length]">
+              <div v-for="(a, i) in axesOf(group)" :key="a.key" class="min-w-0">
+                <span
+                  v-if="r.steps[a.key]"
+                  data-palette-strip-cell
+                  class="block h-10"
+                  :class="stripCell(r, axesOf(group), i)"
+                  :style="{ background: `var(${r.steps[a.key]})` }"
+                />
+                <span v-else class="block h-10" />
+                <span v-if="r.steps[a.key]" class="mt-1 block font-mono text-xs">
+                  <span class="block h-4 whitespace-nowrap text-foreground">{{ suffix(r, r.steps[a.key]!) }}</span>
+                  <span class="block text-muted-foreground">{{ readings[r.steps[a.key]!]?.hex ?? 'нет' }}</span>
+                  <span v-if="readings[r.steps[a.key]!] && !readings[r.steps[a.key]!]!.own" data-inherited class="block text-muted-foreground">из rososmotr</span>
                 </span>
-                <span v-if="!r.steps[s.key]" class="mt-2 block text-xs text-muted-foreground">{{ r.gap }}</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+              </div>
+            </div>
+          </TableCell>
 
-      <ul v-if="group.tokens" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <li v-for="token in group.tokens" :key="token.name" class="rounded-md border border-border p-3">
-          <ShowcasePaletteSwatch
-            :token="token"
-            :reading="readings[token.name]"
-            :plate="plate(readings[token.name])"
-            :theme="theme"
-          />
-        </li>
-      </ul>
+          <TableCell variant="slot" class="h-auto min-w-0 flex-1 shrink items-start px-4 py-4 [contain:inline-size]">
+            <TableCellText :copy="false" class="text-xs text-foreground-secondary">
+              {{ r.where }}
+            </TableCellText>
+          </TableCell>
+        </TableRow>
+      </Table>
 
-      <ul v-if="group.shadows" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <li v-for="s in group.shadows" :key="s.name" class="flex gap-3 rounded-md border border-border p-3">
-          <span class="flex size-12 shrink-0 items-center justify-center rounded-md bg-background">
-            <span
-              :data-shadow="s.name"
-              class="block"
-              :class="[s.utility, s.tone ?? 'size-8 rounded-md bg-background']"
-            />
-          </span>
-          <span class="flex min-w-0 flex-col gap-0.5">
-            <code class="truncate text-xs font-medium">{{ s.name }}</code>
-            <span class="font-mono text-xs break-words text-muted-foreground">{{ shadows[s.name] }}</span>
-            <span class="text-xs">{{ s.role }}</span>
-          </span>
-        </li>
-      </ul>
-    </div>
+      <!-- Таблица ролей: одиночные токены и тени -->
+      <Table v-if="group.tokens || group.shadows" class="mt-4 rounded-none border-0 bg-transparent">
+        <TableRow class="border-stroke-neutral bg-transparent">
+          <TableHead class="w-60 px-4">
+            Роль
+          </TableHead>
+          <TableHead class="w-24 px-4">
+            Свотч
+          </TableHead>
+          <TableHead class="w-50 px-4">
+            Токен
+          </TableHead>
+          <TableHead class="w-24 px-4">
+            Hex
+          </TableHead>
+          <TableHead class="min-w-0 flex-1 px-4">
+            Где применяется
+          </TableHead>
+        </TableRow>
+
+        <TableRow v-for="t in group.tokens" :key="t.name" data-palette-row="token" class="border-stroke-neutral bg-transparent">
+          <TableCell variant="slot" class="w-60 px-4">
+            <span class="flex min-w-0 flex-col">
+              <span class="truncate text-sm font-medium text-foreground">{{ t.role }}</span>
+              <span v-if="t.note" class="truncate text-xs text-foreground-secondary">{{ t.note }}</span>
+            </span>
+          </TableCell>
+          <TableCell variant="slot" class="w-24 px-4">
+            <ShowcasePaletteSwatch :name="t.name" />
+          </TableCell>
+          <TableCell variant="slot" class="w-50 px-4">
+            <span class="flex min-w-0 flex-col">
+              <TableCellText class="font-mono text-xs text-foreground">{{ t.name }}</TableCellText>
+              <span v-if="readings[t.name] && !readings[t.name]!.own" data-inherited class="font-mono text-xs text-muted-foreground">из rososmotr</span>
+            </span>
+          </TableCell>
+          <TableCell variant="slot" class="w-24 px-4">
+            <span v-if="readings[t.name]" class="font-mono text-xs whitespace-nowrap text-muted-foreground">{{ readings[t.name]!.hex }}</span>
+            <span v-else class="text-xs text-destructive">нет в теме</span>
+          </TableCell>
+          <TableCell variant="slot" class="min-w-0 flex-1 shrink px-4 [contain:inline-size]">
+            <TableCellText :copy="false" class="text-xs text-foreground-secondary">
+              {{ t.where }}
+            </TableCellText>
+          </TableCell>
+        </TableRow>
+
+        <TableRow v-for="s in group.shadows" :key="s.name" data-palette-row="shadow" class="border-stroke-neutral bg-transparent">
+          <TableCell variant="slot" class="w-60 px-4">
+            <span class="truncate text-sm font-medium text-foreground">{{ s.role }}</span>
+          </TableCell>
+          <TableCell variant="slot" class="w-24 px-4">
+            <ShowcasePaletteSwatch :name="s.name" :shadow="s.utility" :tone="s.tone" />
+          </TableCell>
+          <TableCell variant="slot" class="w-50 px-4">
+            <TableCellText class="font-mono text-xs text-foreground">
+              {{ s.name }}
+            </TableCellText>
+          </TableCell>
+          <TableCell variant="slot" class="w-24 px-4">
+            <span class="font-mono text-xs whitespace-nowrap text-muted-foreground">{{ shadowHex[s.name] }}</span>
+          </TableCell>
+          <TableCell variant="slot" class="min-w-0 flex-1 shrink px-4 [contain:inline-size]">
+            <TableCellText :copy="false" class="text-xs text-foreground-secondary">
+              {{ s.where }}
+            </TableCellText>
+          </TableCell>
+        </TableRow>
+      </Table>
+    </section>
   </div>
 </template>
