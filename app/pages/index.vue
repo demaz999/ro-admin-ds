@@ -175,7 +175,13 @@ const martianWidths = [
         <a href="/my-inspections" class="underline underline-offset-4">«Мои осмотры»</a> —
         только из компонентов реестра, ноль новых сущностей. Наложение на макет и таблица
         расхождений по категориям — на <code>/compare</code> и в
-        <code>docs/page-my-inspections.md</code>.
+          <code>docs/page-my-inspections.md</code>.
+      </p>
+
+      <p class="max-w-2xl rounded-md border border-border p-3 text-sm">
+        <strong>Гайд компонента:</strong>
+        <NuxtLink to="/components/input" class="underline underline-offset-4">«Поле ввода»</NuxtLink> —
+        выбор контрола, правила применения, живые примеры и фактический API.
       </p>
 
       <div class="flex flex-wrap items-center gap-3 pt-2">
