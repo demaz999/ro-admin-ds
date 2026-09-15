@@ -65,7 +65,8 @@ const text = computed(() => {
       каждое снимается своим крестиком.
     -->
     <Popover
-      v-if="isCounter && open"
+      v-if="isCounter"
+      v-model:open="open"
       data-slot="filter-chip-values"
       :width="348"
       class="absolute top-10 left-0 z-50 p-1"

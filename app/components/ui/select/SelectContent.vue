@@ -44,7 +44,11 @@ withDefaults(defineProps<{
     <div v-if="$slots.top" class="shrink-0">
       <slot name="top" />
     </div>
-    <div data-slot="popover-viewport" class="popover-scroll flex min-h-0 flex-col gap-2 overflow-y-auto">
+    <!--
+      Такт 21: когда в плашке группы, зазор между ними гасится — группы разделяет
+      линия с отступами 4, которую несёт сама группа (SelectGroup).
+    -->
+    <div data-slot="popover-viewport" class="popover-scroll flex min-h-0 flex-col gap-2 overflow-y-auto has-[>[data-slot=list-group]]:gap-0">
       <slot />
     </div>
     <div v-if="$slots.bottom" class="shrink-0">

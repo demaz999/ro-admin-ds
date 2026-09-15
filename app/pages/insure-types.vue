@@ -110,8 +110,9 @@ const TYPES = [
 /**
  * Колонки. Макета нет: ширины — решение сборки, содержательная колонка резиновая.
  * Колонки «Иконка» нет с такта 20: эмблема живёт в «Наименовании» блоком
- * идентичности. «Действия» держат ширину под развёрнутую подпись одного действия и
- * под три слота демо — ширина не меняется ни при наведении, ни в демо.
+ * идентичности. Ширину «Действий» резервирует страница (такт 21): без вторичных
+ * действий — слот плюс подпись (w-44), со вторичными у всех строк — два слота. Демо
+ * смешивает оба вида, поэтому держит w-44. Ширина одна на все строки.
  */
 const columns = [
   { key: 'id', title: 'Id', width: 'w-24' },
@@ -158,8 +159,9 @@ if (route.query.q) search.value = String(route.query.q)
  * Приёмочная оснастка `?actions=demo` — такт 20. В продукт не идёт.
  *
  * Канон — одно действие у всех строк: карандаш с подписью по наведению. Набор
- * действий у всех строк страницы один (D6), поэтому смешанные строки бывают только
- * здесь: первые три строки показывают раскладки 2, 3 и 4+ действий.
+ * действий у всех строк страницы один (D6 такта 20), поэтому смешанные строки бывают
+ * только здесь. Такт 21: колонка из двух слотов — строка 1 только карандаш, строка 2
+ * одно вторичное действие иконкой, строка 3 кебаб.
  */
 const demoActions = route.query.actions === 'demo'
 
@@ -168,19 +170,16 @@ const ARCHIVE: TableRowActionItem = { key: 'archive', label: 'Архивиров
 const EXPORT: TableRowActionItem = { key: 'export', label: 'Экспортировать', icon: 'download' }
 const REMOVE: TableRowActionItem = { key: 'delete', label: 'Удалить', icon: 'delete', destructive: true }
 
-/** Порядок в массивах намеренно разный: колонку раскладывает компонент, не страница. */
+/** Порядок в кебабе задаёт компонент, не страница, — поэтому в массиве он намеренно другой. */
 const DEMO_ROWS: TableRowActionItem[][] = [
+  [],
   [COPY],
-  [COPY, ARCHIVE],
   [REMOVE, EXPORT, ARCHIVE, COPY],
 ]
 
 function actionsFor(index: number): TableRowActionItem[] {
   return demoActions ? (DEMO_ROWS[index] ?? []) : []
 }
-
-/** Резерв слотов колонки — под самую длинную строку страницы. */
-const actionSlots = demoActions ? 3 : 1
 </script>
 
 <template>
@@ -271,7 +270,7 @@ const actionSlots = demoActions ? 3 : 1
 
         <!-- Колонка действий — компонент кита (такт 20, D): раскладку страница не повторяет. -->
         <TableCell variant="slot" :size="56" class="w-44 justify-end px-4">
-          <TableRowActions :actions="actionsFor(index)" :slots="actionSlots" />
+          <TableRowActions :actions="actionsFor(index)" />
         </TableCell>
       </TableRow>
     </Table>

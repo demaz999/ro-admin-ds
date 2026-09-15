@@ -553,7 +553,7 @@ function selectAll(list: readonly string[]) {
                 внутри DatePicker: absolute плюс сам Popover без своей раскладки.
               -->
               <!-- 348 — по самой длинной строке меню: ширины по содержимому у Popover нет. -->
-              <Popover v-if="bulkOpen" :width="348" class="absolute top-8 left-0 z-50 p-1">
+              <Popover v-model:open="bulkOpen" :width="348" class="absolute top-8 left-0 z-50 p-1">
                 <SelectItem
                   v-for="action in selectionModes"
                   :key="action"
@@ -605,7 +605,7 @@ function selectAll(list: readonly string[]) {
                 <Icon name="pending" :size="20" />
               </IconButton>
 
-              <Popover v-if="moreOpen" :width="348" class="absolute top-12 right-0 z-50 p-1">
+              <Popover v-model:open="moreOpen" :width="348" class="absolute top-12 right-0 z-50 p-1">
                 <SelectItem
                   v-for="action in moreActions"
                   :key="action"

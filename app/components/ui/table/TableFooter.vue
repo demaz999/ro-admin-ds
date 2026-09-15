@@ -106,7 +106,7 @@ function pick(size: number) {
         <Icon name="chevron-down" :size="11" class="text-foreground-secondary" />
       </button>
 
-      <Popover v-if="open" :width="160" class="absolute right-0 bottom-13 z-50 p-1">
+      <Popover v-model:open="open" :width="160" class="absolute right-0 bottom-13 z-50 p-1">
         <SelectItem
           v-for="size in props.pageSizes"
           :key="size"
