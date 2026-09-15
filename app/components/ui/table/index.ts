@@ -179,6 +179,18 @@ export interface TableRowActionItem {
  */
 export const TABLE_ROW_ACTION_ORDER = ['copy', 'archive', 'export', 'delete'] as const
 
+/**
+ * Ширина колонки «Действия» — одна на всю админку. Решение владельца, такт 22:
+ * вторичный слот резервируется всегда, поэтому карандаш стоит на одной координате X
+ * на любой странице, а не только внутри одной.
+ *
+ * Расчёт: подпись «Редактировать» 15/20 — 102.6, до слота карандаша 8 (12 до глифа),
+ * слот карандаша 24, зазор 8, вторичный слот 24, паддинги ячейки 16 + 16 — итого
+ * 198.6, до кратного 4 — **200**. Класс статичный: собранную строку Tailwind не увидит.
+ * Страница ширину не пересчитывает.
+ */
+export const TABLE_ROW_ACTIONS_COLUMN = 'w-50'
+
 export type TableRowVariants = VariantProps<typeof tableRowVariants>
 export type TableCellVariants = VariantProps<typeof tableCellVariants>
 export type TableHeadVariants = VariantProps<typeof tableHeadVariants>

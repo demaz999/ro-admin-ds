@@ -9,27 +9,31 @@ import TableRowAction from './TableRowAction.vue'
 import { TABLE_ROW_ACTION_ORDER, type TableRowActionItem } from '.'
 
 /**
- * Колонка «Действия» строки — всегда не больше двух слотов. Решения владельца:
- * такт 20 (удаление не голой иконкой, порядок кебаба), такт 21 (модель двух слотов).
- * Мастера нет — композиция `TableRowAction`, `IconButton service`, `Tooltip` и
- * попапа «ещё» с «Моих осмотров» (`Popover` + `SelectItem`).
+ * Колонка «Действия» строки. Решения владельца: такт 20 (подпись по наведению,
+ * удаление не голой иконкой, порядок кебаба), такт 21 (вторичный слот), такт 22
+ * (порядок слотов и резерв).
  *
- * ## Модель двух слотов
+ * ## Порядок слева направо: подпись → карандаш → вторичный слот
  *
- * | Вторичных действий | Раскладка |
+ * Карандаш с подписью — `TableRowAction`, всегда и при любом числе действий: подпись
+ * «Редактировать» проявляется слева от карандаша по наведению на строку (`opacity`,
+ * место зарезервировано, 12 до глифа). У карандаша тултипа нет — у него подпись.
+ *
+ * Правее карандаша через 8 — **вторичный слот** 24×24:
+ *
+ * | Вторичных действий | Вторичный слот |
  * |---|---|
- * | нет | `TableRowAction`: карандаш и подпись «Редактировать» по наведению на строку |
- * | одно, не удаление | [иконка действия] [карандаш], у обеих тултип с названием |
- * | два и больше — или есть удаление | [кебаб] [карандаш], у карандаша тултип |
+ * | нет | пустой, без объекта — но место занято |
+ * | одно, не удаление | иконка действия (`IconButton service`, глиф 16), тултип с названием |
+ * | два и больше — или есть удаление | кебаб (глиф `pending`), тултипа нет; удаление — последней группой |
  *
- * Правый слот — карандаш, всегда. Слот 24×24 (хит-зона `IconButton size="sm"`),
- * зазор 8, всё прижато вправо — поэтому у карандаша одна координата X на всю колонку.
- * Удаление голой иконкой не встаёт никогда: оно уводит в кебаб все вторичные, даже
- * если оно единственное.
+ * **Вторичный слот резервируется всегда** — рекомендация чата, принято владельцем (такт
+ * 22): тогда карандаш стоит на одной координате X во всей админке, а не только внутри
+ * страницы. Ширина колонки поэтому одна на всю админку —
+ * `TABLE_ROW_ACTIONS_COLUMN` в `table/index.ts`, страница её не пересчитывает.
  *
- * Пороги «1–3 инлайном, 4+ кебаб», очередь инлайн-слотов и резерв под три иконки
- * такта 20 сняты. Ширину колонки резервирует страница: без вторичных — слот плюс
- * подпись, со вторичными — два слота.
+ * > Такт 22 исправил порядок: в такте 21 вторичный слот стоял левее карандаша — ошибка
+ * > передачи решения владельца.
  *
  * ## Клик по действию не уходит в строку
  *
@@ -39,7 +43,7 @@ import { TABLE_ROW_ACTION_ORDER, type TableRowActionItem } from '.'
 const props = withDefaults(defineProps<{
   /** Вторичные действия в любом порядке — порядок кебаба задаёт компонент. */
   actions?: TableRowActionItem[]
-  /** Подпись и имя карандаша. */
+  /** Подпись карандаша. */
   editLabel?: string
   /** Редактирование недоступно по правам. */
   editDisabled?: boolean
@@ -51,7 +55,7 @@ const props = withDefaults(defineProps<{
 
 const menuOpen = ref(false)
 
-/** Одно вторичное действие, и это не удаление, — встаёт иконкой в левый слот. */
+/** Одно вторичное действие, и это не удаление, — встаёт иконкой. */
 const single = computed(() => {
   const [first] = props.actions
   return props.actions.length === 1 && first && !first.destructive ? first : null
@@ -68,28 +72,25 @@ const menuDanger = computed(() => ordered.value.filter(a => a.destructive))
 
 <template>
   <div data-slot="table-row-actions" class="flex items-center justify-end gap-2" @click.stop>
-    <!-- Вторичных нет: один слот, подпись по наведению на строку. -->
-    <TableRowAction v-if="!props.actions.length" :disabled="props.editDisabled">
+    <!-- Подпись и карандаш: всегда, при любом числе действий. -->
+    <TableRowAction :disabled="props.editDisabled">
       {{ props.editLabel }}
     </TableRowAction>
 
-    <template v-else>
-      <!-- Левый слот — одно вторичное действие иконкой. -->
+    <!-- Вторичный слот: 24×24, занят всегда — пустой, иконка или кебаб. -->
+    <span data-slot="table-row-actions-secondary" class="relative flex size-6 shrink-0">
       <TooltipProvider v-if="single">
         <Tooltip>
           <TooltipTrigger as-child>
-            <span data-slot="table-row-actions-slot" class="flex">
-              <IconButton variant="service" size="sm" :label="single.label" :disabled="single.disabled">
-                <Icon :name="single.icon" :size="16" />
-              </IconButton>
-            </span>
+            <IconButton variant="service" size="sm" :label="single.label" :disabled="single.disabled">
+              <Icon :name="single.icon" :size="16" />
+            </IconButton>
           </TooltipTrigger>
           <TooltipContent>{{ single.label }}</TooltipContent>
         </Tooltip>
       </TooltipProvider>
 
-      <!-- Левый слот — кебаб: открывает попап «ещё», удаление последней группой. -->
-      <span v-else data-slot="table-row-actions-slot" class="relative flex">
+      <template v-else-if="props.actions.length">
         <IconButton
           variant="service"
           size="sm"
@@ -126,21 +127,7 @@ const menuDanger = computed(() => ordered.value.filter(a => a.destructive))
             </SelectItem>
           </SelectGroup>
         </Popover>
-      </span>
-
-      <!-- Правый слот — карандаш, всегда. -->
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <span data-slot="table-row-actions-slot" class="flex">
-              <IconButton variant="service" size="sm" :label="props.editLabel" :disabled="props.editDisabled">
-                <Icon name="edit" :size="16" />
-              </IconButton>
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>{{ props.editLabel }}</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    </template>
+      </template>
+    </span>
   </div>
 </template>

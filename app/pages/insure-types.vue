@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import type { TableRowActionItem } from '@/components/ui/table'
+import { TABLE_ROW_ACTIONS_COLUMN, type TableRowActionItem } from '@/components/ui/table'
 
 /**
  * Вторая тестовая страница — «Типы схем осмотров» (`insure-types`) текущей
@@ -110,14 +110,14 @@ const TYPES = [
 /**
  * Колонки. Макета нет: ширины — решение сборки, содержательная колонка резиновая.
  * Колонки «Иконка» нет с такта 20: эмблема живёт в «Наименовании» блоком
- * идентичности. Ширину «Действий» резервирует страница (такт 21): без вторичных
- * действий — слот плюс подпись (w-44), со вторичными у всех строк — два слота. Демо
- * смешивает оба вида, поэтому держит w-44. Ширина одна на все строки.
+ * идентичности. Ширина «Действий» одна на всю админку — `TABLE_ROW_ACTIONS_COLUMN`
+ * (такт 22): подпись, карандаш и всегда зарезервированный вторичный слот. Страница её
+ * не пересчитывает.
  */
 const columns = [
   { key: 'id', title: 'Id', width: 'w-24' },
   { key: 'name', title: 'Наименование', width: 'flex-1' },
-  { key: 'actions', title: 'Действия', width: 'w-44' },
+  { key: 'actions', title: 'Действия', width: TABLE_ROW_ACTIONS_COLUMN },
 ] as const
 
 /**
@@ -160,8 +160,8 @@ if (route.query.q) search.value = String(route.query.q)
  *
  * Канон — одно действие у всех строк: карандаш с подписью по наведению. Набор
  * действий у всех строк страницы один (D6 такта 20), поэтому смешанные строки бывают
- * только здесь. Такт 21: колонка из двух слотов — строка 1 только карандаш, строка 2
- * одно вторичное действие иконкой, строка 3 кебаб.
+ * только здесь. Такт 22: строка 1 — только карандаш, строка 2 — карандаш и копировать,
+ * строка 3 — карандаш и кебаб. Подпись по наведению — у всех трёх.
  */
 const demoActions = route.query.actions === 'demo'
 
@@ -269,7 +269,7 @@ function actionsFor(index: number): TableRowActionItem[] {
         </TableCell>
 
         <!-- Колонка действий — компонент кита (такт 20, D): раскладку страница не повторяет. -->
-        <TableCell variant="slot" :size="56" class="w-44 justify-end px-4">
+        <TableCell variant="slot" :size="56" class="justify-end px-4" :class="TABLE_ROW_ACTIONS_COLUMN">
           <TableRowActions :actions="actionsFor(index)" />
         </TableCell>
       </TableRow>
