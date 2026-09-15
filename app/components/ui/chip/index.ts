@@ -77,9 +77,40 @@ export const chipVariants = cva(
        * фильтр без включённого состояния не работает. Механика взята оттуда же —
        * заливка становится брендовой, подпись белой.
        */
+      /**
+       * Такт 26, решение владельца: **нейтральная метка значения** — компания в
+       * многозначной ячейке справочника.
+       *
+       * | | `default` | `neutral` |
+       * |---|---|---|
+       * | подложка | `chip` (`accent/surface_bright`), включённый — бренд | `muted` (`neutral/soft`) |
+       * | текст | `foreground`, включённый — белый | `foreground` |
+       * | наведение | есть у интерактивного | нет |
+       * | `active`, `count`, `marker`, `trailing` | работают | погашены: хвост всегда `none` |
+       *
+       * Геометрия и типографика общие — мастер `badge` `747:2464`: высота 32,
+       * радиус 24, паддинг 16, подпись 15/20 Regular.
+       *
+       * Мастера статичной метки нет. Кандидат Атома `Badge` `913:8279` рассмотрен
+       * владельцем и отклонён: плашка поверх медиа (`Announcement`, `Slideshow`,
+       * `LightBox`), высота 16/24, кегль 10/13 вне шкалы кита. `ButtonTag`
+       * `256:3601` — кнопка, прецедент такта 24. Разбор — `docs/page-statuses.md`.
+       *
+       * Нейтральная подложка берётся для меток внутри интерактивной строки:
+       * ховер строки — `accent` (`bg/surface_hover`), метка на нём остаётся читаемой плашкой.
+       */
+      variant: {
+        default: '',
+        neutral: 'bg-muted text-foreground',
+      },
+      /**
+       * Ось `Active` пришла из `ButtonTag` Атома: у чипа кита 1 её нет, а
+       * фильтр без включённого состояния не работает. Механика взята оттуда же —
+       * заливка становится брендовой, подпись белой. Значима у `default`.
+       */
       active: {
-        true: 'bg-primary text-primary-foreground',
-        false: 'bg-chip text-foreground',
+        true: '',
+        false: '',
       },
       /**
        * Такт 24: наведение — только у интерактивного чипа. Метка без действия
@@ -93,16 +124,18 @@ export const chipVariants = cva(
       },
     },
     compoundVariants: [
+      { variant: 'default', active: true, class: 'bg-primary text-primary-foreground' },
+      { variant: 'default', active: false, class: 'bg-chip text-foreground' },
       // Наведение включённого чипа — штатная ступень бренда, как у кнопки.
-      { active: true, interactive: true, class: 'hover:bg-primary-hover' },
+      { variant: 'default', active: true, interactive: true, class: 'hover:bg-primary-hover' },
       // Наведение выключенного **осветляет**: ступени темнее `accent/surface_bright`
       // в ките нет вовсе (проверено по всем светлым токенам темы), а соседняя
       // снизу — `accent/surface_soft`. Осветление при наведении — не выдумка:
       // тем же способом ходит наведение в тёмной теме (`--secondary-hover` 8%)
       // и в меню Атома, где ховер светлее выбранного. Дыра записана в долг.
-      { active: false, interactive: true, class: 'hover:bg-secondary' },
+      { variant: 'default', active: false, interactive: true, class: 'hover:bg-secondary' },
     ],
-    defaultVariants: { active: false, interactive: true },
+    defaultVariants: { variant: 'default', active: false, interactive: true },
   },
 )
 

@@ -80,6 +80,20 @@ export const tableCellVariants = cva('flex shrink-0 items-center', {
       true: 'bg-muted-foreground/[var(--opacity-soft)]',
       false: '',
     },
+    /**
+     * Такт 26, решение владельца: в строке, которую растит многозначная ячейка,
+     * соседние ячейки стоят у **первой линии меток**. `start` прижимает ячейку к верху
+     * строки и сохраняет высоту размера: центр её содержимого совпадает с центром первой
+     * линии `values` — 28 при размере 56 (12 + 32 / 2).
+     *
+     * До такта то же положение давала растяжка строки: у ячейки с заданной высотой
+     * `align-self: stretch` работает как прижатие к верху. Ось делает это положение
+     * явным правилом ячейки.
+     */
+    align: {
+      stretch: '',
+      start: 'self-start',
+    },
     size: {
       72: 'h-18',
       56: 'h-14',
@@ -103,6 +117,7 @@ export const tableCellVariants = cva('flex shrink-0 items-center', {
     variant: 'text',
     active: false,
     size: 56,
+    align: 'stretch',
   },
 })
 

@@ -21,6 +21,11 @@ const props = withDefaults(defineProps<{
   /** Высота из мастера. Кегль текста идёт за ней. */
   size?: TableCellVariants['size']
   /**
+   * Положение в строке, которую растит многозначная ячейка: `start` — у первой линии
+   * меток, высота размера сохраняется. Такт 26, разбор — в `index.ts`.
+   */
+  align?: TableCellVariants['align']
+  /**
    * Класс снаружи — слиянием. Ширину колонки задаёт таблица, а не ячейка: у
    * мастера ширины прописаны у каждой колонки отдельно (`size_width`), и
    * без слияния паддинг варианта конфликтует с заданной шириной.
@@ -47,6 +52,7 @@ const props = withDefaults(defineProps<{
   variant: 'text',
   active: false,
   size: 56,
+  align: 'stretch',
 })
 
 const emit = defineEmits<{ toggle: [] }>()
@@ -57,7 +63,7 @@ const emit = defineEmits<{ toggle: [] }>()
     data-slot="table-cell"
     role="cell"
     :class="cn(
-      tableCellVariants({ variant: props.variant, active: props.active, size: props.size }),
+      tableCellVariants({ variant: props.variant, active: props.active, size: props.size, align: props.align }),
       props.sticky !== false ? 'sticky z-10 bg-inherit' : '',
       props.divider ? 'border-r border-border' : '',
       props.class,

@@ -1,17 +1,16 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import type { IconName } from '@/components/ui/icon'
-import { TABLE_ROW_ACTIONS_COLUMN, type TableRowActionItem } from '@/components/ui/table'
+import { TABLE_ROW_ACTIONS_COLUMN } from '@/components/ui/table'
 
 /**
- * Стенд «Статусы» — список статусных моделей справочника, такт 24.
+ * Стенд «Статусы» — список статусных моделей справочника, такты 24 и 26.
  *
  * ## Источник — прод, макета нет
  *
  * Страница прода «Статусы»: заголовок, «Добавить», таблица Наименование | Компании |
  * действия. Макета в Figma нет, поэтому вид собран по канону типовой страницы-таблицы
  * (`docs/naming.md`, «Такт 20: типовая страница-таблица админки (канон)» с правками
- * тактов 21–24). Разбор и провенанс — `docs/page-statuses.md`.
+ * тактов 21–26). Разбор и провенанс — `docs/page-statuses.md`.
  *
  * Форма редактирования статусной модели — отдельный стенд позже.
  *
@@ -19,62 +18,80 @@ import { TABLE_ROW_ACTIONS_COLUMN, type TableRowActionItem } from '@/components/
  *
  * - **Id нет:** у статусной модели нет идентификатора в системе — колонка не заводится.
  * - **Эмблемы нет:** блок идентичности — только имя.
- * - **Многозначная ячейка «Компании»:** метки инлайном с переносом, без потолка и «+N».
- * - **Первое реальное вторичное действие:** «Сделать копию» в правом слоте колонки.
+ * - **Многозначная ячейка «Компании»:** нейтральные метки инлайном с переносом, без потолка
+ *   и «+N»; у компании со знаком — логотип 16×16.
+ * - **Колонка действий — только карандаш** (такт 26): правый слот зарезервирован пустым,
+ *   «Сделать копию» живёт в форме справочника.
  *
  * ## Что живое, а что заглушка
  *
  * Живые: поиск по имени модели и по компаниям, пагинация, размер страницы. Заглушки:
- * «Добавить», клик по строке и «Сделать копию» — обработчиков нет намеренно.
+ * «Добавить» и клик по строке — обработчиков нет намеренно.
  */
 definePageMeta({ layout: 'admin' })
 useHead({ title: 'Статусы' })
 
 /**
- * Логотипы компаний — **демо-данные, не правило.** На проде логотип — картинка; здесь
- * заглушка: глиф Material Symbols 16, окрашенный рампой расширенной палитры. Палитра
- * законна именно тут: цвет различает компании, а не сообщает статус (`naming.md`,
- * «Расширенная палитра»), и взята по явному указанию владельца. Компания без логотипа —
- * метка без иконки и без заглушки. Классы статичны: собранную строку Tailwind не увидит.
+ * Логотипы компаний — **демо-данные стенда.** На проде логотип загружает компания; здесь —
+ * знаки брендов из открытой библиотеки trace-logos.ru, выгрузка 2026-09-15, файлы в
+ * `public/demo/logos/`. Знаки принадлежат владельцам; в прод и витрину не переносятся.
+ * Компания без знака — метка без изображения. Соответствие — `docs/page-statuses.md`.
  */
-const LOGOS: Record<string, { icon: IconName, tone: string }> = {
-  'AnyaTest': { icon: 'person', tone: 'text-palette-01' },
-  'Касса': { icon: 'payments', tone: 'text-palette-02' },
-  'Сбербанк страхование': { icon: 'admin', tone: 'text-palette-03' },
-  'Тестовая компания 2': { icon: 'layers', tone: 'text-palette-04' },
-  'TestKasko': { icon: 'car', tone: 'text-palette-05' },
-  'Домклик': { icon: 'home', tone: 'text-palette-06' },
-  'ВТБ Страхование': { icon: 'monitoring', tone: 'text-palette-01' },
-  'Уралсиб': { icon: 'account-tree', tone: 'text-palette-02' },
-  'Энергогарант': { icon: 'settings', tone: 'text-palette-03' },
-  'Denis': { icon: 'lock', tone: 'text-palette-04' },
-  'Еж': { icon: 'asterisk', tone: 'text-palette-05' },
-  'тест': { icon: 'article', tone: 'text-palette-06' },
+const LOGOS: Record<string, string> = {
+  'Ингосстрах': 'ingosstrakh',
+  'Альфа Страхование': 'alfa-insurance',
+  'Сбер': 'sber',
+  'Согаз': 'sogaz',
+  'Т-Страхование': 't-bank-insurance',
+  'ДомКлик': 'domclick',
+  'ВТБ': 'vtb',
+  'УралСиб': 'uralsib',
+  'Совкомбанк': 'sovcombank',
+  'Райффайзен': 'raiffeisen',
+  'Самолёт': 'samolet',
+  'Брусника': 'brusnika',
 }
+
+const logo = (company: string) => (LOGOS[company] ? `/demo/logos/${LOGOS[company]}.svg` : undefined)
 
 /**
  * Статусные модели с прода, порядок строк и порядок компаний внутри строки сохранены
- * как пришли: алфавит на проде не соблюдается, и сортировка исказила бы данные.
+ * как пришли: алфавит на проде не соблюдается, и сортировка исказила бы данные. Названия
+ * моделей — с прода; двенадцать компаний со знаком переименованы в бренды своих знаков.
  */
 const MODELS: { name: string, companies: string[] }[] = [
-  { name: 'AnyaTest', companies: ['AnyaTest'] },
-  { name: 'COPY AnyaTest', companies: ['AnyaTest'] },
-  { name: 'COPY AnyaTest', companies: ['AnyaTest'] },
-  { name: 'COPY AnyaTest', companies: ['AnyaTest'] },
+  { name: 'AnyaTest', companies: ['Ингосстрах'] },
+  { name: 'COPY AnyaTest', companies: ['Ингосстрах'] },
+  { name: 'COPY AnyaTest', companies: ['Ингосстрах'] },
+  { name: 'COPY AnyaTest', companies: ['Ингосстрах'] },
   { name: 'meztest', companies: ['MezTest'] },
-  { name: 'SavelyTest', companies: ['Касса', 'Сбербанк страхование', 'Тестовая компания 2'] },
-  { name: 'testSafontev', companies: ['TestKasko'] },
-  { name: 'testSafontev123', companies: ['TestKasko'] },
-  { name: 'VIEWAPP eng', companies: ['Касса'] },
-  { name: 'Базовые статусы для Кассы', companies: ['Касса'] },
-  { name: 'Домклик', companies: ['Домклик'] },
-  { name: 'Особый словарь', companies: ['ВТБ Страхование', 'Касса', 'РВИО', 'Сбербанк страхование', 'Тестовая компания 2', 'Уралсиб', 'Энергогарант', 'комп', '1 Схема', 'ViktorTEST'] },
-  { name: 'Райффайзенбанк', companies: ['Denis', 'Еж', 'Золото Толозы'] },
-  { name: 'тест', companies: ['тест'] },
+  { name: 'SavelyTest', companies: ['Альфа Страхование', 'Сбер', 'Согаз'] },
+  { name: 'testSafontev', companies: ['Т-Страхование'] },
+  { name: 'testSafontev123', companies: ['Т-Страхование'] },
+  { name: 'VIEWAPP eng', companies: ['Альфа Страхование'] },
+  { name: 'Базовые статусы для Кассы', companies: ['Альфа Страхование'] },
+  { name: 'Домклик', companies: ['ДомКлик'] },
+  { name: 'Особый словарь', companies: ['ВТБ', 'Альфа Страхование', 'РВИО', 'Сбер', 'Согаз', 'УралСиб', 'Совкомбанк', 'комп', '1 Схема', 'ViktorTEST'] },
+  { name: 'Райффайзенбанк', companies: ['Райффайзен', 'Самолёт', 'Золото Толозы'] },
+  { name: 'тест', companies: ['Брусника'] },
   { name: 'тест1', companies: [] },
-  { name: 'эвелина кастом', companies: ['AnyaTest'] },
-  { name: 'эвелина текст', companies: ['тестовая компания эвелина', 'AnyaTest', 'Касса'] },
+  { name: 'эвелина кастом', companies: ['Ингосстрах'] },
+  { name: 'эвелина текст', companies: ['тестовая компания эвелина', 'Ингосстрах', 'Альфа Страхование'] },
 ]
+
+const route = useRoute()
+
+/**
+ * Приёмочная оснастка: `?values=demo` — у «Особого словаря» 40 компаний по кругу из всех
+ * 19 имён демо-данных, повторы допустимы. Показывает многозначную ячейку при большом
+ * наборе. В продукт не идёт.
+ */
+const models = computed(() => {
+  if (route.query.values !== 'demo') return MODELS
+  const names = [...new Set(MODELS.flatMap(m => m.companies))]
+  const many = Array.from({ length: 40 }, (_, i) => names[i % names.length]!)
+  return MODELS.map(m => (m.name === 'Особый словарь' ? { ...m, companies: many } : m))
+})
 
 /** Колонки: Id нет, у колонки действий заголовка нет — канон, такты 23–24. */
 const columns = [
@@ -92,10 +109,9 @@ const search = ref('')
 
 const filtered = computed(() => {
   const q = search.value.trim().toLowerCase()
-  if (!q) return MODELS.map((m, index) => ({ ...m, index }))
-  return MODELS
-    .map((m, index) => ({ ...m, index }))
-    .filter(m => m.name.toLowerCase().includes(q) || m.companies.some(c => c.toLowerCase().includes(q)))
+  const all = models.value.map((m, index) => ({ ...m, index }))
+  if (!q) return all
+  return all.filter(m => m.name.toLowerCase().includes(q) || m.companies.some(c => c.toLowerCase().includes(q)))
 })
 
 const pageSize = ref(25)
@@ -112,14 +128,8 @@ function onSearch() {
 }
 
 /** Приёмочная оснастка: `?rows=` — размер страницы, `?q=` — запрос для снимка. В продукт не идёт. */
-const route = useRoute()
 if (route.query.rows) pageSize.value = Number(route.query.rows)
 if (route.query.q) search.value = String(route.query.q)
-
-/** Вторичное действие страницы — «Сделать копию» из формы прода. Одно на все строки. */
-const ACTIONS: TableRowActionItem[] = [
-  { key: 'copy', label: 'Сделать копию', icon: 'copy' },
-]
 </script>
 
 <template>
@@ -175,12 +185,12 @@ const ACTIONS: TableRowActionItem[] = [
 
       <!--
         Клик по строке = открыть на редактирование, обработчик не заведён — как у
-        «Добавить». Строка растёт вместе с ячейкой «Компании»: имя и действия стоят
-        у первой линии меток.
+        «Добавить». Строка растёт вместе с ячейкой «Компании»; имя и действия стоят
+        у первой линии меток — `align="start"`, такт 26.
       -->
       <TableRow v-for="row in rows" :key="row.index" interactive>
         <!-- Блок идентичности без эмблемы: у статусной модели своей иконки нет. -->
-        <TableCell variant="slot" :size="56" class="w-60 px-4">
+        <TableCell variant="slot" :size="56" align="start" class="w-60 px-4">
           <TableCellIdentity>
             {{ row.name }}
           </TableCellIdentity>
@@ -188,20 +198,24 @@ const ACTIONS: TableRowActionItem[] = [
 
         <!--
           Многозначная ячейка — канон, такт 24: `TableCell variant="values"` — метки
-          инлайном с переносом, зазор 8, без потолка и без «+N». Пустой набор — пустая
-          ячейка той же высоты, что строка с одной меткой.
+          инлайном с переносом, зазор 8, без потолка и без «+N». Метка — нейтральный `Chip`
+          с логотипом компании, такт 26. Пустой набор — пустая ячейка той же высоты, что
+          строка с одной меткой.
         -->
         <TableCell variant="values" :size="56" class="min-w-0 flex-1 px-4" data-cell="companies">
-          <Chip v-for="company in row.companies" :key="company" trailing="none">
-            <template v-if="LOGOS[company]" #leading>
-              <Icon :name="LOGOS[company]!.icon" :size="16" :class="LOGOS[company]!.tone" />
-            </template>
+          <Chip
+            v-for="(company, i) in row.companies"
+            :key="i"
+            variant="neutral"
+            :image="logo(company)"
+          >
             {{ company }}
           </Chip>
         </TableCell>
 
-        <TableCell variant="slot" :size="56" class="justify-end px-4" :class="TABLE_ROW_ACTIONS_COLUMN">
-          <TableRowActions :actions="ACTIONS" />
+        <!-- Только карандаш: вторичный слот зарезервирован пустым — правило такта 22. -->
+        <TableCell variant="slot" :size="56" align="start" class="justify-end px-4" :class="TABLE_ROW_ACTIONS_COLUMN">
+          <TableRowActions />
         </TableCell>
       </TableRow>
     </Table>
