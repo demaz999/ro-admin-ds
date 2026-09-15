@@ -126,6 +126,13 @@ export const iconButtonVariants = cva(
       { variant: 'secondary', class: 'disabled:opacity-[var(--opacity-disabled)]' },
       { variant: 'elevated', class: 'disabled:opacity-[var(--opacity-disabled)]' },
       { variant: 'ghost', class: 'disabled:opacity-[var(--opacity-disabled)]' },
+      /**
+       * Такт 20: у сервисной кнопки выключенного вида не было вовсе — при
+       * `disabled` глиф оставался ярким. Колонка действий строки держит
+       * недоступное по правам действие в слоте выключенным, поэтому гасится той
+       * же ступенью, что `ghost`: у обоих типов нет заливки, гаснет только глиф.
+       */
+      { variant: 'service', class: 'disabled:opacity-[var(--opacity-disabled)]' },
       { variant: 'service', class: 'disabled:opacity-[var(--opacity-disabled)]' },
       { variant: 'sidebar', class: 'disabled:opacity-[var(--opacity-disabled)]' },
     ],

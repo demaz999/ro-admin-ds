@@ -4,10 +4,12 @@ import { cva } from 'class-variance-authority'
 export { default as Table } from './Table.vue'
 export { default as TableCell } from './TableCell.vue'
 export { default as TableCellText } from './TableCellText.vue'
+export { default as TableCellIdentity } from './TableCellIdentity.vue'
 export { default as TableFooter } from './TableFooter.vue'
 export { default as TableHead } from './TableHead.vue'
 export { default as TableRow } from './TableRow.vue'
 export { default as TableRowAction } from './TableRowAction.vue'
+export { default as TableRowActions } from './TableRowActions.vue'
 export { default as TableToolbar } from './TableToolbar.vue'
 
 /**
@@ -155,6 +157,27 @@ export const tableRowVariants = cva('group/table-row flex w-full items-stretch b
   ],
   defaultVariants: { state: 'default', interactive: false },
 })
+
+/**
+ * Действие строки для `TableRowActions`. Ключ задаёт место в глобальном порядке
+ * колонки (`TABLE_ROW_ACTION_ORDER`), а не место в массиве страницы.
+ */
+export interface TableRowActionItem {
+  key: string
+  label: string
+  icon: import('../icon/icons').IconName
+  /** Недоступно по правам: слот остаётся на месте, действие гаснет. */
+  disabled?: boolean
+  /** Удаление и подобное: голой иконкой не ставится, уходит в кебаб отдельной секцией. */
+  destructive?: boolean
+}
+
+/**
+ * Глобальный порядок вторичных действий, справа налево от карандаша: копировать
+ * ближе всех, дальше архивировать, дальше — то, что живёт только в кебабе.
+ * Решение владельца, такт 20 (D2): одна координата у одного действия на всю админку.
+ */
+export const TABLE_ROW_ACTION_ORDER = ['copy', 'archive', 'export', 'delete'] as const
 
 export type TableRowVariants = VariantProps<typeof tableRowVariants>
 export type TableCellVariants = VariantProps<typeof tableCellVariants>
