@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { Icon } from '../icon'
 import { IconButton } from '../icon-button'
-import { Popover } from '../popover'
+import { Popover, PopoverContent, PopoverTrigger } from '../popover'
 import { SelectGroup, SelectItem } from '../select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../tooltip'
 import TableRowAction from './TableRowAction.vue'
@@ -32,6 +32,10 @@ import { TABLE_ROW_ACTION_ORDER, type TableRowActionItem } from '.'
  * ячейки, на одной вертикали с правым краем «Добавить». На странице со вторичными
  * карандаш сдвинут на 32 левее и стоит на одной X у всех строк страницы. Ширину колонки
  * выбирает `tableRowActionsColumn` в `table/index.ts` по набору действий страницы.
+ *
+ * Кебаб собран на примитивах Reka Popover с такта 28: плашка уходит порталом в `body`,
+ * положение — `align="end"` `:side-offset="4"`, подобрано замером под прежние 4px до
+ * пилюли. Разбор — `popover/index.ts`.
  *
  * Резерв по умолчанию следует за списком строки. `reserveSecondary` задаёт его по
  * странице: у строки без вторичных на странице, где они есть, слот остаётся пустым —
@@ -105,41 +109,35 @@ const menuDanger = computed(() => ordered.value.filter(a => a.destructive))
       </TooltipProvider>
 
       <template v-else-if="props.actions.length">
-        <IconButton
-          variant="service"
-          size="sm"
-          label="Ещё"
-          :aria-expanded="menuOpen"
-          @click="menuOpen = !menuOpen"
-        >
-          <Icon name="pending" :size="16" />
-        </IconButton>
+        <Popover v-model:open="menuOpen">
+          <PopoverTrigger as-child>
+            <IconButton variant="service" size="sm" label="Ещё">
+              <Icon name="pending" :size="16" />
+            </IconButton>
+          </PopoverTrigger>
 
-        <Popover
-          v-model:open="menuOpen"
-          data-menu="row-actions"
-          class="absolute top-7 right-0 z-50 p-1"
-        >
-          <SelectGroup v-if="menuMain.length">
-            <SelectItem
-              v-for="a in menuMain"
-              :key="a.key"
-              :disabled="a.disabled"
-              @click="menuOpen = false"
-            >
-              {{ a.label }}
-            </SelectItem>
-          </SelectGroup>
-          <SelectGroup v-if="menuDanger.length" data-section="danger">
-            <SelectItem
-              v-for="a in menuDanger"
-              :key="a.key"
-              :disabled="a.disabled"
-              @click="menuOpen = false"
-            >
-              {{ a.label }}
-            </SelectItem>
-          </SelectGroup>
+          <PopoverContent data-menu="row-actions" align="end" :side-offset="4" class="p-1">
+            <SelectGroup v-if="menuMain.length">
+              <SelectItem
+                v-for="a in menuMain"
+                :key="a.key"
+                :disabled="a.disabled"
+                @click="menuOpen = false"
+              >
+                {{ a.label }}
+              </SelectItem>
+            </SelectGroup>
+            <SelectGroup v-if="menuDanger.length" data-section="danger">
+              <SelectItem
+                v-for="a in menuDanger"
+                :key="a.key"
+                :disabled="a.disabled"
+                @click="menuOpen = false"
+              >
+                {{ a.label }}
+              </SelectItem>
+            </SelectGroup>
+          </PopoverContent>
         </Popover>
       </template>
     </span>

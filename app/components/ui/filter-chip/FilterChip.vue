@@ -4,7 +4,7 @@ import { ButtonAction } from '../button-action'
 import { Chip } from '../chip'
 import { Icon } from '../icon'
 import { IconButton } from '../icon-button'
-import { Popover } from '../popover'
+import { Popover, PopoverContent, PopoverTrigger } from '../popover'
 import { SelectItem } from '../select'
 
 /**
@@ -46,50 +46,49 @@ const text = computed(() => {
 
 <template>
   <span data-slot="filter-chip" class="relative inline-flex">
-    <Chip
-      v-if="isCounter"
-      :count="props.values.length"
-      trailing="expand"
-      :expanded="open"
-      @toggle="open = !open"
-    >
-      {{ text }}
-    </Chip>
-
-    <Chip v-else @remove="emit('remove')">
+    <Chip v-if="!isCounter" @remove="emit('remove')">
       {{ text }}
     </Chip>
 
     <!--
-      Список выбранных значений. Сверху сброс всего фильтра, ниже значения —
-      каждое снимается своим крестиком.
+      Счётчиковый чип — триггер плашки со значениями: Reka сама слушает клик и
+      исключает его из «снаружи», такт 28. Клавиатура заведена на `Chip.vue`
+      (`onRootKeydown` зовёт `click()` на себе) — отдельного пути тут нет,
+      иначе мышь и клавиатура развели бы состояние. `as="span"` — Reka по
+      умолчанию метит триггер как `<button>`, а чип им не является.
     -->
-    <Popover
-      v-if="isCounter"
-      v-model:open="open"
-      data-slot="filter-chip-values"
-      :width="348"
-      class="absolute top-10 left-0 z-50 p-1"
-    >
-      <div class="px-4 py-2">
-        <ButtonAction :show-icon="false" size="sm" @click="emit('remove')">
-          Сбросить все
-        </ButtonAction>
-      </div>
+    <Popover v-else v-model:open="open">
+      <PopoverTrigger as="span" as-child>
+        <Chip :count="props.values.length" trailing="expand" :expanded="open">
+          {{ text }}
+        </Chip>
+      </PopoverTrigger>
 
-      <SelectItem v-for="value in props.values" :key="value">
-        {{ value }}
-        <template #trailing>
-          <IconButton
-            variant="ghost"
-            size="sm"
-            label="Убрать значение"
-            @click="emit('removeValue', value)"
-          >
-            <Icon name="close" :size="9.4" />
-          </IconButton>
-        </template>
-      </SelectItem>
+      <!--
+        Список выбранных значений. Сверху сброс всего фильтра, ниже значения —
+        каждое снимается своим крестиком.
+      -->
+      <PopoverContent data-slot="filter-chip-values" :width="348" align="start" :side-offset="8" class="p-1">
+        <div class="px-4 py-2">
+          <ButtonAction :show-icon="false" size="sm" @click="emit('remove')">
+            Сбросить все
+          </ButtonAction>
+        </div>
+
+        <SelectItem v-for="value in props.values" :key="value">
+          {{ value }}
+          <template #trailing>
+            <IconButton
+              variant="ghost"
+              size="sm"
+              label="Убрать значение"
+              @click="emit('removeValue', value)"
+            >
+              <Icon name="close" :size="9.4" />
+            </IconButton>
+          </template>
+        </SelectItem>
+      </PopoverContent>
     </Popover>
   </span>
 </template>

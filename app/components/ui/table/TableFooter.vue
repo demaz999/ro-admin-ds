@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { Icon } from '../icon'
 import { Pagination } from '../pagination'
-import { Popover } from '../popover'
+import { Popover, PopoverContent, PopoverTrigger } from '../popover'
 import { SelectItem } from '../select'
 
 /**
@@ -94,27 +94,30 @@ function pick(size: number) {
 
     <!-- Переключатель размера страницы: плашка с подписью и шевроном. -->
     <span class="relative ml-auto">
-      <button
-        data-slot="page-size"
-        type="button"
-        class="flex h-11 items-center gap-2 rounded-md bg-secondary px-4 text-sm outline-none transition-colors hover:bg-secondary-hover"
-        :aria-expanded="open"
-        :style="{ transitionDuration: 'var(--duration-hover)' }"
-        @click="open = !open"
-      >
-        {{ props.pageSize }} строк
-        <Icon name="chevron-down" :size="11" class="text-foreground-secondary" />
-      </button>
+      <Popover v-model:open="open">
+        <PopoverTrigger as-child>
+          <button
+            data-slot="page-size"
+            type="button"
+            class="flex h-11 items-center gap-2 rounded-md bg-secondary px-4 text-sm outline-none transition-colors hover:bg-secondary-hover"
+            :style="{ transitionDuration: 'var(--duration-hover)' }"
+          >
+            {{ props.pageSize }} строк
+            <Icon name="chevron-down" :size="11" class="text-foreground-secondary" />
+          </button>
+        </PopoverTrigger>
 
-      <Popover v-model:open="open" :width="160" class="absolute right-0 bottom-13 z-50 p-1">
-        <SelectItem
-          v-for="size in props.pageSizes"
-          :key="size"
-          :selected="size === props.pageSize"
-          @click="pick(size)"
-        >
-          {{ size }} строк
-        </SelectItem>
+        <!-- У нижнего края экрана плашке снизу некуда расти: открывается вверх. -->
+        <PopoverContent :width="160" side="top" align="end" :side-offset="8" class="p-1">
+          <SelectItem
+            v-for="size in props.pageSizes"
+            :key="size"
+            :selected="size === props.pageSize"
+            @click="pick(size)"
+          >
+            {{ size }} строк
+          </SelectItem>
+        </PopoverContent>
       </Popover>
     </span>
   </div>

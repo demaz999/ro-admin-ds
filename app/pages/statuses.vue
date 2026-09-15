@@ -132,6 +132,12 @@ function onSearch() {
   page.value = 1
 }
 
+/** Сброс поиска — канон пустого состояния (такт 28): очищает запрос и возвращает первую страницу. */
+function resetSearch() {
+  search.value = ''
+  page.value = 1
+}
+
 /** Приёмочная оснастка: `?rows=` — размер страницы, `?q=` — запрос для снимка. В продукт не идёт. */
 if (route.query.rows) pageSize.value = Number(route.query.rows)
 if (route.query.q) search.value = String(route.query.q)
@@ -175,7 +181,8 @@ if (route.query.q) search.value = String(route.query.q)
       </Button>
     </TableToolbar>
 
-    <Table attached-top attached data-slot="statuses-table">
+    <!-- Без подвала (пустой результат) низ несёт сама таблица — `:attached="total > 0"`. -->
+    <Table attached-top :attached="total > 0" data-slot="statuses-table">
       <TableRow>
         <TableHead
           v-for="col in columns"
@@ -189,11 +196,17 @@ if (route.query.q) search.value = String(route.query.q)
       </TableRow>
 
       <!--
+        Пустой результат поиска — канон, такт 28: тело таблицы показывает `Empty`
+        вместо строк, подвал ниже скрыт целиком (`v-if="total"`).
+      -->
+      <TableEmptySearch v-if="total === 0" @reset="resetSearch" />
+
+      <!--
         Клик по строке = открыть на редактирование, обработчик не заведён — как у
         «Добавить». Строка растёт вместе с ячейкой «Компании»; имя и действия стоят
         у первой линии меток — `align="start"`, такт 26.
       -->
-      <TableRow v-for="row in rows" :key="row.index" interactive>
+      <TableRow v-else v-for="row in rows" :key="row.index" interactive>
         <!-- Блок идентичности без эмблемы: у статусной модели своей иконки нет. -->
         <TableCell variant="slot" :size="56" align="start" class="w-60 px-4">
           <TableCellIdentity>
@@ -226,6 +239,7 @@ if (route.query.q) search.value = String(route.query.q)
     </Table>
 
     <TableFooter
+      v-if="total"
       v-model:page="page"
       v-model:page-size="pageSize"
       :pages="Math.max(1, Math.ceil(total / pageSize))"

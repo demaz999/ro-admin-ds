@@ -87,11 +87,18 @@ function onRootClick() {
   if (trailing.value === 'expand') emit('toggle')
 }
 
+/**
+ * Такт 28: клавиатура зовёт `click()` на себе, а не эмитит `toggle` напрямую.
+ * `FilterChip` вешает счётчиковый чип триггером `Popover` — Reka сама слушает
+ * клик и переключает состояние; отдельный путь для клавиатуры удвоил бы тоггл
+ * на мыши и разошёлся бы с ней на Enter/Space. `<span role="button">` в отличие
+ * от `<button>` не рождает клик по Enter/Space сам, поэтому его нужно вызвать.
+ */
 function onRootKeydown(event: KeyboardEvent) {
   if (trailing.value !== 'expand') return
   if (event.key === 'Enter' || event.key === ' ') {
     event.preventDefault()
-    emit('toggle')
+    ;(event.currentTarget as HTMLElement).click()
   }
 }
 </script>

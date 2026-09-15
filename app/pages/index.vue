@@ -836,11 +836,11 @@ const martianWidths = [
             паддинга и рамки нет. Начинку кладёт тот, кто применяет. Плашка светлая даже
             когда вылетает из тёмного меню.
           </p>
-          <Popover>
-            <div class="p-4 text-sm text-foreground">
+          <Popover default-open>
+            <PopoverContent inline class="p-4 text-sm text-foreground">
               Содержимое плашки. Паддинг задаёт содержимое, а не сам компонент —
               в мастере паддинга нет.
-            </div>
+            </PopoverContent>
           </Popover>
         </div>
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { DialogClose, DialogContent, DialogPortal, DialogRoot, DialogTitle } from 'reka-ui'
+import { DialogClose, DialogContent, DialogDescription, DialogPortal, DialogRoot, DialogTitle, VisuallyHidden } from 'reka-ui'
 import { Badge } from '../badge'
 import { ButtonArrow } from '../button-arrow'
 import { Icon } from '../icon'
@@ -109,6 +109,17 @@ function go(step: number) {
           <DialogTitle class="sr-only">
             {{ props.caption || 'Просмотр' }}
           </DialogTitle>
+
+          <!--
+            Такт 28: `aria-describedby` у `DialogContent` смотрит на этот id всегда —
+            без элемента с ним Reka предупреждает в консоль. Слота под описание у
+            лайтбокса нет (три полосы во всю ширину, не композиция с телом), поэтому
+            текст фиксированный, а не проп: подписывать нечего сверх того, что уже
+            говорит заголовок.
+          -->
+          <VisuallyHidden as-child>
+            <DialogDescription>Просмотр изображения или видео на весь экран</DialogDescription>
+          </VisuallyHidden>
 
           <div class="flex size-full items-center justify-center overflow-hidden">
             <slot />

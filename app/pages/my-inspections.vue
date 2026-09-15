@@ -533,27 +533,32 @@ function selectAll(list: readonly string[]) {
               API `Checkbox` не трогаем: кнопка живёт рядом, как держатель иконки
               у `Alert` и `SelectItem`.
             -->
-            <span class="relative flex items-center">
-              <span class="flex h-6 w-4 items-center">
-                <Checkbox />
-              </span>
+            <!--
+              Плашка привязана к связке чекбокс + кнопка целиком (мастер
+              `select_container`), не к одной кнопке — такт 28, `PopoverAnchor`
+              шире триггера на 16px слева. Разбор — `popover/index.ts`.
+            -->
+            <Popover v-model:open="bulkOpen">
+              <PopoverAnchor as-child>
+                <span class="relative flex items-center">
+                  <span class="flex h-6 w-4 items-center">
+                    <Checkbox />
+                  </span>
 
-              <button
-                type="button"
-                aria-label="Массовые действия"
-                :aria-expanded="bulkOpen"
-                class="flex size-6 items-center justify-center rounded-xs text-foreground-secondary outline-none transition-colors hover:bg-secondary-hover"
-                @click="bulkOpen = !bulkOpen"
-              >
-                <Icon name="chevron-down" :size="11" />
-              </button>
+                  <PopoverTrigger as-child>
+                    <button
+                      type="button"
+                      aria-label="Массовые действия"
+                      class="flex size-6 items-center justify-center rounded-xs text-foreground-secondary outline-none transition-colors hover:bg-secondary-hover"
+                    >
+                      <Icon name="chevron-down" :size="11" />
+                    </button>
+                  </PopoverTrigger>
+                </span>
+              </PopoverAnchor>
 
-              <!--
-                Плашка позиционируется локально — тот же приём, что у календаря
-                внутри DatePicker: absolute плюс сам Popover без своей раскладки.
-              -->
               <!-- 348 — по самой длинной строке меню: ширины по содержимому у Popover нет. -->
-              <Popover v-model:open="bulkOpen" :width="348" class="absolute top-8 left-0 z-50 p-1">
+              <PopoverContent :width="348" align="start" :side-offset="8" class="p-1">
                 <SelectItem
                   v-for="action in selectionModes"
                   :key="action"
@@ -561,8 +566,8 @@ function selectAll(list: readonly string[]) {
                 >
                   {{ action }}
                 </SelectItem>
-              </Popover>
-            </span>
+              </PopoverContent>
+            </Popover>
 
             <div class="flex min-w-0 flex-1 items-center gap-3">
               <Input
@@ -594,18 +599,18 @@ function selectAll(list: readonly string[]) {
               строками SelectItem. Выключена, пока ничего не выбрано, — так
               нарисовано в макете.
             -->
-            <span class="relative flex">
-              <IconButton
-                size="lg"
-                label="Ещё"
-                :disabled="selectedCount === 0"
-                :aria-expanded="moreOpen"
-                @click="moreOpen = !moreOpen"
-              >
-                <Icon name="pending" :size="20" />
-              </IconButton>
+            <Popover v-model:open="moreOpen">
+              <PopoverTrigger as-child>
+                <IconButton
+                  size="lg"
+                  label="Ещё"
+                  :disabled="selectedCount === 0"
+                >
+                  <Icon name="pending" :size="20" />
+                </IconButton>
+              </PopoverTrigger>
 
-              <Popover v-model:open="moreOpen" :width="348" class="absolute top-12 right-0 z-50 p-1">
+              <PopoverContent :width="348" align="end" :side-offset="8" class="p-1">
                 <SelectItem
                   v-for="action in moreActions"
                   :key="action"
@@ -613,8 +618,8 @@ function selectAll(list: readonly string[]) {
                 >
                   {{ action }}
                 </SelectItem>
-              </Popover>
-            </span>
+              </PopoverContent>
+            </Popover>
             <IconButton size="lg" label="Скачать">
               <Icon name="download" :size="16" />
             </IconButton>

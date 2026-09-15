@@ -1014,7 +1014,13 @@ const textareaVariants = [
         note="Совпасть обязаны шапка, положение возврата и крестика, боковые паддинги и блок кнопок. Заливки плашек — разметка схемы."
       >
         <Dialog :open="true" :modal="false">
-          <DialogContent inline back="Button text" :trap-focus="false">
+          <DialogContent
+            inline
+            back="Button text"
+            :trap-focus="false"
+            title="Схема со скроллом"
+            description="Раскладочная сверка: шапка, возврат, крестик и блок кнопок на средней ширине."
+          >
             <div class="h-full" />
             <template #footer>
               <DialogFooter layout="full">

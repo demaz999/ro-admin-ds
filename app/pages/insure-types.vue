@@ -184,6 +184,12 @@ function onSearch() {
   page.value = 1
 }
 
+/** Сброс поиска — канон пустого состояния (такт 28): очищает запрос и возвращает первую страницу. */
+function resetSearch() {
+  search.value = ''
+  page.value = 1
+}
+
 /**
  * Приёмочная оснастка, та же, что у «Мои осмотры»: `?rows=` задаёт размер
  * страницы, `?q=` — поисковый запрос для снимка. В продукт не идёт.
@@ -242,7 +248,8 @@ if (route.query.q) search.value = String(route.query.q)
     </TableToolbar>
 
     <!-- Закрепления колонок нет: таблица помещается в ширину без прокрутки. -->
-    <Table attached-top attached data-slot="types-table">
+    <!-- Без подвала (пустой результат) низ несёт сама таблица — `:attached="total > 0"`. -->
+    <Table attached-top :attached="total > 0" data-slot="types-table">
       <TableRow>
         <TableHead
           v-for="col in columns"
@@ -256,10 +263,16 @@ if (route.query.q) search.value = String(route.query.q)
       </TableRow>
 
       <!--
+        Пустой результат поиска — канон, такт 28: тело таблицы показывает `Empty`
+        вместо строк, подвал ниже скрыт целиком (`v-if="total"`).
+      -->
+      <TableEmptySearch v-if="total === 0" @reset="resetSearch" />
+
+      <!--
         Клик по строке = открыть на редактирование, обработчик не заведён — как
         у «Добавить». Редактирование открывает страницу, не дровер (такт 20, C).
       -->
-      <TableRow v-for="(row, index) in rows" :key="row.id" interactive>
+      <TableRow v-else v-for="(row, index) in rows" :key="row.id" interactive>
         <!--
           Id — приглушённый служебный номер, но всё равно идентификатор:
           системное правило владельца (такт 11) не делает исключений по
@@ -287,6 +300,7 @@ if (route.query.q) search.value = String(route.query.q)
     </Table>
 
     <TableFooter
+      v-if="total"
       v-model:page="page"
       v-model:page-size="pageSize"
       :pages="Math.max(1, Math.ceil(total / pageSize))"

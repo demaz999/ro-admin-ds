@@ -1,17 +1,42 @@
 <script setup lang="ts">
 import type { DialogContentEmits, DialogContentProps } from 'reka-ui'
 import { reactiveOmit } from '@vueuse/core'
-import { DialogClose, DialogContent, DialogPortal, useForwardPropsEmits } from 'reka-ui'
+import { DialogClose, DialogContent, DialogDescription, DialogPortal, DialogTitle, useForwardPropsEmits, VisuallyHidden } from 'reka-ui'
 import { ButtonAction } from '../button-action'
 import { Icon } from '../icon'
 import { IconButton } from '../icon-button'
 import { cn } from '@/lib/utils'
 
 /**
+ * Обязательно: приведёт `inheritAttrs` компонента к ручному режиму — корень
+ * шаблона это `DialogPortal`, а он рисует `Teleport`. Vue не умеет молча
+ * докладывать «лишние» атрибуты в портальный корень и предупреждает об этом
+ * в консоли; здесь разбор — под `trapFocus` ниже.
+ */
+defineOptions({ inheritAttrs: false })
+
+/**
  * Поверхность окна во весь экран плюс шапка с возвратом и крестиком.
  *
  * Подложки нет намеренно: в композиции Атома окно занимает экран целиком и
  * лежит на непрозрачной поверхности. Разбор — в `index.ts`.
+ *
+ * ## `trapFocus` — явный проп, не проезжий атрибут (такт 28)
+ *
+ * До такта 28 `:trap-focus="…"` не был объявленным пропом ни у нас, ни у
+ * `DialogContentProps` Reka (там `Omit<DialogContentImplProps, 'trapFocus'>` —
+ * он живёт только у `DialogContentModal`/`DialogContentNonModal`, на уровень
+ * глубже публичного `DialogContent`). Значение падало в `$attrs` и пыталось
+ * само доехать до корня — Vue ловил это и ругался в консоль: «Extraneous
+ * non-props attributes (trap-focus)… component renders… teleport root nodes».
+ * Функционально атрибут всё равно доезжал (Reka сама прокидывает `$attrs`
+ * вниз своей `<DialogContent>`), но предупреждение оставалось.
+ *
+ * Теперь `trapFocus` — обычный проп: `inheritAttrs: false` останавливает
+ * автопроброс на корень, а значение явно уходит во внутренний `<DialogContent>`
+ * вместе с остальными. По умолчанию `true` — настоящее модальное окно обязано
+ * держать фокус внутри себя; `/compare` кладёт `false` явно, чтобы автоснимок
+ * не боролся за фокус со скриптом захвата.
  */
 const props = withDefaults(defineProps<DialogContentProps & {
   class?: string
@@ -29,17 +54,30 @@ const props = withDefaults(defineProps<DialogContentProps & {
    * В продукте не используется.
    */
   inline?: boolean
+  /** Фокус не покидает окно, пока оно открыто. Такт 28, разбор выше. */
+  trapFocus?: boolean
+  /**
+   * Заголовок для программ чтения с экрана, если видимого `DialogTitle` в
+   * содержимом нет. Рендерится скрыто (`VisuallyHidden`) — такт 28. Есть свой
+   * видимый `DialogTitle` в слоте — проп не передаётся, чтобы не задвоить id.
+   */
+  title?: string
+  /** То же для описания — `aria-describedby`. Разбор — там же. */
+  description?: string
 }>(), {
   back: '',
   showClose: true,
   layout: 'center',
   inline: false,
+  trapFocus: true,
+  title: undefined,
+  description: undefined,
 })
 
 /** `back` — наш эмит поверх примитива: возврат на уровень выше, а не закрытие. */
 const emits = defineEmits<DialogContentEmits & { back: [] }>()
 
-const delegated = reactiveOmit(props, 'class', 'back', 'showClose', 'layout', 'inline')
+const delegated = reactiveOmit(props, 'class', 'back', 'showClose', 'layout', 'inline', 'title', 'description')
 const forwarded = useForwardPropsEmits(delegated, emits)
 </script>
 
@@ -54,6 +92,13 @@ const forwarded = useForwardPropsEmits(delegated, emits)
         props.class,
       )"
     >
+      <VisuallyHidden v-if="props.title" as-child>
+        <DialogTitle>{{ props.title }}</DialogTitle>
+      </VisuallyHidden>
+      <VisuallyHidden v-if="props.description" as-child>
+        <DialogDescription>{{ props.description }}</DialogDescription>
+      </VisuallyHidden>
+
       <!--
         Шапка: 44 на узком и среднем, 60 на широком. Возврат прижат к боковому
         паддингу, крестик центрирован в шапке — отступ у него (44−40)/2 = 2 и
