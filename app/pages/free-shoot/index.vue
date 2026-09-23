@@ -209,7 +209,47 @@ function formPreview(o: any) {
   const src = o.auto && o.autoSrc ? o.autoSrc : {}
   return { fields, key, src, locked: objState(o).frz > 0 }
 }
-const SRC_T: Record<string, string> = { rec: 'распознано', def: 'по умолчанию' }
+/** Поля компактной формы для `RepeatForm`: видимые по зависимостям, с источником автозаполнения. */
+function formFields(o: any) {
+  const { fields, src } = formPreview(o)
+  return fields.map((f: any) => ({
+    key: f.k,
+    label: f.l,
+    value: o.form[f.k] || '',
+    required: !!f.req,
+    source: src[f.k] === 'rec' ? 'recognized' as const : src[f.k] === 'def' ? 'default' as const : undefined,
+    group: f.grp,
+  }))
+}
+
+/* Состояние интерфейса панели, без бизнес-логики: этап свёрнут, повтор текущий, форма развёрнута. */
+const closedStages = ref(new Set<string>())
+const formOpen = ref(new Set<string>())
+function toggleStage(id: string) {
+  const next = new Set(closedStages.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  closedStages.value = next
+}
+function toggleForm(id: string) {
+  const next = new Set(formOpen.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  formOpen.value = next
+}
+/** §9.3: клик делает повтор текущим и раскрывает; повторный клик по текущему — сворачивает. */
+function clickRepeat(id: string) {
+  const next = new Set(openObjs.value)
+  if (cur.value === id) {
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+  }
+  else {
+    cur.value = id
+    next.add(id)
+  }
+  openObjs.value = next
+}
 
 function repList(st: any) {
   let list = D.objects.filter((o: any) => o.stageId === st.id)
@@ -269,8 +309,6 @@ onMounted(async () => {
   }
 })
 
-const SVG_CAR = '<svg class="car" width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M3 6l5 5 5-5"/></svg>'
-const SVG_LOCK = '<svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3.2" y="7" width="9.6" height="6.6" rx="1.4"/><path d="M5.6 7V5.2a2.4 2.4 0 0 1 4.8 0V7"/></svg>'
 const SVG_NOTE = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 2.5h10v11H3z"/><path d="M5.5 6h5M5.5 9h4"/></svg>'
 const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l8 5-8 5z"/></svg>'
 </script>
@@ -437,78 +475,52 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
                   <span style="font-size:12px;color:var(--va-muted);align-self:center">этапов: {{ STAGES.length }} · шагов: {{ totalSteps }}<template v-if="nfrz"> · заморожено {{ nfrz }}</template></span>
                 </div>
 
-                <div v-for="st in STAGES" :key="st.id" class="stage">
-                  <button class="stage-h" data-asis="заголовок этапа">
-                    <span v-html="SVG_CAR" /><span class="t">{{ st.title }}</span>
-                    <span v-if="st.rep" class="rep">повторяемый</span>
-                    <span class="c">{{ st.rep ? D.objects.filter((o: any) => o.stageId === st.id).length : plural(st.steps.length, 'шаг', 'шага', 'шагов') }}</span>
-                  </button>
-                  <div class="stage-body">
+                <span v-for="st in STAGES" :key="st.id" class="kit-island">
+                  <StageSection
+                    :title="st.title"
+                    :repeatable="st.rep"
+                    :count="st.rep ? String(D.objects.filter((o: any) => o.stageId === st.id).length) : plural(st.steps.length, 'шаг', 'шага', 'шагов')"
+                    :open="!closedStages.has(st.id)"
+                    :add-label="st.rep ? (st.id === 'bld' ? 'Новое здание' : 'Новая единица') : ''"
+                    @toggle="toggleStage(st.id)"
+                  >
                     <template v-if="st.rep">
-                      <div class="addrow" data-asis="строка добавления повтора">
-                        <span class="kit-island">
-                          <Button variant="secondary" size="sm">+ {{ st.id === 'bld' ? 'Новое здание' : 'Новая единица' }}</Button>
-                        </span>
-                      </div>
-                      <div
+                      <RepeatCard
                         v-for="o in repList(st).list"
                         :key="o.id"
-                        class="obj"
-                        :class="{ cur: cur === o.id, open: openObjs.has(o.id), auto: o.auto, lock: objState(o).frz > 0 }"
+                        :name="objName(o)"
+                        :details="objSub(o)"
+                        :frames="objState(o).total"
+                        :open="openObjs.has(o.id)"
+                        :current="cur === o.id"
+                        :suggested="o.auto"
+                        :checked-steps="objState(o).frz"
+                        :errors="objState(o).bad"
+                        :highlighted="state === 'link' && o.id === LINK.owner"
+                        @header="clickRepeat(o.id)"
                       >
-                        <div class="obj-h" data-asis="заголовок повтора">
-                          <span class="n">{{ objName(o) }}<small>{{ objSub(o) || 'реквизиты не заполнены' }}</small></span>
-                          <span v-if="o.auto" class="pillx warn">предложено</span>
-                          <span v-if="objState(o).frz" class="pillx lock"><span v-html="SVG_LOCK" />{{ objState(o).frz }} проверено</span>
-                          <span v-if="cur === o.id" class="curtag">текущий</span>
-                          <span v-if="objState(o).bad" class="pillx err">{{ objState(o).bad }}</span>
-                          <span class="c">{{ objState(o).total }}</span>
-                        </div>
-                        <div v-if="openObjs.has(o.id)" class="obj-body">
-                          <div v-if="o.auto" class="obj-acts" data-asis="действия приёмки повтора">
-                            <span class="kit-island">
-                              <Button size="sm">Принять объект</Button>
-                              <Button variant="secondary" size="sm">Отклонить</Button>
-                            </span>
-                            <span class="obj-acts-hint">кадры примутся вместе с объектом</span>
-                          </div>
-                          <div class="fp" data-asis="компактная форма повтора">
-                            <div
-                              v-for="f in formPreview(o).key"
-                              :key="f.k"
-                              class="fp-row"
-                              :class="[f.req && !o.form[f.k] ? 'miss' : '', formPreview(o).src[f.k] ?? '']"
-                            >
-                              <span class="fp-l">{{ f.l }}</span>
-                              <span class="fp-v">{{ o.form[f.k] || (f.req ? 'не заполнено' : '—') }}<i v-if="formPreview(o).src[f.k]" class="fp-src">{{ SRC_T[formPreview(o).src[f.k]] }}</i></span>
-                            </div>
-                            <div class="fp-foot">
-                              <span class="fp-af">{{ o.auto ? '«по умолчанию» — не с кадра, проверьте' : '' }}</span>
-                              <button class="lnk">Все поля ({{ formPreview(o).fields.length }})</button>
-                              <button class="lnk">Изменить</button>
-                              <button v-if="!formPreview(o).locked && !o.auto" class="lnk dim">Удалить</button>
-                            </div>
-                          </div>
-                          <span class="kit-island">
-                            <div class="flex flex-col gap-0.5">
-                              <StepRow v-for="(x, k) in stageById[o.stageId].steps" :key="x.id" v-bind="stepProps(o.id, x, k)" :data-step-key="`${o.id}|${x.id}`" />
-                            </div>
-                          </span>
-                        </div>
-                      </div>
-                      <div v-if="repList(st).hidden && view === 'review'" class="hintbox" data-asis="подсказка панели">
+                        <template #form>
+                          <RepeatForm
+                            :fields="formFields(o)"
+                            :expanded="formOpen.has(o.id)"
+                            :deletable="!formPreview(o).locked && !o.auto"
+                            @toggle="toggleForm(o.id)"
+                          />
+                        </template>
+                        <StepRow v-for="(x, k) in stageById[o.stageId].steps" :key="x.id" v-bind="stepProps(o.id, x, k)" :data-step-key="`${o.id}|${x.id}`" />
+                      </RepeatCard>
+                      <StageNote v-if="!repList(st).list.length">
+                        {{ view === 'review' && repList(st).hidden ? 'Все повторы этапа проверены' : 'Повторов пока нет — выделите кадры и нажмите «Новый объект из выделенного»' }}
+                      </StageNote>
+                      <StageNote v-if="repList(st).hidden && view === 'review' && repList(st).list.length">
                         Принято и скрыто: {{ plural(repList(st).hidden, 'объект', 'объекта', 'объектов') }}
-                      </div>
+                      </StageNote>
                     </template>
-                    <div v-else style="padding:4px 6px 8px">
-                      <span class="kit-island">
-                        <div class="flex flex-col gap-0.5">
-                          <StepRow v-for="(x, k) in st.steps" :key="x.id" v-bind="stepProps(st.id, x, k)" />
-                        </div>
-                      </span>
+                    <div v-else class="flex flex-col gap-0.5 px-1.5 pt-1 pb-2">
+                      <StepRow v-for="(x, k) in st.steps" :key="x.id" v-bind="stepProps(st.id, x, k)" />
                     </div>
-                  </div>
-                </div>
+                  </StageSection>
+                </span>
               </template>
 
               <!-- вкладка «Форма осмотра»: поля — кит, группы и сверка — как есть -->

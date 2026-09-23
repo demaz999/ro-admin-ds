@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import type { FrameTileState } from '@/components/ui/frame-tile'
 import type { StepThumbItem, StepVerdict } from '@/components/ui/step-row'
+import type { RepeatFormField } from '@/components/ui/repeat'
 
 /**
  * Стенд-матрицы «Распределение свободной съёмки» — такт 30, часть 2; с такта 31 живёт
@@ -167,6 +168,58 @@ const PROGRESS_EXAMPLE = `<ProgressStat
 <!-- окно автораспределения, §12.5 — голая полоса -->
 <Progress :value="processed" :max="total" label="Автораспределение" />`
 
+
+/* ============================ карточка повтора, такт 32 ============================ */
+
+const FORM_EQ: RepeatFormField[] = [
+  { key: 'mark', label: 'Наименование, марка, модель', value: 'Пропиточная линия POLYPRISE', required: true, group: 'Характеристики оборудования' },
+  { key: 'sn', label: 'Заводской / серийный номер', group: 'Характеристики оборудования' },
+  { key: 'inv', label: 'Инвентарный номер', value: '10798', group: 'Характеристики оборудования' },
+  { key: 'bld', label: 'Здание / цех', value: 'ЦЕХ-6', group: 'Характеристики оборудования' },
+  { key: 'cond', label: 'Состояние', value: 'Рабочее', required: true, group: 'Состояние и эксплуатация' },
+  { key: 'mount', label: 'Монтаж', value: 'Установлено', group: 'Состояние и эксплуатация' },
+  { key: 'use', label: 'Эксплуатация', value: 'Эксплуатируется', group: 'Состояние и эксплуатация' },
+  { key: 'def', label: 'Дефекты', value: 'Не выявлены', group: 'Состояние и эксплуатация' },
+  { key: 'comm', label: 'Комментарий', group: 'Дополнительно' },
+]
+const FORM_MISSING: RepeatFormField[] = FORM_EQ.map(f => (f.key === 'mark' ? { ...f, value: '' } : f.key === 'inv' ? { ...f, value: '10948' } : f))
+const FORM_AUTO: RepeatFormField[] = FORM_EQ.map((f) => {
+  if (f.key === 'mark') return { ...f, value: 'Линия термообработки', source: 'recognized' as const }
+  if (f.key === 'inv') return { ...f, value: '10902', source: 'recognized' as const }
+  if (f.key === 'bld') return { ...f, value: '' }
+  if (['cond', 'mount', 'use', 'def'].includes(f.key)) return { ...f, source: 'default' as const }
+  return f
+})
+
+const REPEAT_EXAMPLE = `<StageSection
+  :title="stage.title" :repeatable="stage.repeatable"
+  :count="String(repeats.length)"
+  :open="!closed.has(stage.id)" @toggle="toggleStage(stage.id)"
+  add-label="Новая единица" @add="createRepeat(stage.id)"
+>
+  <RepeatCard
+    v-for="r in repeats" :key="r.id"
+    :name="r.name" :details="r.details" :frames="r.frames"
+    :open="open.has(r.id)" :current="current === r.id"
+    :suggested="r.draft"                 // §13.1
+    :checked-steps="frozenSteps(r)"      // §6.2: «N проверено», без удаления
+    :errors="badSteps(r)"
+    :highlighted="hoveredFrame?.ownerId === r.id"   // §15.1
+    :hidden-steps="onlyOpen ? frozenSteps(r) : 0"   // §9.2
+    @header="clickRepeat(r.id)"          // §9.3: сделать текущим / свернуть
+    @accept="acceptRepeat(r.id)" @reject="rejectRepeat(r.id)"
+  >
+    <template #form>
+      <RepeatForm
+        :fields="formFields(r)"          // { key, label, value, required, source, group }
+        :expanded="formOpen.has(r.id)" :deletable="!frozenSteps(r) && !r.draft"
+        @toggle="toggleForm(r.id)" @edit="group => openEditor(r.id, group)" @delete="removeRepeat(r.id)"
+      />
+    </template>
+    <StepRow v-for="step in steps(r)" :key="step.id" v-bind="stepProps(r, step)" />
+  </RepeatCard>
+  <StageNote v-if="acceptedHidden">Принято и скрыто: {{ acceptedHidden }}</StageNote>
+</StageSection>`
 </script>
 
 <template>
@@ -446,5 +499,112 @@ const PROGRESS_EXAMPLE = `<ProgressStat
       <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ PROGRESS_EXAMPLE }}</pre>
     </section>
 
+
+    <!-- ============================ карточка повтора, такт 32 ============================ -->
+    <section id="repeat" data-section="repeat" class="space-y-6">
+      <div class="space-y-1">
+        <h2 class="text-lg font-bold">
+          StageSection · RepeatCard · RepeatForm · StageNote — этап и карточка повтора
+        </h2>
+        <p class="text-sm text-foreground-secondary">
+          Такт 32. Спека §6.2, §9.1–9.4, §13.1–13.4, §14.1–14.3. Порядок тела повтора фиксирован: действия приёмки →
+          компактная форма → шаги → служебная строка.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-[repeat(3,--spacing(110))] items-start gap-x-6 gap-y-5">
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">этап раскрыт, повторяемый, строка добавления</p>
+          <StageSection title="Единица оборудования" repeatable count="3" add-label="Новая единица" />
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">этап свёрнут</p>
+          <StageSection title="Здание / цех" repeatable count="1" :open="false" />
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">обычный этап, наведение</p>
+          <StageSection title="Общие данные осмотра" count="4 шага" :open="false" demo-hover />
+        </div>
+      </div>
+
+      <div data-subsection="repeat-headers" class="grid grid-cols-[repeat(3,--spacing(110))] items-start gap-x-6 gap-y-5">
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">свёрнут</p>
+          <RepeatCard name="Ткацкий станок SMIT" details="инв. 10948 · ЦЕХ-6 · Рабочее" :frames="4" />
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">наведение</p>
+          <RepeatCard name="Ткацкий станок SMIT" details="инв. 10948 · ЦЕХ-6 · Рабочее" :frames="4" demo-hover />
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">реквизиты не заполнены</p>
+          <RepeatCard name="Объект без названия" :frames="0" :errors="3" />
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">текущий — §9.3</p>
+          <RepeatCard name="Ткацкий станок SMIT" details="инв. 10948 · ЦЕХ-6 · Рабочее" :frames="4" current />
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">предложено — §13.1</p>
+          <RepeatCard name="Линия термообработки" details="инв. 10902 · Эксплуатируется" :frames="5" suggested :errors="2" />
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">«N проверено» и ошибки — §6.2</p>
+          <RepeatCard name="Пропиточная линия POLYPRISE" details="инв. 10798 · ЦЕХ-6 · Эксплуатируется" :frames="5" :checked-steps="2" :errors="2" />
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">«N проверено», текущий</p>
+          <RepeatCard name="Пропиточная линия POLYPRISE" details="инв. 10798 · ЦЕХ-6 · Эксплуатируется" :frames="5" :checked-steps="2" :errors="2" current />
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">подсвечен связью — §15.1</p>
+          <RepeatCard name="Ткацкий станок SMIT" details="инв. 10948 · ЦЕХ-6 · Рабочее" :frames="4" highlighted />
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">предложено и текущий</p>
+          <RepeatCard name="Линия термообработки" details="инв. 10902 · Эксплуатируется" :frames="5" suggested current :errors="2" />
+        </div>
+      </div>
+
+      <div data-subsection="repeat-open" class="grid grid-cols-[repeat(3,--spacing(110))] items-start gap-x-6 gap-y-5">
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">предложен и раскрыт: приёмка → форма с источниками → шаги — §9.4, §13</p>
+          <RepeatCard name="Линия термообработки" details="инв. 10902 · Эксплуатируется" :frames="5" suggested current open :errors="2">
+            <template #form>
+              <RepeatForm :fields="FORM_AUTO" />
+            </template>
+            <StepRow name="Шильдик, заводская табличка" required :min="1" :count="0" instruction="Марка, модель, заводской номер, год" :hotkey="1" />
+            <StepRow name="Инвентарный или учётный номер" required :min="1" :count="1" instruction="Номер краской, бирка, наклейка" :hotkey="2" :thumbs="[THUMB(12, 'suggested')]" />
+          </RepeatCard>
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">проверенный, «Только открытые»: служебная строка — §9.2</p>
+          <RepeatCard name="Пропиточная линия POLYPRISE" details="инв. 10798 · ЦЕХ-6 · Эксплуатируется" :frames="5" :checked-steps="2" :errors="2" open :hidden-steps="2">
+            <template #form>
+              <RepeatForm :fields="FORM_EQ" />
+            </template>
+            <StepRow name="Общий вид оборудования" required :min="3" :count="0" instruction="Не менее 3 кадров с разных сторон" :verdict="REDO" :thumbs="[THUMB(101, 'rejected')]" />
+          </RepeatCard>
+        </div>
+        <div class="space-y-4">
+          <div class="space-y-1">
+            <p class="text-2xs text-muted-foreground">компактная форма: обязательное не заполнено, удалить можно — §14.1, §6.2</p>
+            <RepeatForm :fields="FORM_MISSING" deletable />
+          </div>
+          <div class="space-y-1">
+            <p class="text-2xs text-muted-foreground">все поля по группам — §14.3</p>
+            <RepeatForm :fields="FORM_EQ" expanded />
+          </div>
+          <div class="space-y-1">
+            <p class="text-2xs text-muted-foreground">служебные строки — §9.2, §13.3</p>
+            <div class="rounded-xs border border-border-soft">
+              <StageNote>Принято и скрыто: 2 объекта</StageNote>
+              <StageNote>Повторов пока нет — выделите кадры и нажмите «Новый объект из выделенного»</StageNote>
+            </div>
+          </div>
+        </div>
+      </div>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ REPEAT_EXAMPLE }}</pre>
+    </section>
   </main>
 </template>

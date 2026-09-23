@@ -1389,6 +1389,24 @@ const textareaVariants = [
         <ProgressStat class="w-48" label="Объекты" value="1 здание · 2 единицы" sub="2 объекта проверено" />
         <Progress class="w-48 self-center" :value="57" :max="173" label="Автораспределение" />
       </div>
+      <!-- Такт 32: этап и карточка повтора — по представителю каждого вида. -->
+      <div class="max-w-110">
+        <StageSection title="Единица оборудования" repeatable count="2" add-label="Новая единица">
+          <RepeatCard name="Линия термообработки" details="инв. 10902 · Эксплуатируется" :frames="5" suggested current open :errors="2">
+            <template #form>
+              <RepeatForm
+                :fields="[
+                  { key: 'mark', label: 'Наименование, марка, модель', value: 'Линия термообработки', required: true, source: 'recognized' },
+                  { key: 'cond', label: 'Состояние', value: 'Рабочее', source: 'default' },
+                  { key: 'bld', label: 'Здание / цех', value: '', required: true },
+                ]"
+              />
+            </template>
+          </RepeatCard>
+          <RepeatCard name="Пропиточная линия POLYPRISE" details="инв. 10798 · ЦЕХ-6" :frames="5" :checked-steps="2" />
+          <StageNote>Принято и скрыто: 2 объекта</StageNote>
+        </StageSection>
+      </div>
     </section>
 
     <section class="space-y-3">
