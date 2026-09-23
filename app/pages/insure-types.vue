@@ -73,7 +73,7 @@ const TYPES = [
   { id: 166, name: 'QA_схема', icon: 'home' },
   { id: 168, name: 'QA_схема без форм', icon: 'package' },
   { id: 167, name: 'QA_схема только просмотр', icon: 'package' },
-  { id: 52, name: 'testSafontev', icon: 'car' },
+  { id: 52, name: 'Тестовый тип', icon: 'car' },
   { id: 156, name: 'ViktorTEST', icon: 'car' },
   { id: 170, name: 'QA_схема мультиосмотр', icon: 'asterisk' },
   { id: 61, name: 'Автомобиль. КАСКО', icon: 'car' },

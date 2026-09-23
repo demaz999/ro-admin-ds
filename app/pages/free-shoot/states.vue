@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { frameTileGridVariants, type FrameTileState } from '@/components/ui/frame-tile'
+import { ref } from 'vue'
+import type { FrameTileState } from '@/components/ui/frame-tile'
 import type { StepThumbItem, StepVerdict } from '@/components/ui/step-row'
 
 /**
- * Стенд «Распределение свободной съёмки» — такт 30, часть 2. Три составных
+ * Стенд-матрицы «Распределение свободной съёмки» — такт 30, часть 2; с такта 31 живёт
+ * на `/free-shoot/states`, экран в сборе — `/free-shoot`. Три составных
  * компонента экрана VA-9265: `FrameTile`, `StepRow` + `StepThumb`, `Progress` +
  * `ProgressStat`. Мастеров в Figma нет — источник прототип v17 и спека,
  * редакция 1 (`docs/sources/va-9265/`), разбор — `docs/free-shoot.md`.
@@ -15,17 +16,13 @@ import type { StepThumbItem, StepVerdict } from '@/components/ui/step-row'
  *
  * ## Оснастка приёмки — не продукт
  *
- * Headless-браузер не наводит курсор и не кликает, поэтому состояния фрагмента
- * «в сборе» задаются адресом: `?state=link` — связь шага и кадров подсвечена,
- * `?state=flash` — вспышка шага при загрузке, `?state=tooltip` — подсказка плашки
- * открыта, `?state=drop` — шаг панели в роли цели приёма. Колонки «наведение»
- * матриц нарисованы пропом `demoHover` — это тоже оснастка.
+ * Колонки «наведение» матриц нарисованы пропом `demoHover` — оснастка: headless-браузер
+ * не наводит курсор. Фрагмент ленты и панели «в сборе» с такта 31 заменён экраном
+ * `/free-shoot`; туда же переехала оснастка `?state=`.
  */
 definePageMeta({ layout: false })
-useHead({ title: 'Свободная съёмка — стенд' })
+useHead({ title: 'Свободная съёмка — матрицы' })
 
-const route = useRoute()
-const demo = computed(() => String(route.query.state ?? ''))
 
 /**
  * Структура кадров — номер, время съёмки, тип, длительность видео — из `window.VA_FRAMES`
@@ -170,73 +167,6 @@ const PROGRESS_EXAMPLE = `<ProgressStat
 <!-- окно автораспределения, §12.5 — голая полоса -->
 <Progress :value="processed" :max="total" label="Автораспределение" />`
 
-/* ============================== Фрагменты в сборе ============================== */
-
-interface FeedFrame { i: number; state: FrameTileState; step?: string; reason?: string }
-const FEED: FeedFrame[] = [
-  { i: 1, state: 'locked', step: 'e1', reason: REASON.locked },
-  { i: 3, state: 'rejected', step: 'e3', reason: REASON.rejected },
-  { i: 6, state: 'free' },
-  { i: 9, state: 'assigned', step: 'e3' },
-  { i: 12, state: 'assigned', step: 'e2' },
-  { i: 17, state: 'free' },
-  { i: 22, state: 'assigned', step: 'e8' },
-  { i: 26, state: 'suggested', step: 'e6' },
-  { i: 31, state: 'free' },
-  { i: 36, state: 'suggested', step: 'e6' },
-  { i: 58, state: 'free' },
-  { i: 60, state: 'free' },
-]
-
-interface PanelStep { id: string; name: string; required?: boolean; kind?: 'photo' | 'video'; min: number; max?: number | null; instruction: string; verdict?: StepVerdict }
-const PANEL: PanelStep[] = [
-  { id: 'e1', name: 'Шильдик, заводская табличка', required: true, min: 1, instruction: 'Марка, модель, заводской номер, год', verdict: OK },
-  { id: 'e2', name: 'Инвентарный или учётный номер', required: true, min: 1, instruction: 'Номер краской, бирка, наклейка' },
-  { id: 'e3', name: 'Общий вид оборудования', required: true, min: 3, instruction: 'Не менее 3 кадров с разных сторон', verdict: REDO },
-  { id: 'e4', name: 'Узлы и агрегаты', min: 0, instruction: 'Приводы, валы, редукторы, насосы' },
-  { id: 'e5', name: 'Органы управления и показания', min: 0, instruction: 'Пульты, шкафы управления, дисплеи' },
-  { id: 'e6', name: 'Повреждения и дефекты', min: 0, instruction: 'Не менее 1 кадра на каждый дефект' },
-  { id: 'e7', name: 'Изменения в конструкции', min: 0, max: 1, instruction: 'Доработки, замены узлов — если есть' },
-  { id: 'e8', name: 'Контрольное видео', required: true, kind: 'video', min: 1, max: 1, instruction: 'От шильдика, затем обход вокруг единицы' },
-]
-const PANEL_NAME: Record<string, string> = Object.fromEntries(PANEL.map(s => [s.id, s.name]))
-
-const hoverStep = ref<string | null>(null)
-const hoverFrame = ref<number | null>(null)
-const selected = ref(new Set<number>([6]))
-const panelFlash = ref<number | null>(null)
-
-onMounted(() => {
-  if (demo.value === 'link') hoverStep.value = 'e6'
-  if (demo.value === 'flash') panelFlash.value = Date.now()
-})
-
-const linkedSet = computed(() => new Set(FEED.filter(f => f.step && f.step === hoverStep.value).map(f => f.i)))
-const stepOf = (i: number) => FEED.find(f => f.i === i)?.step ?? null
-
-function panelProps(step: PanelStep, index: number) {
-  const frames = FEED.filter(f => f.step === step.id)
-  const counted = frames.filter(f => f.state !== 'rejected')
-  const state = (f: FeedFrame): StepThumbItem['state'] =>
-    f.state === 'locked' ? 'locked' : f.state === 'rejected' ? 'rejected' : f.state === 'suggested' ? 'suggested' : 'free'
-  return {
-    ...step,
-    count: counted.length,
-    wasCount: counted.filter(f => f.state === 'locked').length,
-    hotkey: index + 1,
-    thumbs: frames.map(f => ({ id: f.i, src: img(f.i), state: state(f) })),
-    highlighted: hoverFrame.value != null && stepOf(hoverFrame.value) === step.id,
-    dropTarget: demo.value === 'drop' && step.id === 'e4',
-    flash: step.id === 'e3' ? panelFlash.value : null,
-  }
-}
-
-function toggle(i: number) {
-  const next = new Set(selected.value)
-  if (next.has(i)) next.delete(i)
-  else next.add(i)
-  selected.value = next
-}
 </script>
 
 <template>
@@ -248,7 +178,7 @@ function toggle(i: number) {
       <p class="max-w-240 text-sm text-foreground-secondary">
         Такт 30, экран «Распределение свободной съёмки» (VA-9265). Мастеров в Figma нет: источник —
         прототип v17 и спека, редакция 1, разбор с замерами и провенансом — <code>docs/free-shoot.md</code>.
-        Тема <code>rososmotr</code>. Кадры — несвязные фото с Unsplash, демо-данные стенда; авторы — <code>public/free-shoot/CREDITS.md</code>.
+        Тема <code>rososmotr</code>. Кадры — несвязные фото с Unsplash, демо-данные стенда; авторы — <code>public/free-shoot/CREDITS.md</code>. Экран в сборе — <a class="text-primary underline" href="/free-shoot">/free-shoot</a>.
       </p>
     </header>
 
@@ -283,7 +213,7 @@ function toggle(i: number) {
               {{ row.label }}<br><span class="text-2xs text-muted-foreground">{{ row.spec }}</span>
             </span>
             <FrameTile v-bind="tileProps(row)" />
-            <FrameTile v-bind="tileProps(row)" demo-hover :tooltip-open="demo === 'tooltip' && size === 'md' && row.state === 'locked' ? true : undefined" />
+            <FrameTile v-bind="tileProps(row)" demo-hover />
             <FrameTile v-bind="tileProps(row)" selected />
           </template>
         </div>
@@ -516,66 +446,5 @@ function toggle(i: number) {
       <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ PROGRESS_EXAMPLE }}</pre>
     </section>
 
-    <!-- ============================== Фрагменты в сборе ============================== -->
-    <section id="assembly" data-section="assembly" class="space-y-6">
-      <div class="space-y-1">
-        <h2 class="text-lg font-bold">
-          Фрагменты в сборе — лента и панель структуры
-        </h2>
-        <p class="text-sm text-foreground-secondary">
-          Наведите на шаг справа — в ленте подсветятся его кадры, остальные приглушатся (§15.2). Наведите на
-          распределённый кадр — подсветится его шаг (§15.1). Клик по плитке выделяет. Повтор текущий: номера клавиш 1–8.
-        </p>
-      </div>
-      <div class="grid grid-cols-[minmax(0,1fr)_--spacing(110)] items-start gap-6">
-        <div class="space-y-4">
-          <div class="flex flex-wrap gap-8">
-            <ProgressStat class="w-40" label="Кадры разложены" value="8 из 12" :progress="{ value: 8, max: 12, locked: 2 }" sub="2 привязано до вас" />
-            <ProgressStat class="w-40" label="Обязательные шаги" value="1 из 4 закрыто" :progress="{ value: 1, max: 4, locked: 1 }" sub="1 закрыто проверкой" />
-          </div>
-          <div :class="frameTileGridVariants({ size: 'md' })">
-            <FrameTile
-              v-for="f in FEED"
-              :key="f.i"
-              :src="img(f.i)"
-              :time="TIME[f.i]!"
-              :kind="DURATION[f.i] ? 'video' : 'photo'"
-              :duration="DURATION[f.i]"
-              :state="f.state"
-              :step-name="f.step ? PANEL_NAME[f.step] : ''"
-              :locate-hint="f.step ? `Ткацкий станок SMIT · ${PANEL_NAME[f.step]}` : ''"
-              :lock-reason="f.reason"
-              :selected="selected.has(f.i)"
-              :selection-mode="selected.size > 0"
-              :linked="linkedSet.has(f.i)"
-              :dimmed="hoverStep != null && linkedSet.size > 0 && !linkedSet.has(f.i)"
-              @toggle-select="toggle(f.i)"
-              @mouseenter="hoverFrame = f.i"
-              @mouseleave="hoverFrame = null"
-            />
-          </div>
-        </div>
-        <div class="rounded-xs border border-border-soft">
-          <div class="flex items-center gap-2 border-b border-border-soft px-3 py-2">
-            <span class="min-w-0 flex-1">
-              <span class="block text-sm font-medium">Ткацкий станок SMIT</span>
-              <span class="block text-2xs text-muted-foreground">инв. 10948 · ЦЕХ-6 · Рабочее</span>
-            </span>
-            <Badge size="sm">
-              текущий
-            </Badge>
-          </div>
-          <div class="space-y-0.5 p-1.5">
-            <StepRow
-              v-for="(step, index) in PANEL"
-              :key="step.id"
-              v-bind="panelProps(step, index)"
-              @mouseenter="hoverStep = step.id"
-              @mouseleave="hoverStep = demo === 'link' ? 'e6' : null"
-            />
-          </div>
-        </div>
-      </div>
-    </section>
   </main>
 </template>
