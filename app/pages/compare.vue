@@ -1335,6 +1335,62 @@ const textareaVariants = [
       </CompareFrame>
     </section>
 
+    <!--
+      Такт 30. Мастеров у этих компонентов нет ни в ките 1, ни в Атоме: источник —
+      прототип VA-9265 v17. Наложения поэтому нет; раздел здесь ради автопроверок
+      ниже — они обходят `[data-slot]` этой страницы, и без раздела новые узлы
+      прошли бы мимо них. Полные матрицы — на стенде `/free-shoot`.
+    -->
+    <section data-theme="rososmotr" class="space-y-3 bg-background font-sans text-foreground">
+      <h2 class="text-lg font-bold">
+        FrameTile · StepRow · StepThumb · Progress · ProgressStat — без эталона, такт 30
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Мастера нет — сверка идёт с прототипом VA-9265 v17, пары «прототип / кит» лежат в
+        <code>docs/free-shoot-pair-*.png</code>. Здесь по одному представителю каждого вида, чтобы
+        шрифты и оптику иконок проверяли автопроверки.
+      </p>
+      <div class="grid grid-cols-[repeat(5,--spacing(44))] items-start gap-4">
+        <FrameTile src="/free-shoot/frame-017.jpg" time="09:57" demo-hover />
+        <FrameTile src="/free-shoot/frame-060.jpg" time="10:21" kind="video" duration="0:29" />
+        <FrameTile src="/free-shoot/frame-012.jpg" time="09:55" state="assigned" step-name="Инвентарный номер" />
+        <FrameTile src="/free-shoot/frame-064.jpg" time="10:23" state="suggested" step-name="Повреждения и дефекты" />
+        <FrameTile src="/free-shoot/frame-003.jpg" time="09:47" state="rejected" step-name="Общий вид" lock-reason="Кадр отклонён проверяющим" />
+      </div>
+      <div class="grid max-w-5xl grid-cols-2 items-start gap-4">
+        <StepRow
+          name="Общий вид оборудования"
+          required
+          :min="3"
+          :count="1"
+          :was-count="0"
+          instruction="Не менее 3 кадров с разных сторон"
+          :hotkey="3"
+          :verdict="{ kind: 'redo', at: '20 июня', note: 'Станок снят в тени — переснять' }"
+          :thumbs="[
+            { id: 1, src: '/free-shoot/frame-101.jpg', state: 'rejected' },
+            { id: 2, src: '/free-shoot/frame-026.jpg', state: 'suggested' },
+            { id: 3, src: '/free-shoot/frame-052.jpg', state: 'from-step' },
+          ]"
+        />
+        <StepRow
+          name="Шильдик, заводская табличка"
+          required
+          :min="1"
+          :count="1"
+          :verdict="{ kind: 'ok', at: '20 июня' }"
+          :thumbs="[{ id: 1, src: '/free-shoot/frame-001.jpg', state: 'locked' }]"
+        />
+        <StepRow name="Контрольное видео" required kind="video" :min="1" :max="1" :count="1" :hotkey="8" :thumbs="[{ id: 1, src: '/free-shoot/frame-022.jpg' }]" />
+        <StepRow name="Фото с представителем" :min="0" :max="1" :count="2" :thumbs="[{ id: 1, src: '/free-shoot/frame-045.jpg' }, { id: 2, src: '/free-shoot/frame-047.jpg' }]" />
+      </div>
+      <div class="flex flex-wrap gap-8">
+        <ProgressStat class="w-48" label="Кадры разложены" value="14 из 196" :progress="{ value: 14, max: 196, locked: 6 }" sub="6 привязано до вас" />
+        <ProgressStat class="w-48" label="Объекты" value="1 здание · 2 единицы" sub="2 объекта проверено" />
+        <Progress class="w-48 self-center" :value="57" :max="173" label="Автораспределение" />
+      </div>
+    </section>
+
     <section class="space-y-3">
       <h2 class="text-lg font-bold">
         Автопроверка оптики иконок
