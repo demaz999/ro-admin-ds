@@ -281,7 +281,7 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
       <div class="app min-w-320" data-asis="каркас экрана">
         <!-- ============================ шапка 48, §7 ============================ -->
         <div class="topbar" data-asis="шапка">
-          <span class="logo">LOGO</span>
+          <span class="logo">VIEWAPP</span>
           <div class="crumbs">
             <span>Осмотры</span><span>/</span><span>Демо-осмотр · мониторинг оборудования</span><span>/</span><b>Распределение свободной съёмки</b>
           </div>
@@ -348,8 +348,8 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
             <!-- тулбар ленты, §7 -->
             <div class="bar-tools" data-asis="тулбар ленты">
               <span class="kit-island">
-                <Button variant="secondary" size="sm">Распределить автоматически</Button>
-                <Button variant="secondary" size="sm">Выделить всё</Button>
+                <Button variant="secondary">Распределить автоматически</Button>
+                <Button variant="secondary">Выделить всё</Button>
                 <div class="w-55 shrink">
                   <Input v-model="search" placeholder="Поиск по расшифровкам и именам файлов…" />
                 </div>
