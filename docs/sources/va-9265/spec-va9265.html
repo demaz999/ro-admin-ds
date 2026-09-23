@@ -1,0 +1,1060 @@
+<title>Спека VA-9265</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;1,400&display=swap">
+
+<style>
+:root{
+  --paper:#FAFBFC;
+  --card:#FFFFFF;
+  --sunk:#F2F5F8;
+  --ink:#101922;
+  --ink-2:#495969;
+  --ink-3:#7B8A98;
+  --rule:#DBE2EA;
+  --rule-2:#EAEFF4;
+  --accent:#1F5FA0;
+  --accent-soft:#E8F0F8;
+  --ok:#1C7A4C;
+  --ok-soft:#E6F3EC;
+  --warn:#8F620E;
+  --warn-soft:#F8F0DE;
+  --danger:#9C3830;
+  --danger-soft:#F8E9E7;
+  --frozen:#5F707C;
+  --frozen-soft:#EBEFF2;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#0E1319;
+    --card:#161D25;
+    --sunk:#131A21;
+    --ink:#DFE6EC;
+    --ink-2:#9DACB8;
+    --ink-3:#75838E;
+    --rule:#28323B;
+    --rule-2:#1F282F;
+    --accent:#7CB0E2;
+    --accent-soft:#182634;
+    --ok:#59B586;
+    --ok-soft:#14261D;
+    --warn:#D3A257;
+    --warn-soft:#27200F;
+    --danger:#D08379;
+    --danger-soft:#2A1917;
+    --frozen:#8E9DA8;
+    --frozen-soft:#1C242B;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0E1319;
+  --card:#161D25;
+  --sunk:#131A21;
+  --ink:#DFE6EC;
+  --ink-2:#9DACB8;
+  --ink-3:#75838E;
+  --rule:#28323B;
+  --rule-2:#1F282F;
+  --accent:#7CB0E2;
+  --accent-soft:#182634;
+  --ok:#59B586;
+  --ok-soft:#14261D;
+  --warn:#D3A257;
+  --warn-soft:#27200F;
+  --danger:#D08379;
+  --danger-soft:#2A1917;
+  --frozen:#8E9DA8;
+  --frozen-soft:#1C242B;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;padding:0 20px 110px;
+  background:var(--paper);color:var(--ink);
+  font-family:"IBM Plex Sans","Segoe UI",Roboto,Arial,sans-serif;
+  font-size:15.5px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1000px;margin:0 auto}
+
+/* ---------- шапка ---------- */
+.masthead{padding:52px 0 26px;border-bottom:2px solid var(--ink)}
+.tag{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11.5px;
+  letter-spacing:.11em;text-transform:uppercase;color:var(--ink-3);
+  display:flex;gap:16px;flex-wrap:wrap;
+}
+h1{
+  font-weight:700;font-size:clamp(29px,4.6vw,40px);line-height:1.08;
+  letter-spacing:-.02em;margin:12px 0 0;text-wrap:balance;
+}
+.lede{margin:12px 0 0;max-width:64ch;color:var(--ink-2);font-size:17px}
+.facts{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+  gap:0;margin-top:26px;border-top:1px solid var(--rule);
+}
+.fact{padding:12px 16px 12px 0;border-right:1px solid var(--rule)}
+.fact:last-child{border-right:0}
+.fact dt{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:10.5px;
+  letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);margin:0;
+}
+.fact dd{margin:3px 0 0;font-size:14.5px;font-weight:500}
+
+/* ---------- оглавление ---------- */
+.toc{margin-top:34px;padding:18px 20px;background:var(--card);border:1px solid var(--rule)}
+.toc h2{margin:0 0 10px}
+.toc ol{
+  margin:0;padding:0;list-style:none;columns:2;column-gap:32px;
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12.5px;
+}
+.toc li{padding:2.5px 0;break-inside:avoid}
+.toc a{color:var(--ink-2);text-decoration:none}
+.toc a:hover{color:var(--accent);text-decoration:underline}
+.toc .n{color:var(--ink-3);margin-right:8px}
+
+/* ---------- секции ---------- */
+section{margin-top:46px;scroll-margin-top:16px}
+h2{
+  font-size:11.5px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--accent);margin:0;
+}
+h3{
+  font-size:24px;font-weight:600;letter-spacing:-.015em;margin:5px 0 0;
+  text-wrap:balance;padding-bottom:12px;border-bottom:1px solid var(--rule);
+}
+h4{font-size:16.5px;font-weight:600;margin:26px 0 8px}
+p{margin:12px 0;max-width:74ch}
+ul,ol{max-width:74ch;padding-left:22px}
+li{margin:5px 0}
+
+/* ---------- требования ---------- */
+.req{
+  display:grid;grid-template-columns:64px 1fr;gap:0 16px;
+  padding:11px 0;border-top:1px solid var(--rule-2);align-items:baseline;
+}
+.req:first-of-type{border-top:1px solid var(--rule)}
+.req + h4{margin-top:28px}
+.rid{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px;font-weight:500;
+  color:var(--accent);font-variant-numeric:tabular-nums;
+}
+.req > div{max-width:72ch}
+.req p{margin:0}
+.req p + p{margin-top:7px}
+.req ul{margin:7px 0 0;padding-left:20px}
+
+/* ---------- обоснование ---------- */
+.why{
+  font-family:"IBM Plex Serif",Georgia,serif;font-style:italic;
+  color:var(--ink-2);border-left:2px solid var(--rule);
+  padding:2px 0 2px 16px;margin:14px 0;max-width:70ch;font-size:15px;
+}
+.why b{font-style:normal;font-weight:600;color:var(--ink)}
+
+/* ---------- таблицы ---------- */
+.tw{overflow-x:auto;margin:16px 0;border:1px solid var(--rule);background:var(--card)}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:600px}
+th,td{text-align:left;padding:9px 13px;border-bottom:1px solid var(--rule-2);vertical-align:top}
+th{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:10.5px;font-weight:500;
+  letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);
+  background:var(--sunk);border-bottom:1px solid var(--rule);white-space:nowrap;
+}
+tr:last-child td{border-bottom:0}
+td code,th code{white-space:nowrap}
+.tw.narrow table{min-width:460px}
+
+code,.k{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.88em;
+  background:var(--sunk);border:1px solid var(--rule-2);border-radius:3px;
+  padding:.5px 5px;white-space:nowrap;
+}
+kbd{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px;
+  background:var(--card);border:1px solid var(--rule);border-bottom-width:2px;
+  border-radius:4px;padding:1px 6px;white-space:nowrap;
+}
+
+/* ---------- состояния ---------- */
+.pill{
+  display:inline-block;font-family:"IBM Plex Mono",ui-monospace,monospace;
+  font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;
+  border-radius:3px;padding:2px 7px;white-space:nowrap;font-weight:500;
+}
+.p-ok{background:var(--ok-soft);color:var(--ok)}
+.p-warn{background:var(--warn-soft);color:var(--warn)}
+.p-err{background:var(--danger-soft);color:var(--danger)}
+.p-frz{background:var(--frozen-soft);color:var(--frozen)}
+.p-acc{background:var(--accent-soft);color:var(--accent)}
+
+.yes{color:var(--ok);font-weight:600}
+.no{color:var(--danger);font-weight:600}
+.dep{color:var(--warn);font-weight:600}
+
+/* ---------- копирайт интерфейса ---------- */
+.strings{margin:16px 0;border:1px solid var(--rule);background:var(--card)}
+.str{
+  display:grid;grid-template-columns:150px 1fr;gap:0 14px;
+  padding:8px 13px;border-bottom:1px solid var(--rule-2);font-size:13.5px;
+}
+.str:last-child{border-bottom:0}
+.str dt{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11.5px;
+  color:var(--ink-3);margin:0;padding-top:2px;
+}
+.str dd{margin:0;color:var(--ink)}
+
+/* ---------- открытые вопросы ---------- */
+.q{
+  display:grid;grid-template-columns:96px 1fr;gap:0 16px;
+  padding:13px 0;border-top:1px solid var(--rule-2);
+}
+.q:first-of-type{border-top:1px solid var(--rule)}
+.q:last-of-type{border-bottom:1px solid var(--rule)}
+.q b{display:block;font-weight:600;font-size:15px}
+.q span{display:block;color:var(--ink-2);font-size:14.5px;margin-top:2px;max-width:70ch}
+.q .who{align-self:start}
+
+/* ---------- чеклист приёмки ---------- */
+.check{list-style:none;padding:0;margin:16px 0;max-width:none}
+.check li{
+  display:grid;grid-template-columns:22px 1fr;gap:0 12px;
+  padding:8px 0;border-top:1px solid var(--rule-2);margin:0;font-size:14.5px;
+}
+.check li:first-child{border-top:1px solid var(--rule)}
+.check li:last-child{border-bottom:1px solid var(--rule)}
+.check li::before{
+  content:"";width:14px;height:14px;margin-top:4px;
+  border:1.5px solid var(--ink-3);border-radius:2px;
+}
+
+/* ---------- схема экрана ---------- */
+.anat{
+  display:grid;grid-template-columns:1fr 320px;gap:1px;margin:18px 0;
+  background:var(--rule);border:1px solid var(--rule);
+}
+.anat > div{background:var(--card);padding:13px 15px}
+.anat .lbl{
+  font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:10.5px;
+  letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin-bottom:5px;
+}
+.anat .full{grid-column:1/-1}
+.anat p{margin:0;font-size:13.5px;color:var(--ink-2);max-width:none}
+@media (max-width:760px){
+  .anat{grid-template-columns:1fr}
+  .anat .full{grid-column:auto}
+}
+
+/* ---------- футер ---------- */
+.foot{
+  margin-top:52px;padding-top:20px;border-top:2px solid var(--ink);
+  font-size:13.5px;color:var(--ink-3);
+}
+.foot p{max-width:74ch}
+
+@media (max-width:640px){
+  body{padding:0 15px 80px;font-size:15px}
+  .toc ol{columns:1}
+  .req,.q{grid-template-columns:1fr;gap:4px}
+  .rid{font-size:11.5px}
+  .str{grid-template-columns:1fr;gap:2px}
+  .fact{border-right:0;border-bottom:1px solid var(--rule)}
+}
+</style>
+
+<div class="wrap">
+
+<header class="masthead">
+  <div class="tag"><span>VA-9265</span><span>Дизайн-спецификация</span><span>Редакция 1 · прототип v17</span></div>
+  <h1>Распределение материалов свободной съёмки</h1>
+  <p class="lede">Web-экран, на котором эксперт раскладывает неструктурированный набор кадров свободной съёмки по шагам схемы осмотра, создаёт недостающие повторяемые процессы и заполняет их формы.</p>
+  <dl class="facts">
+    <div class="fact"><dt>Родительский эпик</dt><dd>Свободный осмотр</dd></div>
+    <div class="fact"><dt>Зависимость</dt><dd>Core: привязка файлов к шагам</dd></div>
+    <div class="fact"><dt>Целевой объём</dt><dd>до 250 кадров, до 50 повторов</dd></div>
+    <div class="fact"><dt>Минимальная ширина</dt><dd>1280 px</dd></div>
+  </dl>
+</header>
+
+<nav class="toc">
+  <h2>Содержание</h2>
+  <ol>
+    <li><a href="#s1"><span class="n">1</span>Границы задачи</a></li>
+    <li><a href="#s2"><span class="n">2</span>Термины</a></li>
+    <li><a href="#s3"><span class="n">3</span>Модель данных</a></li>
+    <li><a href="#s4"><span class="n">4</span>Состояния кадра</a></li>
+    <li><a href="#s5"><span class="n">5</span>Состояния шага</a></li>
+    <li><a href="#s6"><span class="n">6</span>Права на изменение</a></li>
+    <li><a href="#s7"><span class="n">7</span>Анатомия экрана</a></li>
+    <li><a href="#s8"><span class="n">8</span>Лента материалов</a></li>
+    <li><a href="#s9"><span class="n">9</span>Панель структуры</a></li>
+    <li><a href="#s10"><span class="n">10</span>Выделение и массовые операции</a></li>
+    <li><a href="#s11"><span class="n">11</span>Полноэкранный просмотр</a></li>
+    <li><a href="#s12"><span class="n">12</span>Автораспределение</a></li>
+    <li><a href="#s13"><span class="n">13</span>Приёмка результата</a></li>
+    <li><a href="#s14"><span class="n">14</span>Форма повтора</a></li>
+    <li><a href="#s15"><span class="n">15</span>Связь кадра и структуры</a></li>
+    <li><a href="#s16"><span class="n">16</span>Клавиатура</a></li>
+    <li><a href="#s17"><span class="n">17</span>Сохранение и завершение</a></li>
+    <li><a href="#s18"><span class="n">18</span>Тексты интерфейса</a></li>
+    <li><a href="#s19"><span class="n">19</span>Крайние случаи</a></li>
+    <li><a href="#s20"><span class="n">20</span>Открытые вопросы</a></li>
+    <li><a href="#s21"><span class="n">21</span>Критерии приёмки</a></li>
+  </ol>
+</nav>
+
+<!-- ===================== 1 ===================== -->
+<section id="s1">
+  <h2>Раздел 1</h2>
+  <h3>Границы задачи</h3>
+
+  <div class="req"><span class="rid">1.1</span><div>
+    <p>Экран открывается для осмотра, в котором есть материалы свободной съёмки — кадры, снятые вне шагов схемы. Осмотр другого типа этот экран не использует.</p></div></div>
+
+  <div class="req"><span class="rid">1.2</span><div>
+    <p>В первой итерации распределяются <b>только фотографии и видео</b>. Голосовые и текстовые заметки отображаются как контекст и не распределяются никуда.</p></div></div>
+
+  <div class="req"><span class="rid">1.3</span><div>
+    <p>Поля формы осмотра и формы повторов заполняются на этом экране, но проектирование полноценного редактирования форм вынесено во вторую итерацию. Здесь — компактный просмотр и переход в существующий интерфейс формы.</p></div></div>
+
+  <div class="req"><span class="rid">1.4</span><div>
+    <p>Экран не создаёт и не редактирует схему осмотра. Он работает с той схемой, которая уже назначена осмотру: список этапов и шагов неизменяем, изменяемо только их наполнение.</p></div></div>
+
+  <div class="req"><span class="rid">1.5</span><div>
+    <p>Не поддерживается: мобильный и планшетный режим, ширина экрана меньше 1280&nbsp;px, одновременное редактирование двумя пользователями.</p></div></div>
+
+  <p class="why"><b>Почему так.</b> Задача экрана — не перенести фотографию из левой части в правую. Задача — дать одному человеку за приемлемое время ответить на три вопроса: правильно ли собрана структура осмотра, правильно ли материалы легли в неё, хватает ли данных в формах. Всё, что не помогает ответить на эти три вопроса, из первой итерации исключено.</p>
+</section>
+
+<!-- ===================== 2 ===================== -->
+<section id="s2">
+  <h2>Раздел 2</h2>
+  <h3>Термины</h3>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th>Термин</th><th>Значение</th><th>В интерфейсе</th></tr></thead>
+      <tbody>
+        <tr><td><b>Схема</b></td><td>Шаблон осмотра: набор этапов и шагов</td><td>вкладка «Схема осмотра»</td></tr>
+        <tr><td><b>Этап</b></td><td>Процесс схемы. Бывает неповторяемым и повторяемым</td><td>заголовок группы в панели</td></tr>
+        <tr><td><b>Шаг</b></td><td>Единица требования: что именно нужно снять. Несёт инструкцию, ракурс, лимиты</td><td>строка внутри этапа</td></tr>
+        <tr><td><b>Повтор</b></td><td>Экземпляр повторяемого этапа: конкретное здание, конкретный станок. Имеет собственную форму</td><td>карточка объекта</td></tr>
+        <tr><td><b>Объект</b></td><td>Синоним повтора в текстах интерфейса. В коде — владелец привязки</td><td>«объект», «единица», «здание»</td></tr>
+        <tr><td><b>Кадр</b></td><td>Одна фотография или одно видео</td><td>плитка в ленте</td></tr>
+        <tr><td><b>Заметка</b></td><td>Голосовой комментарий с расшифровкой или текстовая заметка</td><td>полоса-разделитель в ленте</td></tr>
+        <tr><td><b>Свободная съёмка</b></td><td>Материалы, снятые без привязки к шагу</td><td>всё содержимое ленты</td></tr>
+        <tr><td><b>Привязка</b></td><td>Связь кадра с парой «владелец + шаг»</td><td>зелёная плашка на кадре</td></tr>
+        <tr><td><b>Владелец</b></td><td>Кому принадлежит шаг: id повтора либо id неповторяемого этапа</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="why"><b>Дисциплина терминов.</b> «Этап» и «шаг» в текстах интерфейса не взаимозаменяемы. Повторяемость — свойство этапа, а не шага. Слово «схема» занято схемой осмотра, поэтому действие перехода к шагу называется «Показать в&nbsp;структуре», а не «Показать в&nbsp;схеме».</p>
+</section>
+
+<!-- ===================== 3 ===================== -->
+<section id="s3">
+  <h2>Раздел 3</h2>
+  <h3>Модель данных</h3>
+
+  <h4>Кадр</h4>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Поле</th><th>Тип</th><th>Описание</th></tr></thead>
+      <tbody>
+        <tr><td><code>id</code></td><td>int</td><td>Идентификатор файла</td></tr>
+        <tr><td><code>type</code></td><td>enum</td><td><code>photo</code> · <code>video</code> · <code>voice</code> · <code>note</code></td></tr>
+        <tr><td><code>shotAt</code></td><td>datetime</td><td>Время съёмки. Единственный ключ сортировки ленты</td></tr>
+        <tr><td><code>fileName</code></td><td>string</td><td>Имя файла. Участвует в поиске</td></tr>
+        <tr><td><code>duration</code></td><td>int?</td><td>Секунды, для видео и голосовых</td></tr>
+        <tr><td><code>text</code></td><td>string?</td><td>Расшифровка голосового или текст заметки</td></tr>
+        <tr><td><code>recognized</code></td><td>string?</td><td>Текст, распознанный на кадре. Участвует в поиске</td></tr>
+        <tr><td><code>ownerId</code></td><td>string?</td><td>Владелец привязки. <code>null</code> — не распределён</td></tr>
+        <tr><td><code>stepId</code></td><td>string?</td><td>Шаг привязки</td></tr>
+        <tr><td><code>origin</code></td><td>enum</td><td><code>free</code> — свободная съёмка · <code>step</code> — снят внутри шага</td></tr>
+        <tr><td><code>locked</code></td><td>bool</td><td>Привязка сделана до текущей сессии и защищена</td></tr>
+        <tr><td><code>rejected</code></td><td>bool</td><td>Отклонён проверяющим при решении «Повторить»</td></tr>
+        <tr><td><code>draft</code></td><td>bool</td><td>Привязка предложена автоматом и ещё не принята</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Повтор</h4>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Поле</th><th>Тип</th><th>Описание</th></tr></thead>
+      <tbody>
+        <tr><td><code>id</code></td><td>string</td><td>Идентификатор повтора</td></tr>
+        <tr><td><code>stageId</code></td><td>string</td><td>Этап, экземпляром которого является</td></tr>
+        <tr><td><code>form</code></td><td>map</td><td>Значения полей динамической формы</td></tr>
+        <tr><td><code>draft</code></td><td>bool</td><td>Создан автоматом и ещё не принят</td></tr>
+        <tr><td><code>fieldSource</code></td><td>map</td><td>По каждому заполненному полю: <code>recognized</code> — взято с кадра или из заметки, <code>default</code> — подставлено значение по умолчанию</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="req"><span class="rid">3.1</span><div>
+    <p><code>fieldSource</code> обязателен для автоматически созданных повторов. Он различает два принципиально разных случая: «система прочитала это на кадре» и «система подставила значение, потому что оно чаще всего такое». Второе пользователь обязан проверить, первое — может пропустить.</p></div></div>
+
+  <h4>Вердикт проверяющего</h4>
+  <div class="tw narrow">
+    <table>
+      <thead><tr><th>Поле</th><th>Тип</th><th>Описание</th></tr></thead>
+      <tbody>
+        <tr><td><code>ownerId</code> + <code>stepId</code></td><td>ключ</td><td>Адресуется конкретный шаг конкретного владельца</td></tr>
+        <tr><td><code>verdict</code></td><td>enum</td><td><code>ok</code> — принят · <code>redo</code> — повторить</td></tr>
+        <tr><td><code>at</code></td><td>date</td><td>Дата решения. Показывается в интерфейсе</td></tr>
+        <tr><td><code>note</code></td><td>string?</td><td>Замечание проверяющего. Обязательно к показу при <code>redo</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ===================== 4 ===================== -->
+<section id="s4">
+  <h2>Раздел 4</h2>
+  <h3>Состояния кадра</h3>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th>Состояние</th><th>Условие</th><th>Вид в ленте</th><th>Виден в ленте</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="pill p-acc">свободный</span></td>
+          <td><code>origin=free</code>, <code>ownerId=null</code></td>
+          <td>Обычная плитка, время съёмки в подписи</td><td class="yes">Да</td></tr>
+        <tr>
+          <td><span class="pill p-ok">распределён</span></td>
+          <td><code>origin=free</code>, есть <code>ownerId</code></td>
+          <td>Изображение обесцвечено, зелёная плашка с названием шага, крестик открепления</td><td class="dep">Зависит от режима</td></tr>
+        <tr>
+          <td><span class="pill p-warn">предложен</span></td>
+          <td><code>draft=true</code></td>
+          <td>Жёлтая обводка, плашка охристая</td><td class="dep">Зависит от режима</td></tr>
+        <tr>
+          <td><span class="pill p-frz">привязан ранее</span></td>
+          <td><code>locked=true</code>, <code>origin=free</code></td>
+          <td>Плашка серая, вместо крестика — замок</td><td class="yes">Да</td></tr>
+        <tr>
+          <td><span class="pill p-frz">снят в шаге</span></td>
+          <td><code>origin=step</code></td>
+          <td>В ленте не выводится, только миниатюрой внутри шага с иконкой камеры</td><td class="no">Нет</td></tr>
+        <tr>
+          <td><span class="pill p-err">отклонён</span></td>
+          <td><code>rejected=true</code></td>
+          <td>Плашка красная, текст «отклонён · <i>название шага</i>», замок</td><td class="yes">Да</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="req"><span class="rid">4.1</span><div>
+    <p>Кадры <code>origin=step</code> не участвуют в распределении и не попадают в знаменатель счётчика «Кадры разложены». Их привязка возникла в момент съёмки и этим экраном не управляется.</p></div></div>
+
+  <div class="req"><span class="rid">4.2</span><div>
+    <p>Отклонённый кадр остаётся привязанным к своему шагу и виден в нём миниатюрой с перечёркиванием, но <b>не учитывается в счётчике заполнения шага</b>. Благодаря этому шаг с ограничением «не больше 1» можно переснять.</p></div></div>
+
+  <div class="req"><span class="rid">4.3</span><div>
+    <p>Порядок кадров в ленте — строго по <code>shotAt</code>, по возрастанию. Порядок не меняется ни при каком действии пользователя. Группировка кадров в блоки, серии или цепочки в интерфейсе отсутствует.</p></div></div>
+
+  <p class="why"><b>Почему без группировки.</b> Опытный эксперт снимает узел с четырёх сторон подряд — связанные кадры уже лежат рядом. Любая перегруппировка ломает хронологию, по которой человек восстанавливает маршрут осмотра, и заставляет разработку изобретать правило кластеризации, которого в данных нет.</p>
+</section>
+
+<!-- ===================== 5 ===================== -->
+<section id="s5">
+  <h2>Раздел 5</h2>
+  <h3>Состояния шага</h3>
+
+  <p>Шаг имеет два независимых измерения: <b>наполненность</b> (сколько кадров относительно лимитов) и <b>доступность</b> (можно ли его менять). Их нельзя выражать одним визуальным средством.</p>
+
+  <h4>Наполненность</h4>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Состояние</th><th>Условие</th><th>Счётчик</th><th>Подпись</th></tr></thead>
+      <tbody>
+        <tr><td><span class="pill p-err">пусто</span></td><td>0 кадров, шаг обязателен</td><td>красный</td><td>«не хватает N», пустые слоты с красной рамкой</td></tr>
+        <tr><td><span class="pill p-acc">пусто</span></td><td>0 кадров, шаг необязателен</td><td>нейтральный</td><td>«по факту, если есть»</td></tr>
+        <tr><td><span class="pill p-warn">недобор</span></td><td>больше 0, меньше минимума</td><td>жёлтый</td><td>«не хватает N»</td></tr>
+        <tr><td><span class="pill p-ok">норма</span></td><td>минимум набран</td><td>зелёный</td><td>«минимум набран» либо «можно ещё N»</td></tr>
+        <tr><td><span class="pill p-ok">заполнен</span></td><td>достигнут максимум</td><td>зелёный</td><td>помета «· заполнен», строка приглушена</td></tr>
+        <tr><td><span class="pill p-err">переполнен</span></td><td>больше максимума</td><td>красный</td><td>красная рамка строки</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Доступность</h4>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Состояние</th><th>Условие</th><th>Вид</th><th>Снимаемо</th></tr></thead>
+      <tbody>
+        <tr><td><span class="pill p-acc">открыт</span></td><td>вердикта нет</td><td>обычный</td><td>—</td></tr>
+        <tr><td><span class="pill p-ok">заполнен по лимиту</span></td><td>достигнут максимум</td><td>приглушён, приём отклоняется</td><td class="yes">Да, откреплением кадра</td></tr>
+        <tr><td><span class="pill p-frz">заморожен</span></td><td><code>verdict=ok</code></td><td>серый фон, замок, дата, счётчик нейтральный, инструкция и лимиты скрыты, номер для клавиатуры снят</td><td class="no">Нет</td></tr>
+        <tr><td><span class="pill p-warn">повторить</span></td><td><code>verdict=redo</code></td><td>жёлтая рамка, строка «Повторить от <i>дата</i>» и текст замечания</td><td class="no">Вердикт снимается только в Core</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="req"><span class="rid">5.1</span><div>
+    <p>Замороженный шаг и шаг, заполненный по лимиту, обязаны отличаться визуально. Первое пользователь снять не может, второе — может, освободив место.</p></div></div>
+
+  <div class="req"><span class="rid">5.2</span><div>
+    <p>У замороженного шага скрываются инструкция, строка лимитов и пустые слоты. Остаются: название, счётчик, замок с датой и миниатюры содержимого.</p></div></div>
+
+  <div class="req"><span class="rid">5.3</span><div>
+    <p>Шаг с вердиктом <code>redo</code> обязан показывать текст замечания проверяющего рядом с названием, без раскрытия по клику.</p></div></div>
+</section>
+
+<!-- ===================== 6 ===================== -->
+<section id="s6">
+  <h2>Раздел 6</h2>
+  <h3>Права на изменение</h3>
+
+  <div class="tw">
+    <table>
+      <thead><tr>
+        <th>Действие</th><th>Свободный</th><th>Распределён</th><th>Предложен</th><th>Привязан ранее</th><th>Снят в шаге</th><th>Отклонён</th>
+      </tr></thead>
+      <tbody>
+        <tr><td>Выделить</td><td class="yes">да</td><td class="yes">да</td><td class="yes">да</td><td class="yes">да</td><td>—</td><td class="yes">да</td></tr>
+        <tr><td>Привязать к шагу</td><td class="yes">да</td><td class="yes">перенос</td><td class="yes">да</td><td class="no">нет</td><td class="no">нет</td><td class="no">нет</td></tr>
+        <tr><td>Открепить</td><td>—</td><td class="yes">да</td><td class="yes">да</td><td class="no">нет</td><td class="no">нет</td><td class="no">нет</td></tr>
+        <tr><td>Открыть на весь экран</td><td class="yes">да</td><td class="yes">да</td><td class="yes">да</td><td class="yes">да</td><td class="yes">да</td><td class="yes">да</td></tr>
+        <tr><td>Показать в структуре</td><td>—</td><td class="yes">да</td><td class="yes">да</td><td class="yes">да</td><td class="yes">да</td><td class="yes">да</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="req"><span class="rid">6.1</span><div>
+    <p>Запрет всегда сопровождается причиной. Молчаливый отказ и заблокированный элемент без объяснения не допускаются.</p>
+    <ul>
+      <li>Кадр снят прямо в шаге при обычном осмотре — открепить нельзя</li>
+      <li>Кадр в проверенном шаге — открепить нельзя</li>
+      <li>Кадр отклонён проверяющим — открепить нельзя</li>
+      <li>«<i>Название шага</i>» проверен и закрыт — добавить нельзя</li>
+    </ul></div></div>
+
+  <div class="req"><span class="rid">6.2</span><div>
+    <p>Повтор, у которого хотя бы один шаг заморожен, нельзя удалить. Кнопка удаления не выводится; в заголовке повтора выводится пилюля «<i>N</i> проверено» с замком.</p></div></div>
+
+  <div class="req"><span class="rid">6.3</span><div>
+    <p>Автомат не пишет в замороженные шаги и не переносит защищённые кадры. Пропущенное он обязан посчитать и назвать в диалоге запуска и в сводке результата.</p></div></div>
+</section>
+
+<!-- ===================== 7 ===================== -->
+<section id="s7">
+  <h2>Раздел 7</h2>
+  <h3>Анатомия экрана</h3>
+
+  <div class="anat">
+    <div class="full"><div class="lbl">Шапка · 48 px</div>
+      <p>Хлебные крошки до осмотра, индикатор автосохранения, «Горячие клавиши», основное действие «Завершить распределение».</p></div>
+    <div class="full"><div class="lbl">Подшапка</div>
+      <p>Полоса приёмки (только во время проверки автораспределения) · бейдж «Свободная съёмка» · сводка сессии · три счётчика с полосами прогресса: «Кадры разложены», «Обязательные шаги», «Объекты».</p></div>
+    <div><div class="lbl">Тулбар ленты</div>
+      <p>«Распределить автоматически» · «Выделить всё» · поиск · индикатор текущего объекта · переключатель «Разобранные: оставлять / убирать» · переключатель размера превью M&nbsp;/&nbsp;L.</p></div>
+    <div><div class="lbl">Вкладки панели</div>
+      <p>«Схема осмотра» и «Форма осмотра». По умолчанию открыта схема.</p></div>
+    <div><div class="lbl">Лента материалов</div>
+      <p>Сетка плиток в хронологическом порядке, заметки — полосами во всю ширину между кадрами.</p></div>
+    <div><div class="lbl">Панель структуры</div>
+      <p>Инструменты · этапы · шаги · повторы с компактной формой. Ширина 440&nbsp;px по умолчанию, тянется разделителем в диапазоне 320–820&nbsp;px.</p></div>
+    <div class="full"><div class="lbl">Панель выделения · поверх ленты</div>
+      <p>Появляется при непустом выделении: счётчик · «Назначить на шаг» · «Новый объект из выделенного» · «В „Прочее“» · «Открепить» · «Снять».</p></div>
+  </div>
+
+  <div class="req"><span class="rid">7.1</span><div>
+    <p>Счётчик «Кадры разложены» считает только кадры <code>origin=free</code>. Часть полосы, соответствующая кадрам с <code>locked=true</code>, закрашивается серым — это работа, сделанная до текущего пользователя. Под полосой — подпись «<i>N</i> привязано до вас».</p></div></div>
+
+  <div class="req"><span class="rid">7.2</span><div>
+    <p>Счётчик «Обязательные шаги» аналогично отделяет серым долю замороженных шагов и подписывает «<i>N</i> закрыто проверкой».</p></div></div>
+
+  <p class="why"><b>Зачем разделять.</b> Без разделения экран сообщает «8 из 10 закрыто» человеку, которому предстоит разложить двести кадров, и создаёт ложное впечатление почти готовой работы.</p>
+</section>
+
+<!-- ===================== 8 ===================== -->
+<section id="s8">
+  <h2>Раздел 8</h2>
+  <h3>Лента материалов</h3>
+
+  <div class="req"><span class="rid">8.1</span><div>
+    <p>Два размера превью, переключаются в тулбаре: <b>M — 176&nbsp;px</b> (по умолчанию), <b>L — 272&nbsp;px</b>. Сетка — <code>auto-fill</code> с минимальной шириной колонки, промежуток 9&nbsp;px.</p>
+    <p>Превью, отдаваемое бэкендом на размер L, должно быть не меньше 400&nbsp;px по большей стороне.</p></div></div>
+
+  <div class="req"><span class="rid">8.2</span><div>
+    <p>Переключатель «Разобранные»: <b>оставлять</b> — распределённые кадры остаются на своих местах в хронологии и обесцвечиваются; <b>убирать</b> — исчезают из ленты. Выбор запоминается в рамках сессии.</p></div></div>
+
+  <div class="req"><span class="rid">8.3</span><div>
+    <p>Клик по плитке выделяет или снимает выделение. Открытие на весь экран — по иконке в правом верхнем углу плитки, появляющейся при наведении.</p></div></div>
+
+  <div class="req"><span class="rid">8.4</span><div>
+    <p>Заметки выводятся полосой во всю ширину ленты, в позиции по времени. Голосовая — с иконкой воспроизведения, длительностью и волновой формой; текстовая — с иконкой заметки. Текст длиннее 110 символов сворачивается с кнопкой «Показать полностью».</p></div></div>
+
+  <div class="req"><span class="rid">8.5</span><div>
+    <p>Выделение фрагмента текста в расшифровке вызывает всплывающее действие «Новый объект: <i>фрагмент</i>» с выбором этапа. Выделенный текст подставляется в название создаваемого повтора.</p></div></div>
+
+  <div class="req"><span class="rid">8.6</span><div>
+    <p>Поиск фильтрует ленту по расшифровкам заметок, распознанному тексту на кадрах и именам файлов. <span class="pill p-warn">открытый вопрос</span> — см.&nbsp;20.6.</p></div></div>
+</section>
+
+<!-- ===================== 9 ===================== -->
+<section id="s9">
+  <h2>Раздел 9</h2>
+  <h3>Панель структуры</h3>
+
+  <div class="req"><span class="rid">9.1</span><div>
+    <p>Этапы сворачиваются по клику в заголовок. Кнопка «Свернуть все» переключается в «Развернуть все». Состояние свёрнутости сохраняется в рамках сессии.</p></div></div>
+
+  <div class="req"><span class="rid">9.2</span><div>
+    <p>Кнопка «Только открытые» выводится, если в осмотре есть хотя бы один замороженный шаг. Она скрывает замороженные шаги и повторы, у которых заморожены все шаги. В подписи кнопки — количество скрытого; внутри повтора остаётся строка «Скрыто проверенных шагов: <i>N</i>».</p></div></div>
+
+  <div class="req"><span class="rid">9.3</span><div>
+    <p>Один повтор может быть <b>текущим</b>. Текущий подсвечен, раскрыт, и только к его шагам применяются клавиши <kbd>1</kbd>–<kbd>8</kbd>. Клик по заголовку делает повтор текущим; повторный клик сворачивает его.</p></div></div>
+
+  <div class="req"><span class="rid">9.4</span><div>
+    <p>Порядок содержимого раскрытого повтора: действия приёмки (только для предложенных) → компактная форма → шаги → служебная строка.</p></div></div>
+
+  <div class="req"><span class="rid">9.5</span><div>
+    <p>Шаг принимает перетаскивание. При наведении перетаскиваемого выделения шаг подсвечивается синей рамкой; замороженный и заполненный шаг подсветку не получают, курсор показывает запрет.</p></div></div>
+
+  <div class="req"><span class="rid">9.6</span><div>
+    <p>Миниатюра внутри шага: до 8 штук. Действие удаления — крестик поверх миниатюры при наведении; для защищённых кадров вместо крестика выводится замок или иконка камеры.</p></div></div>
+
+  <div class="req"><span class="rid">9.7</span><div>
+    <p>Клик по миниатюре внутри шага открывает кадр на весь экран.</p></div></div>
+</section>
+
+<!-- ===================== 10 ===================== -->
+<section id="s10">
+  <h2>Раздел 10</h2>
+  <h3>Выделение и массовые операции</h3>
+
+  <div class="req"><span class="rid">10.1</span><div>
+    <p>Способы выделения: клик по плитке · <kbd>Shift</kbd>&nbsp;+&nbsp;клик — диапазон · протягивание рамкой с пустого места ленты или с плитки при зажатом <kbd>Alt</kbd> · <kbd>Ctrl</kbd>&nbsp;/&nbsp;<kbd>⌘</kbd>&nbsp;+&nbsp;<kbd>A</kbd> — всё видимое.</p>
+    <p>Протягивание с зажатым <kbd>Shift</kbd> или <kbd>Ctrl</kbd> добавляет к текущему выделению. Лента автоматически прокручивается, когда указатель подходит к её краю ближе 60&nbsp;px.</p></div></div>
+
+  <div class="req"><span class="rid">10.2</span><div>
+    <p>Панель выделения показывает количество выделенного и, отдельно, сколько из них уже распределено и сколько видео. Панель центрируется по ленте, а не по окну, чтобы не перекрывать панель структуры.</p></div></div>
+
+  <div class="req"><span class="rid">10.3</span><div>
+    <p>«Назначить на шаг» открывает список: шаги текущего объекта с номерами клавиш → шаги неповторяемых этапов → другие объекты с действием «сделать текущим». Замороженные и заполненные пункты не выбираются.</p></div></div>
+
+  <div class="req"><span class="rid">10.4</span><div>
+    <p>Групповая привязка проверяется целиком: если добавление выделенного превысит максимум шага, не привязывается ничего, выводится сообщение с указанием лимита.</p></div></div>
+
+  <div class="req"><span class="rid">10.5</span><div>
+    <p>Тип содержимого шага соблюдается: шаг «Видео» не принимает фотографии и наоборот.</p></div></div>
+
+  <div class="req"><span class="rid">10.6</span><div>
+    <p>Каждая привязка и каждое открепление порождают уведомление с действием «Отменить». Отмена доступна также по <kbd>Ctrl</kbd>&nbsp;/&nbsp;<kbd>⌘</kbd>&nbsp;+&nbsp;<kbd>Z</kbd>. Глубина истории — не меньше 20 операций.</p></div></div>
+</section>
+
+<!-- ===================== 11 ===================== -->
+<section id="s11">
+  <h2>Раздел 11</h2>
+  <h3>Полноэкранный просмотр</h3>
+
+  <div class="req"><span class="rid">11.1</span><div>
+    <p>Состав: изображение · позиция «<i>N</i> из <i>M</i>» и имя файла · метаданные (файл, время, тип, распознанный текст) · нижняя плашка состояния · список шагов справа с теми же лимитами и состояниями, что в панели структуры.</p></div></div>
+
+  <div class="req"><span class="rid">11.2</span><div>
+    <p>Список шагов справа группируется так же, как поповер назначения, и допускает сворачивание групп — это обязательно для схем с 30+ шагами.</p></div></div>
+
+  <h4>Нижняя плашка: четыре состояния</h4>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Состояние кадра</th><th>Содержимое плашки</th></tr></thead>
+      <tbody>
+        <tr><td>Не распределён</td><td>Серая. «Кадр не распределён — выберите шаг справа или нажмите 1–<i>N</i>» · кнопка «Подобрать шаг»</td></tr>
+        <tr><td>Распределён</td><td>Зелёная. Название шага и объекта · «Показать в структуре» · «Открепить»</td></tr>
+        <tr><td>Защищён или отклонён</td><td>Зелёная с замком. Название шага · причина · «Показать в структуре». Действий изменения нет</td></tr>
+        <tr><td>Подбор выполнен</td><td>Предложение: шаг и объект · «Принять <kbd>Enter</kbd>» · «Не то». Если объекта нет — «Создать <i>этап</i>»</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="req"><span class="rid">11.3</span><div>
+    <p><b>Сценарий А — кадр не распределён.</b> Клик по шагу: привязка, плашка вспыхивает надписью «Распределено», через 820&nbsp;мс автоматический переход к следующему кадру. Кнопки на время вспышки блокируются.</p></div></div>
+
+  <div class="req"><span class="rid">11.4</span><div>
+    <p><b>Сценарий Б — кадр уже распределён.</b> Клик по другому шагу открывает подтверждение «Перенести кадр?» с текущим и новым адресом. После переноса автоперехода нет — пользователь остаётся на кадре.</p></div></div>
+
+  <p class="why"><b>Почему по-разному.</b> Первый сценарий — конвейер: человек разбирает сотню кадров и должен двигаться без лишних движений. Второй — исправление ошибки, и проскочить его автоматически хуже, чем потратить лишний клик. Отдельного режима «Перенести» нет: перенос — это то же назначение шага, отличается только подтверждением.</p>
+
+  <div class="req"><span class="rid">11.5</span><div>
+    <p>Отдельного уведомления при распределении из полноэкранного режима не выводится: обратная связь целиком в плашке под кадром и в появившейся миниатюре внутри шага.</p></div></div>
+
+  <div class="req"><span class="rid">11.6</span><div>
+    <p>Действие «Показать в структуре» закрывает просмотр и выполняет переход по правилам раздела&nbsp;15.</p></div></div>
+</section>
+
+<!-- ===================== 12 ===================== -->
+<section id="s12">
+  <h2>Раздел 12</h2>
+  <h3>Автораспределение</h3>
+
+  <p>Автораспределение — не одно действие. Оно читает заметки и надписи на кадрах, движется по хронологии, создаёт повторы, заполняет часть их форм и раскладывает кадры. Поэтому его результат — <b>предложение</b>, а не применённое изменение.</p>
+
+  <h4>Три режима</h4>
+  <div class="tw">
+    <table>
+      <thead><tr><th>Режим</th><th>Создаёт повторы</th><th>Заполняет формы</th><th>Раскладывает кадры</th><th>Когда</th></tr></thead>
+      <tbody>
+        <tr><td><b>Полное</b></td><td class="yes">да</td><td class="yes">да</td><td class="yes">да</td><td>Пустой осмотр, нужен черновик целиком</td></tr>
+        <tr><td><b>Только структура</b></td><td class="yes">да</td><td class="yes">да</td><td class="no">нет</td><td>Сначала проверить список объектов, потом раскладывать</td></tr>
+        <tr><td><b>Только кадры</b></td><td class="no">нет</td><td class="no">нет</td><td class="yes">да</td><td>Структура уже есть и проверена</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="req"><span class="rid">12.1</span><div>
+    <p>Режим выбирается в диалоге запуска. У каждого режима выводится <b>прогноз на текущих данных</b>: сколько кадров, сколько повторов, сколько останется в ленте. Прогноз считается до запуска.</p></div></div>
+
+  <div class="req"><span class="rid">12.2</span><div>
+    <p>Режим «Только кадры» недоступен, если в осмотре нет ни одного повтора. Причина выводится текстом.</p></div></div>
+
+  <div class="req"><span class="rid">12.3</span><div>
+    <p>Диалог запуска обязан назвать источники: заметки — голосовые и текстовые; надписи на кадрах — шильдики, инвентарные номера, таблички; хронология съёмки.</p></div></div>
+
+  <div class="req"><span class="rid">12.4</span><div>
+    <p>Диалог запуска обязан сказать, что результат — черновик, что структура на время обработки заблокирована и что операцию можно прервать.</p></div></div>
+
+  <h4>Прогресс</h4>
+  <div class="req"><span class="rid">12.5</span><div>
+    <p>Обработка идёт в модальном окне поверх экрана. Обязательны: детерминированная полоса прогресса, счётчик обработанных кадров, счётчик прочитанных заметок, счётчик созданных или сопоставленных объектов, кнопка «Прервать», текст о блокировке структуры.</p></div></div>
+
+  <div class="req"><span class="rid">12.6</span><div>
+    <p>Прерывание отменяет операцию целиком: ни один повтор не создаётся, ни один кадр не привязывается. Выводится сообщение «Автораспределение прервано — ничего не применено».</p></div></div>
+
+  <div class="req"><span class="rid">12.7</span><div>
+    <p>Анимация перелёта кадров в панель — необязательный слой поверх прогресса. Она не должна влиять на длительность операции и должна отключаться при <code>prefers-reduced-motion</code>.</p></div></div>
+
+  <h4>Правила сопоставления</h4>
+  <div class="req"><span class="rid">12.8</span><div>
+    <p>В режиме «Только кадры» кадр относится к существующему повтору по правилу: сначала совпадение инвентарного номера, при отсутствии номера — совпадение наименования. Совпадение частичное или по похожести не допускается.</p></div></div>
+
+  <div class="req"><span class="rid">12.9</span><div>
+    <p>Если подходящего повтора нет, кадры остаются в ленте и попадают в счётчик «без подходящего объекта». Автомат не создаёт объект в этом режиме.</p></div></div>
+
+  <div class="req"><span class="rid">12.10</span><div>
+    <p>Если идентификатор оборудования не распознан, автомат не относит кадр никуда. Угадывание запрещено: цена ошибочной привязки выше цены пропуска — ошибку потом ищут глазами по всему осмотру.</p></div></div>
+
+  <div class="req"><span class="rid">12.11</span><div>
+    <p>Автомат уважает лимиты шагов: если максимум уже достигнут, кадр пропускается и попадает в счётчик пропущенных.</p></div></div>
+
+  <h4>Сводка результата</h4>
+  <div class="req"><span class="rid">12.12</span><div>
+    <p>После обработки выводится сводка: заголовок с итогом («Предложено: <i>N</i> кадров в <i>M</i> объектов»), объяснение следующего шага, отдельные блоки для кадров без объекта, для пропущенных и для оставшихся в ленте.</p>
+    <p>Сводка обязана сказать, что подтверждать каждую фотографию не требуется: принятие объекта принимает и его кадры.</p></div></div>
+
+  <div class="req"><span class="rid">12.13</span><div>
+    <p>Действия сводки: «К проверке» — прокрутка к первому непроверенному объекту; «Показать кадры без места» — переключение ленты в режим «убирать» и прокрутка в начало.</p></div></div>
+
+  <h4>Подбор для одного кадра</h4>
+  <div class="req"><span class="rid">12.14</span><div>
+    <p>В полноэкранном просмотре нераспределённого кадра доступно действие «Подобрать шаг». Оно применяет ту же логику к одному кадру и выводит предложение в плашку. Подтверждение — кнопкой или <kbd>Enter</kbd>, отказ — «Не то».</p>
+    <p>Если рядом нет распознанного идентификатора, выводится «Не удалось подобрать: идентификатор рядом с кадром не распознан». Предложения не выдаётся.</p></div></div>
+</section>
+
+<!-- ===================== 13 ===================== -->
+<section id="s13">
+  <h2>Раздел 13</h2>
+  <h3>Приёмка результата</h3>
+
+  <div class="req"><span class="rid">13.1</span><div>
+    <p>Всё созданное автоматом помечается как предложенное: повторы получают жёлтый фон заголовка и пилюлю «предложено», кадры — жёлтую обводку и охристую плашку.</p></div></div>
+
+  <div class="req"><span class="rid">13.2</span><div>
+    <p>Полоса приёмки в подшапке показывает: сколько объектов осталось проверить, сколько уже проверено из общего числа, переключатель «только непроверенные», кнопки «Отменить автораспределение» и «Принять все объекты».</p></div></div>
+
+  <div class="req"><span class="rid">13.3</span><div>
+    <p><b>«Принять объект»</b> снимает пометку с повтора и со всех его кадров, сворачивает повтор, убирает его из списка при включённом фильтре и делает текущим следующий непроверенный, прокручивая к нему панель.</p></div></div>
+
+  <div class="req"><span class="rid">13.4</span><div>
+    <p><b>«Отклонить»</b> удаляет повтор и возвращает его кадры в ленту нераспределёнными. Переход к следующему — как при принятии.</p></div></div>
+
+  <div class="req"><span class="rid">13.5</span><div>
+    <p><b>«Принять все объекты»</b> принимает всё оставшееся предложенное разом. <b>«Отменить автораспределение»</b> снимает только непринятое; уже принятые объекты остаются. Оба значения обязаны быть в подсказке кнопки.</p></div></div>
+
+  <div class="req"><span class="rid">13.6</span><div>
+    <p>Режим приёмки завершается автоматически, когда не осталось ни предложенных объектов, ни предложенных кадров. Выводится «Все объекты проверены».</p></div></div>
+
+  <div class="req"><span class="rid">13.7</span><div>
+    <p>Отдельного подтверждения каждой фотографии нет. Единица приёмки — объект.</p></div></div>
+
+  <p class="why"><b>Модель ревью.</b> При сорока объектах человек не помнит, какие уже смотрел. Поэтому проверенное уходит с экрана, а на экране остаётся ровно то, что ещё требует внимания, — как в ревью изменений, где просмотренный файл сворачивается.</p>
+</section>
+
+<!-- ===================== 14 ===================== -->
+<section id="s14">
+  <h2>Раздел 14</h2>
+  <h3>Форма повтора</h3>
+
+  <div class="req"><span class="rid">14.1</span><div>
+    <p>В карточке повтора форма показывается компактно: первые 6 заполненных или обязательных полей парами «подпись — значение». Незаполненное обязательное поле выделяется цветом ошибки и текстом «не заполнено».</p></div></div>
+
+  <div class="req"><span class="rid">14.2</span><div>
+    <p>У автоматически заполненного поля выводится источник: <b>«распознано»</b> — нейтральным серым, <b>«по умолчанию»</b> — охристым. Под формой поясняющая строка: «„по умолчанию“ — не с кадра, проверьте».</p></div></div>
+
+  <div class="req"><span class="rid">14.3</span><div>
+    <p>«Все поля (<i>N</i>)» разворачивает форму целиком, с разбивкой по группам полей. У каждой группы своё действие «Изменить», открывающее редактирование сразу на этой группе.</p></div></div>
+
+  <div class="req"><span class="rid">14.4</span><div>
+    <p>Редактирование открывается модальным окном с существующей динамической формой этапа. Зависимые поля показываются и скрываются по значению родительского поля без перезагрузки формы.</p></div></div>
+
+  <div class="req"><span class="rid">14.5</span><div>
+    <p>При создании повтора из выделенных кадров распознанные на них значения предлагаются подсказками под формой: клик подставляет значение в подходящее поле.</p></div></div>
+
+  <div class="req"><span class="rid">14.6</span><div>
+    <p>Обязательные поля проверяются при сохранении. При незаполненных выводится перечисление: «Заполните: <i>список подписей</i>».</p></div></div>
+
+  <p class="why"><b>Почему форма внутри карточки.</b> Сорок объектов означает сорок открытий попапа, если форма спрятана за кнопкой. Компактный просмотр даёт проверить весь результат одним скроллом; попап остаётся для собственно правки.</p>
+</section>
+
+<!-- ===================== 15 ===================== -->
+<section id="s15">
+  <h2>Раздел 15</h2>
+  <h3>Связь кадра и структуры</h3>
+
+  <div class="req"><span class="rid">15.1</span><div>
+    <p><b>Наведение на распределённый кадр</b> подсвечивает его шаг и объект в панели структуры — <b>только если шаг уже в видимой области</b>. Прокрутка при наведении не выполняется.</p></div></div>
+
+  <div class="req"><span class="rid">15.2</span><div>
+    <p><b>Наведение на шаг или на заголовок объекта</b> подсвечивает в ленте все относящиеся к нему кадры и приглушает остальные до 32% непрозрачности.</p></div></div>
+
+  <div class="req"><span class="rid">15.3</span><div>
+    <p><b>Клик по названию шага в плашке кадра</b> либо по иконке поиска в той же плашке выполняет переход:</p>
+    <ol>
+      <li>панель переключается на вкладку «Схема осмотра»;</li>
+      <li>этап разворачивается, объект открывается и становится текущим;</li>
+      <li>если шаг скрыт фильтром «Только открытые», фильтр снимается;</li>
+      <li>панель прокручивается к шагу;</li>
+      <li>шаг подсвечивается вспышкой 1,5&nbsp;с, конкретная миниатюра получает обводку.</li>
+    </ol>
+    <p>Если шаг не найден — «Шаг не найден в структуре».</p></div></div>
+
+  <div class="req"><span class="rid">15.4</span><div>
+    <p>Название шага в плашке кадра имеет пунктирное подчёркивание и подсказку «Показать в структуре справа» — действие должно читаться как действие.</p></div></div>
+
+  <p class="why"><b>Почему прокрутка только по клику.</b> Автоматическая прокрутка при наведении превращает случайное движение мыши над лентой в постоянное дёрганье правой панели. Наведение отвечает на вопрос «где это», клик — переносит туда.</p>
+</section>
+
+<!-- ===================== 16 ===================== -->
+<section id="s16">
+  <h2>Раздел 16</h2>
+  <h3>Клавиатура</h3>
+
+  <div class="tw narrow">
+    <table>
+      <thead><tr><th>Клавиши</th><th>Действие</th><th>Контекст</th></tr></thead>
+      <tbody>
+        <tr><td><kbd>1</kbd>–<kbd>8</kbd></td><td>Привязать к шагу текущего объекта</td><td>Лента и полноэкранный режим</td></tr>
+        <tr><td><kbd>Shift</kbd> + клик</td><td>Выделить диапазон</td><td>Лента</td></tr>
+        <tr><td><kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>A</kbd></td><td>Выделить всё видимое</td><td>Лента</td></tr>
+        <tr><td><kbd>Ctrl</kbd>/<kbd>⌘</kbd> + <kbd>Z</kbd></td><td>Отменить последнюю операцию</td><td>Везде</td></tr>
+        <tr><td><kbd>Del</kbd> · <kbd>Backspace</kbd></td><td>Открепить</td><td>Выделение или открытый кадр</td></tr>
+        <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>Предыдущий и следующий кадр</td><td>Полноэкранный режим</td></tr>
+        <tr><td><kbd>Enter</kbd></td><td>Принять подобранный шаг</td><td>Полноэкранный режим после подбора</td></tr>
+        <tr><td><kbd>Esc</kbd></td><td>Закрыть просмотр → закрыть окно → снять выделение</td><td>Везде, по приоритету</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="req"><span class="rid">16.1</span><div>
+    <p>Клавиши не срабатывают при фокусе в поле ввода, кроме <kbd>Esc</kbd> и отмены.</p></div></div>
+
+  <div class="req"><span class="rid">16.2</span><div>
+    <p>Цифровые клавиши работают только при выбранном текущем объекте. Без него — «Сначала выберите текущий объект».</p></div></div>
+
+  <div class="req"><span class="rid">16.3</span><div>
+    <p>Номер выводится на строке шага только у текущего объекта и только у незамороженных шагов — соответствие клавиши и строки должно быть видимым.</p></div></div>
+</section>
+
+<!-- ===================== 17 ===================== -->
+<section id="s17">
+  <h2>Раздел 17</h2>
+  <h3>Сохранение и завершение</h3>
+
+  <div class="req"><span class="rid">17.1</span><div>
+    <p>Работа сохраняется автоматически. Сохраняются: привязки кадров, созданные повторы, значения форм, признаки принятия и отклонения, состояние проверки. Отдельной кнопки сохранения нет.</p></div></div>
+
+  <div class="req"><span class="rid">17.2</span><div>
+    <p>Индикатор в шапке имеет два состояния: «Сохранение…» и «Все изменения сохранены». Ошибка сохранения выводится отдельно и не скрывается автоматически.</p></div></div>
+
+  <div class="req"><span class="rid">17.3</span><div>
+    <p>Перезагрузка страницы не теряет работу. Состояние приёмки восстанавливается вместе с остальным.</p></div></div>
+
+  <div class="req"><span class="rid">17.4</span><div>
+    <p>Действие «Завершить распределение» открывает сводку: что оформлено, сколько разложено пользователем, сколько было закреплено до него, сколько шагов заморожено проверкой, перечень незакрытых обязательных шагов, количество нераспределённого.</p></div></div>
+
+  <div class="req"><span class="rid">17.5</span><div>
+    <p>Завершение с незакрытыми обязательными шагами <b>не запрещается</b>, но каждый такой шаг называется поимённо, до шести с указанием остатка.</p></div></div>
+
+  <div class="req"><span class="rid">17.6</span><div>
+    <p>Нераспределённые кадры не удаляются: они остаются в свободной съёмке осмотра. Это указывается в сводке.</p></div></div>
+</section>
+
+<!-- ===================== 18 ===================== -->
+<section id="s18">
+  <h2>Раздел 18</h2>
+  <h3>Тексты интерфейса</h3>
+
+  <p>Полный список сообщений для перевода, аналитики и тестирования. Плейсхолдеры в угловых скобках.</p>
+
+  <h4>Подтверждения</h4>
+  <div class="strings">
+    <div class="str"><dt>assign.ok</dt><dd>&lt;N кадров&gt; → «&lt;шаг&gt;» · &lt;объект&gt;</dd></div>
+    <div class="str"><dt>unassign.ok</dt><dd>Откреплено &lt;N кадров&gt;</dd></div>
+    <div class="str"><dt>object.created</dt><dd>Создан «&lt;название&gt;»</dd></div>
+    <div class="str"><dt>object.deleted</dt><dd>Объект удалён</dd></div>
+    <div class="str"><dt>object.accepted</dt><dd>Объект принят</dd></div>
+    <div class="str"><dt>object.rejected</dt><dd>Объект отклонён, кадры вернулись в ленту</dd></div>
+    <div class="str"><dt>form.saved</dt><dd>Форма сохранена</dd></div>
+    <div class="str"><dt>current.set</dt><dd>Текущий: &lt;название&gt;</dd></div>
+    <div class="str"><dt>undo.ok</dt><dd>Действие отменено</dd></div>
+    <div class="str"><dt>review.all</dt><dd>Все объекты приняты</dd></div>
+    <div class="str"><dt>review.done</dt><dd>Все объекты проверены</dd></div>
+    <div class="str"><dt>review.cancel</dt><dd>Непринятое отменено — принятые объекты остались</dd></div>
+  </div>
+
+  <h4>Отказы</h4>
+  <div class="strings">
+    <div class="str"><dt>step.frozen</dt><dd>«&lt;шаг&gt;» проверен и закрыт — добавить нельзя</dd></div>
+    <div class="str"><dt>step.full</dt><dd>Шаг уже заполнен</dd></div>
+    <div class="str"><dt>step.limit</dt><dd>«&lt;шаг&gt;» принимает не больше &lt;N&gt;</dd></div>
+    <div class="str"><dt>step.kind.video</dt><dd>Шаг принимает только видео</dd></div>
+    <div class="str"><dt>step.kind.photo</dt><dd>Шаг принимает только фото</dd></div>
+    <div class="str"><dt>frame.fromStep</dt><dd>Кадр снят прямо в шаге при обычном осмотре — открепить нельзя</dd></div>
+    <div class="str"><dt>frame.locked</dt><dd>Кадр в проверенном шаге — открепить нельзя</dd></div>
+    <div class="str"><dt>frame.rejected</dt><dd>Кадр отклонён проверяющим — открепить нельзя</dd></div>
+    <div class="str"><dt>object.locked</dt><dd>В объекте есть проверенные шаги — удалить нельзя</dd></div>
+    <div class="str"><dt>current.none</dt><dd>Сначала выберите текущий объект</dd></div>
+    <div class="str"><dt>form.required</dt><dd>Заполните: &lt;список полей&gt;</dd></div>
+    <div class="str"><dt>suggest.fail</dt><dd>Не удалось подобрать: идентификатор рядом с кадром не распознан</dd></div>
+    <div class="str"><dt>locate.fail</dt><dd>Шаг не найден в структуре</dd></div>
+    <div class="str"><dt>wand.empty</dt><dd>Нечего распределять автоматически</dd></div>
+    <div class="str"><dt>wand.aborted</dt><dd>Автораспределение прервано — ничего не применено</dd></div>
+  </div>
+
+  <h4>Состояния и пометки</h4>
+  <div class="strings">
+    <div class="str"><dt>step.frozen.row</dt><dd>Проверен и закрыт &lt;дата&gt; · содержимое изменить нельзя</dd></div>
+    <div class="str"><dt>step.redo.row</dt><dd>«Повторить» от &lt;дата&gt; · &lt;замечание&gt;</dd></div>
+    <div class="str"><dt>step.need.min</dt><dd>Фото · нужно не меньше &lt;N&gt;</dd></div>
+    <div class="str"><dt>step.need.exact</dt><dd>Видео · нужно ровно 1</dd></div>
+    <div class="str"><dt>step.need.range</dt><dd>Фото · нужно от &lt;N&gt; до &lt;M&gt;</dd></div>
+    <div class="str"><dt>step.need.free</dt><dd>Фото · по факту, если есть</dd></div>
+    <div class="str"><dt>step.left</dt><dd>не хватает &lt;N&gt;</dd></div>
+    <div class="str"><dt>step.enough</dt><dd>минимум набран</dd></div>
+    <div class="str"><dt>step.more</dt><dd>можно ещё &lt;N&gt;</dd></div>
+    <div class="str"><dt>step.was</dt><dd>· &lt;N&gt; из них было до вас</dd></div>
+    <div class="str"><dt>stat.frames.sub</dt><dd>&lt;N&gt; привязано до вас</dd></div>
+    <div class="str"><dt>stat.steps.sub</dt><dd>&lt;N&gt; закрыто проверкой</dd></div>
+    <div class="str"><dt>form.source.rec</dt><dd>распознано</dd></div>
+    <div class="str"><dt>form.source.def</dt><dd>по умолчанию</dd></div>
+    <div class="str"><dt>form.source.hint</dt><dd>«по умолчанию» — не с кадра, проверьте</dd></div>
+  </div>
+</section>
+
+<!-- ===================== 19 ===================== -->
+<section id="s19">
+  <h2>Раздел 19</h2>
+  <h3>Крайние случаи</h3>
+
+  <div class="tw">
+    <table>
+      <thead><tr><th>Ситуация</th><th>Поведение</th></tr></thead>
+      <tbody>
+        <tr><td>В осмотре нет материалов свободной съёмки</td><td>Экран не открывается; точка входа не показывается</td></tr>
+        <tr><td>Все кадры уже распределены</td><td>Экран открывается, лента показывает распределённое, счётчик полный, «Завершить» доступно</td></tr>
+        <tr><td>В схеме нет повторяемых этапов</td><td>Панель показывает только шаги; действия создания повтора и режим «Только кадры» скрыты</td></tr>
+        <tr><td>Осмотр целиком проверен</td><td>Все шаги заморожены, распределять некуда. Показать сообщение и не давать запустить автомат</td></tr>
+        <tr><td>Осмотр закрыт или отправлен</td><td>Экран открывается только для чтения либо не открывается — решается в 20.7</td></tr>
+        <tr><td>Кадр без времени съёмки</td><td>Помещается в конец ленты; сортировка вторично по <code>id</code></td></tr>
+        <tr><td>Заметка без расшифровки</td><td>Полоса выводится, вместо текста — пометка о том, что расшифровка недоступна; в поиск не попадает</td></tr>
+        <tr><td>Видео в шаге для фото</td><td>Привязка отклоняется с указанием типа</td></tr>
+        <tr><td>Автомат не нашёл ничего</td><td>«Нечего распределять автоматически», диалог не открывается</td></tr>
+        <tr><td>Прерывание в последний момент</td><td>Ничего не применяется; частичное применение запрещено</td></tr>
+        <tr><td>Ширина окна меньше 1280&nbsp;px</td><td>Не поддерживается — решается в 20.8</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ===================== 20 ===================== -->
+<section id="s20">
+  <h2>Раздел 20</h2>
+  <h3>Открытые вопросы</h3>
+
+  <p>Ни один из перечисленных вопросов не решён в прототипе окончательно. Там, где для работы прототипа требовался выбор, он сделан и помечен как допущение.</p>
+
+  <div class="q"><span class="pill p-acc who">Core</span><div>
+    <b>20.1 Формула наименования повтора</b>
+    <span>В выгрузках схем колонки «Формула наименования» нет. Допущение прототипа: имя берётся из распознанной марки или инвентарного номера.</span></div></div>
+
+  <div class="q"><span class="pill p-acc who">Core</span><div>
+    <b>20.2 Связь повторов разных этапов</b>
+    <span>Оборудование ↔ здание сейчас связано только текстовым полем «Здание / цех», которое подставляется из последнего оформленного здания. Настоящей ссылки нет.</span></div></div>
+
+  <div class="q"><span class="pill p-acc who">Core</span><div>
+    <b>20.3 Один кадр в нескольких шагах</b>
+    <span>Сейчас привязка одна. Практический случай: шильдик одновременно доказывает идентификацию и состояние.</span></div></div>
+
+  <div class="q"><span class="pill p-acc who">Core</span><div>
+    <b>20.4 Обязательное контрольное видео</b>
+    <span>В свободной съёмке его может физически не быть. Смягчать ли требование для этого типа осмотра.</span></div></div>
+
+  <div class="q"><span class="pill p-acc who">Core</span><div>
+    <b>20.5 Судьба отклонённых кадров</b>
+    <span>Допущение прототипа: остаются в истории шага перечёркнутыми. Альтернатива — возврат в ленту как нераспределённых.</span></div></div>
+
+  <div class="q"><span class="pill p-warn who">Дизайн</span><div>
+    <b>20.6 Логика поиска</b>
+    <span>Сейчас ищет по расшифровкам, распознанному тексту и именам файлов. Нужно ли искать по названиям шагов, названиям объектов, значениям форм.</span></div></div>
+
+  <div class="q"><span class="pill p-warn who">Дизайн</span><div>
+    <b>20.7 Поведение после проверки осмотра</b>
+    <span>Что происходит с экраном, когда осмотр отправлен или закрыт: режим чтения, недоступность, частичная доступность.</span></div></div>
+
+  <div class="q"><span class="pill p-warn who">Дизайн</span><div>
+    <b>20.8 Узкие экраны и ширина панели</b>
+    <span>Поведение ниже 1280&nbsp;px не спроектировано. Ширина панели структуры не запоминается между сессиями.</span></div></div>
+
+  <div class="q"><span class="pill p-err who">Продукт</span><div>
+    <b>20.9 Точность распознавания</b>
+    <span>Доля автоматически разложенного целиком зависит от распознавания на боевых снимках. В прототипе распознавание симулировано ручной разметкой. Нужен замер до оценки сроков и до любых обещаний по проценту автоматизации.</span></div></div>
+
+  <div class="q"><span class="pill p-err who">Продукт</span><div>
+    <b>20.10 Одновременная работа двоих</b>
+    <span>Блокировка не требуется, требуется разрешение конфликта по последнему сохранению. Правило не определено.</span></div></div>
+</section>
+
+<!-- ===================== 21 ===================== -->
+<section id="s21">
+  <h2>Раздел 21</h2>
+  <h3>Критерии приёмки</h3>
+
+  <ul class="check">
+    <li>Лента отсортирована по времени съёмки и не меняет порядок ни при каком действии</li>
+    <li>Распределённый кадр показывает название шага, и по нему выполняется переход к этому шагу в панели</li>
+    <li>Миниатюра появляется внутри целевого шага сразу после привязки</li>
+    <li>Наведение работает в обе стороны; прокрутка выполняется только по клику</li>
+    <li>Замороженный шаг не принимает кадры и объясняет причину; шаг, заполненный по лимиту, выглядит иначе</li>
+    <li>Защищённый кадр не открепляется ни одним из четырёх способов и объясняет причину</li>
+    <li>Счётчики в шапке отделяют чужую работу от работы текущего пользователя</li>
+    <li>Три режима автораспределения дают разный результат, соответствующий прогнозу в диалоге запуска</li>
+    <li>Прогресс детерминирован, показывает кадры, заметки и объекты, прерывается без частичного применения</li>
+    <li>Принятие объекта сворачивает его и открывает следующий непроверенный</li>
+    <li>Компактная форма различает «распознано» и «по умолчанию»</li>
+    <li>Подбор шага для одного кадра принимается клавишей <kbd>Enter</kbd> и честно отказывается при нераспознанном идентификаторе</li>
+    <li>Перезагрузка страницы не теряет ни привязок, ни созданных повторов, ни состояния проверки</li>
+    <li>Завершение с незакрытыми обязательными шагами возможно и называет их поимённо</li>
+    <li>Схема из 20 шагов и 44 повторов проверяется одним проходом без открытия отдельных окон для каждого объекта</li>
+  </ul>
+</section>
+
+<footer class="foot">
+  <p>Спецификация описывает поведение, зафиксированное в интерактивном прототипе версии&nbsp;17. Нумерация требований устойчива: при изменениях пункты добавляются, а не перенумеровываются. Раздел&nbsp;20 требует решений вне зоны дизайна и блокирует закрытие спецификации.</p>
+</footer>
+
+</div>
