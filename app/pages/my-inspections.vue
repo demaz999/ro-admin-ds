@@ -386,7 +386,7 @@ function selectAll(list: readonly string[]) {
       class="flex h-14 items-center gap-6 bg-sidebar px-4 text-sidebar-foreground"
     >
       <!-- @debt Логотипа нет: логотипы РИР исключены из скоупа, логотип Рососмотра не отрисован. -->
-      <span class="text-xl font-bold tracking-widest text-sidebar-active-foreground">VIEWAPP</span>
+      <span class="text-xl font-bold tracking-widest text-sidebar-active-foreground">LOGO</span>
 
       <div class="ml-auto flex items-center gap-6 pr-4">
         <button type="button" class="flex items-center gap-2 text-sm outline-none">

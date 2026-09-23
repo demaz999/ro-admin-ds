@@ -68,7 +68,7 @@ const MODELS: { name: string, companies: string[] }[] = [
   { name: 'SavelyTest', companies: ['Альфа Страхование', 'Сбер', 'Согаз'] },
   { name: 'testSafontev', companies: ['Т-Страхование'] },
   { name: 'testSafontev123', companies: ['Т-Страхование'] },
-  { name: 'VIEWAPP eng', companies: ['Альфа Страхование'] },
+  { name: 'LOGO eng', companies: ['Альфа Страхование'] },
   { name: 'Базовые статусы для Кассы', companies: ['Альфа Страхование'] },
   { name: 'Домклик', companies: ['ДомКлик'] },
   { name: 'Особый словарь', companies: ['ВТБ', 'Альфа Страхование', 'РВИО', 'Сбер', 'Согаз', 'УралСиб', 'Совкомбанк', 'комп', '1 Схема', 'ViktorTEST'] },

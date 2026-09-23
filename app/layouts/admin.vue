@@ -22,7 +22,7 @@ import { computed, reactive, ref } from 'vue'
  * сайдбаре остаётся решением сборки, дыра в `docs/design-debt.md`.
  *
  * Логотип в мастере — картинка 85×24, а не текст: у нас логотипа Рососмотра
- * нет (решение от 2026-08-12, логотипы РИР вне скоупа), подпись `VIEWAPP`
+ * нет (решение от 2026-08-12, логотипы РИР вне скоупа), подпись `LOGO`
  * остаётся местозаполнителем. Геометрия шапки при этом взята точно.
  *
  * ## Решения сборки без источника (кит 1 их не покрывает)
@@ -77,7 +77,7 @@ const current = computed(() => route.path)
           <Icon name="menu" :size="24" />
         </IconButton>
         <span v-if="!compact" class="text-xl font-bold tracking-widest text-sidebar-active-foreground">
-          VIEWAPP
+          LOGO
         </span>
       </div>
 

@@ -28,10 +28,16 @@ const route = useRoute()
 const demo = computed(() => String(route.query.state ?? ''))
 
 /**
- * Демо-кадры стенда: превью 320×240 из `window.VA_FRAMES` прототипа, файлами в
- * `public/free-shoot/`. В прод и витрину не переносятся.
+ * Структура кадров — номер, время съёмки, тип, длительность видео — из `window.VA_FRAMES`
+ * прототипа. Изображения — **демо-кадры стенда**: 24 несвязные фотографии с Unsplash
+ * (Unsplash License), 800×600, `public/free-shoot/`, авторы — `CREDITS.md` там же. Боевые
+ * кадры осмотра в репозиторий не кладутся (решение владельца 2026-09-23). В прод и витрину
+ * не переносятся. Кадру прототипа сопоставлен снимок по порядку, повторы допустимы.
  */
-const img = (i: number) => `/free-shoot/frame-${String(i).padStart(3, '0')}.jpg`
+const img = (i: number) => {
+  const k = Object.keys(TIME).map(Number).indexOf(i)
+  return `/free-shoot/demo-${String((Math.max(k, 0) % 24) + 1).padStart(2, '0')}.jpg`
+}
 const TIME: Record<number, string> = {
   1: '09:43', 3: '09:47', 6: '09:51', 9: '09:52', 12: '09:55', 17: '09:57', 22: '10:00', 26: '10:01',
   31: '10:04', 36: '10:07', 43: '10:10', 45: '10:11', 47: '10:11', 52: '10:18', 58: '10:21', 60: '10:21',
@@ -242,7 +248,7 @@ function toggle(i: number) {
       <p class="max-w-240 text-sm text-foreground-secondary">
         Такт 30, экран «Распределение свободной съёмки» (VA-9265). Мастеров в Figma нет: источник —
         прототип v17 и спека, редакция 1, разбор с замерами и провенансом — <code>docs/free-shoot.md</code>.
-        Тема <code>rososmotr</code>. Кадры — превью из прототипа, демо-данные стенда.
+        Тема <code>rososmotr</code>. Кадры — несвязные фото с Unsplash, демо-данные стенда; авторы — <code>public/free-shoot/CREDITS.md</code>.
       </p>
     </header>
 

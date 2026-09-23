@@ -1351,11 +1351,11 @@ const textareaVariants = [
         шрифты и оптику иконок проверяли автопроверки.
       </p>
       <div class="grid grid-cols-[repeat(5,--spacing(44))] items-start gap-4">
-        <FrameTile src="/free-shoot/frame-017.jpg" time="09:57" demo-hover />
-        <FrameTile src="/free-shoot/frame-060.jpg" time="10:21" kind="video" duration="0:29" />
-        <FrameTile src="/free-shoot/frame-012.jpg" time="09:55" state="assigned" step-name="Инвентарный номер" />
-        <FrameTile src="/free-shoot/frame-064.jpg" time="10:23" state="suggested" step-name="Повреждения и дефекты" />
-        <FrameTile src="/free-shoot/frame-003.jpg" time="09:47" state="rejected" step-name="Общий вид" lock-reason="Кадр отклонён проверяющим" />
+        <FrameTile src="/free-shoot/demo-06.jpg" time="09:57" demo-hover />
+        <FrameTile src="/free-shoot/demo-16.jpg" time="10:21" kind="video" duration="0:29" />
+        <FrameTile src="/free-shoot/demo-05.jpg" time="09:55" state="assigned" step-name="Инвентарный номер" />
+        <FrameTile src="/free-shoot/demo-17.jpg" time="10:23" state="suggested" step-name="Повреждения и дефекты" />
+        <FrameTile src="/free-shoot/demo-02.jpg" time="09:47" state="rejected" step-name="Общий вид" lock-reason="Кадр отклонён проверяющим" />
       </div>
       <div class="grid max-w-5xl grid-cols-2 items-start gap-4">
         <StepRow
@@ -1368,9 +1368,9 @@ const textareaVariants = [
           :hotkey="3"
           :verdict="{ kind: 'redo', at: '20 июня', note: 'Станок снят в тени — переснять' }"
           :thumbs="[
-            { id: 1, src: '/free-shoot/frame-101.jpg', state: 'rejected' },
-            { id: 2, src: '/free-shoot/frame-026.jpg', state: 'suggested' },
-            { id: 3, src: '/free-shoot/frame-052.jpg', state: 'from-step' },
+            { id: 1, src: '/free-shoot/demo-22.jpg', state: 'rejected' },
+            { id: 2, src: '/free-shoot/demo-08.jpg', state: 'suggested' },
+            { id: 3, src: '/free-shoot/demo-14.jpg', state: 'from-step' },
           ]"
         />
         <StepRow
@@ -1379,10 +1379,10 @@ const textareaVariants = [
           :min="1"
           :count="1"
           :verdict="{ kind: 'ok', at: '20 июня' }"
-          :thumbs="[{ id: 1, src: '/free-shoot/frame-001.jpg', state: 'locked' }]"
+          :thumbs="[{ id: 1, src: '/free-shoot/demo-01.jpg', state: 'locked' }]"
         />
-        <StepRow name="Контрольное видео" required kind="video" :min="1" :max="1" :count="1" :hotkey="8" :thumbs="[{ id: 1, src: '/free-shoot/frame-022.jpg' }]" />
-        <StepRow name="Фото с представителем" :min="0" :max="1" :count="2" :thumbs="[{ id: 1, src: '/free-shoot/frame-045.jpg' }, { id: 2, src: '/free-shoot/frame-047.jpg' }]" />
+        <StepRow name="Контрольное видео" required kind="video" :min="1" :max="1" :count="1" :hotkey="8" :thumbs="[{ id: 1, src: '/free-shoot/demo-07.jpg' }]" />
+        <StepRow name="Фото с представителем" :min="0" :max="1" :count="2" :thumbs="[{ id: 1, src: '/free-shoot/demo-12.jpg' }, { id: 2, src: '/free-shoot/demo-13.jpg' }]" />
       </div>
       <div class="flex flex-wrap gap-8">
         <ProgressStat class="w-48" label="Кадры разложены" value="14 из 196" :progress="{ value: 14, max: 196, locked: 6 }" sub="6 привязано до вас" />
