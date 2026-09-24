@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, useSlots } from 'vue'
 import { DialogClose, DialogContent, DialogDescription, DialogPortal, DialogRoot, DialogTitle, VisuallyHidden } from 'reka-ui'
 import { Badge } from '../badge'
 import { ButtonArrow } from '../button-arrow'
@@ -50,6 +50,16 @@ const emits = defineEmits<{
  * композиций, а не правило. Взята светлая — с неё снят эталон. Строка — в
  * `docs/atom-inconsistencies.md`.
  */
+/**
+ * Слот боковой панели `aside` — **наше расширение**, такт 34, решение владельца 2026-09-23.
+ * В композиции Атома панели нет; экрану свободной съёмки (VA-9265 §11.1) она нужна для
+ * метаданных и списка шагов. Панель живёт внутри `DialogContent` — ловушка фокуса окна
+ * её охватывает; снаружи окна она была бы недоступна. Без слота раскладка прежняя: обёртка
+ * полос получает `display: contents`, коробок не прибавляется.
+ */
+const slots = useSlots()
+const hasAside = computed(() => !!slots.aside)
+
 const hasPrev = computed(() => props.index > 1)
 const hasNext = computed(() => props.index < props.total)
 
@@ -64,10 +74,12 @@ function go(step: number) {
       <DialogContent
         data-slot="lightbox"
         :class="[
-          'z-50 flex flex-col bg-dialog text-foreground outline-none',
+          'z-50 flex bg-dialog text-foreground outline-none',
+          hasAside ? 'flex-row' : 'flex-col',
           props.inline ? 'absolute inset-0' : 'fixed inset-0',
         ]"
       >
+        <div :class="hasAside ? 'flex min-w-0 flex-1 flex-col' : 'contents'">
         <!--
           Верхняя полоса 56. Отступы асимметричны и так в композиции: счётчик
           отбит на 16 слева, крестик на 8 справа — 40-я кнопка центрируется в
@@ -144,6 +156,16 @@ function go(step: number) {
         >
           <span class="truncate text-base text-foreground">{{ props.caption }}</span>
         </div>
+        </div>
+
+        <!-- Боковая панель: ширина — токен экрана VA-9265, линия слева отделяет её от кадра. -->
+        <aside
+          v-if="hasAside"
+          data-slot="lightbox-aside"
+          class="flex w-side-panel shrink-0 flex-col overflow-y-auto border-l border-border-soft bg-card"
+        >
+          <slot name="aside" />
+        </aside>
       </DialogContent>
     </DialogPortal>
   </DialogRoot>

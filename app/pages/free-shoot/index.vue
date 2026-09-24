@@ -42,7 +42,8 @@ import proto from '~/stands/free-shoot/prototype-data.json'
  * | `?state=drop` | цель приёма перетаскивания и перетаскиваемые кадры (§9.5) |
  * | `?selected=demo` | выделение пяти кадров и панель выделения (§10.2) |
  * | `?open=assign` | панель выделения и поповер «Назначить на шаг», текущий объект (§10.3); с такта 33 поповер и пункты — кит (`Popover`, `SelectContent`, `SelectGroup`, `AssignOption`) |
- * | `?open=viewer-free` / `viewer-assigned` / `viewer-locked` / `viewer-suggest` | полноэкранный просмотр, четыре состояния нижней плашки (§11.2); с такта 33 список шагов справа — кит (`StageSection`, `AssignOption`) |
+ * | `?open=viewer-free` / `viewer-assigned` / `viewer-locked` / `viewer-suggest` | полноэкранный просмотр, четыре состояния нижней плашки (§11.2); с такта 33 список шагов — кит (`StageSection`, `AssignOption`), с такта 34 весь просмотр — кит (`Lightbox` со слотом `aside`, `FrameStage`, `FrameBindBar`, `FrameMeta`) |
+ * | `?open=viewer-flash` | просмотр привязанного кадра со вспышкой «Распределено» по кругу — вспышка длится 820 мс, снимок её застаёт (§11.3), такт 34 |
  * | `?open=wand` | окно запуска автораспределения (§12.1–12.4) |
  * | `?open=progress` | окно прогресса автораспределения (§12.5) |
  * | `?open=summary` | сводка результата автораспределения (§12.12) |
@@ -272,8 +273,9 @@ const generalVisible = (f: any) => !f.dep || general.value[f.dep.k] === f.dep.v
 const eqCount = D.objects.filter((o: any) => o.stageId === 'eq').length
 
 /* -------------------------------- окна -------------------------------- */
-const viewer = openWin.startsWith('viewer-')
-  ? { free: H.viewerFree, assigned: H.viewerAssigned, locked: H.viewerLocked, suggest: H.viewerSuggest }[openWin.slice(7)]
+const viewerKey = openWin === 'viewer-flash' ? 'assigned' : openWin.startsWith('viewer-') ? openWin.slice(7) : ''
+const viewer = viewerKey
+  ? ({ free: H.viewerFree, assigned: H.viewerAssigned, locked: H.viewerLocked, suggest: H.viewerSuggest } as Record<string, any>)[viewerKey] ?? null
   : null
 const modalWin = ({ wand: H.wand, summary: H.summary, finish: H.finish } as Record<string, any>)[openWin] ?? null
 const progressValue = parseFloat(H.progress.width)
@@ -310,17 +312,73 @@ const assignGroups = computed(() => {
   return groups
 })
 
+/* ------------------ полноэкранный просмотр, такт 34 (§11.1–11.3) ------------------ */
+/** Кадры просмотра — прототип `visibleMedia` в режиме «оставлять»: медиа свободной съёмки. */
+const lbFrames = D.frames.filter((f: any) => isMedia(f) && f.origin !== 'step')
+const viewerOpen = ref(!!viewer)
+const viewerIdx = ref(Math.max(0, viewer ? lbFrames.findIndex((f: any) => f.i === viewer.i) : 0))
 /**
- * Список шагов просмотра — группы прототипа `renderLB`. Привязка кадра берётся из разметки,
- * которую прототип отрисовал для этого состояния: в «viewer-assigned» кадр привязан при
- * съёмке окна, в наборе данных он свободен.
+ * Привязка кадра окна «viewer-assigned» берётся из разметки, которую прототип отрисовал для
+ * этого состояния: окно снималось после привязки, в наборе данных кадр свободен.
  */
+const BIND = String(H.viewerAssigned.list).match(/class="it bound" data-owner="([^"]+)" data-step="([^"]+)"/)
+const bindOverride = viewerKey === 'assigned' && BIND ? { i: H.viewerAssigned.i, objId: BIND[1], stepId: BIND[2] } : null
 const viewerFrame = computed(() => {
-  if (!viewer) return null
-  const f = D.frames.find((x: any) => x.i === viewer.i)
-  const m = String(viewer.list).match(/class="it bound" data-owner="([^"]+)" data-step="([^"]+)"/)
-  return m ? { ...f, objId: m[1], stepId: m[2] } : f
+  const f = lbFrames[viewerIdx.value]
+  return bindOverride && f?.i === bindOverride.i ? { ...f, objId: bindOverride.objId, stepId: bindOverride.stepId } : f
 })
+function openViewer(i: number) {
+  viewerIdx.value = Math.max(0, lbFrames.findIndex((f: any) => f.i === i))
+  suggestion.value = null
+  viewerOpen.value = true
+}
+function stepViewer(index: number) {
+  viewerIdx.value = index - 1
+  suggestion.value = null
+}
+
+/** Нижняя плашка — из данных кадра, как прототип `renderLB`. */
+const bindProps = computed(() => {
+  const f = viewerFrame.value
+  const st = f?.objId ? ownerStage(f.objId).steps.find((x: any) => x.id === f.stepId) : null
+  return {
+    state: (st ? (f.lock || f.rej ? 'locked' : 'assigned') : 'free') as 'free' | 'assigned' | 'locked',
+    stepName: st?.n ?? '',
+    ownerName: f?.objId ? (O(f.objId) ? objName(O(f.objId)) : ownerStage(f.objId).title) : '',
+    /* «или нажмите 1–N» — только при текущем объекте: решение владельца 3, такт 34 (§16.2). */
+    keys: cur.value ? stageById[O(cur.value).stageId].steps.length : null,
+    rejected: !!f?.rej,
+    reason: f ? frameWhy(f) : '',
+  }
+})
+const metaRows = computed(() => {
+  const f = viewerFrame.value
+  if (!f) return []
+  const rows = [{ label: 'Файл', value: f.n }, { label: 'Время', value: f.ts }, { label: 'Тип', value: f.type === 'video' ? 'Видео' : 'Фото' }]
+  if (f.ocr) rows.push({ label: 'Распознано', value: f.ocr })
+  return rows
+})
+
+/**
+ * Подбор (§11.2). Логики подбора у стенда нет: предложение взято из окна «viewer-suggest»,
+ * отрисованного прототипом, и показывается только для его кадра.
+ */
+const SUGGEST_HTML = String(H.viewerSuggest.bind)
+const SUGGEST = {
+  i: H.viewerSuggest.i,
+  s: {
+    kind: 'create' as const,
+    title: SUGGEST_HTML.match(/<b>([^<]+)<\/b>/)?.[1] ?? '',
+    inv: SUGGEST_HTML.match(/инв\. ([^<]+)</)?.[1]?.trim() ?? '',
+    stageTitle: SUGGEST_HTML.match(/Создать «([^»]+)»/)?.[1] ?? '',
+  },
+}
+const suggestion = ref<any>(viewerKey === 'suggest' ? SUGGEST.s : null)
+function onSuggest() {
+  if (viewerFrame.value?.i === SUGGEST.i) suggestion.value = SUGGEST.s
+}
+const bindFlash = ref<number | null>(null)
+
 const viewerGroups = computed(() => {
   const f = viewerFrame.value
   if (!f) return []
@@ -369,6 +427,11 @@ const feedEl = ref<HTMLElement | null>(null)
 const selbarLeft = ref('50%')
 onMounted(async () => {
   /* Вспышка длится 1.5 с — оснастка повторяет её по кругу, чтобы снимок её застал. */
+  /* Вспышка плашки длится 820 мс — оснастка ?open=viewer-flash повторяет её по кругу. */
+  if (openWin === 'viewer-flash') {
+    bindFlash.value = Date.now()
+    setInterval(() => { bindFlash.value = Date.now() }, 1200)
+  }
   if (state === 'flash') {
     flashNonce.value = Date.now()
     setInterval(() => { flashNonce.value = Date.now() }, 2000)
@@ -506,7 +569,7 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
               <span class="kit-island">
                 <div :class="frameTileGridVariants({ size })">
                   <template v-for="f in feed" :key="f.i">
-                    <FrameTile v-if="f.type !== 'voice'" v-bind="tileProps(f)" @toggle-select="toggle(f.i)" />
+                    <FrameTile v-if="f.type !== 'voice'" v-bind="tileProps(f)" @toggle-select="toggle(f.i)" @open="openViewer(f.i)" />
                     <div v-else class="va">
                       <div
                         class="card voice"
@@ -674,45 +737,51 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
         </PopoverContent>
       </Popover>
 
-      <!-- ============================ полноэкранный просмотр, §11 ============================ -->
-      <div v-if="viewer" class="lb show" data-asis="полноэкранный просмотр">
-        <div class="lb-main">
-          <div class="lb-top">
-            <span>{{ viewer.pos }}</span><span style="color:#fff;font-weight:600">{{ viewer.file }}</span>
-            <span style="display:contents" v-html="viewer.chip" />
-            <div class="sp" />
-            <button class="lb-close"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 4l8 8M12 4l-8 8" /></svg></button>
-          </div>
-          <button class="lb-nav prev"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 3 5 8l5 5" /></svg></button>
-          <div class="lb-stage" :class="{ on: viewer.stageOn }">
-            <img :src="img(viewer.i)" alt="">
-            <div style="display:contents" data-asis="нижняя плашка состояния" v-html="viewer.bind" />
-          </div>
-          <button class="lb-nav next"><svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3l5 5-5 5" /></svg></button>
-        </div>
-        <div class="lb-side">
-          <div class="lb-meta" v-html="viewer.meta" />
-          <!-- список шагов, §11.1–11.2 — кит, такт 33: группа — StageSection, пункт — AssignOption -->
-          <div class="lb-list">
-            <span class="kit-island">
-              <StageSection
-                v-for="g in viewerGroups"
-                :key="g.id"
-                :title="g.title"
-                :repeatable="g.repeatable"
-                :count="groupCount(g)"
-                :open="!closedStages.has(g.id)"
-                @toggle="toggleStage(g.id)"
-              >
-                <AssignList class="p-1">
-                  <AssignOption v-for="it in g.items" :key="it.value" v-bind="it" />
-                </AssignList>
-              </StageSection>
-            </span>
-          </div>
-          <div style="display:contents" v-html="viewer.note" />
-        </div>
-      </div>
+      <!-- ============================ полноэкранный просмотр, §11 — кит, такт 34 ============================ -->
+      <!--
+        Каркас — Lightbox со слотом боковой панели (решение владельца 1, такт 34). Логика страницы:
+        переход через 820 мс, клавиши 1–N, стрелки, Enter — у стенда не реализованы (бизнес-логики нет).
+      -->
+      <Lightbox
+        v-model:open="viewerOpen"
+        :index="viewerIdx + 1"
+        :total="lbFrames.length"
+        @update:index="stepViewer"
+      >
+        <template #actions>
+          <span class="flex min-w-0 items-center gap-3">
+            <span data-slot="frame-file" class="truncate text-sm font-medium text-foreground">{{ viewerFrame?.n }}</span>
+            <FrameStatus :assigned="bindProps.state !== 'free'" />
+          </span>
+        </template>
+        <FrameStage :src="img(viewerFrame?.i ?? 1)" :alt="viewerFrame?.n" :assigned="bindProps.state !== 'free'">
+          <FrameBindBar
+            v-bind="bindProps"
+            :suggestion="suggestion"
+            :flash="bindFlash"
+            @suggest="onSuggest"
+            @dismiss="suggestion = null"
+            @locate="viewerOpen = false"
+          />
+        </FrameStage>
+        <template #aside>
+          <FrameMeta :rows="metaRows" />
+          <!-- список шагов, §11.1–11.2 — такт 33: группа — StageSection, пункт — AssignOption -->
+          <StageSection
+            v-for="g in viewerGroups"
+            :key="g.id"
+            :title="g.title"
+            :repeatable="g.repeatable"
+            :count="groupCount(g)"
+            :open="!closedStages.has(g.id)"
+            @toggle="toggleStage(g.id)"
+          >
+            <AssignList class="p-1">
+              <AssignOption v-for="it in g.items" :key="it.value" v-bind="it" />
+            </AssignList>
+          </StageSection>
+        </template>
+      </Lightbox>
 
       <!-- ============================ окна: запуск, сводки, §12, §17 ============================ -->
       <div v-if="modalWin" class="modal show" data-asis="модальное окно">

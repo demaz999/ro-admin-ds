@@ -31,6 +31,16 @@ const props = withDefaults(defineProps<{
   subtitle?: string
   /** Ось `Active` мастера. */
   selected?: boolean
+  /**
+   * Тон выбранной строки — **наше расширение матрицы**, такт 34, решение владельца
+   * 2026-09-23. У мастера `ListItem` `2400:14661` выбранное одно — нейтральная заливка 12%.
+   * `success` — выбранное значение, которое означает «распределено»: пункт «кадр привязан
+   * сюда» (`AssignOption`, экран VA-9265) одного цвета с плиткой `FrameTile` и нижней плашкой
+   * просмотра. Роли такта 30: заливка `--success-surface`, текст `--success-strong`, рамка
+   * 1px `--success` (прототип `.it.bound`: `#E9F6EE`, `#1D7444`, рамка `#BFE3CD`). Запрос
+   * дизайнерам — `figma-fixes.md`. Действует только на выбранную строку.
+   */
+  tone?: 'default' | 'success'
   /** Булев проп мастера `Show Icon`. */
   showIcon?: boolean
   /** Булев проп мастера `Checkbox` — режим множественного выбора. */
@@ -39,6 +49,7 @@ const props = withDefaults(defineProps<{
 }>(), {
   subtitle: '',
   selected: false,
+  tone: 'default',
   showIcon: false,
   checkbox: false,
   disabled: false,
@@ -51,7 +62,9 @@ const props = withDefaults(defineProps<{
     :data-selected="selected || undefined"
     :class="[
       'group/item flex min-h-11 w-full items-center gap-3 rounded-md px-4 py-2 text-left',
-      selected ? 'bg-list-selected' : 'hover:bg-list-hover',
+      selected
+        ? (props.tone === 'success' ? 'bg-success-surface ring-1 ring-success ring-inset' : 'bg-list-selected')
+        : 'hover:bg-list-hover',
       disabled ? 'pointer-events-none opacity-[var(--opacity-disabled)]' : '',
     ]"
   >
@@ -75,14 +88,17 @@ const props = withDefaults(defineProps<{
       <span
         data-slot="list-item-title"
         class="truncate text-sm font-medium"
-        :class="selected ? 'text-field-foreground-hover' : 'text-field-foreground group-hover/item:text-field-foreground-hover'"
+        :class="selected
+          ? (props.tone === 'success' ? 'text-success-strong' : 'text-field-foreground-hover')
+          : 'text-field-foreground group-hover/item:text-field-foreground-hover'"
       >
         <slot />
       </span>
       <span
         v-if="props.subtitle"
         data-slot="list-item-subtitle"
-        class="truncate text-xs font-medium text-field-placeholder"
+        class="truncate text-xs font-medium"
+        :class="selected && props.tone === 'success' ? 'text-success-strong' : 'text-field-placeholder'"
       >
         {{ props.subtitle }}
       </span>

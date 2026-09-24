@@ -106,6 +106,7 @@ function onSelect(event: Event) {
       :data-bound="props.bound ?? undefined"
       :subtitle="subtitle"
       :selected="!!props.bound"
+      :tone="props.bound ? 'success' : 'default'"
       :disabled="closed"
       :show-icon="!!lead"
       :class="cn(
@@ -122,7 +123,11 @@ function onSelect(event: Event) {
       )"
     >
       <template #icon>
-        <Icon v-if="lead === 'check' || lead === 'add'" :name="lead" :size="16" />
+        <!-- Привязанный — галочка белым на тёмной ступени успеха (прототип `.it.bound .key.ok`), такт 34. -->
+        <span v-if="lead === 'check'" data-slot="assign-option-check" class="flex size-4 items-center justify-center rounded-xs bg-success-strong text-primary-foreground">
+          <Icon name="check" :size="12" />
+        </span>
+        <Icon v-else-if="lead === 'add'" name="add" :size="16" />
         <span v-else-if="lead === 'key'" data-slot="assign-option-key" :class="stepKeyClass">{{ props.hotkey }}</span>
         <span v-else class="size-4" aria-hidden="true" />
       </template>
@@ -137,7 +142,7 @@ function onSelect(event: Event) {
         >
           Открепить
         </ButtonAction>
-        <Icon v-else-if="props.bound === 'locked'" name="lock" :size="12" class="text-muted-foreground" />
+        <Icon v-else-if="props.bound === 'locked'" name="lock" :size="12" class="text-success-strong" />
         <span v-else data-slot="assign-option-count" class="flex items-center gap-1 text-2xs text-muted-foreground tabular-nums">
           <Icon v-if="props.frozen" name="lock" :size="12" />{{ isStep ? counter : props.frames }}
         </span>

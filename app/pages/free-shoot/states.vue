@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import type { AssignBound } from '@/components/ui/assign'
+import type { FrameSuggestion } from '@/components/ui/frame-viewer'
 import type { FrameTileState } from '@/components/ui/frame-tile'
 import type { StepThumbItem, StepVerdict } from '@/components/ui/step-row'
 import type { RepeatFormField } from '@/components/ui/repeat'
@@ -331,6 +332,65 @@ const ASSIGN_EXAMPLE = `<!-- поповер «Назначить на шаг», 
       @select="assignFrame(frame, it)" @unbind="unassign([frame.id])" />
   </AssignList>
 </StageSection>`
+
+/* ============================ полноэкранный просмотр, такт 34 ============================ */
+
+interface BindCell { label: string, spec: string, props: Record<string, unknown>, flash?: boolean }
+const S_STEP: FrameSuggestion = { kind: 'step', stepName: 'Общий вид территории', ownerName: 'Общие данные осмотра' }
+const BIND_CELLS: BindCell[] = [
+  { label: 'не распределён, текущий объект выбран — «1–N»', spec: '§11.2, решение 3', props: { state: 'free', keys: 8 } },
+  { label: 'не распределён, текущего нет — без «1–N»', spec: '§11.2, §16.2', props: { state: 'free' } },
+  { label: 'распределён', spec: '§11.2', props: { state: 'assigned', stepName: 'Узлы и агрегаты', ownerName: 'Пропиточная линия POLYPRISE' } },
+  { label: 'защищён', spec: '§11.2', props: { state: 'locked', stepName: 'Шильдик, заводская табличка', ownerName: 'Пропиточная линия POLYPRISE', reason: 'Кадр в проверенном шаге' } },
+  { label: 'отклонён', spec: '§11.2, §4.2', props: { state: 'locked', rejected: true, stepName: 'Общий вид оборудования', ownerName: 'Пропиточная линия POLYPRISE', reason: 'Кадр отклонён проверяющим' } },
+  { label: 'подбор выполнен: шаг — «Принять Enter»', spec: '§11.2, §16', props: { state: 'free', suggestion: S_STEP } },
+  { label: 'подбор: шаг закрыт — только «Не то»', spec: 'прототип lbSuggest', props: { state: 'free', suggestion: { ...S_STEP, blocked: 'frozen' } } },
+  { label: 'подбор: шаг заполнен', spec: 'прототип lbSuggest', props: { state: 'free', suggestion: { ...S_STEP, stepName: 'Фото с представителем собственника', ownerName: 'Завершение осмотра', blocked: 'full' } } },
+  { label: 'подбор: новый объект — «Создать «<этап>»»', spec: '§11.2', props: { state: 'free', suggestion: { kind: 'create', title: 'Линия термообработки', inv: '10902', stageTitle: 'Единица оборудования' } } },
+  { label: 'вспышка «Распределено», кнопки выключены — повторяется', spec: '§11.3', props: { state: 'assigned', stepName: 'Узлы и агрегаты', ownerName: 'Пропиточная линия POLYPRISE' }, flash: true },
+]
+const bindTick = ref<number | null>(null)
+onMounted(() => {
+  /* Вспышка длится 820 мс — стенд повторяет её по кругу, чтобы снимок её застал. */
+  bindTick.value = Date.now()
+  setInterval(() => { bindTick.value = Date.now() }, 1200)
+})
+const META = [
+  { label: 'Файл', value: 'IMG_3315.jpeg' },
+  { label: 'Время', value: '10:25:54' },
+  { label: 'Тип', value: 'Фото' },
+  { label: 'Распознано', value: 'Ткацкий участок · Цех по производству изделий из стекловолокна' },
+]
+const lbIndex = ref(21)
+
+const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :total="frames.length">
+  <template #actions>
+    <span class="truncate text-sm font-medium">{{ frame.fileName }}</span>
+    <FrameStatus :assigned="!!frame.stepId" />
+  </template>
+  <FrameStage :src="frame.src" :alt="frame.fileName" :assigned="!!frame.stepId">
+    <FrameBindBar
+      :state="frame.stepId ? (frame.locked ? 'locked' : 'assigned') : 'free'"
+      :step-name="step?.name" :owner-name="owner?.name"
+      :keys="current ? current.steps.length : null"   // «или нажмите 1–N» — только при текущем, §16.2
+      :rejected="frame.rejected" :reason="lockReason(frame)"   // тексты frame.* §18 без хвоста
+      :suggestion="suggestion"            // { kind: 'step', … } | { kind: 'create', … } | null
+      :flash="flashKey"                   // новое число — вспышка 820 мс, кнопки выключены
+      @suggest="suggestFor(frame)" @accept="assign(frame, suggestion)" @dismiss="suggestion = null"
+      @create="openRepeatForm(suggestion, frame)" @locate="showInStructure(frame)" @unbind="unassign([frame.id])"
+    />
+  </FrameStage>
+  <template #aside>
+    <FrameMeta :rows="[{ label: 'Файл', value: frame.fileName }, { label: 'Время', value: frame.time }, …]" />
+    <StageSection v-for="g in groups" :key="g.id" :title="g.title" :count="String(g.items.length)"
+      :open="!closed.has(g.id)" @toggle="toggle(g.id)">
+      <AssignList class="p-1">
+        <AssignOption v-for="it in g.items" :key="it.value" v-bind="it" @select="assignFrame(frame, it)" @unbind="unassign([frame.id])" />
+      </AssignList>
+    </StageSection>
+  </template>
+</Lightbox>
+<!-- переход через 820 мс, 1–N, ←/→, Enter, Del, «Перенести кадр?» (№ 47) — логика страницы, §11.3–11.4, §16 -->`
 </script>
 
 <template>
@@ -845,6 +905,87 @@ const ASSIGN_EXAMPLE = `<!-- поповер «Назначить на шаг», 
       </div>
 
       <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ ASSIGN_EXAMPLE }}</pre>
+    </section>
+
+    <!-- ============================ полноэкранный просмотр, такт 34 ============================ -->
+    <section id="viewer" data-section="viewer" class="space-y-6">
+      <div class="space-y-1">
+        <h2 class="text-lg font-bold">
+          FrameStage · FrameBindBar · FrameMeta · FrameStatus — полноэкранный просмотр
+        </h2>
+        <p class="max-w-240 text-sm text-foreground-secondary">
+          Такт 34. Спека §11.1–11.3. Каркас — <code>Lightbox</code> кита со слотом боковой панели <code>aside</code>
+          (решение владельца 1), панель 440 — токен <code>--container-side-panel</code> (решение 2). Роли плашки — такта 30:
+          фон <code>*-surface</code>, текст <code>*-strong</code>.
+        </p>
+      </div>
+
+      <div data-subsection="viewer-bind" class="grid grid-cols-[repeat(2,minmax(0,1fr))] items-start gap-x-6 gap-y-5">
+        <div v-for="c in BIND_CELLS" :key="c.label" class="space-y-1">
+          <p class="text-2xs text-muted-foreground">{{ c.label }} · {{ c.spec }}</p>
+          <FrameBindBar v-bind="c.props" :flash="c.flash ? bindTick : null" class="rounded-md" />
+        </div>
+      </div>
+
+      <div data-subsection="viewer-parts" class="grid grid-cols-[--spacing(110)_--spacing(110)_1fr] items-start gap-x-6">
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">кадр с плашкой, распределён — кольцо успеха</p>
+          <FrameStage :src="img(12)" alt="IMG_3264.jpeg" assigned>
+            <FrameBindBar state="assigned" step-name="Узлы и агрегаты" owner-name="Пропиточная линия POLYPRISE" />
+          </FrameStage>
+        </div>
+        <div class="space-y-3">
+          <div class="space-y-1">
+            <p class="text-2xs text-muted-foreground">метаданные — §11.1</p>
+            <div class="w-side-panel rounded-xs border border-border-soft">
+              <FrameMeta :rows="META" />
+            </div>
+          </div>
+          <div class="flex flex-wrap items-center gap-3">
+            <p class="text-2xs text-muted-foreground">метка в верхней полосе</p>
+            <FrameStatus assigned />
+            <FrameStatus />
+          </div>
+          <div class="space-y-1">
+            <p class="text-2xs text-muted-foreground">пункт списка в тоне успеха — решение 4</p>
+            <div class="w-side-panel">
+              <AssignList class="p-1">
+                <AssignOption value="vb-here" name="Узлы и агрегаты" :count="1" bound="here" />
+                <AssignOption value="vb-locked" name="Шильдик, заводская табличка" :min="1" :count="1" bound="locked" />
+                <AssignOption value="vb-long" name="Поэтажные планы и планы эвакуации" :count="1" bound="here" />
+              </AssignList>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div data-subsection="viewer-frame" class="space-y-1">
+        <p class="text-2xs text-muted-foreground">каркас: Lightbox со слотом aside, 1280×720 — стрелки гаснут на границах, имя файла по центру полосы</p>
+        <div class="relative h-180 w-320 overflow-hidden rounded-md border border-border-soft">
+          <Lightbox inline :open="true" :index="lbIndex" :total="196" @update:index="lbIndex = $event">
+            <template #actions>
+              <span class="flex min-w-0 items-center gap-3">
+                <span class="truncate text-sm font-medium text-foreground">IMG_3264.jpeg</span>
+                <FrameStatus assigned />
+              </span>
+            </template>
+            <FrameStage :src="img(12)" alt="IMG_3264.jpeg" assigned>
+              <FrameBindBar state="assigned" step-name="Узлы и агрегаты" owner-name="Пропиточная линия POLYPRISE" />
+            </FrameStage>
+            <template #aside>
+              <FrameMeta :rows="META.slice(0, 3)" />
+              <StageSection title="Привязан к · Пропиточная линия POLYPRISE" :count="String(EQ.length)">
+                <AssignList class="p-1">
+                  <AssignOption v-for="o in noKeys(EQ, 'lb-eq')" :key="o.value" v-bind="o" :bound="o.value === 'lb-eq|e4' ? 'here' : null" />
+                </AssignList>
+              </StageSection>
+              <StageSection title="Общие данные осмотра" :count="String(GEN.length)" :open="false" />
+            </template>
+          </Lightbox>
+        </div>
+      </div>
+
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ VIEWER_EXAMPLE }}</pre>
     </section>
   </main>
 </template>

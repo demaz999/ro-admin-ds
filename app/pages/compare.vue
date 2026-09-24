@@ -1343,7 +1343,7 @@ const textareaVariants = [
     -->
     <section data-theme="rososmotr" class="space-y-3 bg-background font-sans text-foreground">
       <h2 class="text-lg font-bold">
-        FrameTile · StepRow · StepThumb · Progress · ProgressStat · StageSection · RepeatCard · AssignOption — без эталона, такты 30–33
+        FrameTile · StepRow · StepThumb · Progress · ProgressStat · StageSection · RepeatCard · AssignOption · FrameBindBar — без эталона, такты 30–34
       </h2>
       <p class="max-w-3xl text-sm text-muted-foreground">
         Мастера нет — сверка идёт с прототипом VA-9265 v17, пары «прототип / кит» лежат в
@@ -1434,6 +1434,28 @@ const textareaVariants = [
               <AssignOption value="vo" type="object" name="Линия термообработки" :frames="5" />
             </AssignList>
           </StageSection>
+        </div>
+      </div>
+      <!-- Такт 34: полноэкранный просмотр — плашка в каждом виде, метаданные, метка, кадр. -->
+      <div class="grid max-w-5xl grid-cols-2 items-start gap-4">
+        <FrameBindBar state="free" :keys="8" class="rounded-md" />
+        <FrameBindBar state="assigned" step-name="Узлы и агрегаты" owner-name="Пропиточная линия POLYPRISE" class="rounded-md" />
+        <FrameBindBar state="locked" rejected step-name="Общий вид оборудования" owner-name="Пропиточная линия POLYPRISE" reason="Кадр отклонён проверяющим" class="rounded-md" />
+        <FrameBindBar :suggestion="{ kind: 'step', stepName: 'Общий вид территории', ownerName: 'Общие данные осмотра' }" class="rounded-md" />
+        <FrameBindBar :suggestion="{ kind: 'create', title: 'Линия термообработки', inv: '10902', stageTitle: 'Единица оборудования' }" class="rounded-md" />
+        <div class="flex items-center gap-3">
+          <FrameStatus assigned />
+          <FrameStatus />
+        </div>
+      </div>
+      <div class="flex flex-wrap items-start gap-8">
+        <div class="w-100">
+          <FrameStage src="/free-shoot/demo-05.jpg" alt="IMG_3264.jpeg" assigned>
+            <FrameBindBar state="assigned" step-name="Узлы и агрегаты" owner-name="Пропиточная линия POLYPRISE" />
+          </FrameStage>
+        </div>
+        <div class="w-side-panel rounded-xs border border-border-soft">
+          <FrameMeta :rows="[{ label: 'Файл', value: 'IMG_3315.jpeg' }, { label: 'Время', value: '10:25:54' }, { label: 'Тип', value: 'Фото' }, { label: 'Распознано', value: 'Ткацкий участок' }]" />
         </div>
       </div>
     </section>

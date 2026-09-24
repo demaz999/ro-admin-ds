@@ -91,7 +91,13 @@ const imageClass = computed(() => {
   return 'bg-muted grayscale opacity-[var(--opacity-disabled)] transition-[filter,opacity] group-hover/tile:grayscale-0 group-hover/tile:opacity-[var(--opacity-media-control)]'
 })
 
+/*
+ * Только клавиша на самой плитке. Enter и пробел из вложенных кнопок («Открыть во весь экран»,
+ * лупа, крестик) всплывают сюда же — до такта 34 плитка их гасила и переключала выделение, и
+ * кнопки не нажимались с клавиатуры. Найдено приёмкой ловушки фокуса просмотра.
+ */
 function onKeydown(event: KeyboardEvent) {
+  if (event.target !== event.currentTarget) return
   if (event.key === ' ' || event.key === 'Enter') {
     event.preventDefault()
     emit('toggle-select', event)

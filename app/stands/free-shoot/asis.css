@@ -55,9 +55,10 @@
 .va .tab .n:not([data-slot] *){color:var(--va-muted);font-weight:400;margin-left:5px}
 .va .tab.on .n:not([data-slot] *){color:var(--va-blue-300)}
 
-.va .work:not([data-slot] *){display:grid;grid-template-columns:1fr 6px 440px;min-height:0}
+/* такт 34: ширина панели структуры — общий токен с панелью просмотра, значение прототипа 440 */
+.va .work:not([data-slot] *){display:grid;grid-template-columns:1fr 6px var(--container-side-panel);min-height:0}
 .va .pane:not([data-slot] *){min-width:0;min-height:0;display:flex;flex-direction:column}
-.va .work:not([data-slot] *){grid-template-columns:1fr 10px 440px}
+.va .work:not([data-slot] *){grid-template-columns:1fr 10px var(--container-side-panel)}
 .va .splitter:not([data-slot] *){background:transparent;cursor:col-resize;position:relative}
 .va .splitter:not([data-slot] *)::after{content:"";position:absolute;inset:0 4px;background:var(--va-line);transition:background .12s}
 .va .splitter:not([data-slot] *)::before{content:"";position:absolute;top:50%;left:2px;width:6px;height:34px;transform:translateY(-50%);
