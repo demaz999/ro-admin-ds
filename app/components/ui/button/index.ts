@@ -75,8 +75,15 @@ export { default as Button } from './Button.vue'
  * занимает `ButtonAction` — соответствие фиксируется в `docs/naming.md` после
  * его переноса.
  */
+/*
+ * Кольцо фокуса с клавиатуры — такт 35, решение владельца 2026-09-23. У мастеров Атома и у кнопок
+ * кита 1 (`btn_accent` `709:6413`: Default / Hover / Pressed / Dissabled / not_active — по инвентарю)
+ * состояния фокуса нет; кит 1 не сверен — Figma MCP в сессии не авторизован. Взят прецедент составных
+ * компонентов тактов 30–33: `focus-visible:ring-2` `--ring`. Только по `focus-visible` — в покое и
+ * под мышью кнопка не меняется. Расширение матрицы — `waves.md`, запрос дизайнерам — `figma-fixes.md`.
+ */
 export const buttonVariants = cva(
-  'group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap font-medium outline-none select-none disabled:pointer-events-none',
+  'group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap font-medium outline-none select-none disabled:pointer-events-none focus-visible:ring-2 focus-visible:ring-ring',
   {
     variants: {
       variant: {

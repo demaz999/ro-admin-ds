@@ -37,8 +37,15 @@ export { default as ButtonArrow } from './ButtonArrow.vue'
  * Глиф у безподложечного типа **пастельный**, а не серый — тот же
  * `accent-soft`, что несут маркер тега и подчёркивание ссылки.
  */
+/*
+ * Кольцо фокуса с клавиатуры — такт 35, решение владельца 2026-09-23. У мастеров Атома и у кнопок
+ * кита 1 (`btn_accent` `709:6413`: Default / Hover / Pressed / Dissabled / not_active — по инвентарю)
+ * состояния фокуса нет; кит 1 не сверен — Figma MCP в сессии не авторизован. Взят прецедент составных
+ * компонентов тактов 30–33: `focus-visible:ring-2` `--ring`. Только по `focus-visible` — в покое и
+ * под мышью кнопка не меняется. Расширение матрицы — `waves.md`, запрос дизайнерам — `figma-fixes.md`.
+ */
 export const buttonArrowVariants = cva(
-  'inline-flex shrink-0 items-center justify-center rounded-full outline-none select-none disabled:pointer-events-none disabled:opacity-[var(--opacity-disabled)]',
+  'inline-flex shrink-0 items-center justify-center rounded-full outline-none select-none disabled:pointer-events-none disabled:opacity-[var(--opacity-disabled)] focus-visible:ring-2 focus-visible:ring-ring',
   {
     variants: {
       variant: {
