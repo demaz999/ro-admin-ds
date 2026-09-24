@@ -1527,6 +1527,20 @@ const textareaVariants = [
       <CompareFontAudit />
     </section>
 
+    <section class="space-y-3">
+      <h2 class="text-lg font-bold">
+        Автопроверка покрытия экрана свободной съёмки
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Экран <code>/free-shoot</code> собран из компонентов кита и блоков «как есть» легаси. Всё, что
+        рисует себя само — текст, фон, рамка, тень, изображение, — должно лежать внутри компонента
+        кита (<code>[data-slot]</code>) или внутри блока «как есть» (<code>[data-asis]</code>): иначе
+        незакрытое не отслеживается ни реестром, ни глазом. Проверка проходит экран во всех значениях
+        оснастки. Довесок 2 к такту 35.
+      </p>
+      <CompareCoverageAudit />
+    </section>
+
     <section class="space-y-2">
       <h2 class="text-lg font-bold">
         Мастер целиком

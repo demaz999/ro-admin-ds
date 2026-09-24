@@ -479,6 +479,14 @@
    прототипа. display: contents — коробки нет, раскладка прототипа не меняется. */
 .va .kit-island{display:contents;font-family:var(--font-sans);font-size:medium;line-height:normal;color:var(--foreground)}
 
+/* Оснастка приёмки — не продукт. По умолчанию каждый перенесённый «как есть» блок обведён тонким
+   пунктиром: незакрытое видно глазом без параметров (довесок 2 к такту 35, решение владельца
+   2026-09-23). Outline, а не border — геометрия не меняется. Цвет — --muted-foreground
+   (neutral/default): заметен на светлых и на тёмной шапке легаси и не совпадает ни с одной ролью
+   состояний компонентов (рамки состояний — --primary, --warning, --success, --destructive, --ring).
+   ?asis=off снимает обводку для чистых снимков; ?asis=mark — пунктир толще и подписи, правило ниже. */
+.asis-outline [data-asis]{outline:1px dashed var(--muted-foreground);outline-offset:-1px}
+
 /* Оснастка приёмки ?asis=mark — не продукт: пунктир вокруг перенесённых блоков.
    Подписи имён рисует страница поверх (FreeShootAsisMarks), без сдвига раскладки. */
 .asis-mark [data-asis]{outline:2px dashed var(--destructive);outline-offset:-2px}

@@ -51,7 +51,9 @@ import proto from '~/stands/free-shoot/prototype-data.json'
  * | `?open=finish` | сводка завершения распределения (§17.4) |
  * | `?view=review` | режим приёмки: полоса приёмки, предложенные объекты и кадры (§13) |
  * | `?tab=form` | вкладка «Форма осмотра» (§7) |
- * | `?asis=mark` | пунктир и подпись вокруг каждого перенесённого блока |
+ * | по умолчанию | тонкий пунктир `--muted-foreground` вокруг каждого перенесённого блока — незакрытое видно глазом (довесок 2 к такту 35) |
+ * | `?asis=mark` | пунктир толще и подпись вокруг каждого перенесённого блока |
+ * | `?asis=off` | без обводки — для чистых снимков |
  */
 definePageMeta({ layout: false })
 useHead({ title: 'Распределение свободной съёмки — экран' })
@@ -62,6 +64,8 @@ const state = q('state')
 const openWin = q('open')
 const view = q('view')
 const asisMark = q('asis') === 'mark'
+/** По умолчанию блоки «как есть» обведены; `?asis=off` — чистый экран для снимков. */
+const asisOutline = q('asis') !== 'off'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const P = proto as any
@@ -491,7 +495,7 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
 </script>
 
 <template>
-  <div data-theme="rososmotr" class="font-sans" :class="{ 'asis-mark': asisMark }">
+  <div data-theme="rososmotr" class="font-sans" :class="{ 'asis-outline': asisOutline, 'asis-mark': asisMark }">
     <div class="va">
       <div class="app min-w-320" data-asis="каркас экрана">
         <!-- ============================ шапка 48, §7 ============================ -->
