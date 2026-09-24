@@ -166,6 +166,12 @@
     --container-modal-edge: 642px;
     --container-modal: 600px;
     --container-modal-narrow: 440px;
+
+    /* Колонка подписи строки формы — Field orientation="left" labelWidth="form", такт 36.
+       Прототип v17 .f-row (170px 1fr); решение владельца 2026-09-23. У мастера кита 1
+       input 720:11753 подпись слева по содержимому. Замер: все 18 подписей форм повтора
+       в 15/20 Bold — не больше двух строк. Утилита — w-form-label. */
+    --container-form-label: 170px;
     --text-4xl--letter-spacing: 0;
 
     /* Вспышка шага после перехода «Показать в структуре» — спека VA-9265 §15.3,

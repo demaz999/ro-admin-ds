@@ -32,7 +32,8 @@ export interface CoverageResult {
 /** Все значения оснастки экрана — `naming.md`, «Такт 31», параметры оснастки. */
 export const COVERAGE_STATES = [
   '', 'open=assign', 'open=viewer-free', 'open=viewer-assigned', 'open=viewer-locked', 'open=viewer-suggest',
-  'open=viewer-flash', 'open=wand', 'open=progress', 'open=hotkeys', 'open=summary', 'open=finish',
+  'open=viewer-flash', 'open=wand', 'open=progress', 'open=hotkeys', 'open=form', 'open=form-group', 'open=form-errors',
+  'open=summary', 'open=finish',
   'view=review', 'tab=form', 'state=link', 'state=flash', 'state=tooltip', 'state=drop', 'selected=demo',
 ] as const
 

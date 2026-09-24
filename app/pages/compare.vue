@@ -1343,7 +1343,7 @@ const textareaVariants = [
     -->
     <section data-theme="rososmotr" class="space-y-3 bg-background font-sans text-foreground">
       <h2 class="text-lg font-bold">
-        FrameTile · StepRow · StepThumb · Progress · ProgressStat · StageSection · RepeatCard · AssignOption · FrameBindBar · ModalCard — без эталона, такты 30–35
+        FrameTile · StepRow · StepThumb · Progress · ProgressStat · StageSection · RepeatCard · AssignOption · FrameBindBar · ModalCard · FieldSet — без эталона, такты 30–36
       </h2>
       <p class="max-w-3xl text-sm text-muted-foreground">
         Мастера нет — сверка идёт с прототипом VA-9265 v17, пары «прототип / кит» лежат в
@@ -1493,6 +1493,28 @@ const textareaVariants = [
             </ModalCardContent>
           </ModalCard>
         </div>
+      </div>
+      <!--
+        Такт 36: строка формы — Field left с колонкой подписи 170 и знаком обязательности, группа — FieldSet;
+        обязательное пустое после «Сохранить» — с ошибкой. Окно формы повтора целиком — на /free-shoot/states.
+      -->
+      <div class="w-modal rounded-md border border-border-soft bg-card px-8 py-4">
+        <FieldSet legend="Характеристики оборудования">
+          <Field orientation="left" label-width="form" label="Наименование, марка, модель" required invalid>
+            <Input model-value="" invalid :show-icon="false" placeholder="" />
+          </Field>
+          <Field orientation="left" label-width="form" label="Инвентарный номер">
+            <Input model-value="10798" :show-icon="false" placeholder="" />
+          </Field>
+        </FieldSet>
+        <FieldSet legend="Состояние и эксплуатация">
+          <Field orientation="left" label-width="form" label="Эксплуатация">
+            <Select model-value="Не эксплуатируется" :items="[{ value: '—', label: '—' }, { value: 'Эксплуатируется', label: 'Эксплуатируется' }, { value: 'Не эксплуатируется', label: 'Не эксплуатируется' }]" :show-icon="false" placeholder="" />
+          </Field>
+          <Field orientation="left" label-width="form" label="Причины простоя">
+            <Input model-value="" :show-icon="false" placeholder="" />
+          </Field>
+        </FieldSet>
       </div>
     </section>
 

@@ -47,6 +47,9 @@ import proto from '~/stands/free-shoot/prototype-data.json'
  * | `?open=wand` | окно запуска автораспределения (§12.1–12.4) |
  * | `?open=progress` | окно прогресса автораспределения (§12.5); с такта 35 — на ките (`ModalCard` center 440, закрытие заблокировано) |
  * | `?open=hotkeys` | окно «Горячие клавиши» (§16) — на ките (`ModalCard` center 600, `ShortcutList`); такт 35 |
+ * | `?open=form` | окно формы повтора оборудования целиком (§14.4) — кит, такт 36 (`ModalCard`, `FieldSet`, `Field` с колонкой подписи) |
+ * | `?open=form-group` | то же окно, открытое «Изменить» у группы «Состояние и эксплуатация»: тело прокручено к группе, фокус на её первом поле (§14.3) |
+ * | `?open=form-errors` | окно после «Сохранить» с пустым «Наименование, марка, модель»: ошибка у поля и уведомление «Заполните: …» без таймера (§14.6) |
  * | `?open=summary` | сводка результата автораспределения (§12.12) |
  * | `?open=finish` | сводка завершения распределения (§17.4) |
  * | `?view=review` | режим приёмки: полоса приёмки, предложенные объекты и кадры (§13) |
@@ -314,6 +317,63 @@ const HOTKEYS = [
 const HOTKEYS_NOTE = 'Порядок работы: сначала оформите здание, потом единицы оборудования внутри него — поле «Здание / цех» подставится автоматически. Перетаскивание работает так же, как клавиши.'
 const hotkeysOpen = ref(openWin === 'hotkeys')
 
+/* ------------------------- окно формы повтора, такт 36 (§14.3–14.6) ------------------------- */
+/**
+ * Окно открывают оба «Изменить» `RepeatForm` (событие `edit(group?)`): без группы — форма целиком,
+ * с группой — сразу на ней (§14.3); «Все поля (N)» разворачивает карточку. Прототип `openObjForm`.
+ * Черновик — копия формы повтора; сохранения нет (бизнес-логики нет): с заполненными обязательными
+ * окно просто закрывается.
+ */
+interface FormDef { k: string, l: string, req?: boolean, opts?: string[], dep?: { k: string, v: string }, grp?: string }
+const EMPTY = '—'
+const editWin = ref<{ obj: string, group: string } | null>(null)
+const editDraft = ref<Record<string, string>>({})
+const editErrors = ref(new Set<string>())
+const editOpen = computed({
+  get: () => !!editWin.value,
+  set: (v: boolean) => { if (!v) editWin.value = null },
+})
+const editStage = computed(() => (editWin.value ? stageById[O(editWin.value.obj).stageId] : null))
+/** Группы — как у прототипа: `grp` стоит у первого поля группы, следующие поля идут в неё же. */
+const editGroups = computed(() => {
+  const out: { title: string, fields: FormDef[] }[] = []
+  for (const f of (editStage.value?.form ?? []) as FormDef[]) {
+    const last = out[out.length - 1]
+    if (!last || (f.grp && f.grp !== last.title)) out.push({ title: f.grp ?? '', fields: [f] })
+    else last.fields.push(f)
+  }
+  return out
+})
+const filled = (k: string) => { const v = (editDraft.value[k] ?? '').trim(); return !!v && v !== EMPTY }
+/** Зависимое поле (§14.4): видно, когда родитель равен `dep.v`; связь — данные этапа, считает страница. */
+const formVisible = (f: FormDef) => !f.dep || editDraft.value[f.dep.k] === f.dep.v
+/** Ошибка у пустого обязательного — после попытки сохранить, снимается заполнением (решение владельца 2, такт 36). */
+const formInvalid = (f: FormDef) => editErrors.value.has(f.k) && !filled(f.k)
+const formItems = (opts: string[]) => [EMPTY, ...opts].map(x => ({ value: x, label: x }))
+function openForm(objId: string, group?: string) {
+  const o = O(objId)
+  editDraft.value = Object.fromEntries((stageById[o.stageId].form as FormDef[]).map(f => [f.k, o.form[f.k] || (f.opts ? EMPTY : '')]))
+  editErrors.value = new Set()
+  editWin.value = { obj: objId, group: group ?? '' }
+}
+
+/** Уведомления экрана — отказы и подтверждения §18. Оснастка `?open=form-errors` держит отказ без таймера. */
+const toasts = ref<{ id: number, text: string }[]>([])
+const toastDuration = openWin === 'form-errors' ? Number.POSITIVE_INFINITY : 5000
+function notify(text: string) {
+  toasts.value = [...toasts.value, { id: Date.now() + Math.random(), text }]
+}
+/** §14.6: обязательные проверяются при сохранении — `form.required` «Заполните: <список полей>», окно открыто. */
+function saveForm() {
+  const need = ((editStage.value?.form ?? []) as FormDef[]).filter(f => f.req && !filled(f.k))
+  if (need.length) {
+    editErrors.value = new Set(need.map(f => f.k))
+    notify(`Заполните: ${need.map(f => f.l).join(', ')}`)
+    return
+  }
+  editWin.value = null
+}
+
 /* ---------------------- пункт назначения, такт 33 (§10.3, §11.1–11.2) ---------------------- */
 /** Кадров в шаге без отклонённых — прототип `cnt`. */
 const cnt = (owner: string, stepId: string) => framesIn(owner, stepId).filter((f: any) => !f.rej).length
@@ -469,6 +529,13 @@ onMounted(async () => {
   if (state === 'flash') {
     flashNonce.value = Date.now()
     setInterval(() => { flashNonce.value = Date.now() }, 2000)
+  }
+  /* Окно формы повтора — оснастка такта 36: повтор оборудования, как `openObjForm('eq', 'o2')` разбора. */
+  if (openWin === 'form' || openWin === 'form-errors') openForm(eqId)
+  if (openWin === 'form-group') openForm(eqId, 'Состояние и эксплуатация')
+  if (openWin === 'form-errors') {
+    editDraft.value = { ...editDraft.value, mark: '' }
+    saveForm()
   }
   await nextTick()
   /* Целевой шаг оснастки — в центр панели, как у перехода «Показать в структуре». */
@@ -687,6 +754,7 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
                             :expanded="formOpen.has(o.id)"
                             :deletable="!formPreview(o).locked && !o.auto"
                             @toggle="toggleForm(o.id)"
+                            @edit="openForm(o.id, $event)"
                           />
                         </template>
                         <StepRow v-for="(x, k) in stageById[o.stageId].steps" :key="x.id" v-bind="stepProps(o.id, x, k)" :data-step-key="`${o.id}|${x.id}`" />
@@ -867,6 +935,50 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
         </ModalCardContent>
       </ModalCard>
     </div>
+
+    <!-- ============================ окно формы повтора, §14.3–14.6 — кит, такт 36 ============================ -->
+    <ModalCard v-model:open="editOpen">
+      <ModalCardContent>
+        <ModalCardHeader :title="`Форма · ${editStage?.title ?? ''}`" subtitle="Динамическая форма повторяемого этапа" />
+        <ModalCardBody>
+          <FieldSet
+            v-for="g in editGroups"
+            :key="g.title || 'form'"
+            :legend="g.title"
+            :autofocus="!!editWin?.group && g.title === editWin.group"
+          >
+            <template v-for="f in g.fields" :key="f.k">
+              <Field v-if="formVisible(f)" orientation="left" label-width="form" :label="f.l" :required="!!f.req" :invalid="formInvalid(f)">
+                <Select v-if="f.opts" v-model="editDraft[f.k]" :items="formItems(f.opts)" :show-icon="false" placeholder="" />
+                <Input v-else v-model="editDraft[f.k]" :invalid="formInvalid(f)" :show-icon="false" placeholder="" />
+              </Field>
+            </template>
+          </FieldSet>
+        </ModalCardBody>
+        <ModalCardFooter>
+          <Button variant="secondary" @click="editWin = null">
+            Отмена
+          </Button>
+          <Button @click="saveForm">
+            Сохранить
+          </Button>
+        </ModalCardFooter>
+      </ModalCardContent>
+    </ModalCard>
+
+    <!-- Уведомления экрана: отказ «Заполните: …» (§18 form.required). Угол и тон — долг Toast. -->
+    <Toaster>
+      <Toast
+        v-for="t in toasts"
+        :key="t.id"
+        :open="true"
+        :duration="toastDuration"
+        :show-action="false"
+        @update:open="toasts = toasts.filter(x => x.id !== t.id)"
+      >
+        {{ t.text }}
+      </Toast>
+    </Toaster>
 
     <AsisMarks v-if="asisMark" />
   </div>

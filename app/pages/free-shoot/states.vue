@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import type { RfDef } from '~/stands/free-shoot/repeat-form-demo'
+import { RF_EQ, RF_GROUPS, RF_VALUES, REPEAT_FORM_WINDOW_EXAMPLE, rfItems } from '~/stands/free-shoot/repeat-form-demo'
 import type { AssignBound } from '@/components/ui/assign'
 import type { FrameSuggestion } from '@/components/ui/frame-viewer'
 import type { FrameTileState } from '@/components/ui/frame-tile'
@@ -385,6 +387,18 @@ const MC_PROGRESS = [
 /** Длинное тело — прокручивается только оно: строки «Истории изменений» условно, текстом. */
 const MC_LONG = Array.from({ length: 30 }, (_, k) => `${String(10 + (k % 12)).padStart(2, '0')}.06.2026 · Инспектор ${k + 1} изменил статус осмотра: «Назначен» → «В работе»`)
 const mcLive = ref<'' | 'center' | 'edge' | 'locked'>('')
+
+/* ------------------------------ окно формы повтора, такт 36 ------------------------------ */
+/** Живая форма стенда: зависимые поля показываются и скрываются по родителю (§14.4). */
+const rfDraft = ref<Record<string, string>>({ ...RF_VALUES })
+const rfVisible = (f: RfDef) => !f.dep || rfDraft.value[f.dep.k] === f.dep.v
+const rfLive = ref<'' | 'window' | 'group'>('')
+/** Зависимое поле в двух состояниях — «Причины простоя» при двух значениях «Эксплуатации». */
+const RF_DEP = [
+  { label: 'родитель «Эксплуатируется» — зависимое скрыто', use: 'Эксплуатируется' },
+  { label: 'родитель «Не эксплуатируется» — зависимое показано', use: 'Не эксплуатируется' },
+]
+const RF_USE = ['Эксплуатируется', 'Не эксплуатируется', 'Консервация']
 
 const MODAL_CARD_EXAMPLE = `<!-- центральное окно, 600; у края — placement="edge" (642, это Sheet) -->
 <ModalCard v-model:open="open">
@@ -1173,6 +1187,172 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
       </ModalCard>
 
       <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ MODAL_CARD_EXAMPLE }}</pre>
+    </section>
+
+    <!-- ============================ окно формы повтора, такт 36 ============================ -->
+    <section id="repeat-form-window" data-section="repeat-form-window" class="space-y-6">
+      <div class="space-y-1">
+        <h2 class="text-lg font-bold">
+          Field left · FieldSet — окно формы повтора
+        </h2>
+        <p class="max-w-240 text-sm text-foreground-secondary">
+          Такт 36, спека §14.3–14.6, разбор — <code>docs/free-shoot.md</code>, раздел 14. Строка формы — <code>Field</code>
+          мастера кита 1 <code>720:11753</code> с двумя осями по решению владельца 1: колонка подписи 170
+          (<code>labelWidth="form"</code>, <code>--container-form-label</code>) и знак обязательности (<code>required</code>).
+          Группа — <code>FieldSet</code>. Отказ при сохранении — уведомление плюс ошибка у поля (решение 2).
+        </p>
+        <p class="flex flex-wrap items-center gap-3 pt-2">
+          <Button variant="secondary" data-live="form" @click="rfLive = 'window'">Открыть окно</Button>
+          <Button variant="secondary" data-live="form-group" @click="rfLive = 'group'">Открыть на группе «Состояние и эксплуатация»</Button>
+        </p>
+      </div>
+
+      <div data-subsection="form-row" class="grid grid-cols-[repeat(2,--spacing(134))] items-start gap-x-10 gap-y-5">
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">labelWidth="content" — подпись по содержимому, как у мастера</p>
+          <Field orientation="left" label="Год выпуска">
+            <Input model-value="" :show-icon="false" placeholder="" />
+          </Field>
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">labelWidth="form" — колонка 170, подпись в одну строку</p>
+          <Field orientation="left" label-width="form" label="Год выпуска">
+            <Input model-value="" :show-icon="false" placeholder="" />
+          </Field>
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">колонка 170, подпись в две строки, required</p>
+          <Field orientation="left" label-width="form" label="Наименование, марка, модель" required>
+            <Input model-value="Пропиточная линия POLYPRISE" :show-icon="false" placeholder="" />
+          </Field>
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">required, пустое — до попытки сохранить</p>
+          <Field orientation="left" label-width="form" label="Наименование, марка, модель" required>
+            <Input model-value="" :show-icon="false" placeholder="" />
+          </Field>
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">required, пустое — после «Сохранить»: Field invalid + Input invalid, без текста</p>
+          <Field orientation="left" label-width="form" label="Наименование, марка, модель" required invalid>
+            <Input model-value="" invalid :show-icon="false" placeholder="" />
+          </Field>
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">выбор — Select, пустое значение «—»</p>
+          <Field orientation="left" label-width="form" label="Эксплуатация">
+            <Select model-value="—" :items="rfItems(RF_USE)" :show-icon="false" placeholder="" />
+          </Field>
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">самая длинная подпись форм повтора (здание), 293.7 — две строки</p>
+          <Field orientation="left" label-width="form" label="Причина, по которой доступ не обеспечен">
+            <Input model-value="" :show-icon="false" placeholder="" />
+          </Field>
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">orientation="top" с required — знак у подписи сверху</p>
+          <Field label="Номер или название" required>
+            <Input model-value="ЦЕХ-6" :show-icon="false" placeholder="" />
+          </Field>
+        </div>
+      </div>
+
+      <div data-subsection="form-groups" class="grid grid-cols-[repeat(2,--spacing(134))] items-start gap-x-10 gap-y-5">
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">FieldSet — три группы этапа «Единица оборудования»: заголовок, строки через 8, между группами 12 / линия / 12</p>
+          <div>
+            <FieldSet v-for="g in RF_GROUPS" :key="g.title" :legend="g.title">
+              <template v-for="f in g.fields" :key="f.k">
+                <Field v-if="!f.dep" orientation="left" label-width="form" :label="f.l" :required="!!f.req">
+                  <Select v-if="f.opts" :model-value="RF_VALUES[f.k]" :items="rfItems(f.opts)" :show-icon="false" placeholder="" />
+                  <Input v-else :model-value="RF_VALUES[f.k]" :show-icon="false" placeholder="" />
+                </Field>
+              </template>
+            </FieldSet>
+          </div>
+        </div>
+        <div class="space-y-5">
+          <div v-for="d in RF_DEP" :key="d.use" data-subsection="form-dep" class="space-y-1">
+            <p class="text-2xs text-muted-foreground">зависимое поле, §14.4: {{ d.label }}</p>
+            <FieldSet legend="Состояние и эксплуатация">
+              <Field orientation="left" label-width="form" label="Эксплуатация">
+                <Select :model-value="d.use" :items="rfItems(RF_USE)" :show-icon="false" placeholder="" />
+              </Field>
+              <Field v-if="d.use === 'Не эксплуатируется'" orientation="left" label-width="form" label="Причины простоя">
+                <Input model-value="" :show-icon="false" placeholder="" />
+              </Field>
+              <Field orientation="left" label-width="form" label="Дефекты">
+                <Select model-value="Не выявлены" :items="rfItems(['Не выявлены', 'Выявлены'])" :show-icon="false" placeholder="" />
+              </Field>
+            </FieldSet>
+          </div>
+          <div data-subsection="form-dep-live" class="space-y-1">
+            <p class="text-2xs text-muted-foreground">вживую: смените «Эксплуатацию» или «Дефекты»</p>
+            <FieldSet legend="Состояние и эксплуатация">
+              <template v-for="f in RF_EQ.slice(6, 12)" :key="f.k">
+                <Field v-if="rfVisible(f)" orientation="left" label-width="form" :label="f.l">
+                  <Select v-if="f.opts" v-model="rfDraft[f.k]" :items="rfItems(f.opts)" :show-icon="false" placeholder="" />
+                  <Input v-else v-model="rfDraft[f.k]" :show-icon="false" placeholder="" />
+                </Field>
+              </template>
+            </FieldSet>
+          </div>
+        </div>
+      </div>
+
+      <div data-subsection="form-window" class="space-y-1">
+        <p class="text-2xs text-muted-foreground">окно целиком — center md 600 в рамке 1440×900: тело прокручивается, шапка и подвал на месте</p>
+        <div class="relative h-225 w-360 overflow-hidden rounded-md border border-border-soft bg-background">
+          <ModalCard :open="true" :modal="false">
+            <ModalCardContent inline>
+              <ModalCardHeader title="Форма · Единица оборудования" subtitle="Динамическая форма повторяемого этапа" />
+              <ModalCardBody>
+                <FieldSet v-for="g in RF_GROUPS" :key="g.title" :legend="g.title">
+                  <template v-for="f in g.fields" :key="f.k">
+                    <Field v-if="!f.dep" orientation="left" label-width="form" :label="f.l" :required="!!f.req">
+                      <Select v-if="f.opts" :model-value="RF_VALUES[f.k]" :items="rfItems(f.opts)" :show-icon="false" placeholder="" />
+                      <Input v-else :model-value="RF_VALUES[f.k]" :show-icon="false" placeholder="" />
+                    </Field>
+                  </template>
+                </FieldSet>
+              </ModalCardBody>
+              <ModalCardFooter>
+                <Button variant="secondary">Отмена</Button>
+                <Button>Сохранить</Button>
+              </ModalCardFooter>
+            </ModalCardContent>
+          </ModalCard>
+        </div>
+      </div>
+
+      <!-- Живое окно: портал, ловушка фокуса, Esc; открытие на группе — прокрутка тела и фокус на первом поле. -->
+      <ModalCard :open="rfLive !== ''" @update:open="!$event && (rfLive = '')">
+        <ModalCardContent>
+          <ModalCardHeader title="Форма · Единица оборудования" subtitle="Динамическая форма повторяемого этапа" />
+          <ModalCardBody>
+            <FieldSet
+              v-for="g in RF_GROUPS"
+              :key="g.title"
+              :legend="g.title"
+              :autofocus="rfLive === 'group' && g.title === 'Состояние и эксплуатация'"
+            >
+              <template v-for="f in g.fields" :key="f.k">
+                <Field v-if="rfVisible(f)" orientation="left" label-width="form" :label="f.l" :required="!!f.req">
+                  <Select v-if="f.opts" v-model="rfDraft[f.k]" :items="rfItems(f.opts)" :show-icon="false" placeholder="" />
+                  <Input v-else v-model="rfDraft[f.k]" :show-icon="false" placeholder="" />
+                </Field>
+              </template>
+            </FieldSet>
+          </ModalCardBody>
+          <ModalCardFooter>
+            <Button variant="secondary" @click="rfLive = ''">Отмена</Button>
+            <Button @click="rfLive = ''">Сохранить</Button>
+          </ModalCardFooter>
+        </ModalCardContent>
+      </ModalCard>
+
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ REPEAT_FORM_WINDOW_EXAMPLE }}</pre>
     </section>
   </main>
 </template>

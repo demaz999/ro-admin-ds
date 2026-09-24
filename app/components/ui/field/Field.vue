@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { FieldVariants } from '.'
+import type { FieldLabelVariants, FieldVariants } from '.'
 import { computed } from 'vue'
 import { fieldLabelVariants, fieldVariants } from '.'
 
@@ -25,6 +25,13 @@ const props = withDefaults(defineProps<{
    * Атомовские поля 40; большой размер 64.
    */
   controlHeight?: number
+  /**
+   * Ширина подписи в раскладке `left`: `content` — по содержимому (мастер), `form` — колонка
+   * строки формы 170, подпись переносится. Такт 36, решение владельца 2026-09-23.
+   */
+  labelWidth?: NonNullable<FieldLabelVariants['labelWidth']>
+  /** Обязательное поле: « *» `--destructive` после подписи. Такт 36; прецедент `StepRow`. */
+  required?: boolean
 }>(), {
   label: '',
   orientation: 'top',
@@ -33,6 +40,8 @@ const props = withDefaults(defineProps<{
   invalid: false,
   disabled: false,
   controlHeight: 40,
+  labelWidth: 'content',
+  required: false,
 })
 
 /**
@@ -58,10 +67,11 @@ const hasHintRow = computed(() => Boolean(props.hint || props.counter))
   >
     <label
       v-if="props.label"
-      :class="fieldLabelVariants({ orientation: props.orientation })"
+      :class="fieldLabelVariants({ orientation: props.orientation, labelWidth: props.orientation === 'left' ? props.labelWidth : 'content' })"
       :style="props.orientation === 'left' ? { height: `${props.controlHeight}px` } : undefined"
     >
-      {{ props.label }}
+      <!-- Одна строчная обёртка: знак обязательности идёт за последним словом, и при переносе тоже. -->
+      <span>{{ props.label }}<span v-if="props.required" class="text-destructive"> *</span></span>
     </label>
 
     <!-- Зазор 4 между контролом и строкой подсказки — из мастера. -->

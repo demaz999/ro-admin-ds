@@ -69,7 +69,11 @@ function go(step: number) {
 </script>
 
 <template>
-  <DialogRoot :open="props.open" @update:open="emits('update:open', $event)">
+  <!--
+    Такт 36: inline — немодальный корень. Модальный Reka ставит body pointer-events: none, и
+    лайтбокс в рамке стенда (/free-shoot/states, /compare) запирал для мыши всю страницу.
+  -->
+  <DialogRoot :open="props.open" :modal="!props.inline" @update:open="emits('update:open', $event)">
     <DialogPortal :disabled="props.inline">
       <DialogContent
         data-slot="lightbox"

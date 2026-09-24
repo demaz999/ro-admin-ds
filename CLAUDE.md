@@ -360,7 +360,7 @@ Headless-браузер снимает страницу **от начала до
 умеет. Поэтому состояния для снимков задаются параметрами адреса, и они помечены в коде как
 оснастка приёмки: `?open=`, `?only=`, `?view=`, `?filters=`,
 `?selected=`, `?rows=`, `?scroll=`, `?q=`, `?actions=demo`, `?values=demo`, `?state=` (экран
-`/free-shoot`: `link`, `flash`, `tooltip`, `drop`), `?open=` (с такта 34 и `viewer-flash`, с такта 35 — `hotkeys`), `?asis=off` и `?view=review`, `?tab=form`, `?asis=mark` там же — список в `docs/naming.md`. В продукт они не идут.
+`/free-shoot`: `link`, `flash`, `tooltip`, `drop`), `?open=` (с такта 34 и `viewer-flash`, с такта 35 — `hotkeys`, с такта 36 — `form`, `form-group`, `form-errors`), `?asis=off` и `?view=review`, `?tab=form`, `?asis=mark` там же — список в `docs/naming.md`. В продукт они не идут.
 
 Наведение адресом не задать — у компонента для этого проп-оснастка `demoHover` (`FrameTile`,
 `StepRow`, `StepThumb`, такт 30; `AssignOption`, такт 33) и `tooltipOpen` у `FrameTile`: они повторяют вид наведения и
@@ -551,6 +551,20 @@ resolve component» и «Hydration completed but contains mismatches» — вы�
 всплывают к его обработчику. `FrameTile` гасил их (`preventDefault`) и переключал выделение — кнопки
 плитки не нажимались с клавиатуры с такта 30, пока приёмка ловушки фокуса в такте 34 не открыла просмотр
 клавишей. Обработчик корня проверяет `event.target === event.currentTarget`. Мышью этого не видно.
+
+**Окно в рамке стенда — немодальное.** Модальный корень Reka ставит `body { pointer-events: none }`: `Lightbox inline`
+открывался модальным, и с такта 34 `/free-shoot/states` и `/compare` не кликались мышью вовсе — проверки, нажимавшие
+кнопки скриптом, этого не видели. У `Lightbox` `inline` теперь даёт `:modal="false"`, у `ModalCard` в рамке — `:modal="false"`
+явно. Проверяется `getComputedStyle(document.body).pointerEvents` на странице стенда.
+
+**`ComboboxTrigger` Reka ставит кнопке `tabindex="-1"`.** Фокус у комбобокса несёт поле ввода; у `Select` его нет, и выбор
+не доставался с клавиатуры с волны 1 — вскрылось в такте 36 проходом Tab по строкам формы. Внешний `tabindex="0"` на
+`ComboboxTrigger` ложится поверх. Там же: у содержимого всплывающего списка обязателен `z-50` — обёртка popper Reka
+берёт `z-index` у содержимого, без него список внутри модального окна ложится под окно.
+
+**`clip` у `Page.captureScreenshot` — в координатах документа.** `getBoundingClientRect` после `scrollIntoView` даёт
+координаты окна: без `scrollX`/`scrollY` кадр ниже первого экрана выходит пустым, и две пустых картинки «совпадают
+побайтно». Кадр сверки проверяется глазом или размером файла.
 
 **Синтетический Enter по CDP без `text` не нажимает нативную кнопку.** `Input.dispatchKeyEvent` с одним
 `key: 'Enter'` доходит до `keydown`, но кнопку не активирует — нужен `text: '\r'`. Иначе проверка

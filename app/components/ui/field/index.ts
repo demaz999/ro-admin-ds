@@ -2,6 +2,7 @@ import type { VariantProps } from 'class-variance-authority'
 import { cva } from 'class-variance-authority'
 
 export { default as Field } from './Field.vue'
+export { default as FieldSet } from './FieldSet.vue'
 
 /**
  * Полевая обвязка — **первый компонент фазы обогащения**.
@@ -58,6 +59,21 @@ export { default as Field } from './Field.vue'
  * Цвета при этом берутся из **текущей темы**, а не из кита 1: обвязка приехала
  * из архива составом, но не палитрой.
  *
+ * ## Строка формы — такт 36
+ *
+ * Решение владельца 2026-09-23 (окно формы повтора VA-9265, `docs/free-shoot.md`, раздел 14):
+ * две оси сверх мастера `720:11753` — запрос дизайнерам в `figma-fixes.md`.
+ *
+ * | ось | значения | провенанс |
+ * |---|---|---|
+ * | `labelWidth` | `content` (мастер) · `form` — колонка 170 `--container-form-label`, подпись переносится | прототип v17 `.f-row` `170px 1fr` |
+ * | `required` | « *» `--destructive` после подписи | прецедент `StepRow`, такт 30; прототип `.req` |
+ *
+ * Без обоих пропов обвязка та же, что до такта. Замер: 18 подписей форм повтора в 15/20 Bold
+ * укладываются в 170 не больше чем в две строки — две строки 40, высота поля.
+ *
+ * `FieldSet` — группа полей формы: заголовок группы и строки через 8; разбор — в `FieldSet.vue`.
+ *
  * > **Про имя слота.** Корень помечен `field-wrapper`, а не `field`: имя `field`
  * > уже занято внутренним контейнером атомовского поля (`Input.vue`), и обе
  * > автопроверки на `/compare` обходят узлы по `[data-slot]`. Одноимённые слоты
@@ -87,9 +103,19 @@ export const fieldLabelVariants = cva(
         top: 'block',
         left: 'flex shrink-0 items-center',
       },
+      /**
+       * Ширина подписи в раскладке `left`. `content` — по содержимому, как у мастера.
+       * `form` — колонка строки формы 170 (`--container-form-label`), подпись переносится;
+       * такт 36, решение владельца 2026-09-23, провенанс — прототип v17 `.f-row`.
+       */
+      labelWidth: {
+        content: '',
+        form: 'w-form-label',
+      },
     },
-    defaultVariants: { orientation: 'top' },
+    defaultVariants: { orientation: 'top', labelWidth: 'content' },
   },
 )
 
 export type FieldVariants = VariantProps<typeof fieldVariants>
+export type FieldLabelVariants = VariantProps<typeof fieldLabelVariants>

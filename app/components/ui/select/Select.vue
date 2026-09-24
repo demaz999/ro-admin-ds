@@ -69,7 +69,12 @@ const selected = computed(() => props.items.find(i => i.value === model.value))
 <template>
   <ComboboxRoot v-model="model" :disabled="props.disabled" class="w-full">
     <ComboboxAnchor as-child>
-      <ComboboxTrigger as-child>
+      <!--
+        Такт 36: ComboboxTrigger Reka ставит кнопке tabindex="-1" — фокус у комбобокса несёт поле
+        ввода, а у Select его нет. Без явного tabindex выбор не достижим с клавиатуры: Tab по
+        строкам формы его пропускал. Внешний атрибут ложится поверх внутреннего.
+      -->
+      <ComboboxTrigger as-child tabindex="0">
         <SelectTrigger
           :variant="props.variant"
           :size="props.size"

@@ -32,9 +32,14 @@ withDefaults(defineProps<{
 </script>
 
 <template>
+  <!--
+    z-50 — как у PopoverContent: обёртка popper Reka берёт z-index у содержимого. Без него
+    список выбора внутри ModalCard открывался под слоем окна, и клик по пункту попадал в
+    кнопку подвала (такт 36).
+  -->
   <div
     data-slot="popover"
-    class="flex flex-col gap-1 rounded-lg bg-popover py-1 pl-1 shadow-dropdown"
+    class="z-50 flex flex-col gap-1 rounded-lg bg-popover py-1 pl-1 shadow-dropdown"
     :style="{ width: `${width}px`, maxHeight: typeof maxHeight === 'number' ? `${maxHeight}px` : maxHeight }"
   >
     <!--
