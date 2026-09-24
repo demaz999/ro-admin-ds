@@ -360,7 +360,7 @@ Headless-браузер снимает страницу **от начала до
 умеет. Поэтому состояния для снимков задаются параметрами адреса, и они помечены в коде как
 оснастка приёмки: `?open=`, `?only=`, `?view=`, `?filters=`,
 `?selected=`, `?rows=`, `?scroll=`, `?q=`, `?actions=demo`, `?values=demo`, `?state=` (экран
-`/free-shoot`: `link`, `flash`, `tooltip`, `drop`), `?open=` (с такта 34 и `viewer-flash`) и `?view=review`, `?tab=form`, `?asis=mark` там же — список в `docs/naming.md`. В продукт они не идут.
+`/free-shoot`: `link`, `flash`, `tooltip`, `drop`), `?open=` (с такта 34 и `viewer-flash`, с такта 35 — `hotkeys`) и `?view=review`, `?tab=form`, `?asis=mark` там же — список в `docs/naming.md`. В продукт они не идут.
 
 Наведение адресом не задать — у компонента для этого проп-оснастка `demoHover` (`FrameTile`,
 `StepRow`, `StepThumb`, такт 30; `AssignOption`, такт 33) и `tooltipOpen` у `FrameTile`: они повторяют вид наведения и
