@@ -5,6 +5,7 @@ export { default as ModalCardBody } from './ModalCardBody.vue'
 export { default as ModalCardContent } from './ModalCardContent.vue'
 export { default as ModalCardFooter } from './ModalCardFooter.vue'
 export { default as ModalCardHeader } from './ModalCardHeader.vue'
+export { default as ModalCardText } from './ModalCardText.vue'
 
 /**
  * Окно-карточка кита 1 — семейство «Modal card», такт 35, решения владельца 2026-09-23.
@@ -24,6 +25,7 @@ export { default as ModalCardHeader } from './ModalCardHeader.vue'
  * | зазор блоков | 24 | `817:34525` |
  * | шапка | строка 28: заголовок 24/28 bold `--foreground`, паддинги 0/12/0/16; крестик — бокс 24, глиф 13 `--foreground` | `modal_cards_header` `864:2747`, `24_close` `751:218` |
  * | подзаголовок | 15/20 `--foreground-secondary`, под заголовком через 4 | «Экспорт в Excel» `32809:17597` |
+ * | текст тела (`ModalCardText`) | 15/20 `--foreground-secondary` — описательный абзац в теле | «Настройка таблицы» `19942:192435`; довесок 1 к такту 35 |
  * | тело | прокручивается **только тело**, шапка и подвал неподвижны; полоса — `Scroll` кита `815:30416` 4px: дорожка `--border-neutral`, бегунок `--muted-foreground`, радиус 4 | решение владельца 2; «История изменений» `19751:28905` |
  * | подвал | строка в потоке, паддинги 0/16, кнопки справа через 24, слот слева под текст; кнопки — `Button` md 40 | `817:34525`, «Настройка таблицы» `19942:192457`; решение владельца 2 |
  * | подложка | `--overlay-modal` `#000` 40% — одна на оба размещения | решение владельца 2, вопрос 35; экран `30957:19948` |

@@ -2,6 +2,7 @@ export { default as FrameBindBar } from './FrameBindBar.vue'
 export { default as FrameMeta } from './FrameMeta.vue'
 export { default as FrameStage } from './FrameStage.vue'
 export { default as FrameStatus } from './FrameStatus.vue'
+export { default as FrameTitle } from './FrameTitle.vue'
 
 /**
  * Полноэкранный просмотр кадра — экран «Распределение свободной съёмки» (VA-9265), такт 34.
@@ -9,8 +10,8 @@ export { default as FrameStatus } from './FrameStatus.vue'
  * `flashBind`) и спека §11.1–11.6. Разбор с замерами — `docs/free-shoot.md`, раздел 12.
  *
  * Каркас — `Lightbox` кита со слотом боковой панели `aside` (решение владельца 1, такт 34):
- * кадр с плашкой — `FrameStage` + `FrameBindBar` в слоте кадра, имя файла и `FrameStatus` —
- * в слоте действий, `FrameMeta` и список шагов такта 33 — в боковой панели.
+ * кадр с плашкой — `FrameStage` + `FrameBindBar` в слоте кадра, `FrameTitle` (имя файла и
+ * `FrameStatus`) — в слоте действий, `FrameMeta` и список шагов такта 33 — в боковой панели.
  *
  * ## Нижняя плашка — `FrameBindBar`
  *

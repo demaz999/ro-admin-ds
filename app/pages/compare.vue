@@ -1541,6 +1541,20 @@ const textareaVariants = [
       <CompareCoverageAudit />
     </section>
 
+    <section class="space-y-3">
+      <h2 class="text-lg font-bold">
+        Автопроверка разметки экрана свободной съёмки
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Проверка покрытия идёт по DOM и не отличает разметку страницы, вложенную в слот компонента, от
+        разметки самого компонента. Эта идёт по исходникам <code>app/pages/free-shoot/*.vue</code>, кроме
+        стенда матриц: вне блоков «как есть» — ни одного <code>data-slot</code>, классов текста, фона, рамки,
+        шрифта, тени, кольца и скругления, произвольных значений в скобках, встроенных стилей и
+        <code>v-html</code>. Классы раскладки разрешены. Довесок 1 к такту 35.
+      </p>
+      <CompareMarkupAudit />
+    </section>
+
     <section class="space-y-2">
       <h2 class="text-lg font-bold">
         Мастер целиком

@@ -375,6 +375,8 @@ const MC_HOTKEYS = [
   { keys: '[⌘]/[Ctrl]+[Z]', action: 'отменить' },
   { keys: '[Esc]', action: 'снять выделение' },
 ]
+/** Примечание окна «Горячие клавиши» — `ModalCardText`, довесок 1 к такту 35. */
+const MC_NOTE = 'Порядок работы: сначала оформите здание, потом единицы оборудования внутри него — поле «Здание / цех» подставится автоматически. Перетаскивание работает так же, как клавиши.'
 const MC_PROGRESS = [
   { label: 'Кадров обработано', value: '59 / 132' },
   { label: 'Заметок прочитано', value: '7 / 9' },
@@ -388,8 +390,9 @@ const MODAL_CARD_EXAMPLE = `<!-- центральное окно, 600; у кра
 <ModalCard v-model:open="open">
   <ModalCardContent>                        <!-- placement="center" size="md" по умолчанию -->
     <ModalCardHeader title="Горячие клавиши" subtitle="Разбор ленты с клавиатуры" />
-    <ModalCardBody>                         <!-- прокручивается только тело, полоса 4px -->
+    <ModalCardBody class="flex flex-col gap-6">   <!-- прокручивается только тело, полоса 4px -->
       <ShortcutList :items="[{ keys: '[Shift] + клик', action: 'выделить подряд идущие кадры' }, …]" />
+      <ModalCardText>Порядок работы: сначала оформите здание, …</ModalCardText>   <!-- описательный текст тела -->
     </ModalCardBody>
     <ModalCardFooter>
       <Button @click="open = false">Понятно</Button>
@@ -415,8 +418,7 @@ const MODAL_CARD_EXAMPLE = `<!-- центральное окно, 600; у кра
 
 const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :total="frames.length">
   <template #actions>
-    <span class="truncate text-sm font-medium">{{ frame.fileName }}</span>
-    <FrameStatus :assigned="!!frame.stepId" />
+    <FrameTitle :name="frame.fileName" :assigned="!!frame.stepId" />   <!-- имя файла и метка -->
   </template>
   <FrameStage :src="frame.src" :alt="frame.fileName" :assigned="!!frame.stepId">
     <FrameBindBar
@@ -961,7 +963,7 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
     <section id="viewer" data-section="viewer" class="space-y-6">
       <div class="space-y-1">
         <h2 class="text-lg font-bold">
-          FrameStage · FrameBindBar · FrameMeta · FrameStatus — полноэкранный просмотр
+          FrameStage · FrameBindBar · FrameMeta · FrameStatus · FrameTitle — полноэкранный просмотр
         </h2>
         <p class="max-w-240 text-sm text-foreground-secondary">
           Такт 34. Спека §11.1–11.3. Каркас — <code>Lightbox</code> кита со слотом боковой панели <code>aside</code>
@@ -996,6 +998,12 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
             <FrameStatus assigned />
             <FrameStatus />
           </div>
+          <div data-subsection="viewer-title" class="space-y-2">
+            <p class="text-2xs text-muted-foreground">FrameTitle — имя файла и метка в слоте действий; длинное имя обрезается, метка не сжимается</p>
+            <FrameTitle name="IMG_3264.jpeg" assigned />
+            <FrameTitle name="IMG_3250.jpeg" />
+            <FrameTitle name="VID_20260611_143015_Цех-6_линия_пропитки_общий_план.mp4" assigned class="w-60" />
+          </div>
           <div class="space-y-1">
             <p class="text-2xs text-muted-foreground">пункт списка в тоне успеха — решение 4</p>
             <div class="w-side-panel">
@@ -1014,10 +1022,7 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
         <div class="relative h-180 w-320 overflow-hidden rounded-md border border-border-soft">
           <Lightbox inline :open="true" :index="lbIndex" :total="196" @update:index="lbIndex = $event">
             <template #actions>
-              <span class="flex min-w-0 items-center gap-3">
-                <span class="truncate text-sm font-medium text-foreground">IMG_3264.jpeg</span>
-                <FrameStatus assigned />
-              </span>
+              <FrameTitle name="IMG_3264.jpeg" assigned />
             </template>
             <FrameStage :src="img(12)" alt="IMG_3264.jpeg" assigned>
               <FrameBindBar state="assigned" step-name="Узлы и агрегаты" owner-name="Пропиточная линия POLYPRISE" />
@@ -1048,6 +1053,8 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
           Такт 35. Мастер карточки <code>817:34525</code> и шапки <code>864:2747</code>; размещения <code>edge</code> (642 — это
           <code>Sheet</code>) и <code>center</code> (600 и 440 — ширины прототипа). Скругление 48 только слева сверху в обоих,
           подложка <code>--overlay-modal</code> 40%, прокручивается только тело, кнопки — <code>Button</code> md 40.
+          Описательный текст тела — <code>ModalCardText</code> 15/20 <code>--foreground-secondary</code> («Настройка таблицы»
+          <code>19942:192435</code>, довесок 1).
           Рамки ниже — окно внутри родителя (<code>inline</code>); живые окна — кнопками справа.
         </p>
         <p class="flex flex-wrap items-center gap-3 pt-2">
@@ -1064,8 +1071,9 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
             <ModalCard :open="true" :modal="false">
               <ModalCardContent inline>
                 <ModalCardHeader title="Горячие клавиши" subtitle="Разбор ленты с клавиатуры" />
-                <ModalCardBody>
+                <ModalCardBody class="flex flex-col gap-6">
                   <ShortcutList :items="MC_HOTKEYS" />
+                  <ModalCardText>{{ MC_NOTE }}</ModalCardText>
                 </ModalCardBody>
                 <ModalCardFooter>
                   <Button>Понятно</Button>
@@ -1124,8 +1132,9 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
       <ModalCard :open="mcLive === 'center'" @update:open="mcLive = $event ? 'center' : ''">
         <ModalCardContent>
           <ModalCardHeader title="Горячие клавиши" subtitle="Разбор ленты с клавиатуры" />
-          <ModalCardBody>
+          <ModalCardBody class="flex flex-col gap-6">
             <ShortcutList :items="MC_HOTKEYS" />
+            <ModalCardText>{{ MC_NOTE }}</ModalCardText>
           </ModalCardBody>
           <ModalCardFooter>
             <Button @click="mcLive = ''">Понятно</Button>

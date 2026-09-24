@@ -495,7 +495,8 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
 </script>
 
 <template>
-  <div data-theme="rososmotr" class="font-sans" :class="{ 'asis-outline': asisOutline, 'asis-mark': asisMark }">
+  <!-- Тема и гарнитура — с корня документа (`:root`, `body`), как у других стендов: узла темы на экране нет. -->
+  <div :class="{ 'asis-outline': asisOutline, 'asis-mark': asisMark }">
     <div class="va">
       <div class="app min-w-320" data-asis="каркас экрана">
         <!-- ============================ шапка 48, §7 ============================ -->
@@ -783,10 +784,7 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
         @update:index="stepViewer"
       >
         <template #actions>
-          <span class="flex min-w-0 items-center gap-3">
-            <span data-slot="frame-file" class="truncate text-sm font-medium text-foreground">{{ viewerFrame?.n }}</span>
-            <FrameStatus :assigned="bindProps.state !== 'free'" />
-          </span>
+          <FrameTitle :name="viewerFrame?.n ?? ''" :assigned="bindProps.state !== 'free'" />
         </template>
         <FrameStage :src="img(viewerFrame?.i ?? 1)" :alt="viewerFrame?.n" :assigned="bindProps.state !== 'free'">
           <FrameBindBar
@@ -859,9 +857,7 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
           <ModalCardHeader title="Горячие клавиши" subtitle="Разбор ленты с клавиатуры" />
           <ModalCardBody class="flex flex-col gap-6">
             <ShortcutList :items="HOTKEYS" />
-            <p class="m-0 text-sm text-foreground-secondary">
-              {{ HOTKEYS_NOTE }}
-            </p>
+            <ModalCardText>{{ HOTKEYS_NOTE }}</ModalCardText>
           </ModalCardBody>
           <ModalCardFooter>
             <Button @click="hotkeysOpen = false">
