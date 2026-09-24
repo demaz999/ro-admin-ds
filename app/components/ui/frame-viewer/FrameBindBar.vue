@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { Button } from '../button'
 import { Icon } from '../icon'
+import { Kbd } from '../kbd'
 import { stepCounterVariants } from '../step-row'
 import { cn } from '@/lib/utils'
 import type { FrameBindState, FrameSuggestion } from '.'
@@ -126,7 +127,7 @@ const blockedText = computed(() => {
       <template v-if="props.suggestion?.kind === 'step'">
         <Button v-if="!props.suggestion.blocked" variant="secondary" size="sm" :disabled="flashing" @click="emit('accept')">
           Принять
-          <span data-slot="frame-bind-key" class="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-xs bg-card px-1 text-3xs font-bold text-secondary-foreground">Enter</span>
+          <Kbd surface="card" class="ml-1">Enter</Kbd>
         </Button>
         <Button variant="secondary" size="sm" :disabled="flashing" @click="emit('dismiss')">
           Не то

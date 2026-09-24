@@ -1,5 +1,6 @@
 export { default as Progress } from './Progress.vue'
 export { default as ProgressStat } from './ProgressStat.vue'
+export { default as ProgressCounter } from './ProgressCounter.vue'
 
 /**
  * Детерминированный прогресс — такт 30, решение владельца 6. **Первый прогресс

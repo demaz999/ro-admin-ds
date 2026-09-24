@@ -159,6 +159,13 @@
        Решение владельца 2026-09-23, такт 34: ширина панели структуры §7; замер такта 34 —
        минимум 418 на самой длинной подписи источника в пункте AssignOption. Утилита — w-side-panel. */
     --container-side-panel: 440px;
+
+    /* Окно-карточка ModalCard — такт 35, решение владельца 2026-09-23. Краевое размещение — мастер
+       card 817:34525 (642). Центральное у кита 1 не нарисовано: ширины окон прототипа VA-9265 —
+       .mbox 600 (окна modal()) и .wbox 440 (прогресс автораспределения). */
+    --container-modal-edge: 642px;
+    --container-modal: 600px;
+    --container-modal-narrow: 440px;
     --text-4xl--letter-spacing: 0;
 
     /* Вспышка шага после перехода «Показать в структуре» — спека VA-9265 §15.3,
@@ -295,6 +302,7 @@
     --radius-xl: 16px;                  /* badge 24px */
     --radius-2xl: 24px;                 /* Chip 32px */
     --radius-3xl: 32px;                 /* Атом: Input размера 64 — мастер 3451:21529 */
+    --radius-4xl: 48px;                 /* кит 1: карточка окна card 817:34525, верхний левый угол — такт 35 */
     --radius-full: 999px;               /* bulb-точки: радиус заведомо больше половины стороны */
 
     /* Вложенный список меню — мастер `_MenuItem` `3497:23069`, вариант с
@@ -318,6 +326,8 @@
        BigShadow: выпадающие плашки. Рамки у них при этом НЕТ. */
     --shadow-button: 0 1px 2px 0 #0000000d;
     --shadow-dropdown: 0 8px 32px 0 #0c10181f;
+    /* Окно-карточка кита 1 — card 817:34525: DROP_SHADOW 0/4/20, #0e1e33 10%. Такт 35. */
+    --shadow-modal: 0 4px 20px 0 #0e1e331a;
 
     /* Свечение точки индикатора — мастер `Bulb` `790:10402`: тень 0/2/8 в цвете
        самой точки на 64%. Цвет не зашит: точка красится `bg-current`, и тень
@@ -413,6 +423,7 @@
     --color-overlay: var(--overlay);
     --color-scrim-light: var(--scrim-light);
     --color-scrim-dark: var(--scrim-dark);
+    --color-overlay-modal: var(--overlay-modal);
 
     --color-stroke-secondary: var(--border-secondary);
     --color-stroke-accent: var(--border-accent);
@@ -554,6 +565,7 @@
     --overlay: #edf3fc80;                           /* bg/overlay */
     --scrim-light: #ffffff66;                       /* bg/neutral_white40% */
     --scrim-dark: #000000b2;                        /* bg/neutral_black70% */
+    --overlay-modal: #00000066;                     /* решение владельца 2026-09-23 (вопрос 35): SchemeDrawer 30957:19948 — #000 40%, в mode переменной нет */
 
     /* границы */
     --border-secondary: #9aacc2;                    /* border/secondary */

@@ -363,6 +363,56 @@ const META = [
 ]
 const lbIndex = ref(21)
 
+/* ============================ окно-карточка, такт 35 ============================ */
+const MC_HOTKEYS = [
+  { keys: '[клик]', action: 'выбрать или снять выбор кадра' },
+  { keys: '[Shift] + клик', action: 'выделить подряд идущие кадры' },
+  { keys: 'протянуть мышью', action: 'выделить рамкой (с пустого места или с [Alt])' },
+  { keys: '[1]–[8]', action: 'назначить на шаг текущего объекта' },
+  { keys: '[←] [→]', action: 'листать в просмотре' },
+  { keys: '[Del]', action: 'открепить' },
+  { keys: '[Enter]', action: 'принять подобранный шаг в просмотре' },
+  { keys: '[⌘]/[Ctrl]+[Z]', action: 'отменить' },
+  { keys: '[Esc]', action: 'снять выделение' },
+]
+const MC_PROGRESS = [
+  { label: 'Кадров обработано', value: '59 / 132' },
+  { label: 'Заметок прочитано', value: '7 / 9' },
+  { label: 'Объектов создано', value: '23 / 42' },
+]
+/** Длинное тело — прокручивается только оно: строки «Истории изменений» условно, текстом. */
+const MC_LONG = Array.from({ length: 30 }, (_, k) => `${String(10 + (k % 12)).padStart(2, '0')}.06.2026 · Инспектор ${k + 1} изменил статус осмотра: «Назначен» → «В работе»`)
+const mcLive = ref<'' | 'center' | 'edge' | 'locked'>('')
+
+const MODAL_CARD_EXAMPLE = `<!-- центральное окно, 600; у края — placement="edge" (642, это Sheet) -->
+<ModalCard v-model:open="open">
+  <ModalCardContent>                        <!-- placement="center" size="md" по умолчанию -->
+    <ModalCardHeader title="Горячие клавиши" subtitle="Разбор ленты с клавиатуры" />
+    <ModalCardBody>                         <!-- прокручивается только тело, полоса 4px -->
+      <ShortcutList :items="[{ keys: '[Shift] + клик', action: 'выделить подряд идущие кадры' }, …]" />
+    </ModalCardBody>
+    <ModalCardFooter>
+      <Button @click="open = false">Понятно</Button>
+    </ModalCardFooter>
+  </ModalCardContent>
+</ModalCard>
+
+<!-- прогресс автораспределения, §12.5: 440, закрыть можно только «Прервать» -->
+<ModalCard v-model:open="running">
+  <ModalCardContent size="sm" :closable="false">
+    <ModalCardHeader title="Автораспределение" :subtitle="\`режим: \${modeName}\`" />
+    <ModalCardBody class="flex flex-col gap-3">
+      <Progress :value="done" :max="total" label="Автораспределение" />
+      <ProgressCounter label="Кадров обработано" :value="\`\${done} / \${total}\`" />
+    </ModalCardBody>
+    <ModalCardFooter>
+      <template #note>Структура заблокирована до конца обработки</template>
+      <Button variant="secondary" @click="abort()">Прервать</Button>   <!-- §12.6 — страница -->
+    </ModalCardFooter>
+  </ModalCardContent>
+</ModalCard>`
+
+
 const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :total="frames.length">
   <template #actions>
     <span class="truncate text-sm font-medium">{{ frame.fileName }}</span>
@@ -986,6 +1036,134 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
       </div>
 
       <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ VIEWER_EXAMPLE }}</pre>
+    </section>
+
+    <!-- ============================ окно-карточка, такт 35 ============================ -->
+    <section id="modal-card" data-section="modal-card" class="space-y-6">
+      <div class="space-y-1">
+        <h2 class="text-lg font-bold">
+          ModalCard — окно-карточка кита 1 · окна прогресса и «Горячие клавиши»
+        </h2>
+        <p class="max-w-240 text-sm text-foreground-secondary">
+          Такт 35. Мастер карточки <code>817:34525</code> и шапки <code>864:2747</code>; размещения <code>edge</code> (642 — это
+          <code>Sheet</code>) и <code>center</code> (600 и 440 — ширины прототипа). Скругление 48 только слева сверху в обоих,
+          подложка <code>--overlay-modal</code> 40%, прокручивается только тело, кнопки — <code>Button</code> md 40.
+          Рамки ниже — окно внутри родителя (<code>inline</code>); живые окна — кнопками справа.
+        </p>
+        <p class="flex flex-wrap items-center gap-3 pt-2">
+          <Button variant="secondary" data-live="center" @click="mcLive = 'center'">Открыть по центру</Button>
+          <Button variant="secondary" data-live="edge" @click="mcLive = 'edge'">Открыть у края</Button>
+          <Button variant="secondary" data-live="locked" @click="mcLive = 'locked'">Открыть прогресс — закрытие заблокировано</Button>
+        </p>
+      </div>
+
+      <div data-subsection="modal-card-center" class="grid grid-cols-[repeat(2,minmax(0,1fr))] items-start gap-6">
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">center md 600 — «Горячие клавиши», §16</p>
+          <div class="relative h-170 overflow-hidden rounded-md border border-border-soft bg-background">
+            <ModalCard :open="true" :modal="false">
+              <ModalCardContent inline>
+                <ModalCardHeader title="Горячие клавиши" subtitle="Разбор ленты с клавиатуры" />
+                <ModalCardBody>
+                  <ShortcutList :items="MC_HOTKEYS" />
+                </ModalCardBody>
+                <ModalCardFooter>
+                  <Button>Понятно</Button>
+                </ModalCardFooter>
+              </ModalCardContent>
+            </ModalCard>
+          </div>
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">center sm 440 — прогресс, §12.5: крестика нет, Esc и клик мимо не закрывают</p>
+          <div class="relative h-170 overflow-hidden rounded-md border border-border-soft bg-background">
+            <ModalCard :open="true" :modal="false">
+              <ModalCardContent inline size="sm" :closable="false">
+                <ModalCardHeader title="Автораспределение" subtitle="режим: полное" />
+                <ModalCardBody class="flex flex-col gap-3">
+                  <Progress :value="59" :max="132" label="Автораспределение" />
+                  <div>
+                    <ProgressCounter v-for="r in MC_PROGRESS" :key="r.label" :label="r.label" :value="r.value" />
+                  </div>
+                </ModalCardBody>
+                <ModalCardFooter>
+                  <template #note>
+                    Структура заблокирована до конца обработки
+                  </template>
+                  <Button variant="secondary">Прервать</Button>
+                </ModalCardFooter>
+              </ModalCardContent>
+            </ModalCard>
+          </div>
+        </div>
+      </div>
+
+      <div data-subsection="modal-card-edge" class="space-y-1">
+        <p class="text-2xs text-muted-foreground">edge 642 — это Sheet такта 29: во всю высоту у правого края; длинное тело прокручивается, шапка и подвал на месте</p>
+        <div class="relative h-180 overflow-hidden rounded-md border border-border-soft bg-background">
+          <ModalCard :open="true" :modal="false">
+            <ModalCardContent inline placement="edge">
+              <ModalCardHeader title="История изменений" subtitle="Осмотр № 10948 · ЦЕХ-6" />
+              <ModalCardBody class="flex flex-col gap-2">
+                <p v-for="line in MC_LONG" :key="line" class="m-0 border-b border-border-soft pb-2 text-sm">
+                  {{ line }}
+                </p>
+              </ModalCardBody>
+              <ModalCardFooter>
+                <template #note>
+                  30 изменений
+                </template>
+                <Button>Готово</Button>
+              </ModalCardFooter>
+            </ModalCardContent>
+          </ModalCard>
+        </div>
+      </div>
+
+      <!-- Живые окна: портал, модальность, ловушка фокуса, Esc и клик мимо. -->
+      <ModalCard :open="mcLive === 'center'" @update:open="mcLive = $event ? 'center' : ''">
+        <ModalCardContent>
+          <ModalCardHeader title="Горячие клавиши" subtitle="Разбор ленты с клавиатуры" />
+          <ModalCardBody>
+            <ShortcutList :items="MC_HOTKEYS" />
+          </ModalCardBody>
+          <ModalCardFooter>
+            <Button @click="mcLive = ''">Понятно</Button>
+          </ModalCardFooter>
+        </ModalCardContent>
+      </ModalCard>
+      <ModalCard :open="mcLive === 'edge'" @update:open="mcLive = $event ? 'edge' : ''">
+        <ModalCardContent placement="edge">
+          <ModalCardHeader title="История изменений" subtitle="Осмотр № 10948 · ЦЕХ-6" />
+          <ModalCardBody class="flex flex-col gap-2">
+            <p v-for="line in MC_LONG" :key="line" class="m-0 border-b border-border-soft pb-2 text-sm">
+              {{ line }}
+            </p>
+          </ModalCardBody>
+          <ModalCardFooter>
+            <Button @click="mcLive = ''">Готово</Button>
+          </ModalCardFooter>
+        </ModalCardContent>
+      </ModalCard>
+      <ModalCard :open="mcLive === 'locked'" @update:open="mcLive = $event ? 'locked' : ''">
+        <ModalCardContent size="sm" :closable="false">
+          <ModalCardHeader title="Автораспределение" subtitle="режим: полное" />
+          <ModalCardBody class="flex flex-col gap-3">
+            <Progress :value="59" :max="132" label="Автораспределение" />
+            <div>
+              <ProgressCounter v-for="r in MC_PROGRESS" :key="r.label" :label="r.label" :value="r.value" />
+            </div>
+          </ModalCardBody>
+          <ModalCardFooter>
+            <template #note>
+              Структура заблокирована до конца обработки
+            </template>
+            <Button variant="secondary" @click="mcLive = ''">Прервать</Button>
+          </ModalCardFooter>
+        </ModalCardContent>
+      </ModalCard>
+
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ MODAL_CARD_EXAMPLE }}</pre>
     </section>
   </main>
 </template>

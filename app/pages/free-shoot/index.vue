@@ -45,7 +45,8 @@ import proto from '~/stands/free-shoot/prototype-data.json'
  * | `?open=viewer-free` / `viewer-assigned` / `viewer-locked` / `viewer-suggest` | полноэкранный просмотр, четыре состояния нижней плашки (§11.2); с такта 33 список шагов — кит (`StageSection`, `AssignOption`), с такта 34 весь просмотр — кит (`Lightbox` со слотом `aside`, `FrameStage`, `FrameBindBar`, `FrameMeta`) |
  * | `?open=viewer-flash` | просмотр привязанного кадра со вспышкой «Распределено» по кругу — вспышка длится 820 мс, снимок её застаёт (§11.3), такт 34 |
  * | `?open=wand` | окно запуска автораспределения (§12.1–12.4) |
- * | `?open=progress` | окно прогресса автораспределения (§12.5) |
+ * | `?open=progress` | окно прогресса автораспределения (§12.5); с такта 35 — на ките (`ModalCard` center 440, закрытие заблокировано) |
+ * | `?open=hotkeys` | окно «Горячие клавиши» (§16) — на ките (`ModalCard` center 600, `ShortcutList`); такт 35 |
  * | `?open=summary` | сводка результата автораспределения (§12.12) |
  * | `?open=finish` | сводка завершения распределения (§17.4) |
  * | `?view=review` | режим приёмки: полоса приёмки, предложенные объекты и кадры (§13) |
@@ -280,6 +281,35 @@ const viewer = viewerKey
 const modalWin = ({ wand: H.wand, summary: H.summary, finish: H.finish } as Record<string, any>)[openWin] ?? null
 const progressValue = parseFloat(H.progress.width)
 
+/* ------------------------- окна на ките, такт 35 (§12.5, §16) ------------------------- */
+/** Окно прогресса — данные окна, отрисованного прототипом (`runWand`): шапка и строки счётчиков. */
+const PROGRESS = {
+  title: String(H.progress.head).replace(/<small>[\s\S]*$/, '').replace(/<[^>]+>/g, '').trim(),
+  mode: String(H.progress.head).match(/<small>([^<]+)<\/small>/)?.[1] ?? '',
+  rows: (H.progress.rows as string[]).map(r => ({
+    label: r.match(/<span>([^<]+)<\/span>/)?.[1] ?? '',
+    value: r.match(/<b[^>]*>([^<]+)<\/b>/)?.[1] ?? '',
+  })),
+}
+const progressOpen = ref(openWin === 'progress')
+
+/** Окно «Горячие клавиши» — состав прототипа `#btnHelp`, клавиши — в квадратных скобках. */
+const HOTKEYS = [
+  { keys: '[клик]', action: 'выбрать или снять выбор кадра' },
+  { keys: '[Shift] + клик', action: 'выделить подряд идущие кадры' },
+  { keys: 'значок в углу', action: 'открыть кадр во весь экран' },
+  { keys: 'протянуть мышью', action: 'выделить рамкой (с пустого места или с [Alt])' },
+  { keys: '[двойной клик]', action: 'то же самое' },
+  { keys: '[1]–[8]', action: 'назначить на шаг текущего объекта' },
+  { keys: '[←] [→]', action: 'листать в просмотре' },
+  { keys: '[Del]', action: 'открепить' },
+  { keys: '[Enter]', action: 'принять подобранный шаг в просмотре' },
+  { keys: '[⌘]/[Ctrl]+[Z]', action: 'отменить' },
+  { keys: '[Esc]', action: 'снять выделение' },
+]
+const HOTKEYS_NOTE = 'Порядок работы: сначала оформите здание, потом единицы оборудования внутри него — поле «Здание / цех» подставится автоматически. Перетаскивание работает так же, как клавиши.'
+const hotkeysOpen = ref(openWin === 'hotkeys')
+
 /* ---------------------- пункт назначения, такт 33 (§10.3, §11.1–11.2) ---------------------- */
 /** Кадров в шаге без отклонённых — прототип `cnt`. */
 const cnt = (owner: string, stepId: string) => framesIn(owner, stepId).filter((f: any) => !f.rej).length
@@ -474,7 +504,7 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
           <div class="saved" data-asis="индикатор сохранения">
             <span class="dot" /><span>Все изменения сохранены</span>
           </div>
-          <button class="tbtn" data-asis="кнопка «Горячие клавиши»">
+          <button class="tbtn" data-asis="кнопка «Горячие клавиши»" @click="hotkeysOpen = true">
             Горячие клавиши
           </button>
           <span class="kit-island">
@@ -797,24 +827,45 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
         </div>
       </div>
 
-      <!-- ============================ окно прогресса, §12.5 ============================ -->
-      <div v-if="openWin === 'progress'" class="wandov" data-asis="окно прогресса">
-        <div class="wbox">
-          <div style="display:contents" v-html="H.progress.head" />
-          <div style="margin:14px 0 12px">
-            <span class="kit-island">
-              <Progress :value="progressValue" :max="100" label="Автораспределение" />
-            </span>
-          </div>
-          <div v-for="(r, k) in H.progress.rows" :key="k" style="display:contents" v-html="r" />
-          <div class="wfoot">
-            <span class="wnote">Структура заблокирована до конца обработки</span>
-            <span class="kit-island">
-              <Button variant="secondary" size="sm">Прервать</Button>
-            </span>
-          </div>
-        </div>
-      </div>
+      <!-- ============================ окно прогресса, §12.5 — кит, такт 35 ============================ -->
+      <!-- Закрыть можно только «Прервать»: ни крестика, ни Esc, ни клика мимо (§12.5). Прерывание — логика страницы. -->
+      <ModalCard v-model:open="progressOpen">
+        <ModalCardContent :closable="false" size="sm">
+          <ModalCardHeader :title="PROGRESS.title" :subtitle="PROGRESS.mode" />
+          <ModalCardBody class="flex flex-col gap-3">
+            <Progress :value="progressValue" :max="100" label="Автораспределение" />
+            <div>
+              <ProgressCounter v-for="r in PROGRESS.rows" :key="r.label" :label="r.label" :value="r.value" />
+            </div>
+          </ModalCardBody>
+          <ModalCardFooter>
+            <template #note>
+              Структура заблокирована до конца обработки
+            </template>
+            <Button variant="secondary" @click="progressOpen = false">
+              Прервать
+            </Button>
+          </ModalCardFooter>
+        </ModalCardContent>
+      </ModalCard>
+
+      <!-- ============================ окно «Горячие клавиши», §16 — кит, такт 35 ============================ -->
+      <ModalCard v-model:open="hotkeysOpen">
+        <ModalCardContent>
+          <ModalCardHeader title="Горячие клавиши" subtitle="Разбор ленты с клавиатуры" />
+          <ModalCardBody class="flex flex-col gap-6">
+            <ShortcutList :items="HOTKEYS" />
+            <p class="m-0 text-sm text-foreground-secondary">
+              {{ HOTKEYS_NOTE }}
+            </p>
+          </ModalCardBody>
+          <ModalCardFooter>
+            <Button @click="hotkeysOpen = false">
+              Понятно
+            </Button>
+          </ModalCardFooter>
+        </ModalCardContent>
+      </ModalCard>
     </div>
 
     <AsisMarks v-if="asisMark" />

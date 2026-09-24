@@ -55,8 +55,13 @@ export { default as ButtonAction } from './ButtonAction.vue'
  * Состояния — та же лестница, что у `Button`, но ходит **цвет текста**, а не
  * заливки: покой брендовый, наведение светлее, нажатие темнее.
  */
+/*
+ * Кольцо фокуса с клавиатуры — такт 35, решение владельца 2026-09-23 (решение 3): то же, что у
+ * `Button`, `IconButton`, `ButtonArrow` (`bd22151`) — `focus-visible:ring-2` `--ring`. У мастеров
+ * Атома `6626:56755` и `1028:8221` фокуса нет. Только `focus-visible` — в покое кнопка прежняя.
+ */
 export const buttonActionVariants = cva(
-  'group/button inline-flex h-5 w-fit shrink-0 items-center gap-1.5 bg-transparent outline-none select-none disabled:pointer-events-none disabled:opacity-[var(--opacity-disabled-strong)]',
+  'group/button inline-flex h-5 w-fit shrink-0 items-center gap-1.5 bg-transparent outline-none select-none disabled:pointer-events-none disabled:opacity-[var(--opacity-disabled-strong)] focus-visible:ring-2 focus-visible:ring-ring',
   {
     variants: {
       size: {

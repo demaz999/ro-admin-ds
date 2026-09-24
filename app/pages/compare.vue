@@ -1343,7 +1343,7 @@ const textareaVariants = [
     -->
     <section data-theme="rososmotr" class="space-y-3 bg-background font-sans text-foreground">
       <h2 class="text-lg font-bold">
-        FrameTile · StepRow · StepThumb · Progress · ProgressStat · StageSection · RepeatCard · AssignOption · FrameBindBar — без эталона, такты 30–34
+        FrameTile · StepRow · StepThumb · Progress · ProgressStat · StageSection · RepeatCard · AssignOption · FrameBindBar · ModalCard — без эталона, такты 30–35
       </h2>
       <p class="max-w-3xl text-sm text-muted-foreground">
         Мастера нет — сверка идёт с прототипом VA-9265 v17, пары «прототип / кит» лежат в
@@ -1456,6 +1456,42 @@ const textareaVariants = [
         </div>
         <div class="w-side-panel rounded-xs border border-border-soft">
           <FrameMeta :rows="[{ label: 'Файл', value: 'IMG_3315.jpeg' }, { label: 'Время', value: '10:25:54' }, { label: 'Тип', value: 'Фото' }, { label: 'Распознано', value: 'Ткацкий участок' }]" />
+        </div>
+      </div>
+      <!--
+        Такт 35: окно-карточка — центральное 600 с «Горячими клавишами» и 440 с прогрессом, внутри рамки.
+        Наложение краевого размещения на экспорт 817:34525 — после авторизации Figma MCP.
+      -->
+      <div class="grid max-w-5xl grid-cols-2 items-start gap-4">
+        <div class="relative h-150 overflow-hidden rounded-md border border-border-soft bg-background">
+          <ModalCard :open="true" :modal="false">
+            <ModalCardContent inline>
+              <ModalCardHeader title="Горячие клавиши" subtitle="Разбор ленты с клавиатуры" />
+              <ModalCardBody>
+                <ShortcutList :items="[{ keys: '[Shift] + клик', action: 'выделить подряд идущие кадры' }, { keys: '[1]–[8]', action: 'назначить на шаг текущего объекта' }, { keys: '[Esc]', action: 'снять выделение' }]" />
+              </ModalCardBody>
+              <ModalCardFooter>
+                <Button>Понятно</Button>
+              </ModalCardFooter>
+            </ModalCardContent>
+          </ModalCard>
+        </div>
+        <div class="relative h-150 overflow-hidden rounded-md border border-border-soft bg-background">
+          <ModalCard :open="true" :modal="false">
+            <ModalCardContent inline size="sm" :closable="false">
+              <ModalCardHeader title="Автораспределение" subtitle="режим: полное" />
+              <ModalCardBody class="flex flex-col gap-3">
+                <Progress :value="59" :max="132" label="Автораспределение" />
+                <ProgressCounter label="Кадров обработано" value="59 / 132" />
+              </ModalCardBody>
+              <ModalCardFooter>
+                <template #note>
+                  Структура заблокирована до конца обработки
+                </template>
+                <Button variant="secondary">Прервать</Button>
+              </ModalCardFooter>
+            </ModalCardContent>
+          </ModalCard>
         </div>
       </div>
     </section>
