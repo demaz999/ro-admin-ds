@@ -51,8 +51,13 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{ header: []; accept: []; reject: [] }>()
 
-const tone = computed(() => (props.suggested ? 'suggested' : props.current ? 'current' : 'default'))
-const rail = computed(() => (props.current ? 'current' : props.highlighted ? 'highlighted' : 'none'))
+/*
+ * Порядок побед — как в CSS прототипа, где правила одной специфичности и побеждает нижнее:
+ * `.obj.auto>.obj-h` (фон предложенного) < `.obj.cur>.obj-h` (фон и полоса текущего) <
+ * `.obj.hl>.obj-h` (полоса подсветки). Такт 32 записал обратное — исправлено тактом 33.
+ */
+const tone = computed(() => (props.current ? 'current' : props.suggested ? 'suggested' : 'default'))
+const rail = computed(() => (props.highlighted ? 'highlighted' : props.current ? 'current' : 'none'))
 </script>
 
 <template>
@@ -77,7 +82,8 @@ const rail = computed(() => (props.current ? 'current' : props.highlighted ? 'hi
         >{{ props.name }}</span>
         <span data-slot="repeat-details" class="truncate text-2xs text-muted-foreground">{{ props.details || 'реквизиты не заполнены' }}</span>
       </span>
-      <span v-if="props.suggested" :class="stepCounterVariants({ tone: 'warning' })">предложено</span>
+      <!-- Правило такта 33: на заголовке предложенного (та же мягкая ступень) пилюля — на --card; у текущего фон свой, пилюля в своей заливке. -->
+      <span v-if="props.suggested" :class="stepCounterVariants({ tone: 'warning', surface: tone === 'suggested' ? 'card' : 'tone' })">предложено</span>
       <span v-if="props.checkedSteps" :class="cn(stepCounterVariants({ tone: 'frozen' }), 'gap-1')">
         <Icon name="lock" :size="10" />{{ props.checkedSteps }} проверено
       </span>

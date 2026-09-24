@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import type { AssignBound } from '@/components/ui/assign'
 import type { FrameTileState } from '@/components/ui/frame-tile'
 import type { StepThumbItem, StepVerdict } from '@/components/ui/step-row'
 import type { RepeatFormField } from '@/components/ui/repeat'
@@ -219,6 +220,116 @@ const REPEAT_EXAMPLE = `<StageSection
     <StepRow v-for="step in steps(r)" :key="step.id" v-bind="stepProps(r, step)" />
   </RepeatCard>
   <StageNote v-if="acceptedHidden">Принято и скрыто: {{ acceptedHidden }}</StageNote>
+</StageSection>`
+
+/* ============================ пункт назначения, такт 33 ============================ */
+
+interface Opt {
+  value: string
+  type?: 'step' | 'create' | 'object'
+  name: string
+  kind?: 'photo' | 'video'
+  min?: number
+  max?: number | null
+  count?: number
+  frozen?: boolean
+  hotkey?: number | null
+  bound?: AssignBound
+  frames?: number | null
+}
+/** Шаги «Единицы оборудования» и «Общих данных» — схема прототипа v17. */
+const EQ: Opt[] = [
+  { value: 'e1', name: 'Шильдик, заводская табличка', min: 1, count: 1, frozen: true },
+  { value: 'e2', name: 'Инвентарный или учётный номер', min: 1, count: 1, frozen: true },
+  { value: 'e3', name: 'Общий вид оборудования', min: 3, count: 0 },
+  { value: 'e4', name: 'Узлы и агрегаты', min: 0, count: 0 },
+  { value: 'e5', name: 'Органы управления и показания', min: 0, count: 0 },
+  { value: 'e8', name: 'Контрольное видео', kind: 'video', min: 1, max: 1, count: 0 },
+]
+const GEN: Opt[] = [
+  { value: 'g1', name: 'Генплан или схема территории', min: 1, count: 1, frozen: true },
+  { value: 'g2', name: 'Поэтажные планы и планы эвакуации', min: 0, count: 0 },
+  { value: 'g4', name: 'Общий вид территории', min: 2, count: 3, frozen: true },
+]
+const FIN: Opt[] = [
+  { value: 'f2', name: 'Документы и подтверждения', min: 0, count: 0 },
+  { value: 'f3', name: 'Фото с представителем собственника', min: 0, max: 1, count: 1 },
+]
+const withKeys = (list: Opt[], prefix: string) => list.map((o, k) => ({ ...o, value: `${prefix}|${o.value}`, hotkey: k + 1 }))
+const noKeys = (list: Opt[], prefix: string) => list.map(o => ({ ...o, value: `${prefix}|${o.value}` }))
+
+/** Все виды пункта — подпись, спека, пропы. */
+const OPTION_STATES: { label: string, spec: string, props: Opt, demoHover?: boolean }[] = [
+  { label: 'доступен', spec: '§10.3', props: { value: 's1', name: 'Поэтажные планы и планы эвакуации', min: 0, count: 0 } },
+  { label: 'текущий объект — номер клавиши', spec: '§16.3', props: { value: 's2', name: 'Общий вид оборудования', min: 3, count: 1, hotkey: 3 } },
+  { label: 'наведение и фокус с клавиатуры', spec: '—', props: { value: 's3', name: 'Узлы и агрегаты', min: 0, count: 0, hotkey: 4 }, demoHover: true },
+  { label: 'заполнен — не выбирается', spec: '§10.3', props: { value: 's4', name: 'Фото с представителем собственника', min: 0, max: 1, count: 1 } },
+  { label: 'переполнен — не выбирается, без «· заполнен»', spec: '§10.3, решение 5', props: { value: 's5', name: 'Фото с представителем собственника', min: 0, max: 1, count: 2 } },
+  { label: 'заморожен — замок, номер снят', spec: '§5.2, §16.3', props: { value: 's6', name: 'Шильдик, заводская табличка', min: 1, count: 1, frozen: true, hotkey: 1 } },
+  { label: 'кадр привязан сюда — «Открепить»', spec: '§11.4', props: { value: 's7', name: 'Узлы и агрегаты', min: 0, count: 1, bound: 'here' } },
+  { label: 'привязано до вас — изменить нельзя', spec: '§6.1', props: { value: 's8', name: 'Шильдик, заводская табличка', min: 1, count: 1, bound: 'locked' } },
+  { label: 'новый повтор — только в просмотре', spec: '§11.2', props: { value: 's9', type: 'create', name: 'Единица оборудования' } },
+  { label: 'другой объект — сделать текущим', spec: '§10.3', props: { value: 's10', type: 'object', name: 'ЦЕХ-6', frames: 6 } },
+  { label: 'видео-шаг', spec: '§10.5', props: { value: 's11', name: 'Контрольное видео', kind: 'video', min: 1, max: 1, count: 0, hotkey: 8 } },
+]
+
+/** Матрица: наполненность и доступность шага × контекст пункта. */
+const MATRIX_ROWS = [
+  { key: 'open', label: 'доступен', base: { name: 'Общий вид оборудования', min: 3, count: 1 } },
+  { key: 'full', label: 'заполнен', base: { name: 'Контрольное видео', kind: 'video' as const, min: 1, max: 1, count: 1 } },
+  { key: 'over', label: 'переполнен', base: { name: 'Фото с представителем', min: 0, max: 1, count: 2 } },
+  { key: 'frozen', label: 'заморожен', base: { name: 'Шильдик, заводская табличка', min: 1, count: 1, frozen: true } },
+]
+const MATRIX_COLS = [
+  { key: 'plain', label: 'не текущий объект' },
+  { key: 'key', label: 'текущий объект — клавиша' },
+  { key: 'here', label: 'просмотр: кадр здесь' },
+  { key: 'locked', label: 'просмотр: кадр здесь до вас' },
+] as const
+function matrixCell(row: typeof MATRIX_ROWS[number], col: typeof MATRIX_COLS[number]['key']): { props?: Opt, none?: string } {
+  if (row.key === 'frozen' && col === 'here') return { none: 'невозможно: кадр в проверенном шаге защищён — это «до вас»' }
+  const props: Opt = { ...row.base, value: `${row.key}-${col}` }
+  if (col === 'key') props.hotkey = 2
+  if (col === 'here') props.bound = 'here'
+  if (col === 'locked') props.bound = 'locked'
+  return { props }
+}
+
+const assignDemoOpen = ref(false)
+
+const ASSIGN_EXAMPLE = `<!-- поповер «Назначить на шаг», §10.3 -->
+<Popover v-model:open="open">
+  <PopoverTrigger as-child><Button size="sm">Назначить на шаг</Button></PopoverTrigger>
+  <PopoverContent as-child side="top" align="start" :align-offset="-40" :collision-padding="12" :width="360">
+    <SelectContent :width="360" max-height="62vh">
+      <AssignList>
+        <SelectGroup :header="\`Текущий · \${current.name}\`">
+          <AssignOption
+            v-for="(step, i) in current.steps" :key="step.id" :value="step.id"
+            :name="step.name" :kind="step.kind" :min="step.min" :max="step.max"
+            :count="countIn(current, step)"      // без отклонённых, §4.2
+            :frozen="isFrozen(current, step)"   // §5.2
+            :hotkey="i + 1"                      // только у текущего объекта, §16.3
+            @select="assign(selection, current, step)"
+          />
+        </SelectGroup>
+        <SelectGroup v-for="stage in plainStages" :key="stage.id" :header="stage.title">…</SelectGroup>
+        <SelectGroup header="Другие объекты">
+          <AssignOption v-for="o in others" :key="o.id" :value="o.id" type="object" :name="o.name" @select="setCurrent(o)" />
+        </SelectGroup>
+      </AssignList>
+    </SelectContent>
+  </PopoverContent>
+</Popover>
+
+<!-- список шагов полноэкранного просмотра, §11.1–11.2: группа сворачивается -->
+<StageSection v-for="g in groups" :key="g.id" :title="g.title" :count="String(g.items.length)"
+  :open="!closed.has(g.id)" @toggle="toggle(g.id)">
+  <AssignList class="p-1">
+    <AssignOption v-for="it in g.items" :key="it.value" v-bind="it"
+      :bound="frame.stepId === it.stepId ? (frame.locked ? 'locked' : 'here') : null"
+      @select="assignFrame(frame, it)" @unbind="unassign([frame.id])" />
+  </AssignList>
 </StageSection>`
 </script>
 
@@ -605,6 +716,135 @@ const REPEAT_EXAMPLE = `<StageSection
         </div>
       </div>
       <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ REPEAT_EXAMPLE }}</pre>
+    </section>
+
+    <!-- ============================ пункт назначения, такт 33 ============================ -->
+    <section id="assign" data-section="assign" class="space-y-6">
+      <div class="space-y-1">
+        <h2 class="text-lg font-bold">
+          AssignOption · AssignList — пункт назначения
+        </h2>
+        <p class="max-w-240 text-sm text-foreground-secondary">
+          Такт 33. Спека §10.3, §10.5, §11.1–11.2, §16.3. Один пункт на два места: поповер «Назначить на шаг» и список
+          шагов полноэкранного просмотра. Пункт стоит на <code>SelectItem</code> (мастер <code>ListItem</code>), группа
+          поповера — <code>SelectGroup</code>, группа просмотра — <code>StageSection</code>. Несовпадение типа (§10.5)
+          вида не имеет: отказ приходит сообщением при попытке, как в спеке §19.
+        </p>
+      </div>
+
+      <div data-subsection="assign-states" class="grid grid-cols-[repeat(3,--spacing(90))] items-start gap-x-6 gap-y-5">
+        <div v-for="st in OPTION_STATES" :key="st.props.value" class="space-y-1">
+          <p class="text-2xs text-muted-foreground">{{ st.label }} · {{ st.spec }}</p>
+          <AssignList>
+            <AssignOption v-bind="st.props" :demo-hover="st.demoHover" />
+          </AssignList>
+        </div>
+      </div>
+
+      <div data-subsection="assign-matrix" class="space-y-2">
+        <h3 class="text-sm font-medium">Пересечение: состояние шага × контекст пункта</h3>
+        <div class="grid grid-cols-[--spacing(30)_repeat(4,minmax(0,1fr))] items-start gap-x-4 gap-y-3">
+          <span />
+          <span v-for="c in MATRIX_COLS" :key="c.key" class="text-2xs text-muted-foreground">{{ c.label }}</span>
+          <template v-for="row in MATRIX_ROWS" :key="row.key">
+            <span class="pt-3 text-xs">{{ row.label }}</span>
+            <template v-for="c in MATRIX_COLS" :key="`${row.key}-${c.key}`">
+              <AssignList v-if="matrixCell(row, c.key).props">
+                <AssignOption v-bind="matrixCell(row, c.key).props!" />
+              </AssignList>
+              <p v-else class="rounded-xs border border-dashed border-border-soft p-2 text-2xs text-muted-foreground">
+                {{ matrixCell(row, c.key).none }}
+              </p>
+            </template>
+          </template>
+        </div>
+      </div>
+
+      <div data-subsection="assign-containers" class="grid grid-cols-[--spacing(90)_--spacing(85)_--spacing(85)] items-start gap-x-8">
+        <div class="space-y-2">
+          <p class="flex items-center gap-2 text-2xs text-muted-foreground">
+            поповер «Назначить на шаг» — §10.3, живой: стрелки, Enter, Esc
+            <Popover v-model:open="assignDemoOpen">
+              <PopoverTrigger as-child>
+                <Button size="sm">Назначить на шаг</Button>
+              </PopoverTrigger>
+              <PopoverContent as-child side="bottom" align="start" :collision-padding="12" :width="360">
+                <SelectContent :width="360" max-height="62vh">
+                  <AssignList>
+                    <SelectGroup header="Текущий · Пропиточная линия POLYPRISE">
+                      <AssignOption v-for="o in withKeys(EQ, 'd-eq')" :key="o.value" v-bind="o" @select="assignDemoOpen = false" />
+                    </SelectGroup>
+                    <SelectGroup header="Общие данные осмотра">
+                      <AssignOption v-for="o in noKeys(GEN, 'd-gen')" :key="o.value" v-bind="o" @select="assignDemoOpen = false" />
+                    </SelectGroup>
+                    <SelectGroup header="Другие объекты">
+                      <AssignOption value="d-obj" type="object" name="ЦЕХ-6" @select="assignDemoOpen = false" />
+                    </SelectGroup>
+                  </AssignList>
+                </SelectContent>
+              </PopoverContent>
+            </Popover>
+          </p>
+          <SelectContent :width="360" :max-height="520">
+            <AssignList>
+              <SelectGroup header="Текущий · Пропиточная линия POLYPRISE">
+                <AssignOption v-for="o in withKeys(EQ, 'eq')" :key="o.value" v-bind="o" />
+              </SelectGroup>
+              <SelectGroup header="Общие данные осмотра">
+                <AssignOption v-for="o in noKeys(GEN, 'gen')" :key="o.value" v-bind="o" />
+              </SelectGroup>
+              <SelectGroup header="Завершение осмотра">
+                <AssignOption v-for="o in noKeys(FIN, 'fin')" :key="o.value" v-bind="o" />
+              </SelectGroup>
+              <SelectGroup header="Другие объекты">
+                <AssignOption value="obj-1" type="object" name="ЦЕХ-6" />
+              </SelectGroup>
+            </AssignList>
+          </SelectContent>
+        </div>
+        <div class="space-y-2">
+          <p class="text-2xs text-muted-foreground">список просмотра — §11.2: кадр в шаге, группы сворачиваются</p>
+          <div class="w-85 rounded-xs border border-border-soft">
+            <StageSection title="Привязан к · Пропиточная линия POLYPRISE" :count="String(EQ.length)">
+              <AssignList class="p-1">
+                <AssignOption v-for="o in noKeys(EQ, 'v-eq')" :key="o.value" v-bind="o" :bound="o.value === 'v-eq|e4' ? 'here' : null" />
+              </AssignList>
+            </StageSection>
+            <StageSection title="Общие данные осмотра" :count="String(GEN.length)" :open="false" />
+            <StageSection title="Единица оборудования" repeatable count="1">
+              <AssignList class="p-1">
+                <AssignOption value="v-new" type="create" name="Единица оборудования" />
+                <AssignOption value="v-obj" type="object" name="Линия термообработки" :frames="5" />
+              </AssignList>
+            </StageSection>
+          </div>
+        </div>
+        <div class="space-y-2">
+          <p class="text-2xs text-muted-foreground">список просмотра, текущий объект — номера клавиш; кадр до вас</p>
+          <div class="w-85 rounded-xs border border-border-soft">
+            <StageSection title="Текущий · Пропиточная линия POLYPRISE" :count="String(EQ.length)">
+              <AssignList class="p-1">
+                <AssignOption v-for="o in withKeys(EQ, 'c-eq')" :key="o.value" v-bind="o" :bound="o.value === 'c-eq|e1' ? 'locked' : null" />
+              </AssignList>
+            </StageSection>
+          </div>
+        </div>
+      </div>
+
+      <div data-subsection="pill-rule" class="space-y-2">
+        <h3 class="text-sm font-medium">Правило пилюли: на подложке своего тона — на <code>--card</code></h3>
+        <p class="max-w-240 text-2xs text-muted-foreground">
+          Решение владельца 2026-09-23. Пилюля того же тона, что строка или заголовок, стоит на <code>--card</code>, текст —
+          <code>*-strong</code>. Пилюля другого тона остаётся в своей заливке (красная «2» на жёлтом заголовке).
+        </p>
+        <div class="grid grid-cols-[repeat(3,--spacing(110))] items-start gap-x-6">
+          <StepRow name="Фото с представителем" :min="0" :max="1" :count="2" instruction="Подтверждение присутствия" :thumbs="[THUMB(45), THUMB(47)]" />
+          <StepRow name="Общий вид оборудования" required :min="3" :count="1" instruction="Не менее 3 кадров с разных сторон" :verdict="REDO" :thumbs="[THUMB(101, 'rejected'), THUMB(26)]" />
+          <RepeatCard name="Линия термообработки" details="инв. 10902 · Эксплуатируется" :frames="5" suggested :errors="2" />
+        </div>
+      </div>
+
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ ASSIGN_EXAMPLE }}</pre>
     </section>
   </main>
 </template>

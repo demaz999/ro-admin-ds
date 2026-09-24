@@ -68,22 +68,52 @@ export const stepRowVariants = cva(
  * (высота 16, паддинг 8, радиус полный), текст 12/16 bold, тон — мягкая
  * заливка роли плюс её тёмная ступень. `Badge` не тронут: мягких тонов в его
  * мастере `913:8279` нет.
+ *
+ * ## Пилюля на подложке своего тона стоит на `--card` — такт 33
+ *
+ * Решение владельца 2026-09-23. Когда строка или заголовок сами залиты мягкой ступенью
+ * того же тона, что и пилюля, пилюля в своей заливке сливается с подложкой и читается
+ * только текстом. Тогда пилюля берёт `surface: 'card'`: заливка `--card`, текст — та же
+ * тёмная ступень `*-strong`. Места: переполненный шаг и «Повторить» (`StepRow`),
+ * «предложено» на заголовке предложенного повтора (`RepeatCard`). Пилюля другого тона на
+ * тонированной подложке остаётся в своей заливке. Расхождение с легаси-прототипом —
+ * `docs/figma-fixes.md`.
  */
 export const stepCounterVariants = cva(
   'inline-flex h-4 shrink-0 items-center rounded-full px-2 text-2xs font-bold whitespace-nowrap',
   {
     variants: {
       tone: {
-        neutral: 'bg-muted text-foreground-secondary',
-        error: 'bg-destructive-surface text-destructive-strong',
-        warning: 'bg-warning-surface text-warning-strong',
-        success: 'bg-success-surface text-success-strong',
-        frozen: 'bg-surface-disabled text-foreground-secondary',
+        neutral: 'text-foreground-secondary',
+        error: 'text-destructive-strong',
+        warning: 'text-warning-strong',
+        success: 'text-success-strong',
+        frozen: 'text-foreground-secondary',
+      },
+      /** `tone` — своя мягкая заливка; `card` — подложка того же тона, пилюля на `--card`. */
+      surface: {
+        tone: '',
+        card: 'bg-card',
       },
     },
-    defaultVariants: { tone: 'neutral' },
+    compoundVariants: [
+      { surface: 'tone', tone: 'neutral', class: 'bg-muted' },
+      { surface: 'tone', tone: 'error', class: 'bg-destructive-surface' },
+      { surface: 'tone', tone: 'warning', class: 'bg-warning-surface' },
+      { surface: 'tone', tone: 'success', class: 'bg-success-surface' },
+      { surface: 'tone', tone: 'frozen', class: 'bg-surface-disabled' },
+    ],
+    defaultVariants: { tone: 'neutral', surface: 'tone' },
   },
 )
+
+export type StepCounterTone = 'neutral' | 'error' | 'warning' | 'success' | 'frozen'
+
+/**
+ * Номер клавиши — прецедент `Tag` (такт 30): 16×16, `--tag` / `--secondary-foreground`,
+ * 10/12 bold. Общий для строки шага и пункта назначения (`AssignOption`, такт 33).
+ */
+export const stepKeyClass = 'flex size-4 shrink-0 items-center justify-center rounded-xs bg-tag text-3xs font-bold text-secondary-foreground'
 
 /** Миниатюра 36×27 — пропорция 4:3, как у кадра (`.th`). */
 export const stepThumbVariants = cva(
@@ -139,4 +169,41 @@ export function stepFill(count: number, min: number, max: number | null | undefi
   if (count === 0) return required ? 'empty-required' : 'empty'
   if (count < min) return 'under'
   return 'norm'
+}
+
+/*
+ * Тексты и тон счётчика — общие для строки шага и пункта назначения (§11.1: «с теми же
+ * лимитами и состояниями, что в панели структуры»). До такта 33 жили внутри `StepRow`.
+ */
+
+/** Тон счётчика по наполненности; замороженный — нейтральный серый (§5.2). */
+export function stepCounterTone(fill: StepFill, frozen: boolean): StepCounterTone {
+  if (frozen) return 'frozen'
+  return ({
+    'empty-required': 'error',
+    'empty': 'neutral',
+    'under': 'warning',
+    'norm': 'success',
+    'full': 'success',
+    'over': 'error',
+  } as const)[fill]
+}
+
+/** Счётчик — прототип `chipText`: «N / M», «N / от M» или «N». */
+export function stepCounterText(count: number, min: number, max: number | null | undefined): string {
+  if (max != null) return `${count} / ${max}`
+  if (min) return `${count} / от ${min}`
+  return `${count}`
+}
+
+/** «Фото» / «Видео» в требовании (`step.need.*`). */
+export const stepKindText = (kind: 'photo' | 'video') => (kind === 'video' ? 'Видео' : 'Фото')
+
+/** Требование — `step.need.*` спеки §18 плюс «можно до N» прототипа `needText`. */
+export function stepNeedText(min: number, max: number | null | undefined): string {
+  if (max === 1 && min === 1) return 'нужно ровно 1'
+  if (min && max != null) return `нужно от ${min} до ${max}`
+  if (min) return `нужно не меньше ${min}`
+  if (max != null) return `можно до ${max}`
+  return 'по факту, если есть'
 }

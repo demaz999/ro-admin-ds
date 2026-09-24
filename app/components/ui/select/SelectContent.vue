@@ -23,8 +23,11 @@ withDefaults(defineProps<{
    * Высота плашки из мастера — все шесть вариантов нарисованы 320×304, а список
    * внутри длиннее и скроллится. Отсюда и нулевой правый паддинг: скроллбар
    * стоит вплотную к краю.
+   *
+   * Число — пиксели, строка — любая длина CSS: плашке назначения (`AssignList`, такт 33)
+   * высоту задаёт окно — `62vh`, как у прототипа VA-9265 (`.pop`).
    */
-  maxHeight?: number
+  maxHeight?: number | string
 }>(), { width: 320, maxHeight: 304 })
 </script>
 
@@ -32,7 +35,7 @@ withDefaults(defineProps<{
   <div
     data-slot="popover"
     class="flex flex-col gap-1 rounded-lg bg-popover py-1 pl-1 shadow-dropdown"
-    :style="{ width: `${width}px`, maxHeight: `${maxHeight}px` }"
+    :style="{ width: `${width}px`, maxHeight: typeof maxHeight === 'number' ? `${maxHeight}px` : maxHeight }"
   >
     <!--
       shrink-0 обязателен: плашка ограничена по высоте, и без него флекс ужимает

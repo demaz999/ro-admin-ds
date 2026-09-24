@@ -6,8 +6,13 @@ import { cn } from '@/lib/utils'
 import StepThumb from './StepThumb.vue'
 import {
   STEP_THUMBS_MAX,
+  stepCounterText,
+  stepCounterTone,
   stepCounterVariants,
   stepFill,
+  stepKeyClass,
+  stepKindText,
+  stepNeedText,
   stepRowVariants,
   type StepThumbItem,
   type StepVerdict,
@@ -91,35 +96,20 @@ const tone = computed(() => {
   return 'default'
 })
 
-const counterTone = computed(() => {
-  if (frozen.value) return 'frozen'
-  return ({
-    'empty-required': 'error',
-    'empty': 'neutral',
-    'under': 'warning',
-    'norm': 'success',
-    'full': 'success',
-    'over': 'error',
-  } as const)[fill.value]
-})
+const counterTone = computed(() => stepCounterTone(fill.value, frozen.value))
+const counterText = computed(() => stepCounterText(props.count, props.min, props.max))
+const kindText = computed(() => stepKindText(props.kind))
+const needText = computed(() => stepNeedText(props.min, props.max))
 
-/** Счётчик — прототип `chipText`: «N / M», «N / от M» или «N». */
-const counterText = computed(() => {
-  if (props.max != null) return `${props.count} / ${props.max}`
-  if (props.min) return `${props.count} / от ${props.min}`
-  return `${props.count}`
-})
-
-const kindText = computed(() => (props.kind === 'video' ? 'Видео' : 'Фото'))
-
-/** Требование — `step.need.*` спеки §18 плюс «можно до N» прототипа `needText`. */
-const needText = computed(() => {
-  const { min, max } = props
-  if (max === 1 && min === 1) return 'нужно ровно 1'
-  if (min && max != null) return `нужно от ${min} до ${max}`
-  if (min) return `нужно не меньше ${min}`
-  if (max != null) return `можно до ${max}`
-  return 'по факту, если есть'
+/**
+ * Правило такта 33: пилюля на строке своего тона стоит на `--card`. Тон строки
+ * «переполнен» — `--destructive-surface`, «Повторить» — `--warning-surface`; пилюля
+ * того же тона на них сливается.
+ */
+const counterSurface = computed(() => {
+  const same = (tone.value === 'over' && counterTone.value === 'error')
+    || (tone.value === 'redo' && counterTone.value === 'warning')
+  return same ? 'card' as const : 'tone' as const
 })
 
 const missing = computed(() => (frozen.value ? 0 : Math.max(0, props.min - props.count)))
@@ -177,7 +167,7 @@ onBeforeUnmount(() => clearTimeout(timer))
         <span
           v-if="showKey"
           data-slot="step-row-key"
-          class="flex size-4 shrink-0 items-center justify-center rounded-xs bg-tag text-3xs font-bold text-secondary-foreground"
+          :class="stepKeyClass"
         >{{ props.hotkey }}</span>
         <span v-else class="size-4 shrink-0" aria-hidden="true" />
 
@@ -190,7 +180,7 @@ onBeforeUnmount(() => clearTimeout(timer))
           <span v-if="full" class="text-2xs font-medium text-success-strong"> · заполнен</span>
         </span>
 
-        <span data-slot="step-row-counter" :class="stepCounterVariants({ tone: counterTone })">
+        <span data-slot="step-row-counter" :class="stepCounterVariants({ tone: counterTone, surface: counterSurface })">
           {{ counterText }}
         </span>
       </div>

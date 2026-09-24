@@ -1343,7 +1343,7 @@ const textareaVariants = [
     -->
     <section data-theme="rososmotr" class="space-y-3 bg-background font-sans text-foreground">
       <h2 class="text-lg font-bold">
-        FrameTile · StepRow · StepThumb · Progress · ProgressStat — без эталона, такт 30
+        FrameTile · StepRow · StepThumb · Progress · ProgressStat · StageSection · RepeatCard · AssignOption — без эталона, такты 30–33
       </h2>
       <p class="max-w-3xl text-sm text-muted-foreground">
         Мастера нет — сверка идёт с прототипом VA-9265 v17, пары «прототип / кит» лежат в
@@ -1406,6 +1406,35 @@ const textareaVariants = [
           <RepeatCard name="Пропиточная линия POLYPRISE" details="инв. 10798 · ЦЕХ-6" :frames="5" :checked-steps="2" />
           <StageNote>Принято и скрыто: 2 объекта</StageNote>
         </StageSection>
+      </div>
+      <!-- Такт 33: пункт назначения — по представителю каждого вида, в плашке и в группе просмотра. -->
+      <div class="flex flex-wrap items-start gap-8">
+        <SelectContent :width="360" :max-height="480">
+          <AssignList>
+            <SelectGroup header="Текущий · Пропиточная линия POLYPRISE">
+              <AssignOption value="c1" name="Шильдик, заводская табличка" :min="1" :count="1" frozen :hotkey="1" />
+              <AssignOption value="c3" name="Общий вид оборудования" :min="3" :count="1" :hotkey="3" />
+              <AssignOption value="c8" name="Контрольное видео" kind="video" :min="1" :max="1" :count="1" :hotkey="8" />
+            </SelectGroup>
+            <SelectGroup header="Другие объекты">
+              <AssignOption value="co" type="object" name="ЦЕХ-6" />
+            </SelectGroup>
+          </AssignList>
+        </SelectContent>
+        <div class="w-85">
+          <StageSection title="Привязан к · Пропиточная линия POLYPRISE" count="2">
+            <AssignList class="p-1">
+              <AssignOption value="v1" name="Шильдик, заводская табличка" :min="1" :count="1" bound="locked" />
+              <AssignOption value="v4" name="Узлы и агрегаты" :count="1" bound="here" />
+            </AssignList>
+          </StageSection>
+          <StageSection title="Единица оборудования" repeatable count="1">
+            <AssignList class="p-1">
+              <AssignOption value="vn" type="create" name="Единица оборудования" />
+              <AssignOption value="vo" type="object" name="Линия термообработки" :frames="5" />
+            </AssignList>
+          </StageSection>
+        </div>
       </div>
     </section>
 

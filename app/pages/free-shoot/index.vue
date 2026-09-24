@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue'
+import type { AssignBound } from '@/components/ui/assign'
 import { frameTileGridVariants, type FrameTileState } from '@/components/ui/frame-tile'
 import type { StepThumbItem, StepVerdict } from '@/components/ui/step-row'
 import AsisMarks from '~/stands/free-shoot/AsisMarks.vue'
@@ -40,8 +41,8 @@ import proto from '~/stands/free-shoot/prototype-data.json'
  * | `?state=tooltip` | подсказка названия шага на плашке кадра (§15.4) |
  * | `?state=drop` | цель приёма перетаскивания и перетаскиваемые кадры (§9.5) |
  * | `?selected=demo` | выделение пяти кадров и панель выделения (§10.2) |
- * | `?open=assign` | панель выделения и поповер «Назначить на шаг», текущий объект (§10.3) |
- * | `?open=viewer-free` / `viewer-assigned` / `viewer-locked` / `viewer-suggest` | полноэкранный просмотр, четыре состояния нижней плашки (§11.2) |
+ * | `?open=assign` | панель выделения и поповер «Назначить на шаг», текущий объект (§10.3); с такта 33 поповер и пункты — кит (`Popover`, `SelectContent`, `SelectGroup`, `AssignOption`) |
+ * | `?open=viewer-free` / `viewer-assigned` / `viewer-locked` / `viewer-suggest` | полноэкранный просмотр, четыре состояния нижней плашки (§11.2); с такта 33 список шагов справа — кит (`StageSection`, `AssignOption`) |
  * | `?open=wand` | окно запуска автораспределения (§12.1–12.4) |
  * | `?open=progress` | окно прогресса автораспределения (§12.5) |
  * | `?open=summary` | сводка результата автораспределения (§12.12) |
@@ -277,9 +278,95 @@ const viewer = openWin.startsWith('viewer-')
 const modalWin = ({ wand: H.wand, summary: H.summary, finish: H.finish } as Record<string, any>)[openWin] ?? null
 const progressValue = parseFloat(H.progress.width)
 
+/* ---------------------- пункт назначения, такт 33 (§10.3, §11.1–11.2) ---------------------- */
+/** Кадров в шаге без отклонённых — прототип `cnt`. */
+const cnt = (owner: string, stepId: string) => framesIn(owner, stepId).filter((f: any) => !f.rej).length
+function stepOption(owner: string, st: any, hotkey: number | null, bound: AssignBound = null) {
+  return {
+    type: 'step' as const,
+    value: `${owner}|${st.id}`,
+    name: st.n,
+    kind: st.kind === 'Видео' ? 'video' as const : 'photo' as const,
+    min: st.min,
+    max: st.max,
+    count: cnt(owner, st.id),
+    frozen: isFrozen(owner, st.id),
+    hotkey,
+    bound,
+  }
+}
+const objectOption = (o: any, frames: number | null) => ({ type: 'object' as const, value: `obj|${o.id}`, name: objName(o), frames })
+
+/** Поповер «Назначить на шаг» — группы прототипа `#btnToStep`: текущий → неповторяемые этапы → другие объекты. */
+const assignGroups = computed(() => {
+  const groups: { key: string, header: string, items: any[] }[] = []
+  if (cur.value) {
+    const o = O(cur.value)
+    groups.push({ key: 'cur', header: `Текущий · ${objName(o)}`, items: stageById[o.stageId].steps.map((x: any, k: number) => stepOption(o.id, x, k + 1)) })
+  }
+  STAGES.filter(s => !s.rep).forEach(s => groups.push({ key: s.id, header: s.title, items: s.steps.map((x: any) => stepOption(s.id, x, null)) }))
+  const others = D.objects.filter((o: any) => o.id !== cur.value)
+  if (others.length) groups.push({ key: 'others', header: 'Другие объекты', items: others.map((o: any) => objectOption(o, null)) })
+  return groups
+})
+
+/**
+ * Список шагов просмотра — группы прототипа `renderLB`. Привязка кадра берётся из разметки,
+ * которую прототип отрисовал для этого состояния: в «viewer-assigned» кадр привязан при
+ * съёмке окна, в наборе данных он свободен.
+ */
+const viewerFrame = computed(() => {
+  if (!viewer) return null
+  const f = D.frames.find((x: any) => x.i === viewer.i)
+  const m = String(viewer.list).match(/class="it bound" data-owner="([^"]+)" data-step="([^"]+)"/)
+  return m ? { ...f, objId: m[1], stepId: m[2] } : f
+})
+const viewerGroups = computed(() => {
+  const f = viewerFrame.value
+  if (!f) return []
+  const locked = f.lock || f.rej
+  const bound = (owner: string, sid: string): AssignBound => (f.objId === owner && f.stepId === sid ? (locked ? 'locked' : 'here') : null)
+  const groups: { id: string, title: string, repeatable?: boolean, items: any[] }[] = []
+  if (cur.value) {
+    const o = O(cur.value)
+    const s = stageById[o.stageId]
+    groups.push({ id: s.id, title: `Текущий · ${objName(o)}`, items: s.steps.map((x: any, k: number) => stepOption(o.id, x, k + 1, bound(o.id, x.id))) })
+  }
+  /* Номера клавиш — только у текущего объекта (§16.3). Прототип выводит их и в группе
+     «Привязан к», но клавиши 1–9 привязывают только к текущему объекту. */
+  if (f.objId && O(f.objId) && f.objId !== cur.value) {
+    const o = O(f.objId)
+    groups.push({ id: `bnd_${o.id}`, title: `Привязан к · ${objName(o)}`, items: stageById[o.stageId].steps.map((x: any) => stepOption(o.id, x, null, bound(o.id, x.id))) })
+  }
+  STAGES.filter(s => !s.rep).forEach(s => groups.push({ id: s.id, title: s.title, items: s.steps.map((x: any) => stepOption(s.id, x, null, bound(s.id, x.id))) }))
+  STAGES.filter(s => s.rep).forEach((s) => {
+    const list = D.objects.filter((o: any) => o.stageId === s.id && o.id !== cur.value)
+    groups.push({
+      id: `rep_${s.id}`,
+      title: s.title,
+      repeatable: true,
+      items: [{ type: 'create' as const, value: `new|${s.id}`, name: s.title }, ...list.map((o: any) => objectOption(o, D.frames.filter((x: any) => x.objId === o.id).length))],
+    })
+  })
+  return groups
+})
+/** Счёт в заголовке группы — число пунктов без «Создать» (прототип `grp`). */
+const groupCount = (g: { items: any[] }) => String(g.items.filter(i => i.type !== 'create').length)
+
+const assignOpen = ref(false)
+const assignAnchor = ref<HTMLElement | null>(null)
+/** Клик по самой кнопке переключает плашку сам — закрытие «кликом мимо» ему не мешает. */
+function onAssignOutside(e: Event) {
+  if (assignAnchor.value?.contains(e.target as Node)) e.preventDefault()
+}
+/** Кнопка «Назначить на шаг» — разметка прототипа, не `PopoverTrigger`: фокус возвращается на неё вручную. */
+function onAssignCloseFocus(e: Event) {
+  e.preventDefault()
+  assignAnchor.value?.focus()
+}
+
 const feedEl = ref<HTMLElement | null>(null)
 const selbarLeft = ref('50%')
-const popStyle = ref<Record<string, string>>({ visibility: 'hidden' })
 onMounted(async () => {
   /* Вспышка длится 1.5 с — оснастка повторяет её по кругу, чтобы снимок её застал. */
   if (state === 'flash') {
@@ -294,18 +381,15 @@ onMounted(async () => {
     const r = feedEl.value.getBoundingClientRect()
     selbarLeft.value = `${r.left + r.width / 2}px`
   }
-  if (openWin === 'assign') {
-    await nextTick()
-    setTimeout(() => {
-      const b = document.getElementById('btnToStep')?.getBoundingClientRect()
-      const p = document.getElementById('pop')
-      if (!b || !p) return
-      const top = b.top - p.offsetHeight - 8
-      popStyle.value = {
-        left: `${Math.max(12, Math.min(b.left - 40, innerWidth - 372))}px`,
-        top: `${top > 10 ? top : b.bottom + 8}px`,
-      }
-    }, 260)
+  /* Поповер назначения привязан к кнопке панели выделения — она разметка прототипа (№ 27, как есть). */
+  const btn = document.getElementById('btnToStep')
+  if (btn) {
+    assignAnchor.value = btn
+    btn.addEventListener('click', () => { assignOpen.value = !assignOpen.value })
+    if (openWin === 'assign') {
+      await nextTick()
+      assignOpen.value = true
+    }
   }
 })
 
@@ -562,10 +646,33 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
         v-html="H.selbar"
       />
 
-      <!-- ============================ поповер «Назначить на шаг», §10.3 ============================ -->
-      <div v-if="openWin === 'assign'" id="pop" class="pop show" :style="popStyle" data-asis="поповер «Назначить на шаг»">
-        <div class="list" v-html="H.assign" />
-      </div>
+      <!-- ============================ поповер «Назначить на шаг», §10.3 — кит, такт 33 ============================ -->
+      <!--
+        Положение — как у прототипа (`#btnToStep`): над кнопкой на 8, левый край на 40 левее
+        кнопки, от краёв окна не ближе 12. Ширина 360 и высота до 62vh — `.pop` прототипа.
+      -->
+      <Popover v-if="assignAnchor" v-model:open="assignOpen">
+        <PopoverAnchor :reference="assignAnchor" />
+        <PopoverContent
+          as-child
+          side="top"
+          align="start"
+          :align-offset="-40"
+          :side-offset="8"
+          :collision-padding="12"
+          :width="360"
+          @interact-outside="onAssignOutside"
+          @close-auto-focus="onAssignCloseFocus"
+        >
+          <SelectContent :width="360" max-height="62vh">
+            <AssignList>
+              <SelectGroup v-for="g in assignGroups" :key="g.key" :header="g.header">
+                <AssignOption v-for="it in g.items" :key="it.value" v-bind="it" @select="assignOpen = false" />
+              </SelectGroup>
+            </AssignList>
+          </SelectContent>
+        </PopoverContent>
+      </Popover>
 
       <!-- ============================ полноэкранный просмотр, §11 ============================ -->
       <div v-if="viewer" class="lb show" data-asis="полноэкранный просмотр">
@@ -585,7 +692,24 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
         </div>
         <div class="lb-side">
           <div class="lb-meta" v-html="viewer.meta" />
-          <div class="lb-list" v-html="viewer.list" />
+          <!-- список шагов, §11.1–11.2 — кит, такт 33: группа — StageSection, пункт — AssignOption -->
+          <div class="lb-list">
+            <span class="kit-island">
+              <StageSection
+                v-for="g in viewerGroups"
+                :key="g.id"
+                :title="g.title"
+                :repeatable="g.repeatable"
+                :count="groupCount(g)"
+                :open="!closedStages.has(g.id)"
+                @toggle="toggleStage(g.id)"
+              >
+                <AssignList class="p-1">
+                  <AssignOption v-for="it in g.items" :key="it.value" v-bind="it" />
+                </AssignList>
+              </StageSection>
+            </span>
+          </div>
           <div style="display:contents" v-html="viewer.note" />
         </div>
       </div>
