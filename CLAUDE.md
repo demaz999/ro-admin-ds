@@ -360,7 +360,7 @@ Headless-браузер снимает страницу **от начала до
 умеет. Поэтому состояния для снимков задаются параметрами адреса, и они помечены в коде как
 оснастка приёмки: `?open=`, `?only=`, `?view=`, `?filters=`,
 `?selected=`, `?rows=`, `?scroll=`, `?q=`, `?actions=demo`, `?values=demo`, `?state=` (экран
-`/free-shoot`: `link`, `flash`, `tooltip`, `drop`), `?open=` (с такта 34 и `viewer-flash`, с такта 35 — `hotkeys`, с такта 36 — `form`, `form-group`, `form-errors`), `?asis=off` и `?view=review`, `?tab=form`, `?asis=mark` там же, с такта 39 — `?expand=eq`, `?data=empty` — список в `docs/naming.md`. В продукт они не идут.
+`/free-shoot`: `link`, `flash`, `tooltip`, `drop`), `?open=` (с такта 34 и `viewer-flash`, с такта 35 — `hotkeys`, с такта 36 — `form`, `form-group`, `form-errors`), `?asis=off` и `?view=review`, `?tab=form`, `?asis=mark` там же, с такта 39 — `?expand=eq`, `?data=empty`, с такта 43 — `?open=new`, `newobj`, `delete`, `fragment` — список в `docs/naming.md`. В продукт они не идут.
 
 Наведение адресом не задать — у компонента для этого проп-оснастка `demoHover` (`FrameTile`,
 `StepRow`, `StepThumb`, такт 30; `AssignOption`, такт 33) и `tooltipOpen` у `FrameTile`: они повторяют вид наведения и
@@ -614,6 +614,10 @@ resolve component» и «Hydration completed but contains mismatches» — вы�
 **Синтетический Enter по CDP без `text` не нажимает нативную кнопку.** `Input.dispatchKeyEvent` с одним
 `key: 'Enter'` доходит до `keydown`, но кнопку не активирует — нужен `text: '\r'`. Иначе проверка
 клавиатуры ложно показывает «не работает».
+
+**Синтетический Delete по CDP без `windowsVirtualKeyCode` не стирает текст.** Нужен код 46, иначе выделенное в поле остаётся.
+Очистка поля в прогоне сценариев совпадала вхолостую у обеих сторон: «очистить поиск» С-04 с такта 42, «пустое» наименование
+формы С-18 сохранялось вместо отказа (такт 43). Проверяется значением поля после шага: совпавшие слепки этого не видят.
 
 **Безрендерный корень съедает обработчики страницы.** Провайдер вида `TooltipProvider` ничего не
 рисует сам — только слот. Если он стоит корнем шаблона компонента, всё, что страница вешает на
