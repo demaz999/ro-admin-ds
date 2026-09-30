@@ -4,6 +4,7 @@ import type { AssignBound } from '@/components/ui/assign'
 import { frameTileGridVariants, type FrameTileState } from '@/components/ui/frame-tile'
 import type { StepThumbItem, StepVerdict } from '@/components/ui/step-row'
 import AsisMarks from '~/stands/free-shoot/AsisMarks.vue'
+import { createModel, plural, type FormDef, type ScreenWindow } from '~/stands/free-shoot/model'
 import proto from '~/stands/free-shoot/prototype-data.json'
 
 /**
@@ -74,55 +75,64 @@ const asisOutline = q('asis') !== 'off'
 const P = proto as any
 const D = view === 'review' ? P.B : P.A
 const H = P.html
-const STAGES: any[] = P.stages
-const stageById: Record<string, any> = Object.fromEntries(STAGES.map(s => [s.id, s]))
 
 /** Демо-кадр по индексу кадра прототипа: 24 снимка по кругу. */
 const img = (i: number) => `/free-shoot/demo-${String(((i - 1) % 24) + 1).padStart(2, '0')}.jpg`
 
-const plural = (n: number, a: string, b: string, c: string) => {
-  const m = n % 100
-  const k = n % 10
-  return `${n} ${m >= 11 && m <= 14 ? c : k === 1 ? a : k >= 2 && k <= 4 ? b : c}`
-}
-
-const O = (id: string | null) => D.objects.find((o: any) => o.id === id) ?? null
-const ownerStage = (owner: string) => (O(owner) ? stageById[O(owner).stageId] : stageById[owner])
-const objName = (o: any) => (o.stageId === 'eq' ? (o.form.mark || 'Объект без названия') : (o.form.no || 'Здание без названия'))
-const objSub = (o: any) => (o.stageId === 'eq'
-  ? [o.form.sn ? `зав. № ${o.form.sn}` : '', o.form.inv ? `инв. ${o.form.inv}` : '', o.form.bld, o.form.use].filter(Boolean).join(' · ')
-  : [o.form.purpose, o.form.cond, o.form.heat].filter(Boolean).join(' · '))
-const verdictOf = (o: string, s: string) => D.review[`${o}|${s}`] ?? null
-const isFrozen = (o: string, s: string) => verdictOf(o, s)?.v === 'ok'
-const framesIn = (o: string, s: string) => D.frames.filter((f: any) => f.objId === o && f.stepId === s)
-const isMedia = (f: any) => f.type !== 'voice'
-const frameWhy = (f: any) => (f.rej ? 'Кадр отклонён проверяющим' : f.origin === 'step' ? 'Кадр снят прямо в шаге при обычном осмотре' : 'Кадр в проверенном шаге')
-
+/* ------------------------------ модель состояния, такт 38 ------------------------------ */
+/**
+ * Состояние экрана — модель прототипа `~/stands/free-shoot/model.ts` (порция П1, `free-shoot.md`, 16.2).
+ * Страница переводит модель в пропы компонентов, события компонентов — в операции модели.
+ * Оснастка адреса выставляет начальное состояние модели.
+ */
 const eqId: string = D.objects.find((o: any) => o.stageId === 'eq')?.id
-const cur = ref<string | null>(openWin === 'assign' ? P.selectCur : D.cur)
-/** Раскрытые повторы. У прототипа после загрузки свёрнуты все — здесь раскрыт один, чтобы строки шагов были видны. */
+/** Раскрытые повторы. У прототипа после загрузки свёрнуты все — здесь раскрыт один, чтобы строки шагов были видны (такт 31). */
 const firstAuto = D.objects.find((o: any) => o.auto && o.stageId === 'eq')?.id
-const openObjs = ref(new Set<string>([view === 'review' ? firstAuto : eqId].filter(Boolean)))
+
+const viewerKey = openWin === 'viewer-flash' ? 'assigned' : openWin.startsWith('viewer-') ? openWin.slice(7) : ''
+const viewer = viewerKey
+  ? ({ free: H.viewerFree, assigned: H.viewerAssigned, locked: H.viewerLocked, suggest: H.viewerSuggest } as Record<string, any>)[viewerKey] ?? null
+  : null
+/** Кадры просмотра — прототип `visibleMedia` в режиме «оставлять»: медиа свободной съёмки. */
+const LB_FRAMES = D.frames.filter((f: any) => f.type !== 'voice' && f.origin !== 'step')
+const WINDOWS = ['hotkeys', 'progress', 'wand', 'summary', 'finish'] as const
+
+const m = createModel({
+  data: D,
+  stages: P.stages,
+  general: P.general,
+  initial: {
+    cur: openWin === 'assign' ? P.selectCur : D.cur,
+    open: [view === 'review' ? firstAuto : eqId].filter(Boolean),
+    sel: state === 'drop' || openWin === 'assign' || q('selected') === 'demo' ? P.selected : [],
+    rtab: q('tab') === 'form' ? 'form' : 'scheme',
+    review: view === 'review',
+    win: (WINDOWS as readonly string[]).includes(openWin) ? openWin as ScreenWindow : null,
+    lb: viewer ? Math.max(0, LB_FRAMES.findIndex((f: any) => f.i === viewer.i)) : -1,
+  },
+})
+const { STAGES, stageById, O, ownerStage, objName, objSub, isFrozen, framesIn, frameWhy, cnt } = m
+const { feed, stats: S, sessMeta, curHint, eqCount } = m
+const verdictOf = m.verdict
+
+/* Обёртки состояния под именами шаблона: чтение — из модели, запись — операцией модели. */
+const cur = computed(() => m.state.cur)
+const openObjs = computed(() => m.state.open)
+const closedStages = computed(() => m.state.closed)
+const formOpen = computed(() => m.state.formOpen)
+const selected = computed(() => m.state.sel)
+const mode = computed({ get: () => m.state.mode, set: v => m.setMode(v) })
+const size = computed({ get: () => m.state.size, set: v => m.setSize(v) })
+const tab = computed({ get: () => m.state.rtab, set: v => m.setTab(v) })
+/** Поиск §8.6 фильтрует ленту с порции П5 (С-04, `free-shoot.md`, 16.5); до неё поле ничего не меняет. */
+const search = ref('')
+const { toggleSelect: toggle, clickRepeat, toggleStage, toggleForm } = m
 
 /* ------------------------------- оснастка ------------------------------- */
 const LINK = { owner: eqId, step: 'e3' }
-const selected = ref(new Set<number>(
-  state === 'drop' || openWin === 'assign' || q('selected') === 'demo' ? P.selected : [],
-))
 const showSelbar = openWin === 'assign' || q('selected') === 'demo'
 const flashNonce = ref<number | null>(null)
 
-/* --------------------------------- лента --------------------------------- */
-const size = ref<'md' | 'lg'>('md')
-const mode = ref<'keep' | 'hide'>('keep')
-const search = ref('')
-const tab = ref(q('tab') === 'form' ? 'form' : 'scheme')
-
-const feed = computed(() => D.frames.filter((f: any) => {
-  if (isMedia(f) && f.origin === 'step') return false
-  if (mode.value === 'hide' && isMedia(f) && f.objId) return false
-  return true
-}))
 const linkedSet = computed(() => new Set(state === 'link' ? framesIn(LINK.owner, LINK.step).map((f: any) => f.i) : []))
 
 function tileState(f: any): FrameTileState {
@@ -134,7 +144,7 @@ function tileState(f: any): FrameTileState {
 }
 function tileProps(f: any) {
   const st = f.objId ? ownerStage(f.objId).steps.find((s: any) => s.id === f.stepId) : null
-  const owner = f.objId ? (O(f.objId) ? objName(O(f.objId)) : ownerStage(f.objId).title) : ''
+  const owner = f.objId ? (O(f.objId) ? objName(O(f.objId)!) : ownerStage(f.objId).title) : ''
   const s = tileState(f)
   return {
     src: img(f.i),
@@ -154,18 +164,12 @@ function tileProps(f: any) {
     tooltipOpen: state === 'tooltip' && f.i === 1 ? true : undefined,
   }
 }
-function toggle(i: number) {
-  const next = new Set(selected.value)
-  if (next.has(i)) next.delete(i)
-  else next.add(i)
-  selected.value = next
-}
 
 /* ------------------------------ заметки (как есть) ------------------------------ */
 const noteWave = (f: any) => Array.from({ length: 80 }, (_, i) => Math.round((3 + Math.abs(Math.sin((i + (f.i - 9000) * 3) * 0.8)) * 11) * 10) / 10)
 
 /* ------------------------------ панель структуры ------------------------------ */
-const nfrz = Object.values(D.review).filter((v: any) => v.v === 'ok').length
+const nfrz = computed(() => m.frzSteps())
 const totalSteps = STAGES.reduce((a, s) => a + s.steps.length, 0)
 
 function thumbState(f: any): StepThumbItem['state'] {
@@ -203,18 +207,18 @@ function stepProps(owner: string, st: any, index: number) {
 function objState(o: any) {
   const st = stageById[o.stageId]
   const bad = st.steps.filter((x: any) => {
-    const n = framesIn(o.id, x.id).filter((f: any) => !f.rej).length
+    const n = cnt(o.id, x.id)
     return (x.max && n > x.max) || (n === 0 && x.req)
   }).length
   const frz = st.steps.filter((x: any) => isFrozen(o.id, x.id)).length
-  return { total: D.frames.filter((f: any) => f.objId === o.id).length, bad, frz, steps: st.steps.length }
+  return { total: m.frames.filter((f: any) => f.objId === o.id).length, bad, frz, steps: st.steps.length }
 }
 
 /** Компактная форма повтора — прототип `formPreview`, как есть. */
 function formPreview(o: any) {
   const st = stageById[o.stageId]
   const vis = (f: any) => !(f.dep && o.form[f.dep.k] !== f.dep.v)
-  const fields = st.form.filter(vis)
+  const fields = (st.form ?? []).filter(vis)
   const key = fields.filter((f: any) => o.form[f.k] || f.req).slice(0, 6)
   const src = o.auto && o.autoSrc ? o.autoSrc : {}
   return { fields, key, src, locked: objState(o).frz > 0 }
@@ -232,60 +236,33 @@ function formFields(o: any) {
   }))
 }
 
-/* Состояние интерфейса панели, без бизнес-логики: этап свёрнут, повтор текущий, форма развёрнута. */
-const closedStages = ref(new Set<string>())
-const formOpen = ref(new Set<string>())
-function toggleStage(id: string) {
-  const next = new Set(closedStages.value)
-  if (next.has(id)) next.delete(id)
-  else next.add(id)
-  closedStages.value = next
-}
-function toggleForm(id: string) {
-  const next = new Set(formOpen.value)
-  if (next.has(id)) next.delete(id)
-  else next.add(id)
-  formOpen.value = next
-}
-/** §9.3: клик делает повтор текущим и раскрывает; повторный клик по текущему — сворачивает. */
-function clickRepeat(id: string) {
-  const next = new Set(openObjs.value)
-  if (cur.value === id) {
-    if (next.has(id)) next.delete(id)
-    else next.add(id)
-  }
-  else {
-    cur.value = id
-    next.add(id)
-  }
-  openObjs.value = next
-}
-
+/** Повторы этапа — прототип `renderRight`: в режиме приёмки с фильтром «только непроверенные» — только предложенные. */
 function repList(st: any) {
-  let list = D.objects.filter((o: any) => o.stageId === st.id)
-  let hidden = 0
-  if (view === 'review') {
-    hidden = list.filter((o: any) => !o.auto).length
-    list = list.filter((o: any) => o.auto)
-  }
+  let list = m.objects.filter((o: any) => o.stageId === st.id)
+  const revFilter = m.state.review && m.state.reviewOnly && m.objects.some((o: any) => o.auto)
+  const hidden = revFilter ? list.filter((o: any) => !o.auto).length : 0
+  if (revFilter) list = list.filter((o: any) => o.auto)
   return { list, hidden }
 }
 
 /* ------------------------------ подшапка ------------------------------ */
-const S = D.stats
 const reviewTitle = computed(() => (D.reviewHtml.match(/<span class="t">([\s\S]*?)<\/span>\s*<span class="sp">/)?.[1] ?? ''))
 
 /* --------------------------- форма осмотра (кит) --------------------------- */
-const general = ref<Record<string, string>>({ ...P.general })
-const generalVisible = (f: any) => !f.dep || general.value[f.dep.k] === f.dep.v
-const eqCount = D.objects.filter((o: any) => o.stageId === 'eq').length
+const generalVisible = (f: any) => !f.dep || m.general[f.dep.k] === f.dep.v
+/** Сверка «Оформлено единиц» с полем «Общее количество объектов по документам» — прототип `renderRight`. */
+const generalCheck = computed(() => {
+  const n = m.general.number
+  if (!n) return null
+  return Number(n) === eqCount.value ? { ok: true, text: '— сходится' } : { ok: false, text: `— расхождение ${Math.abs(Number(n) - eqCount.value)}` }
+})
 
 /* -------------------------------- окна -------------------------------- */
-const viewerKey = openWin === 'viewer-flash' ? 'assigned' : openWin.startsWith('viewer-') ? openWin.slice(7) : ''
-const viewer = viewerKey
-  ? ({ free: H.viewerFree, assigned: H.viewerAssigned, locked: H.viewerLocked, suggest: H.viewerSuggest } as Record<string, any>)[viewerKey] ?? null
-  : null
-const modalWin = ({ wand: H.wand, summary: H.summary, finish: H.finish } as Record<string, any>)[openWin] ?? null
+const windowModel = (win: Exclude<ScreenWindow, null>) => computed({
+  get: () => m.state.win === win,
+  set: (v: boolean) => (v ? m.openWindow(win) : m.closeWindow()),
+})
+const modalWin = computed(() => ({ wand: H.wand, summary: H.summary, finish: H.finish } as Record<string, any>)[m.state.win ?? ''] ?? null)
 const progressValue = parseFloat(H.progress.width)
 
 /* ------------------------- окна на ките, такт 35 (§12.5, §16) ------------------------- */
@@ -298,7 +275,7 @@ const PROGRESS = {
     value: r.match(/<b[^>]*>([^<]+)<\/b>/)?.[1] ?? '',
   })),
 }
-const progressOpen = ref(openWin === 'progress')
+const progressOpen = windowModel('progress')
 
 /** Окно «Горячие клавиши» — состав прототипа `#btnHelp`, клавиши — в квадратных скобках. */
 const HOTKEYS = [
@@ -315,29 +292,25 @@ const HOTKEYS = [
   { keys: '[Esc]', action: 'снять выделение' },
 ]
 const HOTKEYS_NOTE = 'Порядок работы: сначала оформите здание, потом единицы оборудования внутри него — поле «Здание / цех» подставится автоматически. Перетаскивание работает так же, как клавиши.'
-const hotkeysOpen = ref(openWin === 'hotkeys')
+const hotkeysOpen = windowModel('hotkeys')
 
 /* ------------------------- окно формы повтора, такт 36 (§14.3–14.6) ------------------------- */
 /**
  * Окно открывают оба «Изменить» `RepeatForm` (событие `edit(group?)`): без группы — форма целиком,
  * с группой — сразу на ней (§14.3); «Все поля (N)» разворачивает карточку. Прототип `openObjForm`.
- * Черновик — копия формы повтора; сохранения нет (бизнес-логики нет): с заполненными обязательными
- * окно просто закрывается.
+ * Какое окно открыто — модель; черновик полей — окно, как у прототипа (поля `#mBody`). Сохранения
+ * в модель нет до порции П6 (С-18): с заполненными обязательными окно закрывается.
  */
-interface FormDef { k: string, l: string, req?: boolean, opts?: string[], dep?: { k: string, v: string }, grp?: string }
 const EMPTY = '—'
-const editWin = ref<{ obj: string, group: string } | null>(null)
+const editWin = computed(() => m.state.formWin)
 const editDraft = ref<Record<string, string>>({})
 const editErrors = ref(new Set<string>())
-const editOpen = computed({
-  get: () => !!editWin.value,
-  set: (v: boolean) => { if (!v) editWin.value = null },
-})
-const editStage = computed(() => (editWin.value ? stageById[O(editWin.value.obj).stageId] : null))
+const editOpen = windowModel('form')
+const editStage = computed(() => (editWin.value ? stageById[O(editWin.value.obj)!.stageId] : null))
 /** Группы — как у прототипа: `grp` стоит у первого поля группы, следующие поля идут в неё же. */
 const editGroups = computed(() => {
   const out: { title: string, fields: FormDef[] }[] = []
-  for (const f of (editStage.value?.form ?? []) as FormDef[]) {
+  for (const f of editStage.value?.form ?? []) {
     const last = out[out.length - 1]
     if (!last || (f.grp && f.grp !== last.title)) out.push({ title: f.grp ?? '', fields: [f] })
     else last.fields.push(f)
@@ -351,32 +324,27 @@ const formVisible = (f: FormDef) => !f.dep || editDraft.value[f.dep.k] === f.dep
 const formInvalid = (f: FormDef) => editErrors.value.has(f.k) && !filled(f.k)
 const formItems = (opts: string[]) => [EMPTY, ...opts].map(x => ({ value: x, label: x }))
 function openForm(objId: string, group?: string) {
-  const o = O(objId)
-  editDraft.value = Object.fromEntries((stageById[o.stageId].form as FormDef[]).map(f => [f.k, o.form[f.k] || (f.opts ? EMPTY : '')]))
+  const o = O(objId)!
+  editDraft.value = Object.fromEntries((stageById[o.stageId].form ?? []).map(f => [f.k, o.form[f.k] || (f.opts ? EMPTY : '')]))
   editErrors.value = new Set()
-  editWin.value = { obj: objId, group: group ?? '' }
+  m.openForm(objId, group ?? '')
 }
 
-/** Уведомления экрана — отказы и подтверждения §18. Оснастка `?open=form-errors` держит отказ без таймера. */
-const toasts = ref<{ id: number, text: string }[]>([])
+/** Уведомления экрана — очередь модели, отказы и подтверждения §18. Оснастка `?open=form-errors` держит отказ без таймера. */
+const toasts = m.notices
 const toastDuration = openWin === 'form-errors' ? Number.POSITIVE_INFINITY : 5000
-function notify(text: string) {
-  toasts.value = [...toasts.value, { id: Date.now() + Math.random(), text }]
-}
 /** §14.6: обязательные проверяются при сохранении — `form.required` «Заполните: <список полей>», окно открыто. */
 function saveForm() {
-  const need = ((editStage.value?.form ?? []) as FormDef[]).filter(f => f.req && !filled(f.k))
+  const need = (editStage.value?.form ?? []).filter(f => f.req && !filled(f.k))
   if (need.length) {
     editErrors.value = new Set(need.map(f => f.k))
-    notify(`Заполните: ${need.map(f => f.l).join(', ')}`)
+    m.notify(`Заполните: ${need.map(f => f.l).join(', ')}`, 'err')
     return
   }
-  editWin.value = null
+  m.closeWindow()
 }
 
 /* ---------------------- пункт назначения, такт 33 (§10.3, §11.1–11.2) ---------------------- */
-/** Кадров в шаге без отклонённых — прототип `cnt`. */
-const cnt = (owner: string, stepId: string) => framesIn(owner, stepId).filter((f: any) => !f.rej).length
 function stepOption(owner: string, st: any, hotkey: number | null, bound: AssignBound = null) {
   return {
     type: 'step' as const,
@@ -397,20 +365,22 @@ const objectOption = (o: any, frames: number | null) => ({ type: 'object' as con
 const assignGroups = computed(() => {
   const groups: { key: string, header: string, items: any[] }[] = []
   if (cur.value) {
-    const o = O(cur.value)
+    const o = O(cur.value)!
     groups.push({ key: 'cur', header: `Текущий · ${objName(o)}`, items: stageById[o.stageId].steps.map((x: any, k: number) => stepOption(o.id, x, k + 1)) })
   }
   STAGES.filter(s => !s.rep).forEach(s => groups.push({ key: s.id, header: s.title, items: s.steps.map((x: any) => stepOption(s.id, x, null)) }))
-  const others = D.objects.filter((o: any) => o.id !== cur.value)
+  const others = m.objects.filter((o: any) => o.id !== cur.value)
   if (others.length) groups.push({ key: 'others', header: 'Другие объекты', items: others.map((o: any) => objectOption(o, null)) })
   return groups
 })
 
 /* ------------------ полноэкранный просмотр, такт 34 (§11.1–11.3) ------------------ */
-/** Кадры просмотра — прототип `visibleMedia` в режиме «оставлять»: медиа свободной съёмки. */
-const lbFrames = D.frames.filter((f: any) => isMedia(f) && f.origin !== 'step')
-const viewerOpen = ref(!!viewer)
-const viewerIdx = ref(Math.max(0, viewer ? lbFrames.findIndex((f: any) => f.i === viewer.i) : 0))
+const lbFrames = LB_FRAMES
+const viewerOpen = computed({
+  get: () => m.state.lb >= 0,
+  set: (v: boolean) => { if (!v) m.setViewer(-1) },
+})
+const viewerIdx = computed(() => Math.max(0, m.state.lb))
 /**
  * Привязка кадра окна «viewer-assigned» берётся из разметки, которую прототип отрисовал для
  * этого состояния: окно снималось после привязки, в наборе данных кадр свободен.
@@ -422,13 +392,12 @@ const viewerFrame = computed(() => {
   return bindOverride && f?.i === bindOverride.i ? { ...f, objId: bindOverride.objId, stepId: bindOverride.stepId } : f
 })
 function openViewer(i: number) {
-  viewerIdx.value = Math.max(0, lbFrames.findIndex((f: any) => f.i === i))
   suggestion.value = null
-  viewerOpen.value = true
+  m.setViewer(Math.max(0, lbFrames.findIndex((f: any) => f.i === i)))
 }
 function stepViewer(index: number) {
-  viewerIdx.value = index - 1
   suggestion.value = null
+  m.setViewer(index - 1)
 }
 
 /** Нижняя плашка — из данных кадра, как прототип `renderLB`. */
@@ -438,9 +407,9 @@ const bindProps = computed(() => {
   return {
     state: (st ? (f.lock || f.rej ? 'locked' : 'assigned') : 'free') as 'free' | 'assigned' | 'locked',
     stepName: st?.n ?? '',
-    ownerName: f?.objId ? (O(f.objId) ? objName(O(f.objId)) : ownerStage(f.objId).title) : '',
+    ownerName: f?.objId ? (O(f.objId) ? objName(O(f.objId)!) : ownerStage(f.objId).title) : '',
     /* «или нажмите 1–N» — только при текущем объекте: решение владельца 3, такт 34 (§16.2). */
-    keys: cur.value ? stageById[O(cur.value).stageId].steps.length : null,
+    keys: cur.value ? stageById[O(cur.value)!.stageId].steps.length : null,
     rejected: !!f?.rej,
     reason: f ? frameWhy(f) : '',
   }
@@ -480,24 +449,24 @@ const viewerGroups = computed(() => {
   const bound = (owner: string, sid: string): AssignBound => (f.objId === owner && f.stepId === sid ? (locked ? 'locked' : 'here') : null)
   const groups: { id: string, title: string, repeatable?: boolean, items: any[] }[] = []
   if (cur.value) {
-    const o = O(cur.value)
+    const o = O(cur.value)!
     const s = stageById[o.stageId]
     groups.push({ id: s.id, title: `Текущий · ${objName(o)}`, items: s.steps.map((x: any, k: number) => stepOption(o.id, x, k + 1, bound(o.id, x.id))) })
   }
   /* Номера клавиш — только у текущего объекта (§16.3). Прототип выводит их и в группе
      «Привязан к», но клавиши 1–9 привязывают только к текущему объекту. */
   if (f.objId && O(f.objId) && f.objId !== cur.value) {
-    const o = O(f.objId)
+    const o = O(f.objId)!
     groups.push({ id: `bnd_${o.id}`, title: `Привязан к · ${objName(o)}`, items: stageById[o.stageId].steps.map((x: any) => stepOption(o.id, x, null, bound(o.id, x.id))) })
   }
   STAGES.filter(s => !s.rep).forEach(s => groups.push({ id: s.id, title: s.title, items: s.steps.map((x: any) => stepOption(s.id, x, null, bound(s.id, x.id))) }))
   STAGES.filter(s => s.rep).forEach((s) => {
-    const list = D.objects.filter((o: any) => o.stageId === s.id && o.id !== cur.value)
+    const list = m.objects.filter((o: any) => o.stageId === s.id && o.id !== cur.value)
     groups.push({
       id: `rep_${s.id}`,
       title: s.title,
       repeatable: true,
-      items: [{ type: 'create' as const, value: `new|${s.id}`, name: s.title }, ...list.map((o: any) => objectOption(o, D.frames.filter((x: any) => x.objId === o.id).length))],
+      items: [{ type: 'create' as const, value: `new|${s.id}`, name: s.title }, ...list.map((o: any) => objectOption(o, m.frames.filter((x: any) => x.objId === o.id).length))],
     })
   })
   return groups
@@ -597,7 +566,7 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
           </div>
           <div class="sh-row">
             <span class="sess-badge" data-asis="бейдж «Свободная съёмка»">Свободная съёмка</span>
-            <span class="sess-meta" data-asis="сводка сессии">{{ D.sessMeta }}</span>
+            <span class="sess-meta" data-asis="сводка сессии">{{ sessMeta }}</span>
             <div class="stats">
               <div class="stat">
                 <span class="kit-island">
@@ -605,7 +574,7 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
                     label="Кадры разложены"
                     :value="S.framesText"
                     :progress="{ value: S.placed, max: S.total, locked: S.pre }"
-                    :sub="S.pre ? `${S.pre} привязано до вас` : ''"
+                    :sub="S.framesSub"
                   />
                 </span>
               </div>
@@ -615,7 +584,7 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
                     label="Обязательные шаги"
                     :value="S.reqText"
                     :progress="{ value: S.ok, max: S.req, locked: S.frz }"
-                    :sub="S.frz ? `${S.frz} закрыто проверкой` : ''"
+                    :sub="S.reqSub"
                   />
                 </span>
               </div>
@@ -641,7 +610,7 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
                   <Input v-model="search" placeholder="Поиск по расшифровкам и именам файлов…" />
                 </div>
               </span>
-              <span id="curHint" data-asis="индикатор текущего объекта">{{ cur ? `Текущий: ${objName(O(cur))} · клавиши 1–${stageById[O(cur).stageId].steps.length}` : 'Текущий объект не выбран' }}</span>
+              <span id="curHint" data-asis="индикатор текущего объекта">{{ curHint }}</span>
               <div class="ctlgrp">
                 <span class="segl">Разобранные</span>
                 <span class="kit-island">
@@ -671,11 +640,12 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
               <span class="kit-island">
                 <div :class="frameTileGridVariants({ size })">
                   <template v-for="f in feed" :key="f.i">
-                    <FrameTile v-if="f.type !== 'voice'" v-bind="tileProps(f)" @toggle-select="toggle(f.i)" @open="openViewer(f.i)" />
+                    <FrameTile v-if="f.type !== 'voice'" v-bind="tileProps(f)" :data-frame="f.i" @toggle-select="toggle(f.i)" @open="openViewer(f.i)" />
                     <div v-else class="va">
                       <div
                         class="card voice"
                         :class="{ note: f.kind === 'note', exp: f.text.length <= 110 }"
+                        :data-frame="f.i"
                         data-asis="заметка"
                       >
                         <button class="pl" v-html="f.kind === 'note' ? SVG_NOTE : SVG_PLAY" />
@@ -728,7 +698,7 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
                   <StageSection
                     :title="st.title"
                     :repeatable="st.rep"
-                    :count="st.rep ? String(D.objects.filter((o: any) => o.stageId === st.id).length) : plural(st.steps.length, 'шаг', 'шага', 'шагов')"
+                    :count="st.rep ? String(m.objects.filter((o: any) => o.stageId === st.id).length) : plural(st.steps.length, 'шаг', 'шага', 'шагов')"
                     :open="!closedStages.has(st.id)"
                     :add-label="st.rep ? (st.id === 'bld' ? 'Новое здание' : 'Новая единица') : ''"
                     @toggle="toggleStage(st.id)"
@@ -737,6 +707,8 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
                       <RepeatCard
                         v-for="o in repList(st).list"
                         :key="o.id"
+                        :data-obj="o.id"
+                        :data-current="cur === o.id || undefined"
                         :name="objName(o)"
                         :details="objSub(o)"
                         :frames="objState(o).total"
@@ -782,15 +754,16 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
                       <Field :label="f.l">
                         <Select
                           v-if="f.opts"
-                          v-model="general[f.k]"
+                          :model-value="m.general[f.k]"
                           :show-icon="false"
                           placeholder=""
                           :items="f.opts.map((o: string) => ({ value: o, label: o }))"
+                          @update:model-value="m.setGeneral(f.k, $event)"
                         />
-                        <Input v-else v-model="general[f.k]" :show-icon="false" placeholder="" />
+                        <Input v-else :model-value="m.general[f.k]" :show-icon="false" placeholder="" @update:model-value="m.setGeneral(f.k, $event)" />
                       </Field>
                     </span>
-                    <div v-if="f.k === 'number'" class="cmp">Оформлено единиц оборудования: <b>{{ eqCount }}</b></div>
+                    <div v-if="f.k === 'number'" class="cmp">Оформлено единиц оборудования: <b>{{ eqCount }}</b>{{ generalCheck ? ' ' : '' }}<span v-if="generalCheck" :style="{ color: generalCheck.ok ? 'var(--va-ok)' : 'var(--va-danger)' }">{{ generalCheck.text }}</span></div>
                   </div>
                 </template>
                 <div class="note">
@@ -974,7 +947,7 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
         :open="true"
         :duration="toastDuration"
         :show-action="false"
-        @update:open="toasts = toasts.filter(x => x.id !== t.id)"
+        @update:open="m.dismissNotice(t.id)"
       >
         {{ t.text }}
       </Toast>
