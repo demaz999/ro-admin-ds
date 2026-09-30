@@ -125,6 +125,24 @@ async function openPage() {
       await sleep(300)
     },
     /** Клик в точке окна — мимо всего (шапка экрана): закрывает плашки, как клик человека мимо. */
+    /**
+     * Кадр для пары снимков (такт 44): вкладка вперёд, шрифты и видимые картинки загружены и декодированы, элемент `sel` —
+     * в видимую часть (`scroll`), кадр — в координатах документа (`scrollX`/`scrollY`), с полем 8. Без `sel` — окно целиком.
+     */
+    async shot(sel, scroll = true) {
+      await send('Page.bringToFront')
+      if (sel && scroll) await evaluate(`(() => { const el = ${sel}; el?.scrollIntoView({ block: 'nearest', behavior: 'instant' }); return 1 })()`)
+      await evaluate(`(async () => { await document.fonts.ready
+        await Promise.all([...document.images].filter(i => i.getClientRects().length).map(i => (i.complete ? Promise.resolve() : new Promise(r => { i.onload = i.onerror = r })).then(() => i.decode?.().catch(() => {}))))
+        return 1 })()`)
+      await sleep(400)
+      const clip = sel ? await evaluate(`(() => { const el = ${sel}; if (!el) return null; const r = el.getBoundingClientRect(); const q = 8
+        const x = Math.max(0, r.x - q); const y = Math.max(0, r.y - q)
+        return { x: x + scrollX, y: y + scrollY, width: Math.min(r.right + q, innerWidth) - x, height: Math.min(r.bottom + q, innerHeight) - y, scale: 1 } })()`) : null
+      if (sel && !clip) throw new Error(`нет элемента для снимка: ${sel}`)
+      const r = await send('Page.captureScreenshot', clip ? { format: 'png', clip } : { format: 'png' })
+      return r.result.data
+    },
     async clickAt(x, y) {
       await send('Page.bringToFront')
       for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 })
@@ -1110,6 +1128,112 @@ const SCENARIOS = {
   ]],
 }
 
+/* ------------------------------ такт 44: остаток поведения ------------------------------ */
+SCENARIOS['С-38/создание'] = ['сверка «Оформлено единиц» по модели после создания повтора (§7, 16.2: С-38 после С-19)', [
+  ['вкладка «Форма осмотра»', a => a.tab('form')],
+  ['по документам 2 — расхождение', a => a.general('number', '2')],
+  ['вкладка «Схема осмотра»', a => a.tab('scheme')],
+  ['«+ Новая единица»', a => a.addRepeat('eq')],
+  ['наименование', a => a.formField('mark', 'Ткацкий станок SMIT')],
+  ['«Создать»', a => a.windowButton('Создать')],
+  ['вкладка «Форма осмотра» — сходится', a => a.tab('form')],
+]]
+
+/**
+ * Пары снимков «прототип / кит» входа приёмки владельца (такт 44, решение владельца 1): строки раздела 15 классов
+ * «вкусовое решение» и «нехватка в ките», номер — номер строки перестроенного реестра (`free-shoot.md`, раздел 15).
+ * Шаг — действие адаптера `(a, proto, page)` либо кадр `['shot', выражение прототипа, выражение кита]` (`null` — окно целиком).
+ */
+const Q = s => `document.querySelector('${s}')`
+const MODAL = ['document.querySelector(\'#modal .mbox\')', 'document.querySelector(\'[data-slot=modal-card]\')']
+const cur = id => a => a.repeat(id)
+const bind21 = [cur('o2'), a => a.tile(21), a => a.key('4', 'Digit4')]
+const SHOTS = {
+  '01': [...bind21, ['shot', Q('#feed .card[data-i="21"]'), Q('[data-slot=frame-tile][data-frame="21"]')]],
+  '02': [cur('o2'), a => a.locate(1), ['shot', null, null]],
+  '03': [a => a.dblTile(23), ['shot', null, null]],
+  '04': [a => a.noteToggle(9008), a => a.tile(21), ['shot', Q('#feed .card[data-i="9008"]'), Q('[data-slot=feed-note][data-frame="9008"]')]],
+  '05': [a => a.tile(21), a => a.newObj(), ['shot', Q('#pop'), Q('[data-slot=popover]')]],
+  '06': [a => a.splitterTo(900), ['shot', null, null]],
+  '07': [...bind21, ['shot', Q('.step[data-owner="o2"][data-step="e4"]'), Q('[data-step-key="o2|e4"]')], a => a.viewer(21),
+    ['shot', Q('#lbList .it[data-owner="o2"][data-step="e4"]'), Q('[role=dialog] [data-value="o2|e4"]')]],
+  '08': [...bind21, (a, proto, page) => page.hover(proto ? Q('.step[data-owner="o2"][data-step="e4"] .th') : Q('[data-step-key="o2|e4"] [data-slot=step-thumb]')),
+    ['shot', Q('.step[data-owner="o2"][data-step="e4"]'), Q('[data-step-key="o2|e4"]')]],
+  '09': [a => a.viewer(21), a => a.lbCreate('eq'), a => a.formField('mark', 'Кран-балка'), a => a.windowButton('Создать'), ['shot', null, null]],
+  '10': [...bind21, cur('o1'), a => a.viewer(21),
+    ['shot', Q('[data-lg="bnd_o2"]'), "[...document.querySelectorAll('[role=dialog] [data-slot=stage-section]')].find(x => x.querySelector('[data-slot=stage-title]').textContent.startsWith('Привязан к'))"]],
+  '11': [a => a.wand(), ['shot', ...MODAL]],
+  '12': [a => a.hotkeys(), ['shot', ...MODAL]],
+  '13': [cur('o2'), a => a.repeatEdit('o2'), a => a.formField('mark', ''), a => a.windowButton('Сохранить'), ['shot', ...MODAL]],
+  '14': [a => a.tile(21), a => a.selbar('toStep'), a => a.key('Escape'), ['shot', null, null]],
+  '15': [['shot', Q('.topbar'), Q('[data-slot=app-bar]')]],
+  '16': [async (a, proto, page) => { await page.key('Tab'); await page.evaluate(proto ? "(document.getElementById('btnDone').focus(), 1)" : "([...document.querySelectorAll('[data-slot=app-bar] button')].find(b => b.textContent.trim() === 'Завершить распределение').focus(), 1)") },
+    ['shot', Q('.topbar'), Q('[data-slot=app-bar]')]],
+  '17': [['shot', Q('#feed .card[data-i="9000"]'), Q('[data-slot=feed-note][data-frame="9000"]')], ['shot', Q('#feed .card[data-i="9001"]'), Q('[data-slot=feed-note][data-frame="9001"]')]],
+  '18': [a => a.tile(21), ['shot', Q('#selbar'), Q('[data-slot=action-bar]:not([data-fragment])')]],
+  '19': [a => a.viewer(21), ['shot', Q('#lbBind'), Q('[data-slot=frame-bind-bar]')]],
+  '20': [a => a.wand(), ['shot', ...MODAL]],
+  '21': [cur('o2'), a => a.repeatEdit('o2'), a => a.formField('mark', ''), a => a.windowButton('Сохранить'), ['shot', null, null]],
+  '22': [a => a.hotkeys(), ['shot', ...MODAL]],
+  '23': [...bind21, ['shot', null, null]],
+}
+
+/** Склейка пары: кадры прототипа слева, кита справа, по строке на каждый кадр шага; подписи сторон сверху. */
+async function compose(page, rows) {
+  await page.goto('about:blank', 200)
+  return page.evaluate(`(async () => {
+    const rows = ${JSON.stringify(rows)}
+    const load = b => new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = 'data:image/png;base64,' + b })
+    const imgs = await Promise.all(rows.map(async ([p, k]) => [await load(p), await load(k)]))
+    const pad = 16; const gap = 24; const band = 28
+    const wl = Math.max(...imgs.map(x => x[0].width)); const wr = Math.max(...imgs.map(x => x[1].width))
+    const hs = imgs.map(x => Math.max(x[0].height, x[1].height))
+    const c = document.createElement('canvas')
+    c.width = pad * 2 + wl + gap + wr; c.height = pad + band + hs.reduce((a, h) => a + h + pad, 0)
+    const g = c.getContext('2d'); g.fillStyle = '#ffffff'; g.fillRect(0, 0, c.width, c.height)
+    g.fillStyle = '#6e7885'; g.font = '600 14px sans-serif'
+    g.fillText('прототип v17', pad, pad + 14); g.fillText('кит', pad + wl + gap, pad + 14)
+    let y = pad + band
+    imgs.forEach(([a, b], n) => {
+      g.drawImage(a, pad, y); g.drawImage(b, pad + wl + gap, y)
+      g.strokeStyle = '#ccdef5'; g.strokeRect(pad - 0.5, y - 0.5, a.width + 1, a.height + 1); g.strokeRect(pad + wl + gap - 0.5, y - 0.5, b.width + 1, b.height + 1)
+      y += hs[n] + pad
+    })
+    return JSON.stringify({ data: c.toDataURL('image/png').slice(22), w: c.width, h: c.height })
+  })()`)
+}
+
+async function shots(only) {
+  const { writeFileSync } = await import('node:fs')
+  const out = []
+  for (const [nn, steps] of Object.entries(SHOTS)) {
+    if (only.length && !only.includes(nn)) continue
+    const pp = await openPage()
+    const kp = await openPage()
+    const sides = [[prototype(pp), true, pp], [kit(kp), false, kp]]
+    try {
+      for (const [a] of sides) await a.start()
+      const rows = []
+      for (const st of steps) {
+        if (Array.isArray(st)) {
+          const pair = []
+          for (const [, proto, page] of sides) pair.push(await page.shot(proto ? st[1] : st[2]))
+          rows.push(pair)
+        }
+        else for (const [a, proto, page] of sides) { await st(a, proto, page); await sleep(150) }
+      }
+      const r = JSON.parse(await compose(pp, rows))
+      const file = join(ROOT, `docs/free-shoot-registry-${nn}.png`)
+      writeFileSync(file, Buffer.from(r.data, 'base64'))
+      const bytes = Buffer.from(r.data, 'base64').length
+      out.push({ nn, w: r.w, h: r.h, bytes })
+      console.log(`пара ${nn}: ${r.w} × ${r.h}, ${bytes} байт`)
+    }
+    finally { await pp.close(); await kp.close() }
+  }
+  return out
+}
+
 /**
  * Замер «Показать в структуре» (С-22): какой шаг вспыхнул и какая миниатюра обведена — в сравнение (`probe`); сколько
  * держатся вспышка и обводка — в замеры (`measure`, печатаются, не сравниваются). Время снимает наблюдатель в странице,
@@ -1217,6 +1341,11 @@ async function run(id) {
 }
 
 await ensureChrome()
+if (process.argv[2] === '--shots') {
+  const r = await shots(process.argv.slice(3))
+  console.log(`\nПар ${r.length}; пустых ${r.filter(x => x.bytes < 2000).length}`)
+  process.exit(0)
+}
 const pick = process.argv.slice(2)
 const ids = pick.length ? pick : Object.keys(SCENARIOS)
 let failed = 0
