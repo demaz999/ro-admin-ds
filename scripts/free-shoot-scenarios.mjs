@@ -133,7 +133,7 @@ async function openPage() {
       await send('Page.bringToFront')
       if (sel && scroll) await evaluate(`(() => { const el = ${sel}; el?.scrollIntoView({ block: 'nearest', behavior: 'instant' }); return 1 })()`)
       await evaluate(`(async () => { await document.fonts.ready
-        await Promise.all([...document.images].filter(i => i.getClientRects().length).map(i => (i.complete ? Promise.resolve() : new Promise(r => { i.onload = i.onerror = r })).then(() => i.decode?.().catch(() => {}))))
+        await Promise.all([...document.images].filter(i => i.getClientRects().length).map(i => Promise.race([(i.complete ? Promise.resolve() : new Promise(r => { i.onload = i.onerror = r })).then(() => i.decode?.().catch(() => {})), new Promise(r => setTimeout(r, 3000))])))
         return 1 })()`)
       await sleep(400)
       const clip = sel ? await evaluate(`(() => { const el = ${sel}; if (!el) return null; const r = el.getBoundingClientRect(); const q = 8
@@ -1148,26 +1148,29 @@ const Q = s => `document.querySelector('${s}')`
 const MODAL = ['document.querySelector(\'#modal .mbox\')', 'document.querySelector(\'[data-slot=modal-card]\')']
 const cur = id => a => a.repeat(id)
 const bind21 = [cur('o2'), a => a.tile(21), a => a.key('4', 'Digit4')]
+/* Привязка и уход уведомления «Отменить» (6 с): иначе плашка ложится на панель. */
+const bound21 = [...bind21, () => sleep(6500)]
 const SHOTS = {
-  '01': [...bind21, ['shot', Q('#feed .card[data-i="21"]'), Q('[data-slot=frame-tile][data-frame="21"]')]],
+  '01': [...bound21, ['shot', Q('#feed .card[data-i="21"]'), Q('[data-slot=frame-tile][data-frame="21"]')]],
   '02': [cur('o2'), a => a.locate(1), ['shot', null, null]],
   '03': [a => a.dblTile(23), ['shot', null, null]],
-  '04': [a => a.noteToggle(9008), a => a.tile(21), ['shot', Q('#feed .card[data-i="9008"]'), Q('[data-slot=feed-note][data-frame="9008"]')]],
+  '04': [a => a.noteToggle(9008), a => a.tile(21), a => a.tile(21), ['shot', Q('#feed .card[data-i="9008"]'), Q('[data-slot=feed-note][data-frame="9008"]')]],
   '05': [a => a.tile(21), a => a.newObj(), ['shot', Q('#pop'), Q('[data-slot=popover]')]],
   '06': [a => a.splitterTo(900), ['shot', null, null]],
-  '07': [...bind21, ['shot', Q('.step[data-owner="o2"][data-step="e4"]'), Q('[data-step-key="o2|e4"]')], a => a.viewer(21),
+  '07': [...bound21, ['shot', Q('.step[data-owner="o2"][data-step="e4"]'), Q('[data-step-key="o2|e4"]')], a => a.viewer(21),
     ['shot', Q('#lbList .it[data-owner="o2"][data-step="e4"]'), Q('[role=dialog] [data-value="o2|e4"]')]],
-  '08': [...bind21, (a, proto, page) => page.hover(proto ? Q('.step[data-owner="o2"][data-step="e4"] .th') : Q('[data-step-key="o2|e4"] [data-slot=step-thumb]')),
+  '08': [...bound21, (a, proto, page) => page.hover(proto ? Q('.step[data-owner="o2"][data-step="e4"] .th') : Q('[data-step-key="o2|e4"] [data-slot=step-thumb]')),
     ['shot', Q('.step[data-owner="o2"][data-step="e4"]'), Q('[data-step-key="o2|e4"]')]],
   '09': [a => a.viewer(21), a => a.lbCreate('eq'), a => a.formField('mark', 'Кран-балка'), a => a.windowButton('Создать'), ['shot', null, null]],
-  '10': [...bind21, cur('o1'), a => a.viewer(21),
+  '10': [...bound21, cur('o1'), a => a.viewer(21),
     ['shot', Q('[data-lg="bnd_o2"]'), "[...document.querySelectorAll('[role=dialog] [data-slot=stage-section]')].find(x => x.querySelector('[data-slot=stage-title]').textContent.startsWith('Привязан к'))"]],
   '11': [a => a.wand(), ['shot', ...MODAL]],
   '12': [a => a.hotkeys(), ['shot', ...MODAL]],
   '13': [cur('o2'), a => a.repeatEdit('o2'), a => a.formField('mark', ''), a => a.windowButton('Сохранить'), ['shot', ...MODAL]],
   '14': [a => a.tile(21), a => a.selbar('toStep'), a => a.key('Escape'), ['shot', null, null]],
   '15': [['shot', Q('.topbar'), Q('[data-slot=app-bar]')]],
-  '16': [async (a, proto, page) => { await page.key('Tab'); await page.evaluate(proto ? "(document.getElementById('btnDone').focus(), 1)" : "([...document.querySelectorAll('[data-slot=app-bar] button')].find(b => b.textContent.trim() === 'Завершить распределение').focus(), 1)") },
+  '16': [/* Фокус с клавиатуры: соседняя кнопка — программно, на цель — реальный Tab, иначе :focus-visible не включается. */
+    async (a, proto, page) => { await page.evaluate(proto ? "(document.getElementById('btnHelp').focus(), 1)" : "([...document.querySelectorAll('[data-slot=app-bar] button')].find(b => b.textContent.trim() === 'Горячие клавиши').focus(), 1)"); await page.key('Tab', 'Tab', { windowsVirtualKeyCode: 9 }) },
     ['shot', Q('.topbar'), Q('[data-slot=app-bar]')]],
   '17': [['shot', Q('#feed .card[data-i="9000"]'), Q('[data-slot=feed-note][data-frame="9000"]')], ['shot', Q('#feed .card[data-i="9001"]'), Q('[data-slot=feed-note][data-frame="9001"]')]],
   '18': [a => a.tile(21), ['shot', Q('#selbar'), Q('[data-slot=action-bar]:not([data-fragment])')]],
@@ -1206,8 +1209,9 @@ async function compose(page, rows) {
 async function shots(only) {
   const { writeFileSync } = await import('node:fs')
   const out = []
-  for (const [nn, steps] of Object.entries(SHOTS)) {
+  for (const [nn, steps] of Object.entries(SHOTS).sort(([x], [y]) => x.localeCompare(y))) {
     if (only.length && !only.includes(nn)) continue
+    console.log(`пара ${nn}…`)
     const pp = await openPage()
     const kp = await openPage()
     const sides = [[prototype(pp), true, pp], [kit(kp), false, kp]]
