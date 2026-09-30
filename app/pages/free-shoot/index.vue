@@ -4,7 +4,7 @@ import type { AssignBound } from '@/components/ui/assign'
 import { frameTileGridVariants, type FrameTileState } from '@/components/ui/frame-tile'
 import type { StepThumbItem, StepVerdict } from '@/components/ui/step-row'
 import AsisMarks from '~/stands/free-shoot/AsisMarks.vue'
-import { createModel, emptyDataset, MODE_T, plural, type FormDef, type ScreenWindow, type WandMode } from '~/stands/free-shoot/model'
+import { createModel, emptyDataset, MODE_T, plural, type FormDef, type ScreenWindow, type Suggestion, type WandMode } from '~/stands/free-shoot/model'
 import proto from '~/stands/free-shoot/prototype-data.json'
 
 /**
@@ -47,6 +47,7 @@ import proto from '~/stands/free-shoot/prototype-data.json'
  * | `?state=tooltip` | подсказка названия шага на плашке кадра (§15.4) |
  * | `?state=drop` | цель приёма перетаскивания и перетаскиваемые кадры (§9.5) |
  * | `?state=marquee` | рамка выделения над первыми тремя кадрами ленты и их выделение (§10.1) — такт 40 |
+ * | `?open=move` | окно «Перенести кадр?» над просмотром: кадр 21 привязан к «Узлам и агрегатам», выбран «Органы управления» (§11.4) — такт 41 |
  * | `?state=undo` | уведомление привязки с «Отменить» без таймера (§10.6) — такт 40: кадр 21 привязан к «Узлам и агрегатам» |
  * | `?selected=demo` | выделение пяти кадров и панель выделения (§10.2) |
  * | `?open=assign` | панель выделения и поповер «Назначить на шаг», текущий объект (§10.3); с такта 33 поповер и пункты — кит (`Popover`, `SelectContent`, `SelectGroup`, `AssignOption`) |
@@ -150,7 +151,54 @@ const { clickRepeat, toggleStage, toggleForm } = m
 const LINK = { owner: eqId, step: 'e3' }
 const flashNonce = ref<number | null>(null)
 
-const linkedSet = computed(() => new Set(state === 'link' ? framesIn(LINK.owner, LINK.step).map((f: any) => f.i) : []))
+/* ------------------------------ связь в обе стороны, такт 40–41 (§15.1–15.2) ------------------------------ */
+/**
+ * Наведение — прототип `mouseover` ленты и панели. Кадр ленты под курсором подсвечивает свой шаг и повтор, только если шаг
+ * уже виден в панели (без прокрутки); шаг или заголовок повтора под курсором подсвечивает свои кадры ленты, остальные
+ * приглушены. Оснастка `?state=link` — то же без курсора.
+ */
+const hoverTile = ref<number | null>(null)
+const hoverFeed = ref<{ key: string, obj: string | null } | null>(null)
+const hoverPanel = ref<string | null>(null)
+const panelEl = ref<HTMLElement | null>(null)
+/** Шаг кадра под курсором — подсветить, если строка шага уже видна в панели; пересчёт и при смене данных под неподвижным курсором. */
+function recomputeFeedHover() {
+  const f = hoverTile.value != null ? m.frames.find(x => x.i === hoverTile.value) : null
+  const key = f?.objId ? `${f.objId}|${f.stepId}` : null
+  const el = key ? document.querySelector(`[data-step-key="${key}"]`) : null
+  const rb = panelEl.value?.getBoundingClientRect()
+  if (!key || !el || !rb) { hoverFeed.value = null; return }
+  const r = el.getBoundingClientRect()
+  hoverFeed.value = r.bottom > rb.top && r.top < rb.bottom ? { key, obj: m.O(f!.objId) ? f!.objId : null } : null
+}
+function onFeedOver(e: MouseEvent) {
+  const card = (e.target as HTMLElement).closest('[data-frame]') as HTMLElement | null
+  hoverTile.value = card ? Number(card.dataset.frame) : null
+  recomputeFeedHover()
+}
+function onFeedLeave() {
+  hoverTile.value = null
+  hoverFeed.value = null
+}
+watch(() => {
+  const f = hoverTile.value != null ? m.frames.find(x => x.i === hoverTile.value) : null
+  return [f?.objId, f?.stepId, m.state.open.size, m.state.closed.size, m.state.onlyOpen, m.state.cur]
+}, () => nextTick(recomputeFeedHover), { flush: 'post' })
+function onPanelOver(e: MouseEvent) {
+  const t = e.target as HTMLElement
+  const step = t.closest('[data-step-key]') as HTMLElement | null
+  const head = t.closest('[data-slot=repeat-header]')
+  const obj = head ? (head.closest('[data-obj]') as HTMLElement | null)?.dataset.obj : null
+  hoverPanel.value = step ? `s:${step.dataset.stepKey}` : obj ? `o:${obj}` : null
+}
+const linkedSet = computed(() => {
+  if (state === 'link') return new Set(framesIn(LINK.owner, LINK.step).map((f: any) => f.i))
+  const k = hoverPanel.value
+  if (!k) return new Set<number>()
+  const [owner, sid] = k.slice(2).split('|')
+  return new Set(m.frames.filter(f => (k.startsWith('s:') ? f.objId === owner && f.stepId === sid : f.objId === owner)).map(f => f.i))
+})
+const linking = computed(() => state === 'link' || linkedSet.value.size > 0)
 
 function tileState(f: any): FrameTileState {
   if (!f.objId) return 'free'
@@ -176,10 +224,27 @@ function tileProps(f: any) {
     selected: selected.value.has(f.i),
     selectionMode: selected.value.size > 0,
     linked: linkedSet.value.has(f.i),
-    dimmed: state === 'link' && !linkedSet.value.has(f.i),
+    dimmed: linking.value && !linkedSet.value.has(f.i),
     dragging: (state === 'drop' && selected.value.has(f.i)) || dragIds.value.includes(f.i),
     tooltipOpen: state === 'tooltip' && f.i === 1 ? true : undefined,
   }
+}
+
+/* ------------------------------ «Показать в структуре», такт 41 (§15.3) ------------------------------ */
+/** Найденный шаг: вспышка 1.5 с (`StepRow flash`), обводка миниатюры 1.6 с — как у прототипа `locateFrame`. */
+const found = ref<{ key: string, i: number, nonce: number, thumb: boolean } | null>(null)
+let foundTimer: ReturnType<typeof setTimeout> | undefined
+async function onLocate(i: number) {
+  const r = m.locateFrame(i)
+  if (!r) return
+  await nextTick()
+  const key = `${r.owner}|${r.stepId}`
+  const el = document.querySelector(`[data-step-key="${key}"]`)
+  if (!el) { m.notify('Шаг не найден в структуре', 'err'); return }
+  el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  found.value = { key, i, nonce: Date.now(), thumb: true }
+  clearTimeout(foundTimer)
+  foundTimer = setTimeout(() => { if (found.value) found.value = { ...found.value, thumb: false } }, 1600)
 }
 
 /* ------------------------------ заметки (как есть) ------------------------------ */
@@ -187,6 +252,8 @@ const noteWave = (f: any) => Array.from({ length: 80 }, (_, i) => Math.round((3 
 
 /* ------------------------------ панель структуры ------------------------------ */
 const nfrz = computed(() => m.frzSteps())
+/** «Только открытые» (§9.2): этап без повторов, где закрыты все шаги, скрывается целиком — прототип `renderRight`. */
+const visibleStages = computed(() => STAGES.filter(st => st.rep || !m.state.onlyOpen || st.steps.some(x => !isFrozen(st.id, x.id))))
 const totalSteps = STAGES.reduce((a, s) => a + s.steps.length, 0)
 
 function thumbState(f: any): StepThumbItem['state'] {
@@ -214,10 +281,10 @@ function stepProps(owner: string, st: any, index: number) {
     hotkey: cur.value === owner ? index + 1 : null,
     verdict,
     thumbs: inStep.map((f: any) => ({ id: f.i, src: img(f.i), state: thumbState(f) })),
-    highlighted: state === 'link' && isLink,
+    highlighted: (state === 'link' && isLink) || hoverFeed.value?.key === `${owner}|${st.id}`,
     dropTarget: (state === 'drop' && owner === eqId && st.id === 'e4') || hotStep.value === `${owner}|${st.id}`,
-    flash: isLink ? flashNonce.value : null,
-    locatedThumb: state === 'flash' && isLink ? inStep[0]?.i ?? null : null,
+    flash: isLink && flashNonce.value ? flashNonce.value : found.value?.key === `${owner}|${st.id}` ? found.value.nonce : null,
+    locatedThumb: state === 'flash' && isLink ? inStep[0]?.i ?? null : found.value?.key === `${owner}|${st.id}` && found.value.thumb ? found.value.i : null,
   }
 }
 
@@ -256,6 +323,7 @@ function formFields(o: any) {
 /** Повторы этапа — прототип `renderRight`: в режиме приёмки с фильтром «только непроверенные» — только предложенные. */
 function repList(st: any) {
   let list = m.objects.filter((o: any) => o.stageId === st.id)
+  if (m.state.onlyOpen) list = list.filter((o: any) => st.steps.some((x: any) => !isFrozen(o.id, x.id)))
   const revFilter = m.state.review && m.state.reviewOnly && m.objects.some((o: any) => o.auto)
   const hidden = revFilter ? list.filter((o: any) => !o.auto).length : 0
   if (revFilter) list = list.filter((o: any) => o.auto)
@@ -442,6 +510,15 @@ function stepViewer(index: number) {
   suggestion.value = null
   m.setViewer(index - 1)
 }
+/** Прототип `lbStep`: шаг по списку просмотра в пределах первого и последнего кадра. */
+function lbStep(d: number) {
+  stepViewer(Math.max(0, Math.min(lbFrames.value.length - 1, viewerIdx.value + d)) + 1)
+}
+/** Двойной клик по плитке — прототип: снять кадр из выделения и открыть просмотр (§11.1). */
+function onTileDbl(i: number) {
+  m.state.sel.delete(i)
+  openViewer(i)
+}
 
 /** Нижняя плашка — из данных кадра, как прототип `renderLB`. */
 const bindProps = computed(() => {
@@ -465,25 +542,81 @@ const metaRows = computed(() => {
   return rows
 })
 
-/**
- * Подбор (§11.2). Логики подбора у стенда нет: предложение взято из окна «viewer-suggest»,
- * отрисованного прототипом, и показывается только для его кадра.
- */
-const SUGGEST_HTML = String(H.viewerSuggest.bind)
-const SUGGEST = {
-  i: H.viewerSuggest.i,
-  s: {
-    kind: 'create' as const,
-    title: SUGGEST_HTML.match(/<b>([^<]+)<\/b>/)?.[1] ?? '',
-    inv: SUGGEST_HTML.match(/инв\. ([^<]+)</)?.[1]?.trim() ?? '',
-    stageTitle: SUGGEST_HTML.match(/Создать «([^»]+)»/)?.[1] ?? '',
-  },
-}
-const suggestion = ref<any>(viewerKey === 'suggest' ? SUGGEST.s : null)
+/* ------------------------------ привязка в просмотре, такт 41 (§11.3–11.4, §12.14) ------------------------------ */
+/** Подбор шага — модель (`suggestFor`); «Не то» и любая перерисовка плашки его снимают, как прототип `renderLB`. */
+const suggestion = ref<Suggestion | null>(null)
 function onSuggest() {
-  if (viewerFrame.value?.i === SUGGEST.i) suggestion.value = SUGGEST.s
+  const f = viewerFrame.value
+  if (f) suggestion.value = m.lbSuggest(f.i)
 }
+/** Предложение шага для плашки: имена без ключей модели. */
+const barSuggestion = computed(() => {
+  const sg = suggestion.value
+  if (!sg) return null
+  return sg.kind === 'step'
+    ? { kind: 'step' as const, stepName: sg.stepName, ownerName: sg.ownerName, blocked: sg.blocked }
+    : { kind: 'create' as const, title: sg.title, inv: sg.inv, stageTitle: sg.stageTitle }
+})
 const bindFlash = ref<number | null>(null)
+/**
+ * Привязка из просмотра — прототип `lbAssign`: свободный кадр — тихо, вспышка плашки и через её длительность
+ * (`--duration-bind-flash`, 820 мс) следующий кадр; распределённый — окно «Перенести кадр?», после него перехода нет.
+ */
+let advanceTimer: ReturnType<typeof setTimeout> | undefined
+function flashMs() {
+  return parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--duration-bind-flash')) || 820
+}
+function viewerAssign(owner: string, stepId: string) {
+  const f = viewerFrame.value
+  if (!f) return
+  const r = m.lbAssign(f.i, owner, stepId)
+  if (r !== 'done') return
+  suggestion.value = null
+  bindFlash.value = Date.now()
+  clearTimeout(advanceTimer)
+  advanceTimer = setTimeout(() => { if (m.state.lb >= 0) lbStep(1) }, flashMs())
+}
+/** «Перенести» — тихая привязка, вспышка, кадр остаётся. */
+function onMoveConfirm() {
+  if (m.confirmMove()) {
+    suggestion.value = null
+    bindFlash.value = Date.now()
+  }
+}
+const moveOpen = windowModel('move')
+/** «Принять» предложения (Enter) — привязка к предложенному шагу. */
+function onSuggestAccept() {
+  const sg = suggestion.value
+  if (sg?.kind === 'step' && !sg.blocked) viewerAssign(sg.owner, sg.stepId)
+}
+/** Пункт списка просмотра: шаг — привязка, объект — «сделать текущим»; «Создать «<этап>»» — порция П6. */
+function onViewerSelect(it: any) {
+  const [a, b] = String(it.value).split('|')
+  if (it.type === 'object') { m.setCurrent(b!); suggestion.value = null; return }
+  if (it.type === 'step') viewerAssign(a!, b!)
+}
+/** Нажат закрытый пункт списка просмотра — прототип `#lbList`: заморожен — отказ; заполнен — `lbAssign`; привязан до вас — отказ. */
+function onViewerRefuse(it: any, reason: 'frozen' | 'full' | 'locked') {
+  const f = viewerFrame.value
+  if (!f) return
+  const [a, b] = String(it.value).split('|')
+  if (reason === 'locked') m.notify(`${frameWhy(f)} — открепить нельзя`, 'err')
+  else if (reason === 'frozen') m.notify('Шаг проверен и закрыт — добавить нельзя', 'err')
+  else viewerAssign(a!, b!)
+}
+/** Открепить из просмотра — плашка и привязанный пункт списка; плашка перерисовывается. */
+function onViewerUnbind() {
+  const f = viewerFrame.value
+  if (!f) return
+  m.unassignFrame(f.i)
+  suggestion.value = null
+}
+/** «Показать в структуре» из плашки — прототип: просмотр закрыть, через 120 мс найти шаг. */
+function onViewerLocate() {
+  const f = viewerFrame.value
+  viewerOpen.value = false
+  if (f) setTimeout(() => onLocate(f.i), 120)
+}
 
 const viewerGroups = computed(() => {
   const f = viewerFrame.value
@@ -518,6 +651,10 @@ const viewerGroups = computed(() => {
 const groupCount = (g: { items: any[] }) => String(g.items.filter(i => i.type !== 'create').length)
 
 const assignOpen = ref(false)
+/** Нажат закрытый пункт поповера — прототип `#popList`: отказ с причиной, плашка остаётся открытой (решение чата, такт 41). */
+function onAssignRefuse(reason: 'frozen' | 'full' | 'locked') {
+  m.notify(reason === 'full' ? 'Шаг уже заполнен' : 'Шаг проверен и закрыт — добавить нельзя', 'err')
+}
 /**
  * Пункт поповера (§10.3) — прототип `#popList`: шаг — привязка выделения с проверкой шага, другой объект —
  * «сделать текущим». Плашка закрывается.
@@ -571,6 +708,14 @@ onMounted(async () => {
   window.addEventListener('mousemove', onMarqueeMove)
   window.addEventListener('mouseup', onMarqueeEnd)
   document.addEventListener('dragend', onDragEnd)
+  /* Оснастка `?open=move` (такт 41): кадр 21 привязан к «Узлам и агрегатам», в просмотре выбран «Органы управления» — окно № 47. */
+  if (openWin === 'move' && eqId) {
+    m.assign([21], eqId, 'e4', true)
+    openViewer(21)
+    m.lbAssign(21, eqId, 'e5')
+  }
+  /* Оснастка `?open=viewer-suggest`: подбор шага для кадра — моделью, как кнопка «Подобрать шаг». */
+  if (viewerKey === 'suggest') onSuggest()
   if (openWin === 'assign') {
     await nextTick()
     assignOpen.value = true
@@ -691,7 +836,7 @@ function onStepSelect(owner: string, stepId: string) {
 /* ------------------------------ клавиатура, такт 40 (§16) ------------------------------ */
 /**
  * Один обработчик по таблице прототипа (`keydown` документа). П3: Esc, Ctrl+Z, Ctrl+A, 1–8, Del / Backspace;
- * в просмотре — Del / Backspace. ← → Enter и 1–8 в просмотре — порция П4.
+ * в просмотре — Del / Backspace. П4 (такт 41): в просмотре ← →, Enter (принять предложенный шаг) и 1–N.
  *
  * Esc по приоритету «просмотр → окно → выделение»: просмотр и окна закрывает Reka сама, поэтому обработчик
  * стоит в фазе перехвата и снимает выделение, только если ни просмотра, ни окна нет.
@@ -707,15 +852,25 @@ function onKeydown(e: KeyboardEvent) {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') { e.preventDefault(); m.selectAll(); return }
   const lbOpen = m.state.lb >= 0
   if (lbOpen) {
+    if (e.key === 'Enter' && suggestion.value?.kind === 'step' && !suggestion.value.blocked) { e.preventDefault(); onSuggestAccept(); return }
+    if (e.key === 'ArrowLeft') { lbStep(-1); return }
+    if (e.key === 'ArrowRight') { lbStep(1); return }
     if (e.key === 'Backspace' || e.key === 'Delete') {
       const f = viewerFrame.value
       if (f) m.unassignViewed(f.i)
+      suggestion.value = null
       return
     }
   }
   if (/^[1-9]$/.test(e.key)) {
-    if (lbOpen) return
-    m.pressDigit(Number(e.key))
+    const n = Number(e.key)
+    /* В просмотре — привязка показанного кадра к шагу текущего объекта (§11.3, §16.2). */
+    if (lbOpen && m.state.cur) {
+      const st = stageById[m.O(m.state.cur)!.stageId]!.steps[n - 1]
+      if (st) viewerAssign(m.state.cur, st.id)
+      return
+    }
+    m.pressDigit(n)
     return
   }
   if ((e.key === 'Backspace' || e.key === 'Delete') && m.state.sel.size) m.unassignSelection()
@@ -842,7 +997,7 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
             </div>
 
             <!-- лента материалов, §8 -->
-            <div ref="feedEl" class="feed" data-asis="лента (прокрутка)" @mousedown="onFeedMousedown">
+            <div ref="feedEl" class="feed" data-asis="лента (прокрутка)" @mousedown="onFeedMousedown" @mouseover="onFeedOver" @mouseleave="onFeedLeave">
               <span class="kit-island">
                 <div :class="frameTileGridVariants({ size })">
                   <template v-for="f in feed" :key="f.i">
@@ -854,6 +1009,8 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
                       @toggle-select="onTileClick(f.i, $event)"
                       @open="openViewer(f.i)"
                       @unassign="m.unassignFrame(f.i)"
+                      @locate="onLocate(f.i)"
+                      @dblclick="onTileDbl(f.i)"
                       @dragstart="onDragStart(f.i, $event)"
                     />
                     <div v-else class="va">
@@ -899,18 +1056,21 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
               </Tabs>
             </span>
 
-            <div class="rbody" @dragover="onPanelDragover" @drop="onPanelDrop">
+            <div ref="panelEl" class="rbody" @dragover="onPanelDragover" @drop="onPanelDrop" @mouseover="onPanelOver" @mouseleave="hoverPanel = null">
               <template v-if="tab === 'scheme'">
                 <div class="schtools" data-asis="инструменты схемы">
                   <span class="kit-island">
-                    <Button variant="secondary" size="sm">Свернуть все</Button>
-                    <Button v-if="nfrz" variant="secondary" size="sm">Только открытые</Button>
+                    <Button variant="secondary" size="sm" @click="m.toggleAllStages()">{{ m.allClosed.value ? 'Развернуть все' : 'Свернуть все' }}</Button>
+                    <Button v-if="nfrz" :variant="m.state.onlyOpen ? 'default' : 'secondary'" size="sm" @click="m.toggleOnlyOpen()">
+                      {{ m.state.onlyOpen ? `Показать все (+${nfrz})` : 'Только открытые' }}
+                    </Button>
                   </span>
                   <span style="font-size:12px;color:var(--va-muted);align-self:center">этапов: {{ STAGES.length }} · шагов: {{ totalSteps }}<template v-if="nfrz"> · заморожено {{ nfrz }}</template></span>
                 </div>
 
-                <span v-for="st in STAGES" :key="st.id" class="kit-island">
+                <span v-for="st in visibleStages" :key="st.id" class="kit-island">
                   <StageSection
+                    :data-stage="st.id"
                     :title="st.title"
                     :repeatable="st.rep"
                     :count="st.rep ? String(m.objects.filter((o: any) => o.stageId === st.id).length) : plural(st.steps.length, 'шаг', 'шага', 'шагов')"
@@ -932,7 +1092,8 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
                         :suggested="o.auto"
                         :checked-steps="objState(o).frz"
                         :errors="objState(o).bad"
-                        :highlighted="state === 'link' && o.id === LINK.owner"
+                        :highlighted="(state === 'link' && o.id === LINK.owner) || hoverFeed?.obj === o.id"
+                        :hidden-steps="m.state.onlyOpen ? objState(o).frz : 0"
                         @header="clickRepeat(o.id)"
                         @accept="acceptRepeat(o.id)"
                         @reject="rejectRepeat(o.id)"
@@ -946,33 +1107,35 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
                             @edit="openForm(o.id, $event)"
                           />
                         </template>
-                        <StepRow
-                          v-for="(x, k) in stageById[o.stageId].steps"
-                          :key="x.id"
-                          v-bind="stepProps(o.id, x, k)"
-                          :data-step-key="`${o.id}|${x.id}`"
-                          @select="onStepSelect(o.id, x.id)"
-                          @thumb-open="openViewer(Number($event))"
-                          @thumb-remove="m.unassignFrame(Number($event))"
-                        />
+                        <template v-for="(x, k) in stageById[o.stageId].steps" :key="x.id">
+                          <StepRow
+                            v-if="!m.state.onlyOpen || !isFrozen(o.id, x.id)"
+                            v-bind="stepProps(o.id, x, k)"
+                            :data-step-key="`${o.id}|${x.id}`"
+                            @select="onStepSelect(o.id, x.id)"
+                            @thumb-open="openViewer(Number($event))"
+                            @thumb-remove="m.unassignFrame(Number($event))"
+                          />
+                        </template>
                       </RepeatCard>
                       <StageNote v-if="!repList(st).list.length">
-                        {{ repList(st).hidden ? 'Все повторы этапа проверены' : 'Повторов пока нет — выделите кадры и нажмите «Новый объект из выделенного»' }}
+                        {{ repList(st).hidden ? 'Все повторы этапа проверены' : m.state.onlyOpen ? 'Все повторы этого этапа проверены и закрыты' : 'Повторов пока нет — выделите кадры и нажмите «Новый объект из выделенного»' }}
                       </StageNote>
                       <StageNote v-if="repList(st).hidden && repList(st).list.length">
                         Принято и скрыто: {{ plural(repList(st).hidden, 'объект', 'объекта', 'объектов') }}
                       </StageNote>
                     </template>
                     <div v-else class="flex flex-col gap-0.5 px-1.5 pt-1 pb-2">
-                      <StepRow
-                        v-for="(x, k) in st.steps"
-                        :key="x.id"
-                        v-bind="stepProps(st.id, x, k)"
-                        :data-step-key="`${st.id}|${x.id}`"
-                        @select="onStepSelect(st.id, x.id)"
-                        @thumb-open="openViewer(Number($event))"
-                        @thumb-remove="m.unassignFrame(Number($event))"
-                      />
+                      <template v-for="(x, k) in st.steps" :key="x.id">
+                        <StepRow
+                          v-if="!m.state.onlyOpen || !isFrozen(st.id, x.id)"
+                          v-bind="stepProps(st.id, x, k)"
+                          :data-step-key="`${st.id}|${x.id}`"
+                          @select="onStepSelect(st.id, x.id)"
+                          @thumb-open="openViewer(Number($event))"
+                          @thumb-remove="m.unassignFrame(Number($event))"
+                        />
+                      </template>
                     </div>
                   </StageSection>
                 </span>
@@ -1031,7 +1194,7 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
             <SelectContent :width="360" max-height="62vh">
               <AssignList>
                 <SelectGroup v-for="g in assignGroups" :key="g.key" :header="g.header">
-                  <AssignOption v-for="it in g.items" :key="it.value" v-bind="it" :data-value="it.value" @select="onAssignSelect(it.value)" />
+                  <AssignOption v-for="it in g.items" :key="it.value" v-bind="it" :data-value="it.value" @select="onAssignSelect(it.value)" @refuse="onAssignRefuse" />
                 </SelectGroup>
               </AssignList>
             </SelectContent>
@@ -1068,12 +1231,13 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
         <FrameStage :src="img(viewerFrame?.i ?? 1)" :alt="viewerFrame?.n" :assigned="bindProps.state !== 'free'">
           <FrameBindBar
             v-bind="bindProps"
-            :suggestion="suggestion"
+            :suggestion="barSuggestion"
             :flash="bindFlash"
             @suggest="onSuggest"
+            @accept="onSuggestAccept"
             @dismiss="suggestion = null"
-            @locate="viewerOpen = false"
-            @unbind="viewerFrame && m.unassignFrame(viewerFrame.i)"
+            @locate="onViewerLocate"
+            @unbind="onViewerUnbind"
           />
         </FrameStage>
         <template #aside>
@@ -1089,7 +1253,7 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
             @toggle="toggleStage(g.id)"
           >
             <AssignList class="p-1">
-              <AssignOption v-for="it in g.items" :key="it.value" v-bind="it" @unbind="viewerFrame && m.unassignFrame(viewerFrame.i)" />
+              <AssignOption v-for="it in g.items" :key="it.value" v-bind="it" :data-value="it.value" @select="onViewerSelect(it)" @refuse="onViewerRefuse(it, $event)" @unbind="onViewerUnbind" />
             </AssignList>
           </StageSection>
         </template>
@@ -1156,6 +1320,31 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
               @click="onSummary(b.action)"
             >
               {{ b.t }}
+            </Button>
+          </ModalCardFooter>
+        </ModalCardContent>
+      </ModalCard>
+
+      <!-- ============================ «Перенести кадр?», §11.4 — кит, такт 41 ============================ -->
+      <!-- № 47: ModalCard center 600, «Откуда» — Callout warning, «Куда» — Callout success, примечание — ModalCardText. -->
+      <ModalCard v-model:open="moveOpen">
+        <ModalCardContent>
+          <ModalCardHeader title="Перенести кадр?" subtitle="Кадр уже распределён — перенос это тот же выбор шага, но с подтверждением" />
+          <ModalCardBody class="flex flex-col gap-3">
+            <Callout tone="warning" title="Откуда">
+              {{ m.state.move?.from }}
+            </Callout>
+            <Callout tone="success" title="Куда">
+              {{ m.state.move?.to }}
+            </Callout>
+            <ModalCardText>После переноса автоматического перехода к следующему кадру не будет — останетесь здесь.</ModalCardText>
+          </ModalCardBody>
+          <ModalCardFooter>
+            <Button variant="secondary" @click="moveOpen = false">
+              Отмена
+            </Button>
+            <Button @click="onMoveConfirm">
+              Перенести
             </Button>
           </ModalCardFooter>
         </ModalCardContent>

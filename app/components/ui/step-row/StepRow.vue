@@ -166,6 +166,8 @@ onBeforeUnmount(() => clearTimeout(timer))
       :data-fill="fill"
       :data-verdict="props.verdict?.kind ?? 'none'"
       :data-accepts-drop="acceptsDrop"
+      :data-highlighted="props.highlighted || undefined"
+      :data-flash="flashing || undefined"
       :class="cn(
         stepRowVariants({ tone, dimmed: full }),
         props.demoHover && tone === 'default' ? 'bg-accent' : '',

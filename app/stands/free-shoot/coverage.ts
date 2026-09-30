@@ -39,6 +39,8 @@ export const COVERAGE_STATES = [
   'expand=eq', 'view=review&expand=eq', 'data=empty', 'open=wand&data=empty',
   /* Такт 40: рамка выделения, уведомление с «Отменить». Панель выделения — `selected=demo`. */
   'state=marquee', 'state=undo',
+  /* Такт 41: окно «Перенести кадр?» над просмотром. */
+  'open=move',
 ] as const
 
 const transparent = (c: string) => !c || c === 'transparent' || /rgba\([^)]*,\s*0\)$/.test(c)

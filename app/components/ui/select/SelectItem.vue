@@ -46,6 +46,12 @@ const props = withDefaults(defineProps<{
   /** Булев проп мастера `Checkbox` — режим множественного выбора. */
   checkbox?: boolean
   disabled?: boolean
+  /**
+   * Вид выключенного без запрета нажатия: прозрачность выключенного, без наведения, клик доходит до
+   * потребителя. Пункт назначения, закрытый для приёма (§10.3): нажатие даёт отказ с причиной — прототип
+   * `#popList`, решение чата 2026-09-30, такт 41.
+   */
+  muted?: boolean
 }>(), {
   subtitle: '',
   selected: false,
@@ -53,6 +59,7 @@ const props = withDefaults(defineProps<{
   showIcon: false,
   checkbox: false,
   disabled: false,
+  muted: false,
 })
 </script>
 
@@ -64,8 +71,9 @@ const props = withDefaults(defineProps<{
       'group/item flex min-h-11 w-full items-center gap-3 rounded-md px-4 py-2 text-left',
       selected
         ? (props.tone === 'success' ? 'bg-success-surface ring-1 ring-success ring-inset' : 'bg-list-selected')
-        : 'hover:bg-list-hover',
+        : props.muted ? '' : 'hover:bg-list-hover',
       disabled ? 'pointer-events-none opacity-[var(--opacity-disabled)]' : '',
+      props.muted && !disabled ? 'cursor-default opacity-[var(--opacity-disabled)]' : '',
     ]"
   >
     <!--
@@ -77,7 +85,8 @@ const props = withDefaults(defineProps<{
     <span
       v-if="props.showIcon"
       data-slot="list-item-icon"
-      class="flex h-5 w-4 shrink-0 items-center justify-center opacity-[var(--opacity-icon-muted)] group-hover/item:opacity-100"
+      class="flex h-5 w-4 shrink-0 items-center justify-center opacity-[var(--opacity-icon-muted)]"
+      :class="props.muted ? '' : 'group-hover/item:opacity-100'"
     >
       <slot name="icon">
         <Icon name="link" :size="16" />
@@ -90,7 +99,7 @@ const props = withDefaults(defineProps<{
         class="truncate text-sm font-medium"
         :class="selected
           ? (props.tone === 'success' ? 'text-success-strong' : 'text-field-foreground-hover')
-          : 'text-field-foreground group-hover/item:text-field-foreground-hover'"
+          : props.muted ? 'text-field-foreground' : 'text-field-foreground group-hover/item:text-field-foreground-hover'"
       >
         <slot />
       </span>

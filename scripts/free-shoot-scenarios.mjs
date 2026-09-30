@@ -118,6 +118,33 @@ async function openPage() {
       }
       return p
     },
+    /** Двойной клик по центру элемента: два нажатия, второе с `clickCount: 2` — браузер даёт click, click, dblclick. */
+    async dblclick(sel) {
+      const p = await this.point(sel)
+      for (const n of [1, 2]) for (const type of ['mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: 'left', clickCount: n })
+      await sleep(300)
+    },
+    /** Клик в точке окна — мимо всего (шапка экрана): закрывает плашки, как клик человека мимо. */
+    async clickAt(x, y) {
+      await send('Page.bringToFront')
+      for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 })
+      await sleep(250)
+    },
+    /** Наблюдатель в странице: каждые 10 мс снимает выражения и пишет время первого включения и выключения каждого. */
+    async watch(exprs) {
+      await evaluate(`(() => { clearInterval(window.__wt); const E = { ${Object.entries(exprs).map(([k, e]) => `${JSON.stringify(k)}: () => (${e})`).join(', ')} }
+        const t0 = performance.now(); const first = {}; for (const k in E) first[k] = E[k]()
+        window.__w = { t0, first, on: {}, off: {} }
+        window.__wt = setInterval(() => { const t = performance.now() - t0; for (const k in E) { const v = E[k](); const w = window.__w
+          if (v !== first[k] && w.on[k] == null) w.on[k] = t
+          if (w.on[k] != null && v === first[k] && w.off[k] == null) w.off[k] = t } }, 10); return 1 })()`)
+    },
+    async watched() { return evaluate(`(clearInterval(window.__wt), JSON.stringify(window.__w))`) },
+    /** Указатель в полосу шапки — уход с ленты и панели (`mouseleave`). */
+    async away() {
+      await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 700, y: 10 })
+      await sleep(200)
+    },
     /** Наведение: указатель на центр элемента. */
     async hover(sel) {
       const p = await this.point(sel)
@@ -257,6 +284,27 @@ const prototype = page => ({
   marqueeEdge: (a, n) => sweepEdge(page, i => `document.querySelector('#feed .card[data-i="${i}"]')`, `document.getElementById('feed')`, a, n),
   dragTo: (i, k) => page.drag(`document.querySelector('#feed .card[data-i="${i}"] img')`, `document.querySelector('.step[data-owner="${k.split('|')[0]}"][data-step="${k.split('|')[1]}"] .nm')`),
   savingNow: () => page.evaluate(`document.getElementById('saveState').classList.contains('busy')`),
+  /* П4 */
+  toggleAll: async () => { await page.evaluate(`(document.getElementById('rbody').scrollTop = 0, 1)`); await page.click(`document.querySelector('.schtools [data-coll]')`) },
+  onlyOpen: async () => { await page.evaluate(`(document.getElementById('rbody').scrollTop = 0, 1)`); await page.click(`document.querySelector('.schtools [data-onlyopen]')`) },
+  clickAway: () => page.clickAt(700, 10),
+  foundWatch: () => page.watch({ step: `!!document.querySelector('.step.found')`, thumb: `[...document.querySelectorAll('.th')].some(t => t.style.outline)` }),
+  bindWatch: () => page.watch({ flash: `document.getElementById('lbBind').classList.contains('flash')`, index: `state.lb` }),
+  watched: () => page.watched(),
+  hoverTile: i => page.hover(`document.querySelector('#feed .card[data-i="${i}"] img')`),
+  hoverStep: k => page.hover(`document.querySelector('.step[data-owner="${k.split('|')[0]}"][data-step="${k.split('|')[1]}"] .nm')`),
+  hoverRepeat: id => page.hover(`document.querySelector('.obj[data-obj="${id}"] .obj-h')`),
+  away: () => page.away(),
+  async locate(i) { await page.hover(`document.querySelector('#feed .card[data-i="${i}"] img')`); await page.click(`document.querySelector('#feed .card[data-i="${i}"] .mark .find')`) },
+  found: () => page.evaluate(`JSON.stringify({ step: [...document.querySelectorAll('.step.found')].map(x => x.dataset.owner + '|' + x.dataset.step), thumb: [...document.querySelectorAll('.th')].filter(t => t.style.outline).map(t => +t.dataset.i) })`),
+  dblTile: i => page.dblclick(`document.querySelector('#feed .card[data-i="${i}"] img')`),
+  thumbOpen: (k, n) => page.click(`document.querySelectorAll('.step[data-owner="${k.split('|')[0]}"][data-step="${k.split('|')[1]}"] .th')[${n}]`),
+  lbItem: v => page.click(v.startsWith('obj|') ? `document.querySelector('#lbList [data-setcur="${v.slice(4)}"]')` : `document.querySelector('#lbList .it[data-owner="${v.split('|')[0]}"][data-step="${v.split('|')[1]}"]')`),
+  suggest: () => page.click(`document.querySelector('#lbBind [data-act="suggest"]')`),
+  suggestNo: () => page.click(`document.querySelector('#lbBind [data-act="no"]')`),
+  bindLocate: () => page.click(`document.querySelector('#lbBind [data-act="locate"]')`),
+  bindFlashing: () => page.evaluate(`document.getElementById('lbBind').classList.contains('flash')`),
+  lbIndex: () => page.evaluate(`document.getElementById('lb').classList.contains('show') ? state.lb : -1`),
   tile: i => page.click(`document.querySelector('#feed .card[data-i="${i}"] img')`),
   mode: v => page.click(`document.querySelector('#mode button[data-m="${v}"]')`),
   size: v => page.click(`document.querySelector('#sizer button[data-s="${v === 'lg' ? 272 : 176}"]')`),
@@ -328,13 +376,26 @@ const prototype = page => ({
         text: t(rv.querySelector('.t small').textContent),
         only: rv.querySelector('[data-rev="only"]') ? rv.querySelector('[data-rev="only"]').checked : null,
       } : null,
-      repeats: [...document.querySelectorAll('.obj[data-obj]')].map(o => o.dataset.obj + (o.classList.contains('auto') ? '*' : '')),
-      hints: [...document.querySelectorAll('#rbody .hintbox')].map(h => t(h.textContent)),
+      repeats: [...document.querySelectorAll('.obj[data-obj]')].filter(o => o.getClientRects().length).map(o => o.dataset.obj + (o.classList.contains('auto') ? '*' : '')),
+      hints: [...document.querySelectorAll('#rbody .hintbox')].filter(h => h.getClientRects().length).map(h => t(h.textContent)),
       bind: frames.filter(f => f.objId).map(f => f.i + '>' + f.objId + '|' + f.stepId + (f.auto ? '*' : '')),
       notices: [...document.querySelectorAll('#toasts .toast')].filter(e => !e.dataset.seen).map(e => { e.dataset.seen = '1'; return t(e.querySelector('span').textContent) }),
       selbar: document.querySelector('#selbar.show') ? { count: t(document.getElementById('selN').textContent), sub: t(document.getElementById('selSub').textContent) } : null,
       pop: !!document.querySelector('#pop.show'),
       viewer: document.getElementById('lb').classList.contains('show') ? lbList()[state.lb]?.n ?? null : null,
+      bind: (() => { const lb = document.getElementById('lb'); if (!lb.classList.contains('show')) return null; const b = document.getElementById('lbBind')
+        const name = [...b.querySelectorAll('b')].map(x => t(x.textContent)).filter(x => x !== 'Отклонён проверяющим').pop() ?? ''
+        const blocked = /— шаг (проверен и закрыт|уже заполнен)/.exec(b.textContent)?.[1] ?? ''
+        if (b.querySelector('[data-act="mk"]')) return 'создать: ' + name
+        if (b.querySelector('[data-act="ok"]') || /Предложение:/.test(b.textContent)) return 'предложение: ' + name + (blocked ? ' — ' + blocked : '')
+        return b.classList.contains('on') ? 'распределён: ' + name : 'свободен' })(),
+      linked: [...document.querySelectorAll('#feed .card.linked')].map(c => +c.dataset.i),
+      dim: document.getElementById('feed').classList.contains('linking'),
+      hl: [...document.querySelectorAll('.step.hl')].map(x => x.dataset.owner + '|' + x.dataset.step),
+      hlObj: [...document.querySelectorAll('.obj.hl')].map(x => x.dataset.obj),
+      closed: [...document.querySelectorAll('.stage.closed')].map(x => x.dataset.st),
+      steps: [...document.querySelectorAll('#rbody .step')].filter(x => x.getClientRects().length).map(x => x.dataset.owner + '|' + x.dataset.step),
+      tools: [...document.querySelectorAll('.schtools button')].map(b => t(b.textContent)),
     }
   })()`),
 })
@@ -367,6 +428,27 @@ const kit = page => ({
   marqueeEdge: (a, n) => sweepEdge(page, i => `document.querySelector('[data-slot=frame-tile][data-frame="${i}"]')`, `document.querySelector('.feed')`, a, n),
   dragTo: (i, k) => page.drag(`document.querySelector('[data-slot=frame-tile][data-frame="${i}"] img')`, `document.querySelector('[data-step-key="${k}"] [data-slot=step-row-name]')`),
   savingNow: () => page.evaluate(`window.__freeShoot.state.saving`),
+  /* П4 */
+  toggleAll: async () => { await page.evaluate(`(document.querySelector('.rbody').scrollTop = 0, 1)`); await page.click(`document.querySelectorAll('.schtools button')[0]`) },
+  onlyOpen: async () => { await page.evaluate(`(document.querySelector('.rbody').scrollTop = 0, 1)`); await page.click(`document.querySelectorAll('.schtools button')[1]`) },
+  clickAway: () => page.clickAt(700, 10),
+  foundWatch: () => page.watch({ step: `!!document.querySelector('[data-step-key][data-flash]')`, thumb: `!!document.querySelector('[data-step-key] [data-located]')` }),
+  bindWatch: () => page.watch({ flash: `!!document.querySelector('[data-slot=frame-bind-bar][data-flash]')`, index: `window.__freeShoot.state.lb` }),
+  watched: () => page.watched(),
+  hoverTile: i => page.hover(`document.querySelector('[data-slot=frame-tile][data-frame="${i}"] img')`),
+  hoverStep: k => page.hover(`document.querySelector('[data-step-key="${k}"] [data-slot=step-row-name]')`),
+  hoverRepeat: id => page.hover(`document.querySelector('[data-obj="${id}"] [data-slot=repeat-header]')`),
+  away: () => page.away(),
+  async locate(i) { await page.hover(`document.querySelector('[data-slot=frame-tile][data-frame="${i}"] img')`); await page.click(`document.querySelector('[data-slot=frame-tile][data-frame="${i}"] [data-slot=frame-tile-locate]')`) },
+  found: () => page.evaluate(`JSON.stringify({ step: [...document.querySelectorAll('[data-step-key][data-flash]')].map(x => x.dataset.stepKey), thumb: [...document.querySelectorAll('[data-step-key]')].flatMap(r => { const M = window.__freeShoot; const [o, st] = r.dataset.stepKey.split('|'); return [...r.querySelectorAll('[data-slot=step-thumb]')].map((t, k) => t.dataset.located ? M.framesIn(o, st)[k]?.i : null).filter(x => x != null) }) })`),
+  dblTile: i => page.dblclick(`document.querySelector('[data-slot=frame-tile][data-frame="${i}"] img')`),
+  thumbOpen: (k, n) => page.click(`document.querySelectorAll('[data-step-key="${k}"] [data-slot=step-thumb-open]')[${n}]`),
+  lbItem: v => page.click(`document.querySelector('[role=dialog] [data-value="${v}"]')`),
+  suggest: () => page.click(`[...document.querySelectorAll('[data-slot=frame-bind-bar] button')].find(b => b.textContent.trim() === 'Подобрать шаг')`),
+  suggestNo: () => page.click(`[...document.querySelectorAll('[data-slot=frame-bind-bar] button')].find(b => b.textContent.trim() === 'Не то')`),
+  bindLocate: () => page.click(`[...document.querySelectorAll('[data-slot=frame-bind-bar] button')].find(b => b.textContent.trim() === 'Показать в структуре')`),
+  bindFlashing: () => page.evaluate(`!!document.querySelector('[data-slot=frame-bind-bar][data-flash]')`),
+  lbIndex: () => page.evaluate(`window.__freeShoot.state.lb`),
   tile: i => page.click(`document.querySelector('[data-slot=frame-tile][data-frame="${i}"] img')`),
   mode: v => page.click(`[...document.querySelectorAll('[role=tab]')].find(b => b.textContent.trim() === ${JSON.stringify(v === 'hide' ? 'убирать' : 'оставлять')})`),
   size: v => page.click(`[...document.querySelectorAll('[role=tab]')].find(b => b.textContent.trim() === ${JSON.stringify(v === 'lg' ? 'L' : 'M')})`),
@@ -437,13 +519,25 @@ const kit = page => ({
         text: t(rv.querySelector('[data-slot=callout-text]')?.textContent),
         only: rv.querySelector('[role=checkbox]') ? rv.querySelector('[role=checkbox]').getAttribute('aria-checked') === 'true' : null,
       } : null,
-      repeats: [...document.querySelectorAll('[data-obj]')].map(o => o.dataset.obj + ([...o.querySelectorAll('[data-slot=repeat-header] span')].some(s => t(s.textContent) === 'предложено') ? '*' : '')),
-      hints: [...document.querySelectorAll('[data-slot=stage-note]')].map(h => t(h.textContent)),
+      repeats: [...document.querySelectorAll('[data-obj]')].filter(o => o.getClientRects().length).map(o => o.dataset.obj + ([...o.querySelectorAll('[data-slot=repeat-header] span')].some(s => t(s.textContent) === 'предложено') ? '*' : '')),
+      hints: [...document.querySelectorAll('[data-slot=stage-note]')].filter(h => h.getClientRects().length).map(h => t(h.textContent)),
       bind: M.frames.filter(f => f.objId).map(f => f.i + '>' + f.objId + '|' + f.stepId + (f.auto ? '*' : '')),
       notices: [...document.querySelectorAll('[data-slot=toast]')].filter(e => e.dataset.state !== 'closed' && !e.dataset.seen).map(e => { e.dataset.seen = '1'; return t(e.querySelector('[data-slot=alert] p')?.textContent) }),
       selbar: document.querySelector('[data-slot=action-bar][data-state=open]') ? { count: t(document.querySelector('[data-slot=action-bar-count]').textContent), sub: t(document.querySelector('[data-slot=action-bar-sub]')?.textContent) } : null,
       pop: !!document.querySelector('[data-slot=popover] [data-slot=assign-list]'),
       viewer: M.state.lb >= 0 ? M.visibleMedia()[M.state.lb]?.n ?? null : null,
+      bind: (() => { if (M.state.lb < 0) return null; const b = document.querySelector('[data-slot=frame-bind-bar]'); if (!b) return null
+        const name = [...b.querySelectorAll('b')].map(x => t(x.textContent)).filter(x => x !== 'Отклонён проверяющим').pop() ?? ''
+        const blocked = /— шаг (проверен и закрыт|уже заполнен)/.exec(b.textContent)?.[1] ?? ''
+        if (b.dataset.state === 'suggest') return /Похоже на новый объект/.test(b.textContent) ? 'создать: ' + name : 'предложение: ' + name + (blocked ? ' — ' + blocked : '')
+        return b.dataset.state === 'free' ? 'свободен' : 'распределён: ' + name })(),
+      linked: [...document.querySelectorAll('[data-slot=frame-tile][data-linked]')].map(c => +c.dataset.frame),
+      dim: !!document.querySelector('[data-slot=frame-tile][data-dimmed]'),
+      hl: [...document.querySelectorAll('[data-step-key][data-highlighted]')].map(x => x.dataset.stepKey),
+      hlObj: [...document.querySelectorAll('[data-obj][data-highlighted]')].map(x => x.dataset.obj),
+      closed: [...document.querySelectorAll('[data-stage][data-state=closed]')].map(x => x.dataset.stage),
+      steps: [...document.querySelectorAll('[data-step-key]')].filter(x => x.getClientRects().length).map(x => x.dataset.stepKey),
+      tools: [...document.querySelectorAll('.schtools button')].map(b => t(b.textContent)),
     }
   })()`),
 })
@@ -692,6 +786,135 @@ const SCENARIOS = {
     ['Esc — закрыто окно, выделение на месте', a => a.key('Escape')],
     ['Esc — снято выделение', a => a.key('Escape')],
   ]],
+  /* ------------------------------ П4, такт 41 ------------------------------ */
+  'С-07/закрытый пункт': ['поповер: закрытый пункт даёт отказ с причиной, плашка открыта (решение чата, такт 41)', [
+    ['кадр 21', a => a.tile(21)],
+    ['«Назначить на шаг»', a => a.selbar('toStep')],
+    ['закрытый «Генплан» — отказ', a => a.popOption('gen|g1')],
+    ['«Фото с представителем» — привязка', a => a.popOption('fin|f3')],
+    ['кадр 23', a => a.tile(23)],
+    ['«Назначить на шаг» — снова', a => a.selbar('toStep')],
+    ['заполненный «Фото с представителем» — отказ', a => a.popOption('fin|f3')],
+    ['клик мимо — плашка закрыта', a => a.clickAway()],
+  ]],
+  'С-17': ['«Свернуть все / Развернуть все», «Только открытые», «Скрыто проверенных шагов» (§9.1–9.2)', [
+    ['«Свернуть все»', a => a.toggleAll()],
+    ['«Развернуть все»', a => a.toggleAll()],
+    ['заголовок o2 — раскрыть', a => a.repeat('o2')],
+    ['«Только открытые»', a => a.onlyOpen()],
+    ['«Показать все (+N)»', a => a.onlyOpen()],
+  ]],
+  'С-21': ['наведение в обе стороны без прокрутки (§15.1–15.2)', [
+    ['кадр 1 — шаг свёрнут, подсветки нет', a => a.hoverTile(1)],
+    ['заголовок o2 — раскрыть: кадры объекта', a => a.repeat('o2')],
+    ['кадр 1 — шаг виден: шаг и объект', a => a.hoverTile(1)],
+    ['шаг «Шильдик» — его кадры', a => a.hoverStep('o2|e1')],
+    ['шаг g4 — кадры сняты в шаге, лента приглушена', a => a.hoverStep('gen|g4')],
+    ['заголовок o2 — кадры объекта', a => a.hoverRepeat('o2')],
+    ['указатель ушёл', a => a.away()],
+  ], { hover: true }],
+  'С-22': ['«Показать в структуре»: раскрытие, текущий, снять фильтр, вспышка, обводка (§15.3)', [
+    ['кадр 1 — показать в структуре', a => findProbe(a, 1)],
+    ['«Только открытые»', a => a.onlyOpen()],
+    ['кадр 2 — показать: фильтр снят', a => findProbe(a, 2)],
+  ], { hover: true }],
+  'С-22/не найден': ['«Шаг не найден в структуре»: объект скрыт фильтром приёмки (§15.3)', [
+    ['открыть запуск', a => a.wand()],
+    ['запустить полное', a => a.windowButton('Запустить')],
+    ['конец обработки', a => a.waitWand()],
+    ['«К проверке»', a => a.windowButton('К проверке')],
+    ['кадр 1 — показать: объект скрыт', a => a.locate(1)],
+  ]],
+  'С-23': ['просмотр: иконка, двойной клик, миниатюра, ← →, Esc (§11, §9.7)', [
+    ['кадр 21 — иконкой', a => a.viewer(21)],
+    ['→', a => a.key('ArrowRight')],
+    ['← ←', async (a) => { await a.key('ArrowLeft'); await a.key('ArrowLeft') }],
+    ['Esc', a => a.key('Escape')],
+    /* Прототип двойным кликом просмотр не открывает: первый клик перерисовывает ленту, узел плитки подменён, dblclick не приходит.
+       Кит открывает, как хочет код прототипа и спека (§11.1), — строка реестра расхождений; шаг кадр просмотра не сравнивает. */
+    ['двойной клик по кадру 23', a => a.dblTile(23), { skip: ['viewer', 'bind'] }],
+    ['Esc — после двойного клика', a => a.key('Escape')],
+    ['заголовок o2 — раскрыть', a => a.repeat('o2')],
+    ['миниатюра кадра 1 в «Шильдике»', a => a.thumbOpen('o2|e1', 0)],
+    ['← у первого кадра', a => a.key('ArrowLeft')],
+    ['Esc — после миниатюры', a => a.key('Escape')],
+  ]],
+  'С-24': ['просмотр, сценарий А: привязка, вспышка, переход через 820 мс; 1–N (§11.3)', [
+    ['заголовок o2 — текущий', a => a.repeat('o2')],
+    ['просмотр кадра 20', a => a.viewer(20)],
+    ['4 — вспышка и переход', a => flashProbe(a, () => a.key('4', 'Digit4'))],
+    ['пункт «Узлы и агрегаты» для кадра 21', a => flashProbe(a, () => a.lbItem('o2|e4'))],
+    ['пункт «Узлы и агрегаты» для видео 22 — не тот тип', a => a.lbItem('o2|e4')],
+    ['закрытый пункт «Шильдик» — отказ', a => a.lbItem('o2|e1')],
+    ['«сделать текущим» o1', a => a.lbItem('obj|o1')],
+    ['Esc', a => a.key('Escape')],
+  ]],
+  'С-25': ['просмотр, сценарий Б: «Перенести кадр?», без перехода (§11.4)', [
+    ['заголовок o2 — текущий', a => a.repeat('o2')],
+    ['просмотр кадра 21', a => a.viewer(21)],
+    ['4 — привязка', a => flashProbe(a, () => a.key('4', 'Digit4'))],
+    ['← к кадру 21', a => a.key('ArrowLeft')],
+    ['5 — окно «Перенести кадр?»', a => a.key('5', 'Digit5')],
+    ['«Отмена»', a => a.windowButton('Отмена')],
+    ['5 — снова', a => a.key('5', 'Digit5')],
+    ['«Перенести» — вспышка, кадр остаётся', a => flashProbe(a, () => a.windowButton('Перенести'))],
+    ['«Открепить» на плашке', a => a.bindUnbind()],
+    ['Esc', a => a.key('Escape')],
+    ['просмотр кадра 1 — привязан до вас', a => a.viewer(1)],
+    ['5 — перенести нельзя', a => a.key('5', 'Digit5')],
+    ['«Показать в структуре» на плашке', a => a.bindLocate().then(() => sleep(400))],
+  ]],
+  'С-26': ['«Подобрать шаг»: закрытый шаг, новый объект, «Не то», честный отказ (§12.14)', [
+    ['просмотр кадра 6', a => a.viewer(6)],
+    ['«Подобрать шаг» — шаг закрыт', a => a.suggest()],
+    ['Enter — у закрытого не действует', a => a.key('Enter', 'Enter', { text: '\r' })],
+    ['«Не то»', a => a.suggestNo()],
+    ['→ кадр 7', a => a.key('ArrowRight')],
+    ['«Подобрать шаг» — новый объект', a => a.suggest()],
+    ['«Не то» — снова', a => a.suggestNo()],
+    ['Esc', a => a.key('Escape')],
+    ['просмотр кадра 23', a => a.viewer(23)],
+    ['«Подобрать шаг» — не распознан', a => a.suggest()],
+    ['Esc — после отказа', a => a.key('Escape')],
+  ]],
+  'С-26/пустой': ['«Подобрать шаг» → Enter: привязка, вспышка, переход (§12.14) · «Пустой осмотр»', [
+    ['просмотр кадра 6', a => a.viewer(6)],
+    ['«Подобрать шаг» — «Общий вид территории»', a => a.suggest()],
+    ['Enter — принять', a => flashProbe(a, () => a.key('Enter', 'Enter', { text: '\r' }))],
+    ['Esc', a => a.key('Escape')],
+  ], { dataset: 'empty' }],
+}
+
+/**
+ * Замер «Показать в структуре» (С-22): какой шаг вспыхнул и какая миниатюра обведена — в сравнение (`probe`); сколько
+ * держатся вспышка и обводка — в замеры (`measure`, печатаются, не сравниваются). Время снимает наблюдатель в странице,
+ * задержка CDP в числа не входит. После действия указатель уходит: прототип теряет подсветку наведения при перерисовке.
+ */
+async function findProbe(a, i) {
+  await a.foundWatch()
+  await a.locate(i)
+  a.probe = [JSON.parse(await a.found())]
+  await a.away()
+  await sleep(2000)
+  const w = JSON.parse(await a.watched())
+  const span = k => (w.on[k] != null && w.off[k] != null ? Math.round(w.off[k] - w.on[k]) : null)
+  a.measure = { 'вспышка шага, мс': span('step'), 'обводка миниатюры, мс': span('thumb') }
+}
+/**
+ * Замер привязки в просмотре (С-24–26): вспышка плашки и переход к следующему кадру. В сравнение — были ли вспышка и
+ * переход; длительности — в замеры: вспышка от включения до выключения, переход — от включения вспышки.
+ */
+async function flashProbe(a, act) {
+  await a.bindWatch()
+  await act()
+  await sleep(1400)
+  const w = JSON.parse(await a.watched())
+  const on = w.on.flash
+  a.probe = [on != null, w.on.index != null]
+  a.measure = {
+    'вспышка плашки, мс': on != null && w.off.flash != null ? Math.round(w.off.flash - on) : null,
+    'переход после начала вспышки, мс': on != null && w.on.index != null ? Math.round(w.on.index - on) : null,
+  }
 }
 
 /** Кадры для глубины отмены: 21 свободное фото ленты. */
@@ -725,6 +948,7 @@ async function run(id) {
   const K = kit(kp)
   const fails = []
   const kept = {}
+  const measures = []
   let snaps = 0
   try {
     await P.start(opts.dataset)
@@ -750,17 +974,21 @@ async function run(id) {
       /* Замер действия (С-14): сохранение идёт сразу после операции и закончилось через 0.9 с. */
       ;[[a, P], [b, K]].forEach(([x, side]) => { if (side.probe) { x.probe = side.probe; side.probe = null } })
       if (process.env.DEBUG_PROBE && (a.probe || b.probe)) console.log('   замер', name, JSON.stringify(a.probe), JSON.stringify(b.probe))
+      if (P.measure || K.measure) { measures.push({ step: name, p: P.measure, k: K.measure }); P.measure = null; K.measure = null }
       /* Шаг, где раскладка ленты различается до вёрстки П5, сравнивает только названные поля. */
       if (o.only) for (const x of [a, b]) for (const key of Object.keys(x)) if (!o.only.includes(key)) delete x[key]
       /* Шаг-цикл: стороны действуют по очереди, и уведомления первой истекают, пока идёт вторая, — их шаг не сравнивает. */
       if (o.skip) for (const x of [a, b]) for (const key of o.skip) delete x[key]
+      /* Подсветку наведения сравнивают сценарии наведения (опция сценария `hover`): в остальных указатель остаётся там, где
+         кликнул, а прототип пересчитывает подсветку, когда перерисовка подменяет узел под курсором, — строка реестра, такт 41. */
+      if (!opts.hover) for (const x of [a, b]) for (const key of ['linked', 'dim', 'hl', 'hlObj']) delete x[key]
       snaps += 2
       const d = diff(a, b)
       if (d.length) fails.push({ step: name, lines: d })
     }
   }
   finally { await pp.close(); await kp.close() }
-  return { id, title, steps: steps.length, snaps, fails }
+  return { id, title, steps: steps.length, snaps, fails, measures }
 }
 
 await ensureChrome()
@@ -780,6 +1008,7 @@ for (const id of ids) {
     for (const f of r.fails) { console.log(`   шаг «${f.step}»:`); f.lines.forEach(l => console.log(`     ${l}`)) }
   }
   else console.log(`✓ ${r.id} ${r.title} — шагов ${r.steps}, слепков ${r.snaps}, совпали`)
+  for (const x of r.measures) console.log(`   замер «${x.step}»: прототип ${JSON.stringify(x.p)} · кит ${JSON.stringify(x.k)}`)
 }
 console.log(`\nСценариев ${ids.length}, зелёных ${ids.length - failed}; шагов ${totalSteps}, слепков ${totalSnaps}`)
 process.exit(failed ? 1 : 0)

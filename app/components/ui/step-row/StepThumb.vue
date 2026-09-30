@@ -71,6 +71,7 @@ const removable = computed(() => props.state === 'free' || props.state === 'sugg
   <div
     data-slot="step-thumb"
     :data-state="props.state"
+    :data-located="props.located || undefined"
     :class="cn(stepThumbVariants({ state: props.state, located: props.located }), props.class)"
   >
     <Tooltip>

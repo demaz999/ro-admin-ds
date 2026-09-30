@@ -56,7 +56,11 @@ export interface Dataset { frames: Frame[], objects: Repeat[], review: Record<st
 export interface Block { a: number, b: number, kind: 'eq' | 'bld' | 'terr', inv: string, shop: string, title: string, st: string }
 
 /** Окно поверх экрана: у прототипа одно (`#modal`), плюс прогресс автораспределения. */
-export type ScreenWindow = null | 'hotkeys' | 'form' | 'progress' | 'wand' | 'summary' | 'finish'
+export type ScreenWindow = null | 'hotkeys' | 'form' | 'progress' | 'wand' | 'summary' | 'finish' | 'move'
+/** Подбор шага для кадра (§12.14) — прототип `suggestFor`: существующий шаг или новый объект. */
+export type Suggestion =
+  | { kind: 'step', owner: string, stepId: string, stepName: string, ownerName: string, blocked?: 'frozen' | 'full' }
+  | { kind: 'create', stage: string, title: string, inv: string, stepId: string, stageTitle: string }
 export interface Notice { id: number, text: string, kind: 'ok' | 'err', undo: boolean }
 
 /** Режим автораспределения (§12.1): полное, только структура, только кадры. */
@@ -110,6 +114,8 @@ export interface UiState {
   formWin: { obj: string, group: string } | null
   /** Стек отмены (§10.6) — прототип `state.undo`: на операцию — прежние привязки её кадров. Глубина не ограничена. */
   undo: { i: number, o: string | null, s: string | null }[][]
+  /** Окно «Перенести кадр?» (§11.4, № 47): кадр, куда, тексты «Откуда» и «Куда». */
+  move: { i: number, owner: string, stepId: string, from: string, to: string } | null
   /** Идущее автораспределение — окно прогресса (§12.5). */
   run: WandRun | null
   /** Сводка результата автораспределения — окно `summary` (§12.12). */
@@ -132,7 +138,7 @@ export interface ModelOptions {
   /** Блоки съёмки для автораспределения — `window.VA_BLOCKS` прототипа. */
   blocks?: Block[]
   /** Начальное состояние интерфейса — оснастка адреса и выбор стенда. */
-  initial?: Partial<Omit<UiState, 'sel' | 'open' | 'closed' | 'formOpen' | 'undo'>> & { sel?: number[], open?: string[] }
+  initial?: Partial<Omit<UiState, 'sel' | 'open' | 'closed' | 'formOpen' | 'undo' | 'move'>> & { sel?: number[], open?: string[] }
 }
 
 export function createModel(opts: ModelOptions) {
@@ -163,6 +169,7 @@ export function createModel(opts: ModelOptions) {
     win: init.win ?? null,
     formWin: init.formWin ?? null,
     undo: [],
+    move: null,
     run: null,
     summary: null,
     saving: false,
@@ -797,6 +804,89 @@ export function createModel(opts: ModelOptions) {
   /** Метка перетаскивания — прототип `#ghost`: «N кадров» или имя файла одного кадра. */
   const dragLabel = (drag: number[]) => (drag.length > 1 ? plural(drag.length, 'кадр', 'кадра', 'кадров') : frameByI[drag[0]!]?.n ?? '')
 
+  /* ------------------------------ П4: панель (§9.1–9.2) ------------------------------ */
+  /** «Свернуть все» / «Развернуть все» — прототип `data-coll`: все свёрнуты — развернуть, иначе свернуть все. */
+  const allClosed = computed(() => STAGES.every(s => state.closed.has(s.id)))
+  function toggleAllStages() {
+    if (allClosed.value) state.closed.clear()
+    else STAGES.forEach(s => state.closed.add(s.id))
+  }
+  /** «Только открытые» / «Показать все (+N)» — прототип `data-onlyopen`: проверенные шаги убираются с глаз. */
+  function toggleOnlyOpen() { state.onlyOpen = !state.onlyOpen }
+
+  /* ------------------------------ П4: связь (§15.3) ------------------------------ */
+  /**
+   * «Показать в структуре» — прототип `locateFrame`, часть модели: вкладка «Схема», этап раскрыт, повтор текущий и
+   * раскрыт, фильтр «Только открытые» снят, если прячет шаг. Найти строку, прокрутить и зажечь — страница;
+   * не нашла — «Шаг не найден в структуре». Возвращает шаг кадра или `null` («Кадр не распределён»).
+   */
+  function locateFrame(i: number) {
+    const f = frameByI[i]
+    if (!f || !f.objId) { notify('Кадр не распределён'); return null }
+    const o = O(f.objId)
+    state.closed.delete(o ? o.stageId : f.objId)
+    if (o) { state.cur = o.id; state.open.add(o.id) }
+    if (state.onlyOpen && isFrozen(f.objId, f.stepId!)) state.onlyOpen = false
+    state.rtab = 'scheme'
+    return { owner: f.objId, stepId: f.stepId! }
+  }
+
+  /* ------------------------------ П4: привязка в просмотре (§11.3–11.4, §12.14) ------------------------------ */
+  /**
+   * Прототип `lbAssign`: защищённый кадр, закрытый и заполненный шаг — отказ; кадр уже в другом шаге — окно
+   * «Перенести кадр?» (`confirm`), иначе тихая привязка (`done`) — вспышку и переход через 820 мс делает страница.
+   */
+  function lbAssign(i: number, owner: string, stepId: string): 'done' | 'confirm' | null {
+    const f = frameByI[i]
+    if (!f) return null
+    if (f.lock || f.rej) { notify(`${frameWhy(f)} — перенести нельзя`, 'err'); return null }
+    const stage = ownerStage(owner)!
+    const st = stage.steps.find(x => x.id === stepId)!
+    if (isFrozen(owner, stepId)) { notify('Шаг проверен и закрыт — добавить нельзя', 'err'); return null }
+    if (stepFull(owner, st) && !(f.objId === owner && f.stepId === stepId)) { notify('Шаг уже заполнен', 'err'); return null }
+    if (f.objId) {
+      const cs = ownerStage(f.objId)!.steps.find(x => x.id === f.stepId)
+      state.move = { i, owner, stepId, from: `${ownerLabel(f.objId)} · ${cs ? cs.n : '—'}`, to: `${ownerLabel(owner)} · ${st.n}` }
+      state.win = 'move'
+      return 'confirm'
+    }
+    return assign([i], owner, stepId, true) ? 'done' : null
+  }
+  /** «Перенести» окна № 47 — тихая привязка; без перехода к следующему кадру (§11.4). */
+  function confirmMove() {
+    const mv = state.move
+    closeWindow()
+    state.move = null
+    return !!mv && assign([mv.i], mv.owner, mv.stepId, true)
+  }
+  /** Прототип `suggestFor`: блок съёмки кадра → шаг существующего объекта, новый объект или `null` (не распознано). */
+  function suggestFor(f: Frame): Suggestion | null {
+    const b = BLOCKS.find(x => f.i >= x.a && f.i <= x.b)
+    if (!b) return null
+    if (b.kind === 'terr') return stepSuggestion('gen', f.k === 'plan' ? 'g1' : 'g4')
+    const stageId = b.kind === 'bld' ? 'bld' : 'eq'
+    const stepId = stageId === 'eq' ? autoStepEq(f) : (f.k === 'building' ? 'b1' : 'b2')
+    const o = stageId === 'eq'
+      ? (b.inv && objects.find(x => x.stageId === 'eq' && x.form.inv === b.inv)) || objects.find(x => x.stageId === 'eq' && !x.form.inv && x.form.mark === b.title)
+      : objects.find(x => x.stageId === 'bld' && x.form.no === (b.shop || b.title))
+    if (o) return stepSuggestion(o.id, stepId)
+    if (stageId === 'eq' && !b.inv) return null // идентификатор не распознан — не угадываем
+    return { kind: 'create', stage: stageId, title: b.shop || b.title, inv: b.inv || '', stepId, stageTitle: stageById[stageId]!.title }
+  }
+  function stepSuggestion(owner: string, stepId: string): Suggestion {
+    const st = ownerStage(owner)!.steps.find(x => x.id === stepId)!
+    const blocked = isFrozen(owner, stepId) ? 'frozen' as const : stepFull(owner, st) ? 'full' as const : undefined
+    return { kind: 'step', owner, stepId, stepName: st.n, ownerName: ownerLabel(owner), blocked }
+  }
+  /** «Подобрать шаг» — прототип `lbSuggest`: предложение или честный отказ. */
+  function lbSuggest(i: number) {
+    const f = frameByI[i]
+    if (!f) return null
+    const sg = suggestFor(f)
+    if (!sg) notify('Не удалось подобрать: идентификатор рядом с кадром не распознан', 'err')
+    return sg
+  }
+
   return {
     STAGES,
     stageById,
@@ -882,6 +972,15 @@ export function createModel(opts: ModelOptions) {
     pressDigit,
     dragStart,
     dragLabel,
+    /* П4 */
+    allClosed,
+    toggleAllStages,
+    toggleOnlyOpen,
+    locateFrame,
+    lbAssign,
+    confirmMove,
+    suggestFor,
+    lbSuggest,
   }
 }
 

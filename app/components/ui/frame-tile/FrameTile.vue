@@ -109,6 +109,8 @@ function onKeydown(event: KeyboardEvent) {
   <div
     data-slot="frame-tile"
     :data-state="props.state"
+    :data-linked="props.linked || undefined"
+    :data-dimmed="props.dimmed || undefined"
     role="checkbox"
     tabindex="0"
     :aria-checked="props.selected"

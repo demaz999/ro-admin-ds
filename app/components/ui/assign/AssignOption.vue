@@ -55,7 +55,12 @@ const props = withDefaults(defineProps<{
   demoHover: false,
 })
 
-const emit = defineEmits<{ select: []; unbind: [] }>()
+/**
+ * `refuse` — нажат пункт, закрытый для приёма: заморожен (`frozen`), заполнен (`full`) или кадр привязан до вас (`locked`).
+ * Вид пункта — выключенный, отказ с причиной даёт страница текстом §18: прототип `#popList` и `#lbList`, решение чата
+ * 2026-09-30, такт 41 (до него пункт был выключен и нажатие не доходило).
+ */
+const emit = defineEmits<{ select: []; unbind: []; refuse: [reason: 'frozen' | 'full' | 'locked'] }>()
 
 const fill = computed(() => stepFill(props.count, props.min, props.max, false))
 const isStep = computed(() => props.type === 'step')
@@ -88,6 +93,12 @@ const lead = computed(() => {
 
 const counter = computed(() => stepCounterText(props.count, props.min, props.max))
 
+/** Нажатие мимо выбора Reka: выключенный пункт `ListboxItem` события `select` не даёт — отказ ловится кликом. */
+function onClick() {
+  if (props.bound === 'locked') emit('refuse', 'locked')
+  else if (closed.value) emit('refuse', props.frozen ? 'frozen' : 'full')
+}
+
 function onSelect(event: Event) {
   if (inert.value) {
     event.preventDefault()
@@ -107,8 +118,9 @@ function onSelect(event: Event) {
       :subtitle="subtitle"
       :selected="!!props.bound"
       :tone="props.bound ? 'success' : 'default'"
-      :disabled="closed"
+      :muted="closed"
       :show-icon="!!lead"
+      @click="onClick"
       :class="cn(
         'cursor-pointer outline-none',
         /*

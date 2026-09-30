@@ -64,6 +64,7 @@ const rail = computed(() => (props.highlighted ? 'highlighted' : props.current ?
   <div
     data-slot="repeat-card"
     :data-state="props.open ? 'open' : 'closed'"
+    :data-highlighted="props.highlighted || undefined"
     :class="cn('border-b border-border-soft', props.class)"
   >
     <button
