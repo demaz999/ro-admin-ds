@@ -112,7 +112,9 @@ export const frameTilePlateVariants = cva(
  * Сетка ленты: `auto-fill` с минимальной шириной колонки (спека §8.1). Минимум
  * M = 176 — ступень `MediaGalleryItem` md, L = 272 — ширина варианта `16:10`
  * мастера `Image` `174:3128`. Промежуток 16 (`MediaGallery` md) вместо 9
- * прототипа: число колонок при 1440 и 1280 то же — закрыто фактом в разборе.
+ * прототипа: число колонок при 1440 и 1280 то же — закрыто фактом в разборе. На других ширинах
+ * (панель с разделителем, такт 42) `auto-fill` с зазором 16 расходится с прототипом в узких окнах
+ * ширин — поэтому страница передаёт число колонок явно (`columns`, `frameTileColumns`).
  */
 export const frameTileGridVariants = cva('grid items-start gap-4', {
   variants: {
@@ -120,9 +122,38 @@ export const frameTileGridVariants = cva('grid items-start gap-4', {
       md: 'grid-cols-[repeat(auto-fill,minmax(--spacing(44),1fr))]',
       lg: 'grid-cols-[repeat(auto-fill,minmax(--spacing(68),1fr))]',
     },
+    /**
+     * Число колонок явно — такт 42, решение чата 2026-09-30: число колонок ленты — структура прототипа при той же
+     * ширине окна и панели. Страница считает его правилом `frameTileColumns` и передаёт сюда; без него — `auto-fill`.
+     */
+    columns: {
+      1: 'grid-cols-[repeat(1,minmax(0,1fr))]',
+      2: 'grid-cols-[repeat(2,minmax(0,1fr))]',
+      3: 'grid-cols-[repeat(3,minmax(0,1fr))]',
+      4: 'grid-cols-[repeat(4,minmax(0,1fr))]',
+      5: 'grid-cols-[repeat(5,minmax(0,1fr))]',
+      6: 'grid-cols-[repeat(6,minmax(0,1fr))]',
+      7: 'grid-cols-[repeat(7,minmax(0,1fr))]',
+      8: 'grid-cols-[repeat(8,minmax(0,1fr))]',
+      9: 'grid-cols-[repeat(9,minmax(0,1fr))]',
+      10: 'grid-cols-[repeat(10,minmax(0,1fr))]',
+      11: 'grid-cols-[repeat(11,minmax(0,1fr))]',
+      12: 'grid-cols-[repeat(12,minmax(0,1fr))]',
+    },
   },
   defaultVariants: { size: 'md' },
 })
+
+/**
+ * Число колонок ленты по правилу прототипа (`.grid`: `repeat(auto-fill, minmax(var(--card), 1fr))`, зазор 9, `--card`
+ * 176 / 272): сколько колонок прототип уложил бы в ту же ширину. Зазор кита 16 — вид; число колонок — структура
+ * (решение чата 2026-09-30, такт 42). `width` — ширина содержимого сетки.
+ */
+export function frameTileColumns(width: number, size: 'md' | 'lg' = 'md') {
+  const card = size === 'lg' ? 272 : 176
+  const gap = 9
+  return Math.min(12, Math.max(1, Math.floor((width + gap) / (card + gap)))) as 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12
+}
 
 export type FrameTileState = 'free' | 'assigned' | 'suggested' | 'locked' | 'rejected'
 export type FrameTileGridVariants = VariantProps<typeof frameTileGridVariants>

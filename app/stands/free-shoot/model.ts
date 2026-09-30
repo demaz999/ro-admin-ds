@@ -56,7 +56,7 @@ export interface Dataset { frames: Frame[], objects: Repeat[], review: Record<st
 export interface Block { a: number, b: number, kind: 'eq' | 'bld' | 'terr', inv: string, shop: string, title: string, st: string }
 
 /** Окно поверх экрана: у прототипа одно (`#modal`), плюс прогресс автораспределения. */
-export type ScreenWindow = null | 'hotkeys' | 'form' | 'progress' | 'wand' | 'summary' | 'finish' | 'move'
+export type ScreenWindow = null | 'hotkeys' | 'form' | 'progress' | 'wand' | 'summary' | 'finish' | 'move' | 'entry'
 /** Подбор шага для кадра (§12.14) — прототип `suggestFor`: существующий шаг или новый объект. */
 export type Suggestion =
   | { kind: 'step', owner: string, stepId: string, stepName: string, ownerName: string, blocked?: 'frozen' | 'full' }
@@ -69,7 +69,7 @@ export const MODE_T: Record<WandMode, string> = { full: 'полное', struct: 
 /** Идущее автораспределение (§12.5) — прототип `runWand`: доля `k` растёт по таймеру. */
 export interface WandRun { mode: WandMode, total: number, notes: number, objN: number, k: number }
 /** Блок окна: `.sum` прототипа — тон, заголовок, текст. */
-export interface WindowBlock { tone: 'success' | 'warning' | 'destructive', title: string, text: string }
+export interface WindowBlock { tone: 'success' | 'warning' | 'destructive', title: string, text: string, list?: string[] }
 /** Сводка результата (§12.12) — прототип `wandSummary`, тексты собраны в момент вызова, как у прототипа. */
 export interface WandSummary {
   mode: WandMode
@@ -137,6 +137,8 @@ export interface ModelOptions {
   general: Record<string, string>
   /** Блоки съёмки для автораспределения — `window.VA_BLOCKS` прототипа. */
   blocks?: Block[]
+  /** Сценарий исходного состояния — прототип `scen`: окно входа говорит о нём (`review` — «Частично проверен», `empty`). */
+  scenario?: 'review' | 'empty'
   /** Начальное состояние интерфейса — оснастка адреса и выбор стенда. */
   initial?: Partial<Omit<UiState, 'sel' | 'open' | 'closed' | 'formOpen' | 'undo' | 'move'>> & { sel?: number[], open?: string[] }
 }
@@ -887,6 +889,71 @@ export function createModel(opts: ModelOptions) {
     return sg
   }
 
+  /* ------------------------------ П5: каркас (§8.6, §17.4–17.6, окно входа) ------------------------------ */
+  /** Поиск по расшифровкам и именам файлов (§8.6) — прототип `#feedSearch`: фильтр ленты. */
+  function setQuery(q: string) { state.q = q }
+
+  /** Сводка завершения (№ 55, §17.4–17.6) — прототип `#btnDone`: тексты в момент открытия. */
+  const finishWindow = computed(() => {
+    const media = freeFrames()
+    const placed = media.filter(f => f.objId).length
+    const left = media.length - placed
+    const bad: string[] = []
+    STAGES.filter(s => !s.rep).forEach(s => s.steps.forEach((x) => { if (x.req && !stepOk(s.id, x)) bad.push(`${s.title} — «${x.n}»`) }))
+    objects.forEach(o => stageById[o.stageId]!.steps.forEach((x) => { if (x.req && !stepOk(o.id, x)) bad.push(`${objName(o)} — «${x.n}»`) }))
+    const nb = objects.filter(o => o.stageId === 'bld').length
+    const ne = objects.filter(o => o.stageId === 'eq').length
+    const pre = frames.filter(f => isMedia(f) && f.lock).length
+    const frz = frzSteps()
+    const blocks: WindowBlock[] = [{
+      tone: 'success',
+      title: `Оформлено: ${plural(nb, 'здание', 'здания', 'зданий')}, ${plural(ne, 'единица', 'единицы', 'единиц')} оборудования`,
+      text: `Из свободной съёмки разложено ${placed} из ${media.length}${pre ? `. Плюс ${pre} кадров были закреплены до вас` : ''}`,
+    }]
+    if (frz) blocks.push({ tone: 'success', title: `Проверено и заморожено шагов: ${frz}`, text: 'Их содержимое уходит в Core без изменений.' })
+    if (general.number && Number(general.number) !== ne) {
+      blocks.push({ tone: 'warning', title: 'Расхождение с общей формой', text: `По документам ${general.number} объектов, оформлено ${ne}. Заполните «Имущество, которое не удалось осмотреть».` })
+    }
+    if (bad.length) {
+      blocks.push({ tone: 'destructive', title: `Не закрыты обязательные шаги: ${bad.length}`, text: '', list: [...bad.slice(0, 6), ...(bad.length > 6 ? [`…и ещё ${bad.length - 6}`] : [])] })
+    }
+    if (left) blocks.push({ tone: 'warning', title: `Не распределено: ${plural(left, 'кадр', 'кадра', 'кадров')}`, text: 'Останутся в свободной съёмке.' })
+    return { blocks, note: 'Голосовые комментарии не распределяются и остаются в свободной съёмке как есть.' }
+  })
+  /** «Завершить» сводки — демо прототипа: привязки «уходят в Core». */
+  function finish() {
+    closeWindow()
+    notify('Отправлено в Core (демо)')
+  }
+
+  /**
+   * Окно входа (№ 59) — прототип `showEntry`: сводка состояния осмотра при загрузке. Переключатель сценариев внутри окна —
+   * оснастка прототипа, не переносится (раздел 15). Заголовок и подзаголовок — строки прототипа.
+   */
+  const SCEN = opts.scenario ?? 'review'
+  const entryWindow = computed(() => {
+    const free = freeFrames()
+    const left = free.filter(f => !f.objId).length
+    const pre = frames.filter(f => isMedia(f) && f.lock).length
+    const fromStep = frames.filter(f => isMedia(f) && f.origin === 'step').length
+    const notes = frames.filter(f => !isMedia(f)).length
+    const frz = frzSteps()
+    const blocks: WindowBlock[] = SCEN === 'empty'
+      ? [{ tone: 'warning', title: 'Осмотр пустой', text: 'Ни один шаг не заполнен, повторов нет — вся структура появится из свободной съёмки.' }]
+      : [
+          { tone: 'success', title: `Осмотр уже проверен частично: ${plural(frz, 'шаг', 'шага', 'шагов')} заморожено`, text: 'Проверяющий прошёл по схеме 20 июня. Шаги с решением «Ок» закрыты: дописать туда нельзя, открепить оттуда тоже. Они помечены замком.' },
+          { tone: 'warning', title: 'По шагу «Общий вид» линии POLYPRISE вынесено «Повторить»', text: 'Старые кадры помечены отклонёнными и остаются в истории, но место в шаге освободилось — нужно переснять и разложить заново.' },
+          { tone: 'warning', title: `${plural(pre, 'кадр', 'кадра', 'кадров')} привязано до вас`, text: `${plural(fromStep, 'кадр', 'кадра', 'кадров')} сняты прямо в шагах, ${plural(pre - fromStep, 'кадр', 'кадра', 'кадров')} разложены из свободной съёмки в прошлый заход. Счётчик «Кадры разложены» считает только вашу работу.` },
+        ]
+    blocks.push({ tone: 'warning', title: `Свободная съёмка: ${plural(left, 'кадр', 'кадра', 'кадров')} не распределено`, text: `Плюс ${notes} голосовых и текстовых заметок — они остаются как контекст.` })
+    return { title: 'Распределение свободной съёмки', sub: '208 кадров и 8 видео, 13 июня 2018, 09:43–11:40', blocks }
+  })
+  /** «Распределить автоматически» окна входа — окно закрывается, через 80 мс запуск (`magicWand`), как у прототипа. */
+  function entryAuto() {
+    closeWindow()
+    setTimeout(magicWand, 80)
+  }
+
   return {
     STAGES,
     stageById,
@@ -981,6 +1048,12 @@ export function createModel(opts: ModelOptions) {
     confirmMove,
     suggestFor,
     lbSuggest,
+    /* П5 */
+    setQuery,
+    finishWindow,
+    finish,
+    entryWindow,
+    entryAuto,
   }
 }
 

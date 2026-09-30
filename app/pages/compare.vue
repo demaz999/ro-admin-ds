@@ -1343,7 +1343,7 @@ const textareaVariants = [
     -->
     <section data-theme="rososmotr" class="space-y-3 bg-background font-sans text-foreground">
       <h2 class="text-lg font-bold">
-        FrameTile · StepRow · StepThumb · Progress · ProgressStat · StageSection · RepeatCard · AssignOption · FrameBindBar · ModalCard · FieldSet · Callout · RadioGroupItem card · ActionBar · SelectionMarquee — без эталона, такты 30–36, 39–40
+        FrameTile · StepRow · StepThumb · Progress · ProgressStat · StageSection · RepeatCard · AssignOption · FrameBindBar · ModalCard · FieldSet · Callout · RadioGroupItem card · ActionBar · SelectionMarquee · AppBar · Toolbar · Resizable — без эталона, такты 30–36, 39–42
       </h2>
       <p class="max-w-3xl text-sm text-muted-foreground">
         Мастера нет — сверка идёт с прототипом VA-9265 v17, пары «прототип / кит» лежат в
@@ -1552,6 +1552,42 @@ const textareaVariants = [
             </template>
           </RadioGroupItem>
         </RadioGroup>
+      </div>
+      <!--
+        Такт 42: полоса приложения AppBar (крошки на тёмном, статус, кнопка sidebar), светлая полоса Toolbar, панели Resizable.
+      -->
+      <div class="max-w-5xl space-y-3">
+        <AppBar>
+          <template #start>
+            <AppBarBrand>VIEWAPP</AppBarBrand>
+          </template>
+          <Breadcrumb surface="dark">
+            <li>
+              <ButtonNavigation size="sm" muted>Осмотры</ButtonNavigation>
+            </li>
+            <li>
+              <ButtonNavigation size="sm" direction="none">Распределение свободной съёмки</ButtonNavigation>
+            </li>
+          </Breadcrumb>
+          <template #end>
+            <AppBarStatus state="saving" />
+            <Button variant="sidebar">Горячие клавиши</Button>
+          </template>
+        </AppBar>
+        <Toolbar>
+          <Button variant="secondary">Выделить всё</Button>
+          <ToolbarText truncate grow align="end">Текущий объект не выбран</ToolbarText>
+          <ToolbarGroup label="Размер">
+            <Button variant="secondary" size="sm">M</Button>
+          </ToolbarGroup>
+        </Toolbar>
+        <div class="h-16 border border-border-soft">
+          <ResizablePanelGroup direction="horizontal">
+            <ResizablePanel />
+            <ResizableHandle with-handle />
+            <ResizablePanel :default-size="320" :min-size="320" :max-size="820" size-unit="px" />
+          </ResizablePanelGroup>
+        </div>
       </div>
       <!--
         Такт 40: панель выделения ActionBar (в потоке, на экране прибита к низу окна), рамка SelectionMarquee

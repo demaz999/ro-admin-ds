@@ -152,12 +152,12 @@ async function openPage() {
       await sleep(200)
     },
     /** Протяжка мышью по точкам `[x, y]` с зажатой левой кнопкой — рамка выделения (§10.1). */
-    async sweep(points, modifiers = 0) {
+    async sweep(points, modifiers = 0, pause = 30) {
       await send('Page.bringToFront')
       const [a, ...rest] = points
       await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: a[0], y: a[1], modifiers })
       await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: a[0], y: a[1], button: 'left', buttons: 1, clickCount: 1, modifiers })
-      for (const [x, y] of rest) { await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y, button: 'left', buttons: 1, modifiers }); await sleep(30) }
+      for (const [x, y] of rest) { await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y, button: 'left', buttons: 1, modifiers }); if (pause) await sleep(pause) }
       const z = points[points.length - 1]
       await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: z[0], y: z[1], button: 'left', buttons: 0, clickCount: 1, modifiers })
       await sleep(250)
@@ -230,10 +230,12 @@ const DUMP = `(M) => {
 
 /**
  * Рамка по первой строке ленты: из поля ленты слева от кадра `from` (или с Alt — из центра кадра) до центра кадра `to`.
- * Раскладка ленты у прототипа и стенда разная до вёрстки П5 (5 колонок против 4), поэтому рамка идёт внутри строки,
- * где набор кадров совпадает. `tile` — выражение плитки по номеру кадра, `feed` — лента.
+ * С такта 42 число колонок ленты у стенда — правилом прототипа (решение чата 2026-09-30), рамка сверяется полностью,
+ * через несколько строк. `tile` — выражение плитки по номеру кадра, `feed` — лента.
  */
 async function sweepRow(page, tile, feed, from, to, { alt = false, shift = false } = {}) {
+  /* Начальный кадр — в видимую часть ленты: иначе нажатие уходит мимо ленты и рамки нет ни у кого (шаг совпадал вхолостую). */
+  await page.evaluate(`(${tile(from)}.scrollIntoView({ block: 'start', behavior: 'instant' }), ${feed}.scrollTop -= 24, 1)`)
   const pts = await page.evaluate(`(() => { const a = ${tile(from)}.getBoundingClientRect(); const b = ${tile(to)}.getBoundingClientRect(); const f = ${feed}.getBoundingClientRect()
     const start = ${alt} ? [a.x + a.width / 2, a.y + a.height / 2] : [f.x + 6, a.y + a.height / 2]
     const end = [b.x + b.width / 2, b.y + b.height / 2]
@@ -252,10 +254,24 @@ async function sweepEdge(page, tile, feed, from, moves) {
   return page.evaluate(`Math.round(${feed}.scrollTop)`)
 }
 
+/**
+ * Разделитель (С-34): нажать на ручке и протянуть к точке `x` окна шагами по 4 px, как рука. Крупный первый шаг у прототипа
+ * сдвигает раскладку, и под точкой нажатия оказывается картинка кадра: Chrome начинает её перетаскивание и гасит движения.
+ */
+async function splitterDrag(page, handle, x) {
+  const p = await page.point(handle)
+  if (process.env.DEBUG_CLICK) console.log('   разделитель', p, await page.evaluate(`document.elementFromPoint(${p.x}, ${p.y})?.outerHTML.slice(0, 90)`))
+  const n = Math.max(1, Math.ceil(Math.abs(x - p.x) / 4))
+  const pts = [[p.x, p.y], ...Array.from({ length: n }, (_, k) => [p.x + (x - p.x) * (k + 1) / n, p.y])]
+  await page.sweep(pts, 0, 0)
+  await sleep(200)
+}
+
 const prototype = page => ({
   name: 'прототип',
-  async start(dataset) {
+  async start(dataset, keepEntry) {
     await page.goto(PROTO_URL, 1500)
+    if (keepEntry) return
     /* Окно входа (`showEntry`) открывается при загрузке — закрыть «Разложу вручную». Окно входа на ките — П5. */
     await page.click(`[...document.querySelectorAll('#mFoot button')].find(b => b.textContent.trim() === 'Разложу вручную')`)
     /* «Пустой осмотр» — функция самого прототипа, как кнопка переключателя сценариев окна входа. */
@@ -283,7 +299,7 @@ const prototype = page => ({
   marquee: (a, b, o) => sweepRow(page, i => `document.querySelector('#feed .card[data-i="${i}"]')`, `document.getElementById('feed')`, a, b, o),
   marqueeEdge: (a, n) => sweepEdge(page, i => `document.querySelector('#feed .card[data-i="${i}"]')`, `document.getElementById('feed')`, a, n),
   dragTo: (i, k) => page.drag(`document.querySelector('#feed .card[data-i="${i}"] img')`, `document.querySelector('.step[data-owner="${k.split('|')[0]}"][data-step="${k.split('|')[1]}"] .nm')`),
-  savingNow: () => page.evaluate(`document.getElementById('saveState').classList.contains('busy')`),
+  savingNow: () => page.evaluate(`document.getElementById('saveState').lastElementChild.textContent.trim()`),
   /* П4 */
   toggleAll: async () => { await page.evaluate(`(document.getElementById('rbody').scrollTop = 0, 1)`); await page.click(`document.querySelector('.schtools [data-coll]')`) },
   onlyOpen: async () => { await page.evaluate(`(document.getElementById('rbody').scrollTop = 0, 1)`); await page.click(`document.querySelector('.schtools [data-onlyopen]')`) },
@@ -305,6 +321,11 @@ const prototype = page => ({
   bindLocate: () => page.click(`document.querySelector('#lbBind [data-act="locate"]')`),
   bindFlashing: () => page.evaluate(`document.getElementById('lbBind').classList.contains('flash')`),
   lbIndex: () => page.evaluate(`document.getElementById('lb').classList.contains('show') ? state.lb : -1`),
+  /* П5 */
+  async search(q) { await page.click(`document.getElementById('feedSearch')`); await page.evaluate(`document.getElementById('feedSearch').select()`); await page.key('Delete'); if (q) await page.type(q) },
+  finishOpen: () => page.click(`document.getElementById('btnDone')`),
+  splitterTo: x => splitterDrag(page, `document.getElementById('splitter')`, x),
+  paneWidth: () => page.evaluate(`Math.round(document.querySelector('.pane.right').getBoundingClientRect().width * 10) / 10`),
   tile: i => page.click(`document.querySelector('#feed .card[data-i="${i}"] img')`),
   mode: v => page.click(`document.querySelector('#mode button[data-m="${v}"]')`),
   size: v => page.click(`document.querySelector('#sizer button[data-s="${v === 'lg' ? 272 : 176}"]')`),
@@ -357,6 +378,8 @@ const prototype = page => ({
     } : null
     return {
       feed: cards.map(c => +c.dataset.i),
+      cols: (() => { const c = cards.filter(x => !x.classList.contains('voice')); if (!c.length) return 0; const top = c[0].getBoundingClientRect().top; return c.filter(x => Math.abs(x.getBoundingClientRect().top - top) < 2).length })(),
+      empty: t(document.querySelector('#feed .empty')?.textContent) || null,
       tiles: cards.filter(c => !c.classList.contains('voice')).map(c => c.dataset.i + ':' + tileState(c)),
       /* Выделение — из состояния: после привязки прототип чистит state.sel, но ленту не перерисовывает, и класс .sel
          висит на плитках до следующей отрисовки (такт 40, строка реестра расхождений). */
@@ -402,8 +425,11 @@ const prototype = page => ({
 
 const kit = page => ({
   name: 'кит',
-  async start(dataset) {
-    await page.goto(KIT_URL + '?asis=off' + (dataset === 'empty' ? '&data=empty' : ''), 4000)
+  async start(dataset, keepEntry) {
+    /* Без параметров адреса экран открывает окно входа, как прототип (решение чата 3, такт 42) — закрыть «Разложу вручную».
+       «Пустой осмотр» — оснастка `?data=empty`: окна входа нет, у прототипа адаптер закрыл его до смены сценария. */
+    await page.goto(KIT_URL + (dataset === 'empty' ? '?data=empty' : ''), 4000)
+    if (dataset !== 'empty' && !keepEntry) await page.click(`[...document.querySelectorAll('[data-slot=modal-card] button')].find(b => b.textContent.trim() === 'Разложу вручную')`)
   },
   wand: () => page.click(`[...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Распределить автоматически')`),
   wandMode: v => page.click(`[...document.querySelectorAll('[data-slot=choice][data-variant=card]')].find(c => c.querySelector('[data-slot=choice-title]').textContent.trim() === ${JSON.stringify(MODE_TITLES[v])})?.querySelector('[data-slot=choice-control]')`),
@@ -424,13 +450,13 @@ const kit = page => ({
   async viewer(i) { await page.hover(`document.querySelector('[data-slot=frame-tile][data-frame="${i}"] img')`); await page.click(`document.querySelector('[data-slot=frame-tile][data-frame="${i}"] [data-slot=frame-tile-open]')`) },
   bindUnbind: () => page.click(`[...document.querySelectorAll('[data-slot=frame-bind-bar] button')].find(b => b.textContent.trim() === 'Открепить')`),
   toastUndo: () => page.click(`[...document.querySelectorAll('[data-slot=toast] button')].filter(b => b.textContent.trim() === 'Отменить').pop()`),
-  marquee: (a, b, o) => sweepRow(page, i => `document.querySelector('[data-slot=frame-tile][data-frame="${i}"]')`, `document.querySelector('.feed')`, a, b, o),
-  marqueeEdge: (a, n) => sweepEdge(page, i => `document.querySelector('[data-slot=frame-tile][data-frame="${i}"]')`, `document.querySelector('.feed')`, a, n),
+  marquee: (a, b, o) => sweepRow(page, i => `document.querySelector('[data-slot=frame-tile][data-frame="${i}"]')`, `document.querySelector('[data-feed]')`, a, b, o),
+  marqueeEdge: (a, n) => sweepEdge(page, i => `document.querySelector('[data-slot=frame-tile][data-frame="${i}"]')`, `document.querySelector('[data-feed]')`, a, n),
   dragTo: (i, k) => page.drag(`document.querySelector('[data-slot=frame-tile][data-frame="${i}"] img')`, `document.querySelector('[data-step-key="${k}"] [data-slot=step-row-name]')`),
-  savingNow: () => page.evaluate(`window.__freeShoot.state.saving`),
+  savingNow: () => page.evaluate(`document.querySelector('[data-slot=app-bar-status]').textContent.trim()`),
   /* П4 */
-  toggleAll: async () => { await page.evaluate(`(document.querySelector('.rbody').scrollTop = 0, 1)`); await page.click(`document.querySelectorAll('.schtools button')[0]`) },
-  onlyOpen: async () => { await page.evaluate(`(document.querySelector('.rbody').scrollTop = 0, 1)`); await page.click(`document.querySelectorAll('.schtools button')[1]`) },
+  toggleAll: async () => { await page.evaluate(`(document.querySelector('[data-panel]').scrollTop = 0, 1)`); await page.click(`document.querySelectorAll('[data-schtools] button')[0]`) },
+  onlyOpen: async () => { await page.evaluate(`(document.querySelector('[data-panel]').scrollTop = 0, 1)`); await page.click(`document.querySelectorAll('[data-schtools] button')[1]`) },
   clickAway: () => page.clickAt(700, 10),
   foundWatch: () => page.watch({ step: `!!document.querySelector('[data-step-key][data-flash]')`, thumb: `!!document.querySelector('[data-step-key] [data-located]')` }),
   bindWatch: () => page.watch({ flash: `!!document.querySelector('[data-slot=frame-bind-bar][data-flash]')`, index: `window.__freeShoot.state.lb` }),
@@ -449,6 +475,11 @@ const kit = page => ({
   bindLocate: () => page.click(`[...document.querySelectorAll('[data-slot=frame-bind-bar] button')].find(b => b.textContent.trim() === 'Показать в структуре')`),
   bindFlashing: () => page.evaluate(`!!document.querySelector('[data-slot=frame-bind-bar][data-flash]')`),
   lbIndex: () => page.evaluate(`window.__freeShoot.state.lb`),
+  /* П5 */
+  async search(q) { await page.click(`document.querySelector('[data-search] input')`); await page.evaluate(`document.querySelector('[data-search] input').select()`); await page.key('Delete'); if (q) await page.type(q) },
+  finishOpen: () => page.click(`[...document.querySelectorAll('[data-slot=app-bar] button')].find(b => b.textContent.trim() === 'Завершить распределение')`),
+  splitterTo: x => splitterDrag(page, `document.querySelector('[data-slot=resizable-handle]')`, x),
+  paneWidth: () => page.evaluate(`Math.round(document.querySelector('[data-pane-right]').getBoundingClientRect().width * 10) / 10`),
   tile: i => page.click(`document.querySelector('[data-slot=frame-tile][data-frame="${i}"] img')`),
   mode: v => page.click(`[...document.querySelectorAll('[role=tab]')].find(b => b.textContent.trim() === ${JSON.stringify(v === 'hide' ? 'убирать' : 'оставлять')})`),
   size: v => page.click(`[...document.querySelectorAll('[role=tab]')].find(b => b.textContent.trim() === ${JSON.stringify(v === 'lg' ? 'L' : 'M')})`),
@@ -458,7 +489,7 @@ const kit = page => ({
   windowButton: text => page.click(`[...document.querySelectorAll('[data-slot=modal-card] button')].find(b => b.textContent.trim() === ${JSON.stringify(text)})`),
   key: (name, code, extra) => page.key(name, code, extra),
   async general(k, value) {
-    const field = `[...document.querySelectorAll('.gform [data-slot=field-wrapper]')].find(w => w.querySelector('label').textContent.trim() === ${JSON.stringify(GENERAL_KEYS[k])})`
+    const field = `[...document.querySelectorAll('[data-general] [data-slot=field-wrapper]')].find(w => w.querySelector('label').textContent.trim() === ${JSON.stringify(GENERAL_KEYS[k])})`
     const isSelect = await page.evaluate(`!!(${field}).querySelector('button[aria-haspopup]')`)
     if (isSelect) {
       await page.click(`(${field}).querySelector('button[aria-haspopup]')`)
@@ -491,17 +522,20 @@ const kit = page => ({
       buttons: [...card.querySelectorAll('[data-slot=modal-card-footer] button')].map(b => t(b.textContent)),
       rows: [...card.querySelectorAll('[data-slot=progress-counter]')].map(r => t(r.firstElementChild?.textContent)),
     } : null
-    const rv = document.querySelector('.subhead [data-slot=callout]')
+    const rv = document.querySelector('[data-review]')
     const M = window.__freeShoot
     const form = tab === 'form' ? {
-      rows: [...document.querySelectorAll('.gform [data-slot=field-wrapper]')].map(w => {
+      rows: [...document.querySelectorAll('[data-general] [data-slot=field-wrapper]')].map(w => {
         const input = w.querySelector('input'); const sel = w.querySelector('button[aria-haspopup] [data-slot=field-input]')
-        return t(w.querySelector('label').textContent) + ' = ' + t(input ? input.value : sel?.textContent) }),
-      check: t(document.querySelector('.gform .cmp')?.textContent),
+        const v = t(input ? input.value : sel?.textContent)
+        return t(w.querySelector('label').textContent) + ' = ' + (v === '—' ? '' : v) }),
+      check: t(document.querySelector('[data-general] [data-slot=field-hint]')?.textContent),
     } : null
     const frames = stat('Кадры разложены'), req = stat('Обязательные шаги'), obj = stat('Объекты')
     return {
       feed: items.map(e => +e.dataset.frame),
+      cols: (() => { if (!tiles.length) return 0; const top = tiles[0].getBoundingClientRect().top; return tiles.filter(x => Math.abs(x.getBoundingClientRect().top - top) < 2).length })(),
+      empty: (() => { const e = document.querySelector('[data-feed] [data-slot=empty]'); return e ? t(e.querySelector('[data-slot=empty-title]').textContent) + t(e.querySelector('[data-slot=empty-description]').textContent) : null })(),
       tiles: tiles.map(e => e.dataset.frame + ':' + e.dataset.state),
       sel: tiles.filter(e => e.getAttribute('aria-checked') === 'true').map(e => +e.dataset.frame),
       mode: activeTab(['оставлять', 'убирать']) === 'убирать' ? 'hide' : 'keep',
@@ -510,7 +544,7 @@ const kit = page => ({
       cur: document.querySelector('[data-obj][data-current]')?.dataset.obj ?? null,
       open: [...document.querySelectorAll('[data-obj][data-state=open]')].map(o => o.dataset.obj).sort(),
       curHint: t(document.querySelector('#curHint')?.textContent),
-      sessMeta: t(document.querySelector('[data-asis="сводка сессии"]')?.textContent),
+      sessMeta: t(document.querySelector('[data-sess-meta]')?.textContent),
       stats: [val(frames, 'value'), val(frames, 'sub'), val(req, 'value'), val(req, 'sub'), val(obj, 'value'), val(obj, 'sub')],
       window: win,
       form,
@@ -520,7 +554,7 @@ const kit = page => ({
         only: rv.querySelector('[role=checkbox]') ? rv.querySelector('[role=checkbox]').getAttribute('aria-checked') === 'true' : null,
       } : null,
       repeats: [...document.querySelectorAll('[data-obj]')].filter(o => o.getClientRects().length).map(o => o.dataset.obj + ([...o.querySelectorAll('[data-slot=repeat-header] span')].some(s => t(s.textContent) === 'предложено') ? '*' : '')),
-      hints: [...document.querySelectorAll('[data-slot=stage-note]')].filter(h => h.getClientRects().length).map(h => t(h.textContent)),
+      hints: [...document.querySelectorAll('[data-slot=stage-note]')].filter(h => h.getClientRects().length && !h.closest('[data-general]')).map(h => t(h.textContent)),
       bind: M.frames.filter(f => f.objId).map(f => f.i + '>' + f.objId + '|' + f.stepId + (f.auto ? '*' : '')),
       notices: [...document.querySelectorAll('[data-slot=toast]')].filter(e => e.dataset.state !== 'closed' && !e.dataset.seen).map(e => { e.dataset.seen = '1'; return t(e.querySelector('[data-slot=alert] p')?.textContent) }),
       selbar: document.querySelector('[data-slot=action-bar][data-state=open]') ? { count: t(document.querySelector('[data-slot=action-bar-count]').textContent), sub: t(document.querySelector('[data-slot=action-bar-sub]')?.textContent) } : null,
@@ -537,7 +571,7 @@ const kit = page => ({
       hlObj: [...document.querySelectorAll('[data-obj][data-highlighted]')].map(x => x.dataset.obj),
       closed: [...document.querySelectorAll('[data-stage][data-state=closed]')].map(x => x.dataset.stage),
       steps: [...document.querySelectorAll('[data-step-key]')].filter(x => x.getClientRects().length).map(x => x.dataset.stepKey),
-      tools: [...document.querySelectorAll('.schtools button')].map(b => t(b.textContent)),
+      tools: [...document.querySelectorAll('[data-schtools] button')].map(b => t(b.textContent)),
     }
   })()`),
 })
@@ -666,7 +700,9 @@ const SCENARIOS = {
     ['Shift + Alt: рамка с кадра 4 — к выделению', a => a.marquee(4, 4, { alt: true, shift: true })],
     ['Alt: рамка с кадра 2 до 3 — заново', a => a.marquee(2, 3, { alt: true })],
     ['Esc — снять', a => a.key('Escape')],
-    ['рамка к нижнему краю — автопрокрутка', async (a) => { a.probe = [await a.marqueeEdge(1, 8)] }, { only: ['probe'] }],
+    ['рамка через три строки — до кадра 13', a => a.marquee(1, 13)],
+    ['Shift: рамка ещё через две строки — к выделению', a => a.marquee(16, 22, { shift: true })],
+    ['рамка к нижнему краю — автопрокрутка', async (a) => { a.probe = [await a.marqueeEdge(1, 8)] }],
     ['«Снять» после рамки к краю', a => a.selbar('clear')],
   ]],
   'С-06': ['панель выделения: счёт, распределено, видео (§10.2)', [
@@ -883,6 +919,39 @@ const SCENARIOS = {
     ['Enter — принять', a => flashProbe(a, () => a.key('Enter', 'Enter', { text: '\r' }))],
     ['Esc', a => a.key('Escape')],
   ], { dataset: 'empty' }],
+  /* ------------------------------ П5, такт 42 ------------------------------ */
+  'С-04': ['поиск фильтрует ленту по расшифровкам и именам файлов (§8.6)', [
+    ['«POLYPRISE»', a => a.search('POLYPRISE')],
+    ['«IMG_32» — имена файлов', a => a.search('IMG_32')],
+    ['«zzz» — ничего не найдено', a => a.search('zzz')],
+    ['очистить поиск', a => a.search('')],
+  ]],
+  'С-14/вид': ['индикатор автосохранения в шапке: «Сохранение…» → «Все изменения сохранены» (§17.2)', [
+    ['заголовок o2 — текущий', a => a.repeat('o2')],
+    ['кадр 21', a => a.tile(21)],
+    ['4 — индикатор', async (a) => { await a.key('4', 'Digit4'); a.probe = [await a.savingNow()]; await sleep(900); a.probe.push(await a.savingNow()) }],
+  ]],
+  'С-31': ['завершение: сводка, незакрытые поимённо до шести, расхождение с общей формой (§17.4–17.6)', [
+    ['«Завершить распределение»', a => a.finishOpen()],
+    ['«Продолжить»', a => a.windowButton('Продолжить')],
+    ['вкладка «Форма осмотра»', a => a.tab('form')],
+    ['по документам 3', a => a.general('number', '3')],
+    ['«Завершить распределение» — с расхождением', a => a.finishOpen()],
+    ['«Завершить»', a => a.windowButton('Завершить')],
+  ]],
+  'С-34': ['ширина панели 320–820 разделителем (§7)', [
+    ['разделитель к левому краю — 820', async (a) => { await a.splitterTo(5); a.probe = [await a.paneWidth()] }],
+    ['разделитель к правому краю — 320', async (a) => { await a.splitterTo(1435); a.probe = [await a.paneWidth()] }],
+    /* Середину — в замеры: прототип ставит край панели под указатель, Reka сохраняет смещение точки захвата (раздел 15). */
+    ['разделитель на 900', async (a) => { await a.splitterTo(900); a.measure = { 'ширина панели, px': await a.paneWidth() } }, { skip: ['cols'] }],
+  ]],
+  'С-36': ['окно входа: сводка состояния осмотра, «Распределить автоматически» (прототип showEntry)', [
+    ['«Распределить автоматически»', a => a.windowButton('Распределить автоматически').then(() => sleep(300))],
+    ['«Отмена»', a => a.windowButton('Отмена')],
+  ], { keepEntry: true }],
+  'С-36/вручную': ['окно входа: «Разложу вручную»', [
+    ['«Разложу вручную»', a => a.windowButton('Разложу вручную')],
+  ], { keepEntry: true }],
 }
 
 /**
@@ -951,8 +1020,8 @@ async function run(id) {
   const measures = []
   let snaps = 0
   try {
-    await P.start(opts.dataset)
-    await K.start(opts.dataset)
+    await P.start(opts.dataset, opts.keepEntry)
+    await K.start(opts.dataset, opts.keepEntry)
     const all = [['старт', null], ...steps]
     for (const [name, act, o = {}] of all) {
       if (o.remember) kept[o.remember] = [await P.dump(), await K.dump()]

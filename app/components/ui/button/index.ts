@@ -90,6 +90,11 @@ export const buttonVariants = cva(
         default: 'bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-pressed',
         secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary-hover active:bg-secondary-pressed',
         destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive-hover active:bg-destructive-pressed',
+        /**
+         * Текстовая кнопка на тёмной полосе приложения — такт 42, нехватка в ките (дыра с такта 8). Прецедент —
+         * `IconButton variant="sidebar"`: фона нет, текст `--sidebar-foreground`, наведение — ступень `--sidebar-accent`.
+         */
+        sidebar: 'bg-transparent text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
       },
       size: {
         lg: 'h-16 gap-1.5 rounded-3xl px-8 text-sm',
@@ -109,6 +114,7 @@ export const buttonVariants = cva(
       { variant: 'default', class: 'disabled:opacity-[var(--opacity-disabled-strong)]' },
       { variant: 'destructive', class: 'disabled:opacity-[var(--opacity-disabled-strong)]' },
       { variant: 'secondary', class: 'disabled:opacity-[var(--opacity-disabled)]' },
+      { variant: 'sidebar', class: 'disabled:opacity-[var(--opacity-disabled)]' },
     ],
     defaultVariants: {
       variant: 'default',

@@ -995,6 +995,14 @@ Skeleton, Toast, тело и футер Dialog, строка Table берутс�
 | `AssignOption` | — (такт 33, на `SelectItem`) | событие `refuse` с причиной `frozen`, `full`, `locked` | то же | 41 |
 | `FrameTile`, `StepRow`, `StepThumb`, `RepeatCard` | — (такты 30, 32) | атрибуты состояний `data-linked`, `data-dimmed`, `data-highlighted`, `data-flash`, `data-located` | прогон сценариев читает видимое состояние (такт 41) | 41 |
 
+| `Breadcrumb` | `BreadCrumbs` `3880:31214` | ось `surface`: `light` (мастер) · `dark` — на тёмной полосе | шапка экрана VA-9265 (№ 4) и полоса `AppBar` — нехватка в ките, решение агента в плане такта 37 | 42 |
+| `ButtonNavigation` | `612:5443` | ось `surface` (берётся у `Breadcrumb`): `dark` — роли сайдбара | то же | 42 |
+| `Button` | `Button` `57:340` | вариант `sidebar` — текстовая кнопка на тёмной полосе | «Горячие клавиши» (№ 6); дыра с такта 8, прецедент `IconButton variant="sidebar"` | 42 |
+| `frameTileGridVariants` | — (такт 30) | ось `columns` 1–12 и правило `frameTileColumns` | число колонок ленты — структура прототипа (решение чата 2026-09-30, такт 42) | 42 |
+
+Новые компоненты такта 42 без мастера — `AppBar` (`ui/app-bar/`, карточка 1), `Toolbar` (`ui/toolbar/`, карточка 2), `Resizable`
+(`ui/resizable/`, карточка 3), ворота 2026-09-30 «да». Токены `--container-panel-min`, `--container-panel-max`. Разбор — `free-shoot.md`, раздел 21.
+
 Новые компоненты такта 40 без мастера — `ActionBar` (`ui/action-bar/`, карточка 6) и `SelectionMarquee` (`ui/selection-marquee/`,
 карточка 7), ворота 2026-09-30 «да». Разбор — `free-shoot.md`, раздел 19.
 

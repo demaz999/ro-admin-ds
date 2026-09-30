@@ -481,6 +481,36 @@ const RADIO_CARD_EXAMPLE = `<!-- карточка выбора: variant="card", 
 </RadioGroup>`
 
 /* ------------------------------ такт 40: ActionBar, SelectionMarquee, «Отменить» ------------------------------ */
+/* ------------------------------ такт 42: AppBar, Toolbar, Resizable, оси ------------------------------ */
+const saveDemo = ref<'saving' | 'saved' | 'error'>('saved')
+const FRAME_EXAMPLE = `<!-- полоса приложения: бренд, навигация, статус и действия справа; внутри — только sidebar-типы -->
+<AppBar>
+  <template #start><AppBarBrand>VIEWAPP</AppBarBrand></template>
+  <Breadcrumb surface="dark">
+    <li><ButtonNavigation size="sm" muted>Осмотры</ButtonNavigation></li>
+    <li><ButtonNavigation size="sm" direction="none">Распределение свободной съёмки</ButtonNavigation></li>
+  </Breadcrumb>
+  <template #end>
+    <AppBarStatus :state="saving ? 'saving' : 'saved'" />   <!-- тексты §17.2 выводит сам -->
+    <Button variant="sidebar">Горячие клавиши</Button>
+    <Button>Завершить распределение</Button>
+  </template>
+</AppBar>
+
+<!-- светлая полоса: строка с переносом, зазор 8; Tab проходит каждый контрол -->
+<Toolbar>
+  <Button variant="secondary">Выделить всё</Button>
+  <ToolbarText truncate grow align="end">{{ currentHint }}</ToolbarText>
+  <ToolbarGroup label="Размер"><Tabs v-model="size">…</Tabs></ToolbarGroup>
+</Toolbar>
+
+<!-- рабочая зона: панель справа в пикселях, пределы — токены --container-panel-min / -max -->
+<ResizablePanelGroup direction="horizontal">
+  <ResizablePanel>лента</ResizablePanel>
+  <ResizableHandle with-handle />
+  <ResizablePanel :default-size="440" :min-size="320" :max-size="820" size-unit="px">панель</ResizablePanel>
+</ResizablePanelGroup>`
+
 const ACTION_BAR_EXAMPLE = `<!-- панель выделения, §10.2: по центру ленты (x считает страница), закрытая уезжает вниз -->
 <ActionBar :open="selected.size > 0" :count="plural(n, 'кадр выбран', 'кадра выбрано', 'кадров выбрано')" :sub="sub" :x="feedCenter">
   <Popover v-model:open="assignOpen">
@@ -1684,6 +1714,100 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
       </div>
 
       <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ ACTION_BAR_EXAMPLE }}</pre>
+    </section>
+
+    <!-- ============================ каркас экрана, такт 42 ============================ -->
+    <section id="frame" data-section="frame" class="space-y-6">
+      <div class="space-y-1">
+        <h2 class="text-lg font-bold">
+          AppBar · Toolbar · Resizable · Breadcrumb surface="dark" · Button variant="sidebar" — каркас экрана
+        </h2>
+        <p class="max-w-240 text-sm text-foreground-secondary">
+          Такт 42, карточки 1–3 такта 37 (ворота 2026-09-30). <code>AppBar</code> — полоса приложения 56 на ролях сайдбара, геометрия
+          верхней панели <code>admin.vue</code> (<code>top_menu</code> кита 1); <code>admin.vue</code> переведена на неё.
+          <code>Toolbar</code> — светлая полоса на <code>--card</code> с нижней линией <code>--border-soft</code>, без примитива Reka.
+          <code>Resizable</code> — <code>Splitter</code> Reka, панель в пикселях, пределы 320–820. Разбор — <code>docs/free-shoot.md</code>, раздел 21.
+        </p>
+        <p class="flex flex-wrap items-center gap-3 pt-2">
+          <Button variant="secondary" @click="saveDemo = 'saving'">Статус: сохранение</Button>
+          <Button variant="secondary" @click="saveDemo = 'saved'">Статус: сохранено</Button>
+          <Button variant="secondary" @click="saveDemo = 'error'">Статус: ошибка</Button>
+        </p>
+      </div>
+
+      <div data-subsection="app-bar" class="space-y-2">
+        <p class="text-2xs text-muted-foreground">AppBar — бренд, крошки на тёмном, статус, кнопки sidebar и главная</p>
+        <AppBar>
+          <template #start>
+            <AppBarBrand>VIEWAPP</AppBarBrand>
+          </template>
+          <Breadcrumb surface="dark">
+            <li>
+              <ButtonNavigation size="sm" muted>Осмотры</ButtonNavigation>
+            </li>
+            <li>
+              <ButtonNavigation size="sm" muted>Демо-осмотр · мониторинг оборудования</ButtonNavigation>
+            </li>
+            <li>
+              <ButtonNavigation size="sm" direction="none">Распределение свободной съёмки</ButtonNavigation>
+            </li>
+          </Breadcrumb>
+          <template #end>
+            <AppBarStatus :state="saveDemo" />
+            <Button variant="sidebar">Горячие клавиши</Button>
+            <Button>Завершить распределение</Button>
+          </template>
+        </AppBar>
+        <div class="flex flex-wrap items-center gap-6 bg-sidebar px-4 py-3">
+          <AppBarStatus state="saving" />
+          <AppBarStatus state="saved" />
+          <AppBarStatus state="error" />
+          <Button variant="sidebar" size="sm">sm</Button>
+          <Button variant="sidebar">md</Button>
+          <Button variant="sidebar" disabled>выключена</Button>
+        </div>
+      </div>
+
+      <div data-subsection="toolbar" class="space-y-2">
+        <p class="text-2xs text-muted-foreground">Toolbar — кнопки, поле, текст с обрезкой, группы с подписью; перенос строки</p>
+        <div class="max-w-240 border border-border-soft">
+          <Toolbar>
+            <Button variant="secondary">Распределить автоматически</Button>
+            <Button variant="secondary">Выделить всё</Button>
+            <ToolbarText truncate grow align="end">Текущий: Пропиточная линия POLYPRISE · клавиши 1–8</ToolbarText>
+            <ToolbarGroup label="Размер">
+              <Tabs model-value="md">
+                <TabsList variant="pill">
+                  <TabsTrigger value="md" variant="pill">M</TabsTrigger>
+                  <TabsTrigger value="lg" variant="pill">L</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </ToolbarGroup>
+          </Toolbar>
+          <Toolbar class="px-3">
+            <Button variant="secondary" size="sm">Свернуть все</Button>
+            <Button size="sm">Показать все (+7)</Button>
+            <ToolbarText>этапов: 5 · шагов: 24 · заморожено 7</ToolbarText>
+          </Toolbar>
+        </div>
+      </div>
+
+      <div data-subsection="resizable" class="space-y-2">
+        <p class="text-2xs text-muted-foreground">Resizable — ручка с захватом; панель справа 320–820, по умолчанию 440 (стрелками с клавиатуры — тоже)</p>
+        <div class="h-40 max-w-300 border border-border-soft">
+          <ResizablePanelGroup direction="horizontal">
+            <ResizablePanel class="flex items-center justify-center">
+              <span class="text-xs text-muted-foreground">лента</span>
+            </ResizablePanel>
+            <ResizableHandle with-handle />
+            <ResizablePanel :default-size="440" :min-size="320" :max-size="820" size-unit="px" class="flex items-center justify-center">
+              <span class="text-xs text-muted-foreground">панель</span>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </div>
+      </div>
+
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ FRAME_EXAMPLE }}</pre>
     </section>
   </main>
 </template>

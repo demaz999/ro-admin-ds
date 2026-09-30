@@ -138,7 +138,7 @@ Skeleton, Accordion, детерминированный Progress bar, Date picke
 Всё перечисленное **не блокирует работу**: берётся дефолтом shadcn-vue сразу и учитывается в
 [design-debt.md](design-debt.md). Кит закрывает любой экран админки.
 
-Такты 39–40 (экран VA-9265, порции П2–П3) — позиции, которых в ките нет, собраны по прототипу v17 на ролях кита,
+Такты 39–42 (экран VA-9265, порции П2–П5) — позиции, которых в ките нет, собраны по прототипу v17 на ролях кита,
 запросы дизайнерам — в [figma-fixes.md](figma-fixes.md):
 
 | Чего нет | Ближайшее в ките | В коде |
@@ -147,3 +147,7 @@ Skeleton, Accordion, детерминированный Progress bar, Date picke
 | карточка выбора с описанием | `radiobtn`, `radiobtn_title` — строка с подписью | `RadioGroupItem variant="card"`, слоты `description` и `meta` |
 | плавающая полоса действий над выделением | `Popover`, `dropdown_menu` — плашки у якоря | `ActionBar` (`ui/action-bar/`), такт 40 |
 | рамка выделения | — | `SelectionMarquee` (`ui/selection-marquee/`), такт 40 |
+| верхняя полоса приложения с навигацией, статусом и действиями | `top_menu` — шапка сайдбара 56 (логотип и бургер) | `AppBar` (`ui/app-bar/`), такт 42; верхняя панель `admin.vue` — на нём |
+| светлая полоса инструментов во всю ширину | `table_header` — верх таблицы | `Toolbar` (`ui/toolbar/`), такт 42 |
+| панели с разделителем | — | `Resizable` (`ui/resizable/`), такт 42 |
+| крошки и текстовая кнопка на тёмной полосе | `bread_crumbs`, `btn_*` — на светлой | оси `Breadcrumb surface="dark"`, `Button variant="sidebar"`, такт 42 |

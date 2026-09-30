@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { AssignBound } from '@/components/ui/assign'
-import { frameTileGridVariants, type FrameTileState } from '@/components/ui/frame-tile'
+import { frameTileColumns, frameTileGridVariants, type FrameTileState } from '@/components/ui/frame-tile'
 import type { StepThumbItem, StepVerdict } from '@/components/ui/step-row'
 import AsisMarks from '~/stands/free-shoot/AsisMarks.vue'
 import { createModel, emptyDataset, MODE_T, plural, type FormDef, type ScreenWindow, type Suggestion, type WandMode } from '~/stands/free-shoot/model'
@@ -111,6 +111,7 @@ const m = createModel({
   stages: P.stages,
   general: P.general,
   blocks: P.blocks,
+  scenario: q('data') === 'empty' ? 'empty' : 'review',
   initial: {
     cur: openWin === 'assign' ? P.selectCur : D.cur,
     sel: state === 'drop' || openWin === 'assign' || q('selected') === 'demo' ? P.selected : [],
@@ -143,8 +144,8 @@ const selected = computed(() => m.state.sel)
 const mode = computed({ get: () => m.state.mode, set: v => m.setMode(v) })
 const size = computed({ get: () => m.state.size, set: v => m.setSize(v) })
 const tab = computed({ get: () => m.state.rtab, set: v => m.setTab(v) })
-/** Поиск §8.6 фильтрует ленту с порции П5 (С-04, `free-shoot.md`, 16.5); до неё поле ничего не меняет. */
-const search = ref('')
+/** Поиск §8.6 — фильтр ленты моделью (С-04), такт 42. */
+const search = computed({ get: () => m.state.q, set: (v: string) => m.setQuery(v ?? '') })
 const { clickRepeat, toggleStage, toggleForm } = m
 
 /* ------------------------------- оснастка ------------------------------- */
@@ -351,6 +352,8 @@ function rejectRepeat(id: string) {
 
 /* --------------------------- форма осмотра (кит) --------------------------- */
 const generalVisible = (f: any) => !f.dep || m.general[f.dep.k] === f.dep.v
+/** Подсказка поля «Общее количество объектов по документам» — сверка прототипа `.cmp` одной строкой (такт 42). */
+const generalHint = computed(() => `Оформлено единиц оборудования: ${eqCount.value}${generalCheck.value ? ` ${generalCheck.value.text}` : ''}`)
 /** Сверка «Оформлено единиц» с полем «Общее количество объектов по документам» — прототип `renderRight`. */
 const generalCheck = computed(() => {
   const n = m.general.number
@@ -363,8 +366,10 @@ const windowModel = (win: Exclude<ScreenWindow, null>) => computed({
   get: () => m.state.win === win,
   set: (v: boolean) => (v ? m.openWindow(win) : m.closeWindow()),
 })
-/** Окно «как есть» — только сводка завершения (№ 55, порция П5). */
-const modalWin = computed(() => (m.state.win === 'finish' ? H.finish : null))
+/** Сводка завершения (№ 55, §17.4–17.6) — кит, такт 42: `ModalCard` + `Callout`; тексты — модель. */
+const finishOpen = windowModel('finish')
+/** Окно входа (№ 59) — кит, такт 42: открывается при загрузке, как у прототипа; оснастка адреса его не открывает. */
+const entryOpen = windowModel('entry')
 
 /* ------------------------- автораспределение, такт 39 (§12) ------------------------- */
 /** Окно запуска (№ 48–49): выбранный режим — черновик окна, как радио `#mBody` прототипа; при открытии — «полное». */
@@ -667,6 +672,14 @@ function onAssignSelect(value: string) {
 }
 
 const feedEl = ref<HTMLElement | null>(null)
+/**
+ * Число колонок ленты — правилом прототипа по ширине содержимого сетки (`frameTileColumns`), решение чата 2026-09-30,
+ * такт 42: при той же ширине окна и панели колонок столько же, сколько у прототипа. До замера — `auto-fill`.
+ */
+const gridEl = ref<HTMLElement | null>(null)
+const gridWidth = ref(0)
+const gridColumns = computed(() => (gridWidth.value ? frameTileColumns(gridWidth.value, size.value) : undefined))
+let gridObserver: ResizeObserver | undefined
 const selbarLeft = ref('50%')
 onMounted(async () => {
   /* Оснастка прогона сценариев (`scripts/free-shoot-scenarios.mjs`): модель — слепку привязок и состояния. Не продукт. */
@@ -694,6 +707,14 @@ onMounted(async () => {
   /* Целевой шаг оснастки — в центр панели, как у перехода «Показать в структуре». */
   const target = state === 'drop' ? `${eqId}|e4` : ['link', 'flash'].includes(state) ? `${LINK.owner}|${LINK.step}` : ''
   if (target) document.querySelector(`[data-step-key="${target}"]`)?.scrollIntoView({ block: 'center' })
+  if (feedEl.value) {
+    const measure = () => { const el = feedEl.value; if (!el) return; const cs = getComputedStyle(el); gridWidth.value = el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) }
+    measure()
+    gridObserver = new ResizeObserver(() => { measure(); placeSelbar() })
+    gridObserver.observe(feedEl.value)
+  }
+  /* Окно входа (№ 59): при загрузке без параметров адреса — как прототип `showEntry` (решение чата 3, такт 42). */
+  if (!Object.keys(route.query).length) m.openWindow('entry')
   placeSelbar()
   /* Оснастка такта 40: рамка над первыми тремя плитками — как протяжка с поля ленты до третьего кадра. */
   if (state === 'marquee' && feedEl.value) {
@@ -722,6 +743,7 @@ onMounted(async () => {
   }
 })
 onBeforeUnmount(() => {
+  gridObserver?.disconnect()
   window.removeEventListener('resize', placeSelbar)
   window.removeEventListener('keydown', onKeydown, true)
   window.removeEventListener('mousemove', onMarqueeMove)
@@ -738,6 +760,8 @@ function placeSelbar() {
 }
 /** Клик по плитке: Shift — диапазон (§10.1). */
 function onTileClick(i: number, e: MouseEvent | KeyboardEvent) {
+  /* Рамка — жест: отпускание кнопки на плитке после протяжки клика не даёт (прототип перерисовывает ленту в mouseup). */
+  if (marqueeEnded) return
   m.clickTile(i, e.shiftKey)
 }
 
@@ -747,6 +771,7 @@ function onTileClick(i: number, e: MouseEvent | KeyboardEvent) {
  */
 const marquee = ref<{ x: number, y: number, width: number, height: number } | null>(null)
 let marq: { sx: number, sy: number, base: Set<number>, moved: boolean } | null = null
+let marqueeEnded = false
 function onFeedMousedown(e: MouseEvent) {
   if (e.button !== 0) return
   const onCard = (e.target as HTMLElement).closest('[data-frame]')
@@ -777,6 +802,8 @@ function onMarqueeEnd() {
   if (!marq) return
   marq = null
   marquee.value = null
+  marqueeEnded = true
+  setTimeout(() => { marqueeEnded = false })
 }
 
 /* ------------------------------ перетаскивание, такт 40 (§9.5) ------------------------------ */
@@ -890,116 +917,102 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
 <template>
   <!-- Тема и гарнитура — с корня документа (`:root`, `body`), как у других стендов: узла темы на экране нет. -->
   <div :class="{ 'asis-outline': asisOutline, 'asis-mark': asisMark }">
-    <div class="va">
-      <div class="app min-w-320" data-asis="каркас экрана">
-        <!-- ============================ шапка 48, §7 ============================ -->
-        <div class="topbar" data-asis="шапка">
-          <span class="logo">VIEWAPP</span>
-          <div class="crumbs">
-            <span>Осмотры</span><span>/</span><span>Демо-осмотр · мониторинг оборудования</span><span>/</span><b>Распределение свободной съёмки</b>
-          </div>
-          <div style="flex:1" />
-          <div class="saved" data-asis="индикатор сохранения">
-            <span class="dot" /><span>Все изменения сохранены</span>
-          </div>
-          <button class="tbtn" data-asis="кнопка «Горячие клавиши»" @click="hotkeysOpen = true">
-            Горячие клавиши
-          </button>
-          <span class="kit-island">
-            <Button>Завершить распределение</Button>
-          </span>
-        </div>
+    <div>
+      <!-- каркас экрана, §7 — такт 42: раскладка классами, полосы — AppBar и Toolbar, рабочая зона — Resizable -->
+      <div class="flex h-screen min-w-320 flex-col overflow-hidden">
+        <!-- ============================ шапка, §7 — кит, такт 42: AppBar (№ 2–7) ============================ -->
+        <AppBar>
+          <template #start>
+            <AppBarBrand>VIEWAPP</AppBarBrand>
+          </template>
+          <Breadcrumb surface="dark">
+            <li>
+              <ButtonNavigation size="sm" muted>Осмотры</ButtonNavigation>
+            </li>
+            <li>
+              <ButtonNavigation size="sm" muted>Демо-осмотр · мониторинг оборудования</ButtonNavigation>
+            </li>
+            <li>
+              <ButtonNavigation size="sm" direction="none">Распределение свободной съёмки</ButtonNavigation>
+            </li>
+          </Breadcrumb>
+          <template #end>
+            <AppBarStatus :state="m.state.saving ? 'saving' : 'saved'" />
+            <Button variant="sidebar" @click="hotkeysOpen = true">Горячие клавиши</Button>
+            <Button @click="m.openWindow('finish')">Завершить распределение</Button>
+          </template>
+        </AppBar>
 
-        <!-- ============================ подшапка, §7 ============================ -->
-        <div class="subhead" data-asis="подшапка">
-          <!-- полоса приёмки, §13.2 — кит, такт 39: Callout warning, текст — модель (`renderReview`) -->
-          <span v-if="reviewBar" class="kit-island">
-            <Callout tone="warning" :title="reviewBar.title" class="mb-3">
-              {{ reviewBar.text }}
-              <template #actions>
-                <Checkbox v-if="reviewBar.only !== null" :model-value="reviewBar.only" @update:model-value="m.setReviewOnly(!!$event)">
-                  только непроверенные
-                </Checkbox>
-                <Button variant="secondary" size="sm" @click="m.rejectAll()">Отменить автораспределение</Button>
-                <Button size="sm" @click="m.acceptAll()">Принять все объекты</Button>
-              </template>
-            </Callout>
-          </span>
-          <div class="sh-row">
-            <span class="sess-badge" data-asis="бейдж «Свободная съёмка»">Свободная съёмка</span>
-            <span class="sess-meta" data-asis="сводка сессии">{{ sessMeta }}</span>
-            <div class="stats">
-              <div class="stat">
-                <span class="kit-island">
-                  <ProgressStat
-                    label="Кадры разложены"
-                    :value="S.framesText"
-                    :progress="{ value: S.placed, max: S.total, locked: S.pre }"
-                    :sub="S.framesSub"
-                  />
-                </span>
-              </div>
-              <div class="stat">
-                <span class="kit-island">
-                  <ProgressStat
-                    label="Обязательные шаги"
-                    :value="S.reqText"
-                    :progress="{ value: S.ok, max: S.req, locked: S.frz }"
-                    :sub="S.reqSub"
-                  />
-                </span>
-              </div>
-              <div class="stat">
-                <span class="kit-island">
-                  <ProgressStat label="Объекты" :value="S.objText" :sub="S.objSub" />
-                </span>
-              </div>
-            </div>
+        <!-- ============================ подшапка, §7 — кит, такт 42: Toolbar (№ 11–14) ============================ -->
+        <Toolbar class="gap-y-3 py-3">
+          <!-- полоса приёмки, §13.2 — кит, такт 39: Callout warning во всю строку, текст — модель (`renderReview`) -->
+          <Callout v-if="reviewBar" data-review tone="warning" :title="reviewBar.title" class="basis-full">
+            {{ reviewBar.text }}
+            <template #actions>
+              <Checkbox v-if="reviewBar.only !== null" :model-value="reviewBar.only" @update:model-value="m.setReviewOnly(!!$event)">
+                только непроверенные
+              </Checkbox>
+              <Button variant="secondary" size="sm" @click="m.rejectAll()">Отменить автораспределение</Button>
+              <Button size="sm" @click="m.acceptAll()">Принять все объекты</Button>
+            </template>
+          </Callout>
+          <!-- № 11 — нейтральная метка сессии (решение чата 2026-09-30, прецедент такта 26) -->
+          <Chip variant="neutral" trailing="none">Свободная съёмка</Chip>
+          <ToolbarText data-sess-meta>{{ sessMeta }}</ToolbarText>
+          <div class="ml-auto flex items-center gap-5">
+            <ProgressStat
+              class="min-w-38 max-w-47.5"
+              label="Кадры разложены"
+              :value="S.framesText"
+              :progress="{ value: S.placed, max: S.total, locked: S.pre }"
+              :sub="S.framesSub"
+            />
+            <ProgressStat
+              class="min-w-38 max-w-47.5"
+              label="Обязательные шаги"
+              :value="S.reqText"
+              :progress="{ value: S.ok, max: S.req, locked: S.frz }"
+              :sub="S.reqSub"
+            />
+            <ProgressStat class="min-w-38 max-w-47.5" label="Объекты" :value="S.objText" :sub="S.objSub" />
           </div>
-          <div style="height:11px" />
-        </div>
+        </Toolbar>
 
-        <!-- ============================ рабочая зона ============================ -->
-        <div class="work" data-asis="рабочая зона">
-          <div class="pane">
-            <!-- тулбар ленты, §7 -->
-            <div class="bar-tools" data-asis="тулбар ленты">
-              <span class="kit-island">
-                <Button variant="secondary" @click="m.magicWand()">Распределить автоматически</Button>
-                <Button variant="secondary" @click="m.selectAll()">Выделить всё</Button>
-                <div class="w-55 shrink">
-                  <Input v-model="search" placeholder="Поиск по расшифровкам и именам файлов…" />
-                </div>
-              </span>
-              <span id="curHint" data-asis="индикатор текущего объекта">{{ curHint }}</span>
-              <div class="ctlgrp">
-                <span class="segl">Разобранные</span>
-                <span class="kit-island">
-                  <Tabs v-model="mode">
-                    <TabsList variant="pill">
-                      <TabsTrigger value="keep" variant="pill">оставлять</TabsTrigger>
-                      <TabsTrigger value="hide" variant="pill">убирать</TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                </span>
+        <!-- ============================ рабочая зона — кит, такт 42: Resizable (№ 1, 30), панель 320–820, по умолчанию 440 ============================ -->
+        <ResizablePanelGroup direction="horizontal" class="min-h-0 flex-1">
+          <ResizablePanel class="flex flex-col">
+            <!-- тулбар ленты, §7 — кит, такт 42: Toolbar (№ 15–21) -->
+            <Toolbar>
+              <Button variant="secondary" @click="m.magicWand()">Распределить автоматически</Button>
+              <Button variant="secondary" @click="m.selectAll()">Выделить всё</Button>
+              <div class="w-55 shrink" data-search>
+                <Input v-model="search" placeholder="Поиск по расшифровкам и именам файлов…" />
               </div>
-              <div class="ctlgrp">
-                <span class="segl">Размер</span>
-                <span class="kit-island">
-                  <Tabs v-model="size">
-                    <TabsList variant="pill">
-                      <TabsTrigger value="md" variant="pill">M</TabsTrigger>
-                      <TabsTrigger value="lg" variant="pill">L</TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                </span>
-              </div>
-            </div>
+              <ToolbarText id="curHint" truncate grow align="end">{{ curHint }}</ToolbarText>
+              <ToolbarGroup label="Разобранные">
+                <Tabs v-model="mode">
+                  <TabsList variant="pill">
+                    <TabsTrigger value="keep" variant="pill">оставлять</TabsTrigger>
+                    <TabsTrigger value="hide" variant="pill">убирать</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </ToolbarGroup>
+              <ToolbarGroup label="Размер">
+                <Tabs v-model="size">
+                  <TabsList variant="pill">
+                    <TabsTrigger value="md" variant="pill">M</TabsTrigger>
+                    <TabsTrigger value="lg" variant="pill">L</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </ToolbarGroup>
+            </Toolbar>
 
             <!-- лента материалов, §8 -->
-            <div ref="feedEl" class="feed" data-asis="лента (прокрутка)" @mousedown="onFeedMousedown" @mouseover="onFeedOver" @mouseleave="onFeedLeave">
-              <span class="kit-island">
-                <div :class="frameTileGridVariants({ size })">
+            <!-- лента, §8 — такт 42: прокрутка и поля классами раскладки (№ 22), число колонок — правилом прототипа -->
+            <div ref="feedEl" data-feed class="min-h-0 flex-1 overflow-auto px-4 pt-3.5 pb-32" @mousedown="onFeedMousedown" @mouseover="onFeedOver" @mouseleave="onFeedLeave">
+              <div>
+                <div ref="gridEl" :class="frameTileGridVariants({ size, columns: gridColumns })">
+                  <Empty v-if="!feed.length" class="col-span-full" title="Ничего не найдено" description="Измените фильтр или запрос" />
                   <template v-for="f in feed" :key="f.i">
                     <FrameTile
                       v-if="f.type !== 'voice'"
@@ -1039,36 +1052,33 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
                     </div>
                   </template>
                 </div>
-              </span>
+              </div>
             </div>
-          </div>
+          </ResizablePanel>
 
-          <div class="splitter" data-asis="разделитель" />
+          <ResizableHandle with-handle />
 
           <!-- панель структуры, §9 -->
-          <div class="pane right" data-asis="панель структуры">
-            <span class="kit-island">
-              <Tabs v-model="tab">
-                <TabsList>
-                  <TabsTrigger value="scheme">Схема осмотра</TabsTrigger>
-                  <TabsTrigger value="form">Форма осмотра</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            </span>
+          <ResizablePanel data-pane-right :default-size="440" :min-size="320" :max-size="820" size-unit="px" class="flex flex-col">
+            <Tabs v-model="tab">
+              <TabsList>
+                <TabsTrigger value="scheme">Схема осмотра</TabsTrigger>
+                <TabsTrigger value="form">Форма осмотра</TabsTrigger>
+              </TabsList>
+            </Tabs>
 
-            <div ref="panelEl" class="rbody" @dragover="onPanelDragover" @drop="onPanelDrop" @mouseover="onPanelOver" @mouseleave="hoverPanel = null">
+            <div ref="panelEl" data-panel class="min-h-0 flex-1 overflow-auto pb-30" @dragover="onPanelDragover" @drop="onPanelDrop" @mouseover="onPanelOver" @mouseleave="hoverPanel = null">
               <template v-if="tab === 'scheme'">
-                <div class="schtools" data-asis="инструменты схемы">
-                  <span class="kit-island">
-                    <Button variant="secondary" size="sm" @click="m.toggleAllStages()">{{ m.allClosed.value ? 'Развернуть все' : 'Свернуть все' }}</Button>
-                    <Button v-if="nfrz" :variant="m.state.onlyOpen ? 'default' : 'secondary'" size="sm" @click="m.toggleOnlyOpen()">
-                      {{ m.state.onlyOpen ? `Показать все (+${nfrz})` : 'Только открытые' }}
-                    </Button>
-                  </span>
-                  <span style="font-size:12px;color:var(--va-muted);align-self:center">этапов: {{ STAGES.length }} · шагов: {{ totalSteps }}<template v-if="nfrz"> · заморожено {{ nfrz }}</template></span>
-                </div>
+                <!-- инструменты схемы, §9.1–9.2 — кит, такт 42: Toolbar (№ 32–33), липкий поверх заголовков этапов -->
+                <Toolbar data-schtools class="sticky top-0 z-20 px-3">
+                  <Button variant="secondary" size="sm" @click="m.toggleAllStages()">{{ m.allClosed.value ? 'Развернуть все' : 'Свернуть все' }}</Button>
+                  <Button v-if="nfrz" :variant="m.state.onlyOpen ? 'default' : 'secondary'" size="sm" @click="m.toggleOnlyOpen()">
+                    {{ m.state.onlyOpen ? `Показать все (+${nfrz})` : 'Только открытые' }}
+                  </Button>
+                  <ToolbarText>этапов: {{ STAGES.length }} · шагов: {{ totalSteps }}{{ nfrz ? ` · заморожено ${nfrz}` : '' }}</ToolbarText>
+                </Toolbar>
 
-                <span v-for="st in visibleStages" :key="st.id" class="kit-island">
+                <template v-for="st in visibleStages" :key="st.id">
                   <StageSection
                     :data-stage="st.id"
                     :title="st.title"
@@ -1138,37 +1148,33 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
                       </template>
                     </div>
                   </StageSection>
-                </span>
+                </template>
               </template>
 
-              <!-- вкладка «Форма осмотра»: поля — кит, группы и сверка — как есть -->
-              <div v-else class="gform" data-asis="форма осмотра">
-                <template v-for="g in P.GENERAL" :key="g.g">
-                  <div class="gl">{{ g.g }}</div>
-                  <div v-for="f in g.fields.filter(generalVisible)" :key="f.k" class="grow">
-                    <span class="kit-island">
-                      <Field :label="f.l">
-                        <Select
-                          v-if="f.opts"
-                          :model-value="m.general[f.k]"
-                          :show-icon="false"
-                          placeholder=""
-                          :items="f.opts.map((o: string) => ({ value: o, label: o }))"
-                          @update:model-value="m.setGeneral(f.k, $event)"
-                        />
-                        <Input v-else :model-value="m.general[f.k]" :show-icon="false" placeholder="" @update:model-value="m.setGeneral(f.k, $event)" />
-                      </Field>
-                    </span>
-                    <div v-if="f.k === 'number'" class="cmp">Оформлено единиц оборудования: <b>{{ eqCount }}</b>{{ generalCheck ? ' ' : '' }}<span v-if="generalCheck" :style="{ color: generalCheck.ok ? 'var(--va-ok)' : 'var(--va-danger)' }">{{ generalCheck.text }}</span></div>
-                  </div>
-                </template>
-                <div class="note">
+              <!-- вкладка «Форма осмотра», §7 — кит, такт 42 (№ 42–43): группы — FieldSet, сверка — подсказка Field, примечание — StageNote -->
+              <div v-else data-general class="flex flex-col gap-3 px-3 pt-2 pb-3">
+                <FieldSet v-for="g in P.GENERAL" :key="g.g" :legend="g.g">
+                  <template v-for="f in g.fields" :key="f.k">
+                    <Field v-if="generalVisible(f)" :label="f.l" :hint="f.k === 'number' ? generalHint : ''">
+                      <Select
+                        v-if="f.opts"
+                        :model-value="m.general[f.k] || EMPTY"
+                        :show-icon="false"
+                        placeholder=""
+                        :items="formItems(f.opts)"
+                        @update:model-value="m.setGeneral(f.k, $event)"
+                      />
+                      <Input v-else :model-value="m.general[f.k]" :show-icon="false" placeholder="" @update:model-value="m.setGeneral(f.k, $event)" />
+                    </Field>
+                  </template>
+                </FieldSet>
+                <StageNote>
                   Общая форма схемы. «Общее количество объектов по документам» вместе с «Имущество, которое не удалось осмотреть» отвечают на вопрос, всё ли обошли.
-                </div>
+                </StageNote>
               </div>
             </div>
-          </div>
-        </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
       </div>
 
       <!-- ============================ панель выделения, §10.2 — кит, такт 40 ============================ -->
@@ -1350,19 +1356,53 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
         </ModalCardContent>
       </ModalCard>
 
-      <!-- ============================ сводка завершения, §17.4 — как есть до П5 ============================ -->
-      <div v-if="modalWin" class="modal show" data-asis="модальное окно">
-        <div class="mbox">
-          <h3>{{ modalWin.title }}</h3>
-          <div class="sub">{{ modalWin.sub }}</div>
-          <div class="body" v-html="modalWin.body" />
-          <div class="foot">
-            <span class="kit-island">
-              <Button v-for="b in modalWin.buttons" :key="b.t" :variant="b.primary ? 'default' : 'secondary'">{{ b.t }}</Button>
-            </span>
-          </div>
-        </div>
-      </div>
+      <!-- ============================ сводка завершения, §17.4–17.6 — кит, такт 42 ============================ -->
+      <!-- № 55: ModalCard center 600, блоки — Callout, незакрытые обязательные — список до шести и «…и ещё N», примечание — ModalCardText. -->
+      <ModalCard v-model:open="finishOpen">
+        <ModalCardContent>
+          <ModalCardHeader title="Завершить распределение?" subtitle="Привязки уйдут в Core" />
+          <ModalCardBody class="flex flex-col gap-3">
+            <Callout v-for="b in m.finishWindow.value.blocks" :key="b.title" :tone="b.tone" :title="b.title">
+              <ul v-if="b.list">
+                <li v-for="x in b.list" :key="x">{{ x }}</li>
+              </ul>
+              <template v-else>
+                {{ b.text }}
+              </template>
+            </Callout>
+            <ModalCardText>{{ m.finishWindow.value.note }}</ModalCardText>
+          </ModalCardBody>
+          <ModalCardFooter>
+            <Button variant="secondary" @click="finishOpen = false">
+              Продолжить
+            </Button>
+            <Button @click="m.finish()">
+              Завершить
+            </Button>
+          </ModalCardFooter>
+        </ModalCardContent>
+      </ModalCard>
+
+      <!-- ============================ окно входа — кит, такт 42 ============================ -->
+      <!-- № 59: прототип showEntry; сводка состояния осмотра — Callout. Переключатель сценариев прототипа не переносится (раздел 15). -->
+      <ModalCard v-model:open="entryOpen">
+        <ModalCardContent>
+          <ModalCardHeader :title="m.entryWindow.value.title" :subtitle="m.entryWindow.value.sub" />
+          <ModalCardBody class="flex flex-col gap-3">
+            <Callout v-for="b in m.entryWindow.value.blocks" :key="b.title" :tone="b.tone" :title="b.title">
+              {{ b.text }}
+            </Callout>
+          </ModalCardBody>
+          <ModalCardFooter>
+            <Button variant="secondary" @click="entryOpen = false">
+              Разложу вручную
+            </Button>
+            <Button @click="m.entryAuto()">
+              Распределить автоматически
+            </Button>
+          </ModalCardFooter>
+        </ModalCardContent>
+      </ModalCard>
 
       <!-- ============================ окно прогресса, §12.5 — кит, такт 35 ============================ -->
       <!-- Закрыть можно только «Прервать»: ни крестика, ни Esc, ни клика мимо (§12.5). Прерывание — модель, ничего не применяется (§12.6). -->

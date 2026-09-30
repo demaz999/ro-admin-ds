@@ -188,11 +188,9 @@ const current = computed(() => route.path)
 
     <div class="flex min-w-0 flex-1 flex-col">
       <!-- Верхняя панель: язык, профиль, выход. Состав тот же, что в «Мои осмотры». -->
-      <header
-        data-slot="app-bar"
-        class="flex h-14 shrink-0 items-center gap-6 bg-sidebar px-4 text-sidebar-foreground"
-      >
-        <div class="ml-auto flex items-center gap-6">
+      <!-- Верхняя панель — AppBar кита (такт 42, решение ворот 1): одна шапка в ките. Слева пусто — бренд живёт в сайдбаре. -->
+      <AppBar>
+        <template #end>
           <button type="button" class="flex items-center gap-2 text-sm outline-none">
             RU
             <Icon name="chevron-down" :size="8" />
@@ -207,8 +205,8 @@ const current = computed(() => route.path)
           <IconButton variant="sidebar" size="lg" label="Выйти">
             <Icon name="logout" :size="24" />
           </IconButton>
-        </div>
-      </header>
+        </template>
+      </AppBar>
 
       <main class="flex min-w-0 flex-1 flex-col gap-6 px-8 py-6">
         <slot />

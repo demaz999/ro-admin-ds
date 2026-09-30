@@ -44,13 +44,28 @@ export const buttonNavigationVariants = cva(
       },
       /** Ось `Color` мастера: тёмный против приглушённого. */
       muted: {
-        true: 'text-muted-foreground',
-        false: 'text-foreground',
+        true: '',
+        false: '',
+      },
+      /**
+       * Подача — такт 42, нехватка в ките: на тёмной полосе (`AppBar`) действуют только роли сайдбара.
+       * Тёмный оттенок мастера — `--sidebar-active-foreground`, приглушённый — `--sidebar-foreground`.
+       */
+      surface: {
+        light: '',
+        dark: '',
       },
     },
+    compoundVariants: [
+      { surface: 'light', muted: true, class: 'text-muted-foreground' },
+      { surface: 'light', muted: false, class: 'text-foreground' },
+      { surface: 'dark', muted: true, class: 'text-sidebar-foreground' },
+      { surface: 'dark', muted: false, class: 'text-sidebar-active-foreground' },
+    ],
     defaultVariants: {
       size: 'md',
       muted: false,
+      surface: 'light',
     },
   },
 )
