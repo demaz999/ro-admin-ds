@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { AssignBound } from '@/components/ui/assign'
 import { frameTileGridVariants, type FrameTileState } from '@/components/ui/frame-tile'
 import type { StepThumbItem, StepVerdict } from '@/components/ui/step-row'
@@ -46,6 +46,8 @@ import proto from '~/stands/free-shoot/prototype-data.json'
  * | `?state=flash` | вспышка шага и обводка миниатюры после «Показать в структуре» (§15.3) |
  * | `?state=tooltip` | подсказка названия шага на плашке кадра (§15.4) |
  * | `?state=drop` | цель приёма перетаскивания и перетаскиваемые кадры (§9.5) |
+ * | `?state=marquee` | рамка выделения над первыми тремя кадрами ленты и их выделение (§10.1) — такт 40 |
+ * | `?state=undo` | уведомление привязки с «Отменить» без таймера (§10.6) — такт 40: кадр 21 привязан к «Узлам и агрегатам» |
  * | `?selected=demo` | выделение пяти кадров и панель выделения (§10.2) |
  * | `?open=assign` | панель выделения и поповер «Назначить на шаг», текущий объект (§10.3); с такта 33 поповер и пункты — кит (`Popover`, `SelectContent`, `SelectGroup`, `AssignOption`) |
  * | `?open=viewer-free` / `viewer-assigned` / `viewer-locked` / `viewer-suggest` | полноэкранный просмотр, четыре состояния нижней плашки (§11.2); с такта 33 список шагов — кит (`StageSection`, `AssignOption`), с такта 34 весь просмотр — кит (`Lightbox` со слотом `aside`, `FrameStage`, `FrameBindBar`, `FrameMeta`) |
@@ -142,11 +144,10 @@ const size = computed({ get: () => m.state.size, set: v => m.setSize(v) })
 const tab = computed({ get: () => m.state.rtab, set: v => m.setTab(v) })
 /** Поиск §8.6 фильтрует ленту с порции П5 (С-04, `free-shoot.md`, 16.5); до неё поле ничего не меняет. */
 const search = ref('')
-const { toggleSelect: toggle, clickRepeat, toggleStage, toggleForm } = m
+const { clickRepeat, toggleStage, toggleForm } = m
 
 /* ------------------------------- оснастка ------------------------------- */
 const LINK = { owner: eqId, step: 'e3' }
-const showSelbar = openWin === 'assign' || q('selected') === 'demo'
 const flashNonce = ref<number | null>(null)
 
 const linkedSet = computed(() => new Set(state === 'link' ? framesIn(LINK.owner, LINK.step).map((f: any) => f.i) : []))
@@ -176,7 +177,7 @@ function tileProps(f: any) {
     selectionMode: selected.value.size > 0,
     linked: linkedSet.value.has(f.i),
     dimmed: state === 'link' && !linkedSet.value.has(f.i),
-    dragging: state === 'drop' && selected.value.has(f.i),
+    dragging: (state === 'drop' && selected.value.has(f.i)) || dragIds.value.includes(f.i),
     tooltipOpen: state === 'tooltip' && f.i === 1 ? true : undefined,
   }
 }
@@ -214,7 +215,7 @@ function stepProps(owner: string, st: any, index: number) {
     verdict,
     thumbs: inStep.map((f: any) => ({ id: f.i, src: img(f.i), state: thumbState(f) })),
     highlighted: state === 'link' && isLink,
-    dropTarget: state === 'drop' && owner === eqId && st.id === 'e4',
+    dropTarget: (state === 'drop' && owner === eqId && st.id === 'e4') || hotStep.value === `${owner}|${st.id}`,
     flash: isLink ? flashNonce.value : null,
     locatedThumb: state === 'flash' && isLink ? inStep[0]?.i ?? null : null,
   }
@@ -373,7 +374,7 @@ function openForm(objId: string, group?: string) {
 /** Уведомления экрана — очередь модели, отказы и подтверждения §18. Оснастка `?open=form-errors` держит отказ без таймера. */
 const toasts = m.notices
 /** Сроки прототипа `toast`: 3 с, с действием «Отменить» — 6 с (§10.6). */
-const toastDuration = (undo: boolean) => (openWin === 'form-errors' ? Number.POSITIVE_INFINITY : undo ? 6000 : 3000)
+const toastDuration = (undo: boolean) => (openWin === 'form-errors' || state === 'undo' ? Number.POSITIVE_INFINITY : undo ? 6000 : 3000)
 /** §14.6: обязательные проверяются при сохранении — `form.required` «Заполните: <список полей>», окно открыто. */
 function saveForm() {
   const need = (editStage.value?.form ?? []).filter(f => f.req && !filled(f.k))
@@ -416,7 +417,8 @@ const assignGroups = computed(() => {
 })
 
 /* ------------------ полноэкранный просмотр, такт 34 (§11.1–11.3) ------------------ */
-const lbFrames = LB_FRAMES
+/** Кадры просмотра — прототип `lbList` = `visibleMedia`: медиа ленты с её фильтрами, из модели (такт 40). */
+const lbFrames = computed(() => m.visibleMedia())
 const viewerOpen = computed({
   get: () => m.state.lb >= 0,
   set: (v: boolean) => { if (!v) m.setViewer(-1) },
@@ -429,12 +431,12 @@ const viewerIdx = computed(() => Math.max(0, m.state.lb))
 const BIND = String(H.viewerAssigned.list).match(/class="it bound" data-owner="([^"]+)" data-step="([^"]+)"/)
 const bindOverride = viewerKey === 'assigned' && BIND ? { i: H.viewerAssigned.i, objId: BIND[1], stepId: BIND[2] } : null
 const viewerFrame = computed(() => {
-  const f = lbFrames[viewerIdx.value]
+  const f = lbFrames.value[viewerIdx.value]
   return bindOverride && f?.i === bindOverride.i ? { ...f, objId: bindOverride.objId, stepId: bindOverride.stepId } : f
 })
 function openViewer(i: number) {
   suggestion.value = null
-  m.setViewer(Math.max(0, lbFrames.findIndex((f: any) => f.i === i)))
+  m.setViewer(Math.max(0, lbFrames.value.findIndex((f: any) => f.i === i)))
 }
 function stepViewer(index: number) {
   suggestion.value = null
@@ -516,15 +518,15 @@ const viewerGroups = computed(() => {
 const groupCount = (g: { items: any[] }) => String(g.items.filter(i => i.type !== 'create').length)
 
 const assignOpen = ref(false)
-const assignAnchor = ref<HTMLElement | null>(null)
-/** Клик по самой кнопке переключает плашку сам — закрытие «кликом мимо» ему не мешает. */
-function onAssignOutside(e: Event) {
-  if (assignAnchor.value?.contains(e.target as Node)) e.preventDefault()
-}
-/** Кнопка «Назначить на шаг» — разметка прототипа, не `PopoverTrigger`: фокус возвращается на неё вручную. */
-function onAssignCloseFocus(e: Event) {
-  e.preventDefault()
-  assignAnchor.value?.focus()
+/**
+ * Пункт поповера (§10.3) — прототип `#popList`: шаг — привязка выделения с проверкой шага, другой объект —
+ * «сделать текущим». Плашка закрывается.
+ */
+function onAssignSelect(value: string) {
+  const [a, b] = value.split('|')
+  if (a === 'obj') m.setCurrent(b!)
+  else m.assignTo([...m.state.sel], a!, b!)
+  assignOpen.value = false
 }
 
 const feedEl = ref<HTMLElement | null>(null)
@@ -538,6 +540,8 @@ onMounted(async () => {
     bindFlash.value = Date.now()
     setInterval(() => { bindFlash.value = Date.now() }, 1200)
   }
+  /* Оснастка такта 40: привязка с уведомлением «Отменить» — операцией модели. */
+  if (state === 'undo' && eqId) m.assign([21], eqId, 'e4')
   if (state === 'flash') {
     flashNonce.value = Date.now()
     setInterval(() => { flashNonce.value = Date.now() }, 2000)
@@ -553,21 +557,176 @@ onMounted(async () => {
   /* Целевой шаг оснастки — в центр панели, как у перехода «Показать в структуре». */
   const target = state === 'drop' ? `${eqId}|e4` : ['link', 'flash'].includes(state) ? `${LINK.owner}|${LINK.step}` : ''
   if (target) document.querySelector(`[data-step-key="${target}"]`)?.scrollIntoView({ block: 'center' })
-  if (feedEl.value) {
-    const r = feedEl.value.getBoundingClientRect()
-    selbarLeft.value = `${r.left + r.width / 2}px`
+  placeSelbar()
+  /* Оснастка такта 40: рамка над первыми тремя плитками — как протяжка с поля ленты до третьего кадра. */
+  if (state === 'marquee' && feedEl.value) {
+    const tiles = [...feedEl.value.querySelectorAll<HTMLElement>('[data-slot=frame-tile][data-frame]')].slice(0, 3)
+    const f = feedEl.value.getBoundingClientRect()
+    const b = tiles[2]!.getBoundingClientRect()
+    marquee.value = { x: f.left + 6, y: b.top + 20, width: b.left + b.width / 2 - f.left - 6, height: b.height / 2 - 20 }
+    m.setSelection(tiles.map(t => Number(t.dataset.frame)))
   }
-  /* Поповер назначения привязан к кнопке панели выделения — она разметка прототипа (№ 27, как есть). */
-  const btn = document.getElementById('btnToStep')
-  if (btn) {
-    assignAnchor.value = btn
-    btn.addEventListener('click', () => { assignOpen.value = !assignOpen.value })
-    if (openWin === 'assign') {
-      await nextTick()
-      assignOpen.value = true
-    }
+  window.addEventListener('resize', placeSelbar)
+  window.addEventListener('keydown', onKeydown, true)
+  window.addEventListener('mousemove', onMarqueeMove)
+  window.addEventListener('mouseup', onMarqueeEnd)
+  document.addEventListener('dragend', onDragEnd)
+  if (openWin === 'assign') {
+    await nextTick()
+    assignOpen.value = true
   }
 })
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', placeSelbar)
+  window.removeEventListener('keydown', onKeydown, true)
+  window.removeEventListener('mousemove', onMarqueeMove)
+  window.removeEventListener('mouseup', onMarqueeEnd)
+  document.removeEventListener('dragend', onDragEnd)
+})
+
+/* ------------------------------ выделение, такт 40 (§10.1–10.2) ------------------------------ */
+/** Панель выделения — по центру ленты, как прототип `renderSelbar`. */
+function placeSelbar() {
+  if (!feedEl.value) return
+  const r = feedEl.value.getBoundingClientRect()
+  selbarLeft.value = `${r.left + r.width / 2}px`
+}
+/** Клик по плитке: Shift — диапазон (§10.1). */
+function onTileClick(i: number, e: MouseEvent | KeyboardEvent) {
+  m.clickTile(i, e.shiftKey)
+}
+
+/**
+ * Рамка выделения — прототип «выделение рамкой»: с пустого места ленты или с Alt с плитки; с Shift, Ctrl или ⌘
+ * к прежнему выделению. Под рамкой — плитки кадров (без заметок); у края ленты — автопрокрутка по 14.
+ */
+const marquee = ref<{ x: number, y: number, width: number, height: number } | null>(null)
+let marq: { sx: number, sy: number, base: Set<number>, moved: boolean } | null = null
+function onFeedMousedown(e: MouseEvent) {
+  if (e.button !== 0) return
+  const onCard = (e.target as HTMLElement).closest('[data-frame]')
+  if (onCard && !e.altKey) return
+  marq = { sx: e.clientX, sy: e.clientY, base: e.shiftKey || e.metaKey || e.ctrlKey ? new Set(m.state.sel) : new Set(), moved: false }
+  marquee.value = { x: e.clientX, y: e.clientY, width: 0, height: 0 }
+  e.preventDefault()
+}
+function onMarqueeMove(e: MouseEvent) {
+  if (!marq || !feedEl.value) return
+  if (Math.abs(e.clientX - marq.sx) > 3 || Math.abs(e.clientY - marq.sy) > 3) marq.moved = true
+  const x = Math.min(marq.sx, e.clientX)
+  const y = Math.min(marq.sy, e.clientY)
+  const w = Math.abs(e.clientX - marq.sx)
+  const h = Math.abs(e.clientY - marq.sy)
+  marquee.value = { x, y, width: w, height: h }
+  const sel = new Set(marq.base)
+  feedEl.value.querySelectorAll<HTMLElement>('[data-slot=frame-tile][data-frame]').forEach((c) => {
+    const b = c.getBoundingClientRect()
+    if (b.right > x && b.left < x + w && b.bottom > y && b.top < y + h) sel.add(Number(c.dataset.frame))
+  })
+  m.setSelection(sel)
+  const fr = feedEl.value.getBoundingClientRect()
+  if (e.clientY - fr.top < 60) feedEl.value.scrollTop -= 14
+  else if (fr.bottom - e.clientY < 60) feedEl.value.scrollTop += 14
+}
+function onMarqueeEnd() {
+  if (!marq) return
+  marq = null
+  marquee.value = null
+}
+
+/* ------------------------------ перетаскивание, такт 40 (§9.5) ------------------------------ */
+/** Кадры в полёте — прототип `drag`; метка под курсором — `Badge` md (решение ворот 7), вне экрана до броска. */
+const dragIds = ref<number[]>([])
+const ghostEl = ref<HTMLElement | null>(null)
+const ghostText = ref('')
+const hotStep = ref('')
+function onDragStart(i: number, e: DragEvent) {
+  if (marq) { e.preventDefault(); return }
+  const drag = m.dragStart(i)
+  dragIds.value = drag
+  ghostText.value = m.dragLabel(drag)
+  /* Картинка переноса снимается синхронно — текст метки ставится в узел сразу, не дожидаясь перерисовки. */
+  const badge = ghostEl.value?.firstElementChild
+  if (badge) badge.textContent = ghostText.value
+  if (e.dataTransfer && ghostEl.value) {
+    e.dataTransfer.setDragImage(ghostEl.value, 10, 10)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', drag.join(','))
+  }
+}
+function onDragEnd() {
+  dragIds.value = []
+  hotStep.value = ''
+}
+const stepKeyOf = (e: Event) => ((e.target as HTMLElement).closest('[data-step-key]') as HTMLElement | null)?.dataset.stepKey ?? ''
+/** Над панелью: шаг под курсором — цель приёма, у заполненного и замороженного приёма нет; у края — автопрокрутка. */
+function onPanelDragover(e: DragEvent) {
+  if (!dragIds.value.length) return
+  e.preventDefault()
+  const rb = e.currentTarget as HTMLElement
+  const r = rb.getBoundingClientRect()
+  if (e.clientY - r.top < 60) rb.scrollTop -= 14
+  else if (r.bottom - e.clientY < 60) rb.scrollTop += 14
+  const key = stepKeyOf(e)
+  const [owner, sid] = key.split('|')
+  const st = key ? m.ownerStage(owner!)?.steps.find(x => x.id === sid) : null
+  const closed = !st || m.isFrozen(owner!, sid!) || m.stepFull(owner!, st)
+  hotStep.value = closed ? '' : key
+  if (e.dataTransfer) e.dataTransfer.dropEffect = key && closed ? 'none' : 'move'
+}
+/** Бросок на шаг — прототип `drop`: отказ с причиной или привязка; выделение снимается. */
+function onPanelDrop(e: DragEvent) {
+  const key = stepKeyOf(e)
+  if (!key || !dragIds.value.length) return
+  e.preventDefault()
+  const [owner, sid] = key.split('|')
+  m.assignTo([...dragIds.value], owner!, sid!)
+  onDragEnd()
+}
+/** Клик по строке шага при выделении — привязка (С-08); без выделения ничего. */
+function onStepSelect(owner: string, stepId: string) {
+  if (m.state.sel.size) m.assignTo([...m.state.sel], owner, stepId)
+}
+
+/* ------------------------------ клавиатура, такт 40 (§16) ------------------------------ */
+/**
+ * Один обработчик по таблице прототипа (`keydown` документа). П3: Esc, Ctrl+Z, Ctrl+A, 1–8, Del / Backspace;
+ * в просмотре — Del / Backspace. ← → Enter и 1–8 в просмотре — порция П4.
+ *
+ * Esc по приоритету «просмотр → окно → выделение»: просмотр и окна закрывает Reka сама, поэтому обработчик
+ * стоит в фазе перехвата и снимает выделение, только если ни просмотра, ни окна нет.
+ */
+function onKeydown(e: KeyboardEvent) {
+  const typing = /INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName ?? '')
+  if (e.key === 'Escape') {
+    if (m.state.lb < 0 && !m.state.win) m.clearSel()
+    return
+  }
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); m.undoLast(); return }
+  if (typing) return
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') { e.preventDefault(); m.selectAll(); return }
+  const lbOpen = m.state.lb >= 0
+  if (lbOpen) {
+    if (e.key === 'Backspace' || e.key === 'Delete') {
+      const f = viewerFrame.value
+      if (f) m.unassignViewed(f.i)
+      return
+    }
+  }
+  if (/^[1-9]$/.test(e.key)) {
+    if (lbOpen) return
+    m.pressDigit(Number(e.key))
+    return
+  }
+  if ((e.key === 'Backspace' || e.key === 'Delete') && m.state.sel.size) m.unassignSelection()
+}
+
+/* ------------------------------ уведомления, такт 40 (§10.6) ------------------------------ */
+/** «Отменить» — прототип: действие `undoLast`, плашка снимается. */
+function onUndo(id: number) {
+  m.undoLast()
+  m.dismissNotice(id)
+}
 
 const SVG_NOTE = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 2.5h10v11H3z"/><path d="M5.5 6h5M5.5 9h4"/></svg>'
 const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l8 5-8 5z"/></svg>'
@@ -652,7 +811,7 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
             <div class="bar-tools" data-asis="тулбар ленты">
               <span class="kit-island">
                 <Button variant="secondary" @click="m.magicWand()">Распределить автоматически</Button>
-                <Button variant="secondary">Выделить всё</Button>
+                <Button variant="secondary" @click="m.selectAll()">Выделить всё</Button>
                 <div class="w-55 shrink">
                   <Input v-model="search" placeholder="Поиск по расшифровкам и именам файлов…" />
                 </div>
@@ -683,11 +842,20 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
             </div>
 
             <!-- лента материалов, §8 -->
-            <div ref="feedEl" class="feed" data-asis="лента (прокрутка)">
+            <div ref="feedEl" class="feed" data-asis="лента (прокрутка)" @mousedown="onFeedMousedown">
               <span class="kit-island">
                 <div :class="frameTileGridVariants({ size })">
                   <template v-for="f in feed" :key="f.i">
-                    <FrameTile v-if="f.type !== 'voice'" v-bind="tileProps(f)" :data-frame="f.i" @toggle-select="toggle(f.i)" @open="openViewer(f.i)" />
+                    <FrameTile
+                      v-if="f.type !== 'voice'"
+                      v-bind="tileProps(f)"
+                      :data-frame="f.i"
+                      draggable="true"
+                      @toggle-select="onTileClick(f.i, $event)"
+                      @open="openViewer(f.i)"
+                      @unassign="m.unassignFrame(f.i)"
+                      @dragstart="onDragStart(f.i, $event)"
+                    />
                     <div v-else class="va">
                       <div
                         class="card voice"
@@ -731,7 +899,7 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
               </Tabs>
             </span>
 
-            <div class="rbody">
+            <div class="rbody" @dragover="onPanelDragover" @drop="onPanelDrop">
               <template v-if="tab === 'scheme'">
                 <div class="schtools" data-asis="инструменты схемы">
                   <span class="kit-island">
@@ -778,7 +946,15 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
                             @edit="openForm(o.id, $event)"
                           />
                         </template>
-                        <StepRow v-for="(x, k) in stageById[o.stageId].steps" :key="x.id" v-bind="stepProps(o.id, x, k)" :data-step-key="`${o.id}|${x.id}`" />
+                        <StepRow
+                          v-for="(x, k) in stageById[o.stageId].steps"
+                          :key="x.id"
+                          v-bind="stepProps(o.id, x, k)"
+                          :data-step-key="`${o.id}|${x.id}`"
+                          @select="onStepSelect(o.id, x.id)"
+                          @thumb-open="openViewer(Number($event))"
+                          @thumb-remove="m.unassignFrame(Number($event))"
+                        />
                       </RepeatCard>
                       <StageNote v-if="!repList(st).list.length">
                         {{ repList(st).hidden ? 'Все повторы этапа проверены' : 'Повторов пока нет — выделите кадры и нажмите «Новый объект из выделенного»' }}
@@ -788,7 +964,15 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
                       </StageNote>
                     </template>
                     <div v-else class="flex flex-col gap-0.5 px-1.5 pt-1 pb-2">
-                      <StepRow v-for="(x, k) in st.steps" :key="x.id" v-bind="stepProps(st.id, x, k)" />
+                      <StepRow
+                        v-for="(x, k) in st.steps"
+                        :key="x.id"
+                        v-bind="stepProps(st.id, x, k)"
+                        :data-step-key="`${st.id}|${x.id}`"
+                        @select="onStepSelect(st.id, x.id)"
+                        @thumb-open="openViewer(Number($event))"
+                        @thumb-remove="m.unassignFrame(Number($event))"
+                      />
                     </div>
                   </StageSection>
                 </span>
@@ -824,43 +1008,48 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
         </div>
       </div>
 
-      <!-- ============================ панель выделения, §10.2 ============================ -->
-      <div
-        v-if="showSelbar"
-        id="selbar"
-        class="selbar show"
-        :style="{ left: selbarLeft }"
-        data-asis="панель выделения"
-        v-html="H.selbar"
-      />
+      <!-- ============================ панель выделения, §10.2 — кит, такт 40 ============================ -->
+      <!-- № 27: ActionBar по центру ленты; закрытая уезжает вниз, как у прототипа. «Новый объект из выделенного» (№ 29) — порция П6. -->
+      <ActionBar :open="m.state.sel.size > 0" :count="m.selbar.value.count" :sub="m.selbar.value.sub" :x="selbarLeft">
+        <!--
+          Поповер «Назначить на шаг», §10.3 — кит, такт 33. Положение — как у прототипа (`#btnToStep`): над
+          кнопкой на 8, левый край на 40 левее кнопки, от краёв окна не ближе 12. Ширина 360 и высота до 62vh — `.pop`.
+        -->
+        <Popover v-model:open="assignOpen">
+          <PopoverTrigger as-child>
+            <Button size="sm">Назначить на шаг</Button>
+          </PopoverTrigger>
+          <PopoverContent
+            as-child
+            side="top"
+            align="start"
+            :align-offset="-40"
+            :side-offset="8"
+            :collision-padding="12"
+            :width="360"
+          >
+            <SelectContent :width="360" max-height="62vh">
+              <AssignList>
+                <SelectGroup v-for="g in assignGroups" :key="g.key" :header="g.header">
+                  <AssignOption v-for="it in g.items" :key="it.value" v-bind="it" :data-value="it.value" @select="onAssignSelect(it.value)" />
+                </SelectGroup>
+              </AssignList>
+            </SelectContent>
+          </PopoverContent>
+        </Popover>
+        <Button variant="secondary" size="sm">Новый объект из выделенного</Button>
+        <Button variant="secondary" size="sm" @click="m.assignMisc()">В «Прочее»</Button>
+        <Button variant="secondary" size="sm" @click="m.unassignSelection()">Открепить</Button>
+        <ActionBarSeparator />
+        <Button variant="secondary" size="sm" @click="m.clearSel()">Снять</Button>
+      </ActionBar>
 
-      <!-- ============================ поповер «Назначить на шаг», §10.3 — кит, такт 33 ============================ -->
-      <!--
-        Положение — как у прототипа (`#btnToStep`): над кнопкой на 8, левый край на 40 левее
-        кнопки, от краёв окна не ближе 12. Ширина 360 и высота до 62vh — `.pop` прототипа.
-      -->
-      <Popover v-if="assignAnchor" v-model:open="assignOpen">
-        <PopoverAnchor :reference="assignAnchor" />
-        <PopoverContent
-          as-child
-          side="top"
-          align="start"
-          :align-offset="-40"
-          :side-offset="8"
-          :collision-padding="12"
-          :width="360"
-          @interact-outside="onAssignOutside"
-          @close-auto-focus="onAssignCloseFocus"
-        >
-          <SelectContent :width="360" max-height="62vh">
-            <AssignList>
-              <SelectGroup v-for="g in assignGroups" :key="g.key" :header="g.header">
-                <AssignOption v-for="it in g.items" :key="it.value" v-bind="it" @select="assignOpen = false" />
-              </SelectGroup>
-            </AssignList>
-          </SelectContent>
-        </PopoverContent>
-      </Popover>
+      <!-- ============================ рамка и метка перетаскивания, §10.1, §9.5 — кит, такт 40 ============================ -->
+      <SelectionMarquee v-if="marquee" :rect="marquee" />
+      <!-- Метка «N кадров» — Badge md как есть (решение ворот 7), вне экрана: из неё снимается картинка переноса. -->
+      <div ref="ghostEl" class="pointer-events-none fixed -top-96 -left-96">
+        <Badge>{{ ghostText }}</Badge>
+      </div>
 
       <!-- ============================ полноэкранный просмотр, §11 — кит, такт 34 ============================ -->
       <!--
@@ -884,6 +1073,7 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
             @suggest="onSuggest"
             @dismiss="suggestion = null"
             @locate="viewerOpen = false"
+            @unbind="viewerFrame && m.unassignFrame(viewerFrame.i)"
           />
         </FrameStage>
         <template #aside>
@@ -899,7 +1089,7 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
             @toggle="toggleStage(g.id)"
           >
             <AssignList class="p-1">
-              <AssignOption v-for="it in g.items" :key="it.value" v-bind="it" />
+              <AssignOption v-for="it in g.items" :key="it.value" v-bind="it" @unbind="viewerFrame && m.unassignFrame(viewerFrame.i)" />
             </AssignList>
           </StageSection>
         </template>
@@ -1061,10 +1251,14 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
         :key="t.id"
         :open="true"
         :duration="toastDuration(t.undo)"
-        :show-action="false"
+        :show-action="t.undo"
         @update:open="m.dismissNotice(t.id)"
+        @action="onUndo(t.id)"
       >
         {{ t.text }}
+        <template v-if="t.undo" #action>
+          Отменить
+        </template>
       </Toast>
     </Toaster>
 

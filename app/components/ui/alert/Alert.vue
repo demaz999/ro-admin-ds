@@ -26,7 +26,8 @@ const props = withDefaults(defineProps<{
   value: 0.25,
 })
 
-const emit = defineEmits<{ close: [] }>()
+/** `action` — нажата кнопка действия (`ButtonAction`): «Отменить» уведомления экрана VA-9265, такт 40. */
+const emit = defineEmits<{ close: []; action: [] }>()
 
 /** Таймер занимает место иконки, поэтому отдельная иконка при нём не рисуется. */
 const withIcon = computed(() => props.type === 'timer' || props.showIcon)
@@ -59,7 +60,7 @@ const withIcon = computed(() => props.type === 'timer' || props.showIcon)
       <!-- Размер `md` — это `suluguni` 16/20, ровно то, что инстанцировано в
            мастере уведомления. Оба узла `ButtonAction` сведены в один компонент
            решением от 2026-08-13. -->
-      <ButtonAction v-if="props.showAction" :show-icon="false">
+      <ButtonAction v-if="props.showAction" :show-icon="false" @click="emit('action')">
         <slot name="action">
           Button text
         </slot>

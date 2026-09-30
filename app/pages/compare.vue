@@ -1343,7 +1343,7 @@ const textareaVariants = [
     -->
     <section data-theme="rososmotr" class="space-y-3 bg-background font-sans text-foreground">
       <h2 class="text-lg font-bold">
-        FrameTile · StepRow · StepThumb · Progress · ProgressStat · StageSection · RepeatCard · AssignOption · FrameBindBar · ModalCard · FieldSet · Callout · RadioGroupItem card — без эталона, такты 30–36 и 39
+        FrameTile · StepRow · StepThumb · Progress · ProgressStat · StageSection · RepeatCard · AssignOption · FrameBindBar · ModalCard · FieldSet · Callout · RadioGroupItem card · ActionBar · SelectionMarquee — без эталона, такты 30–36, 39–40
       </h2>
       <p class="max-w-3xl text-sm text-muted-foreground">
         Мастера нет — сверка идёт с прототипом VA-9265 v17, пары «прототип / кит» лежат в
@@ -1552,6 +1552,27 @@ const textareaVariants = [
             </template>
           </RadioGroupItem>
         </RadioGroup>
+      </div>
+      <!--
+        Такт 40: панель выделения ActionBar (в потоке, на экране прибита к низу окна), рамка SelectionMarquee
+        внутри рамки стенда, уведомление с «Отменить».
+      -->
+      <div class="grid max-w-5xl grid-cols-2 items-start gap-4">
+        <ActionBar count="5 кадров выбрано" sub="1 видео · 2 уже распределено" x="0" class="relative bottom-0 translate-x-0">
+          <Button size="sm">Назначить на шаг</Button>
+          <Button variant="secondary" size="sm">Открепить</Button>
+          <ActionBarSeparator />
+          <Button variant="secondary" size="sm">Снять</Button>
+        </ActionBar>
+        <div class="relative h-24 overflow-hidden rounded-md border border-border-soft bg-background">
+          <SelectionMarquee :rect="{ x: 16, y: 16, width: 200, height: 56 }" class="absolute" />
+        </div>
+        <Alert :show-action="true">
+          1 кадр → «Узлы и агрегаты» · Пропиточная линия POLYPRISE
+          <template #action>
+            Отменить
+          </template>
+        </Alert>
       </div>
       <!--
         Такт 36: строка формы — Field left с колонкой подписи 170 и знаком обязательности, группа — FieldSet;

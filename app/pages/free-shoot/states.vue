@@ -480,6 +480,34 @@ const RADIO_CARD_EXAMPLE = `<!-- карточка выбора: variant="card", 
   </RadioGroupItem>
 </RadioGroup>`
 
+/* ------------------------------ такт 40: ActionBar, SelectionMarquee, «Отменить» ------------------------------ */
+const ACTION_BAR_EXAMPLE = `<!-- панель выделения, §10.2: по центру ленты (x считает страница), закрытая уезжает вниз -->
+<ActionBar :open="selected.size > 0" :count="plural(n, 'кадр выбран', 'кадра выбрано', 'кадров выбрано')" :sub="sub" :x="feedCenter">
+  <Popover v-model:open="assignOpen">
+    <PopoverTrigger as-child><Button size="sm">Назначить на шаг</Button></PopoverTrigger>
+    <PopoverContent as-child side="top" align="start" :width="360"> … </PopoverContent>
+  </Popover>
+  <Button variant="secondary" size="sm" @click="assignMisc()">В «Прочее»</Button>
+  <Button variant="secondary" size="sm" @click="unassignSelection()">Открепить</Button>
+  <ActionBarSeparator />
+  <Button variant="secondary" size="sm" @click="clearSelection()">Снять</Button>
+</ActionBar>
+
+<!-- рамка выделения, §10.1: только вид — геометрию и выделение под ней считает страница -->
+<SelectionMarquee v-if="rect" :rect="rect" />
+
+<!-- метка переноса «N кадров», §9.5: Badge md как есть, вне экрана — из неё снимается картинка переноса -->
+<div ref="ghost" class="pointer-events-none fixed -top-96 -left-96"><Badge>{{ label }}</Badge></div>
+
+<!-- строка шага, С-08: клик мимо миниатюр — событие select -->
+<StepRow v-bind="step" @select="selected.size && assignTo([...selected], owner, step.id)" />
+
+<!-- уведомление с «Отменить», §10.6: 6 с с действием, 3 с без -->
+<Toast :duration="6000" @action="undoLast()">1 кадр → «Узлы и агрегаты» · Пропиточная линия
+  <template #action>Отменить</template>
+</Toast>`
+const marqueeDemo = { x: 24, y: 24, width: 280, height: 96 }
+
 const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :total="frames.length">
   <template #actions>
     <FrameTitle :name="frame.fileName" :assigned="!!frame.stepId" />   <!-- имя файла и метка -->
@@ -1586,6 +1614,76 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
           </div>
         </div>
       </div>
+    </section>
+
+    <!-- ============================ ActionBar, SelectionMarquee, «Отменить», такт 40 ============================ -->
+    <section id="selection" data-section="selection" class="space-y-6">
+      <div class="space-y-1">
+        <h2 class="text-lg font-bold">
+          ActionBar · SelectionMarquee · метка переноса · «Отменить» — выделение и привязка
+        </h2>
+        <p class="max-w-240 text-sm text-foreground-secondary">
+          Такт 40, карточки 6 и 7 такта 37 (ворота 2026-09-30). Мастеров нет: структура — панель выделения
+          <code>#selbar</code>, рамка <code>.marquee</code>, метка <code>#ghost</code> и уведомление <code>toast</code> прототипа v17;
+          вид — роли всплывающих кита (<code>--popover</code>, <code>shadow-dropdown</code>), <code>--primary</code> на ступени
+          <code>--opacity-soft</code>, <code>Badge</code> md, <code>Toast</code>. Разбор — <code>docs/free-shoot.md</code>, раздел 19.
+          На экране полоса прибита к низу окна; здесь — в потоке (<code>class="relative …"</code>).
+        </p>
+      </div>
+
+      <div data-subsection="action-bar" class="grid max-w-6xl grid-cols-[repeat(2,minmax(0,1fr))] items-start gap-6">
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">ActionBar — счёт с подписью, действия, разделитель</p>
+          <ActionBar count="5 кадров выбрано" sub="1 видео · 2 уже распределено" x="0" class="relative bottom-0 translate-x-0">
+            <Button size="sm">Назначить на шаг</Button>
+            <Button variant="secondary" size="sm">Новый объект из выделенного</Button>
+            <Button variant="secondary" size="sm">В «Прочее»</Button>
+            <Button variant="secondary" size="sm">Открепить</Button>
+            <ActionBarSeparator />
+            <Button variant="secondary" size="sm">Снять</Button>
+          </ActionBar>
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">ActionBar — счёт без подписи</p>
+          <ActionBar count="1 кадр выбран" x="0" class="relative bottom-0 translate-x-0">
+            <Button size="sm">Назначить на шаг</Button>
+            <ActionBarSeparator />
+            <Button variant="secondary" size="sm">Снять</Button>
+          </ActionBar>
+        </div>
+      </div>
+
+      <div data-subsection="marquee" class="grid max-w-6xl grid-cols-[repeat(2,minmax(0,1fr))] items-start gap-6">
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">SelectionMarquee — рамка поверх плиток (в окне стенда — внутри рамки)</p>
+          <div class="relative h-40 overflow-hidden rounded-md border border-border-soft bg-background p-6">
+            <div class="flex gap-4">
+              <FrameTile class="w-44" :src="img(1)" time="09:43" selected selection-mode />
+              <FrameTile class="w-44" :src="img(2)" time="09:47" />
+            </div>
+            <SelectionMarquee :rect="marqueeDemo" class="absolute" />
+          </div>
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">метка переноса — Badge md как есть (решение ворот 7)</p>
+          <div class="flex gap-3">
+            <Badge>5 кадров</Badge>
+            <Badge>IMG_3264.jpeg</Badge>
+          </div>
+        </div>
+      </div>
+
+      <div data-subsection="toast-undo" class="space-y-1">
+        <p class="text-2xs text-muted-foreground">уведомление привязки с «Отменить» — Alert мастера Notification со слотом действия</p>
+        <Alert :show-action="true">
+          1 кадр → «Узлы и агрегаты» · Пропиточная линия POLYPRISE
+          <template #action>
+            Отменить
+          </template>
+        </Alert>
+      </div>
+
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ ACTION_BAR_EXAMPLE }}</pre>
     </section>
   </main>
 </template>

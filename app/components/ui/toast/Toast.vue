@@ -21,7 +21,10 @@ const props = defineProps<ToastRootProps & {
   value?: number
 }>()
 
-const emits = defineEmits<ToastRootEmits>()
+const emits = defineEmits<ToastRootEmits & {
+  /** Кнопка действия плашки — «Отменить» (такт 40, §10.6). Подпись — слот `action`. */
+  action: []
+}>()
 
 const delegated = reactiveOmit(props, 'type', 'showIcon', 'showAction', 'value')
 const forwarded = useForwardPropsEmits(delegated, emits)
@@ -39,12 +42,16 @@ const forwarded = useForwardPropsEmits(delegated, emits)
       :show-action="props.showAction ?? true"
       :value="props.value ?? 0.25"
       @close="emits('update:open', false)"
+      @action="emits('action')"
     >
       <slot />
       <!-- Слот прокидывается только когда он реально заполнен: иначе он затёр бы
            дефолтную иконку `Alert` пустотой. -->
       <template v-if="$slots.icon" #icon>
         <slot name="icon" />
+      </template>
+      <template v-if="$slots.action" #action>
+        <slot name="action" />
       </template>
     </Alert>
   </ToastRoot>

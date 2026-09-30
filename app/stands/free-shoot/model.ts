@@ -108,6 +108,8 @@ export interface UiState {
   win: ScreenWindow
   /** Окно формы повтора: какой повтор и на какой группе открыто (§14.3). */
   formWin: { obj: string, group: string } | null
+  /** Стек отмены (§10.6) — прототип `state.undo`: на операцию — прежние привязки её кадров. Глубина не ограничена. */
+  undo: { i: number, o: string | null, s: string | null }[][]
   /** Идущее автораспределение — окно прогресса (§12.5). */
   run: WandRun | null
   /** Сводка результата автораспределения — окно `summary` (§12.12). */
@@ -130,7 +132,7 @@ export interface ModelOptions {
   /** Блоки съёмки для автораспределения — `window.VA_BLOCKS` прототипа. */
   blocks?: Block[]
   /** Начальное состояние интерфейса — оснастка адреса и выбор стенда. */
-  initial?: Partial<Omit<UiState, 'sel' | 'open' | 'closed' | 'formOpen'>> & { sel?: number[], open?: string[] }
+  initial?: Partial<Omit<UiState, 'sel' | 'open' | 'closed' | 'formOpen' | 'undo'>> & { sel?: number[], open?: string[] }
 }
 
 export function createModel(opts: ModelOptions) {
@@ -160,6 +162,7 @@ export function createModel(opts: ModelOptions) {
     size: init.size ?? 'md',
     win: init.win ?? null,
     formWin: init.formWin ?? null,
+    undo: [],
     run: null,
     summary: null,
     saving: false,
@@ -649,6 +652,151 @@ export function createModel(opts: ModelOptions) {
     return next?.id ?? null
   }
 
+  /* ------------------------------ П3: выделение (§10.1–10.2) ------------------------------ */
+  /** Прототип `visibleMedia`: кадры ленты без заметок — порядок выделения диапазоном и «Выделить всё». */
+  const visibleMedia = () => visible().filter(isMedia)
+  /** Прототип `selectRange`: от последнего кликнутого до `to` по порядку ленты; без опоры — только `to`. */
+  function selectRange(to: number) {
+    const l = visibleMedia().map(f => f.i)
+    const a = l.indexOf(state.last ?? -1)
+    const b = l.indexOf(to)
+    if (a < 0 || b < 0) { state.sel.add(to); return }
+    const [s, e] = a < b ? [a, b] : [b, a]
+    for (let k = s; k <= e; k++) state.sel.add(l[k]!)
+  }
+  /** Клик по плитке (§8.3): с Shift — диапазон, иначе переключение; кликнутый — опора диапазона. */
+  function clickTile(i: number, shift = false) {
+    if (shift) selectRange(i)
+    else if (state.sel.has(i)) state.sel.delete(i)
+    else state.sel.add(i)
+    state.last = i
+  }
+  /** «Выделить всё» и Ctrl+A — прототип `#btnSelAll`: всё видимое, повторно — снять видимое. */
+  function selectAll() {
+    const l = visibleMedia().map(f => f.i)
+    const all = l.every(i => state.sel.has(i))
+    if (all) l.forEach(i => state.sel.delete(i))
+    else l.forEach(i => state.sel.add(i))
+  }
+  /** «Снять», Esc — прототип `clearSel`. */
+  function clearSel() { state.sel.clear() }
+  /** Рамка (§10.1): выделение = основа (с Shift, Ctrl, ⌘ — прежнее) плюс кадры под рамкой; геометрию считает страница. */
+  function setSelection(ids: Iterable<number>) {
+    state.sel.clear()
+    for (const i of ids) state.sel.add(i)
+  }
+  /** Панель выделения (№ 27) — прототип `renderSelbar`: строка счёта и подпись. */
+  const selbar = computed(() => {
+    const n = state.sel.size
+    const arr = [...state.sel].map(i => frameByI[i]!).filter(Boolean)
+    const done = arr.filter(f => f.objId).length
+    const vd = arr.filter(f => f.type === 'video').length
+    return {
+      n,
+      count: plural(n, 'кадр выбран', 'кадра выбрано', 'кадров выбрано'),
+      sub: [vd ? `${vd} видео` : '', done ? `${done} уже распределено` : ''].filter(Boolean).join(' · '),
+    }
+  })
+
+  /* ------------------------------ П3: привязка и отмена (§6, §9.5, §10.3–10.6) ------------------------------ */
+  const stepOf = (owner: string, stepId: string) => ownerStage(owner)?.steps.find(s => s.id === stepId) ?? null
+  /** Прототип `stepFull`: у шага с верхним пределом места нет. */
+  const stepFull = (owner: string, st: Step) => !!(st.max && cnt(owner, st.id) >= st.max)
+  const ownerLabel = (owner: string) => { const o = O(owner); return o ? objName(o) : ownerStage(owner)?.title ?? '' }
+  /**
+   * Прототип `assign`: отказы с причиной (§6.1, тексты §18) — заморожен, не тот тип, сверх предела; иначе
+   * прежние привязки — в стек отмены, кадры — в шаг, «N кадров → «шаг» · объект» с «Отменить».
+   */
+  function assign(ids: number[], owner: string, stepId: string, silent = false) {
+    const stage = ownerStage(owner)
+    if (!stage) return false
+    const st = stage.steps.find(s => s.id === stepId)
+    if (!st) return false
+    if (isFrozen(owner, stepId)) { notify(`«${st.n}» проверен и закрыт — добавить нельзя`, 'err'); return false }
+    const wrong = ids.map(i => frameByI[i]!).find(f => (st.kind === 'Видео') !== (f.type === 'video'))
+    if (wrong) { notify(st.kind === 'Видео' ? 'Шаг принимает только видео' : 'Шаг принимает только фото', 'err'); return false }
+    const add = ids.filter(i => !(frameByI[i]!.objId === owner && frameByI[i]!.stepId === stepId)).length
+    if (st.max && cnt(owner, stepId) + add > st.max) { notify(`«${st.n}» принимает не больше ${st.max}`, 'err'); return false }
+    state.undo.push(ids.map(i => ({ i, o: frameByI[i]!.objId, s: frameByI[i]!.stepId })))
+    ids.forEach((i) => { frameByI[i]!.objId = owner; frameByI[i]!.stepId = stepId })
+    markSaving()
+    if (!silent) notify(`${plural(ids.length, 'кадр', 'кадра', 'кадров')} → «${st.n}» · ${ownerLabel(owner)}`, 'ok', true)
+    return true
+  }
+  /** Прототип `unassign`: защищённый кадр — отказ с причиной; нераспределённое — «и так не распределено». */
+  function unassign(ids: number[]) {
+    const blocked = ids.map(i => frameByI[i]!).find(f => f.lock || f.rej)
+    if (blocked) { notify(`${frameWhy(blocked)} — открепить нельзя`, 'err'); return }
+    const t = ids.filter(i => frameByI[i]!.objId)
+    if (!t.length) { notify('Выбранное и так не распределено'); return }
+    state.undo.push(t.map(i => ({ i, o: frameByI[i]!.objId, s: frameByI[i]!.stepId })))
+    t.forEach((i) => { frameByI[i]!.objId = null; frameByI[i]!.stepId = null })
+    markSaving()
+    notify(`Откреплено ${plural(t.length, 'кадр', 'кадра', 'кадров')}`, 'ok', true)
+  }
+  /** Прототип `undoLast` — «Отменить» уведомления и Ctrl+Z (§10.6). */
+  function undoLast() {
+    const p = state.undo.pop()
+    if (!p) { notify('Нечего отменять'); return }
+    p.forEach((x) => { frameByI[x.i]!.objId = x.o; frameByI[x.i]!.stepId = x.s })
+    markSaving()
+    notify('Действие отменено')
+  }
+  /**
+   * Привязка по намерению с проверкой шага до `assign` — пункт поповера, клик по строке шага, бросок
+   * перетаскивания: «Шаг проверен и закрыт — добавить нельзя», «Шаг уже заполнен». Удалось — выделение снято.
+   */
+  function assignTo(ids: number[], owner: string, stepId: string) {
+    const st = stepOf(owner, stepId)
+    if (!st) return false
+    if (isFrozen(owner, stepId)) { notify('Шаг проверен и закрыт — добавить нельзя', 'err'); return false }
+    if (stepFull(owner, st)) { notify('Шаг уже заполнен', 'err'); return false }
+    const ok = assign(ids, owner, stepId)
+    if (ok) state.sel.clear()
+    return ok
+  }
+  /** «В «Прочее»» панели выделения. */
+  function assignMisc() { if (assign([...state.sel], 'misc', 'm1')) state.sel.clear() }
+  /** «Открепить» панели выделения и Del / Backspace. */
+  function unassignSelection() { unassign([...state.sel]); state.sel.clear() }
+  /** Крестик плитки и миниатюры, «Открепить» плашки и списка просмотра: защищённый кадр — отказ с причиной. */
+  function unassignFrame(i: number) {
+    const f = frameByI[i]
+    if (!f) return
+    if (f.lock || f.rej) { notify(`${frameWhy(f)} — открепить нельзя`, 'err'); return }
+    unassign([i])
+  }
+  /** Del / Backspace в просмотре (§11.2) — у нераспределённого «Кадр и так не распределён». */
+  function unassignViewed(i: number) {
+    const f = frameByI[i]
+    if (!f) return
+    if (f.lock || f.rej) { notify(`${frameWhy(f)} — открепить нельзя`, 'err'); return }
+    if (f.objId) unassign([i])
+    else notify('Кадр и так не распределён')
+  }
+  /** Пункт «сделать текущим» поповера назначения (§10.3). */
+  function setCurrent(id: string) {
+    state.cur = id
+    state.open.add(id)
+    notify(`Текущий: ${objName(O(id)!)}`)
+  }
+  /** Клавиши 1–8 (§16.2): без текущего объекта — отказ; с выделением — привязка к шагу текущего. */
+  function pressDigit(n: number) {
+    if (!state.cur) { notify('Сначала выберите текущий объект', 'err'); return }
+    const o = O(state.cur)!
+    const st = stageById[o.stageId]!.steps[n - 1]
+    if (!st) return
+    if (state.sel.size && assign([...state.sel], o.id, st.id)) state.sel.clear()
+  }
+  /** Начало перетаскивания (§9.5) — прототип `dragstart`: тянется выделение, если кадр в нём, иначе только кадр. */
+  function dragStart(i: number) {
+    const drag = state.sel.has(i) ? [...state.sel] : [i]
+    if (!state.sel.has(i)) { state.sel.clear(); state.sel.add(i) }
+    return drag
+  }
+  /** Метка перетаскивания — прототип `#ghost`: «N кадров» или имя файла одного кадра. */
+  const dragLabel = (drag: number[]) => (drag.length > 1 ? plural(drag.length, 'кадр', 'кадра', 'кадров') : frameByI[drag[0]!]?.n ?? '')
+
   return {
     STAGES,
     stageById,
@@ -713,6 +861,27 @@ export function createModel(opts: ModelOptions) {
     rejectAll,
     acceptObj,
     rejectObj,
+    /* П3 */
+    visibleMedia,
+    selectRange,
+    clickTile,
+    selectAll,
+    clearSel,
+    setSelection,
+    selbar,
+    stepFull,
+    assign,
+    unassign,
+    undoLast,
+    assignTo,
+    assignMisc,
+    unassignSelection,
+    unassignFrame,
+    unassignViewed,
+    setCurrent,
+    pressDigit,
+    dragStart,
+    dragLabel,
   }
 }
 

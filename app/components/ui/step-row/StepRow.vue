@@ -74,7 +74,19 @@ const emit = defineEmits<{
   'thumb-remove': [id: string | number]
   /** Хвост «+N» — страница решает, что показать (решение владельца 8). */
   more: []
+  /**
+   * Клик по строке мимо миниатюр и «+N» — прототип, обработчик панели `.step` (такт 40, С-08): при
+   * выделении в ленте страница привязывает его к шагу или отказывает с причиной (§6.1). Без выделения
+   * событие ничего не значит — решает страница.
+   */
+  select: []
 }>()
+
+function onRowClick(event: MouseEvent) {
+  const target = event.target as HTMLElement | null
+  if (target?.closest('[data-slot=step-thumb], [data-slot=step-row-more]')) return
+  emit('select')
+}
 
 /** Вспышка идёт — см. ниже, у `watch` на `flash`. */
 const flashing = ref(false)
@@ -161,6 +173,7 @@ onBeforeUnmount(() => clearTimeout(timer))
         props.class,
       )"
       :style="{ transitionDuration: 'var(--duration-hover)' }"
+      @click="onRowClick"
     >
       <div class="flex min-h-4 items-center gap-2">
         <!-- Номер клавиши; без номера — пустое место той же ширины, строки не пляшут. -->

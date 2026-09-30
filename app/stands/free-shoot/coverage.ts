@@ -37,6 +37,8 @@ export const COVERAGE_STATES = [
   'view=review', 'tab=form', 'state=link&expand=eq', 'state=flash&expand=eq', 'state=tooltip', 'state=drop&expand=eq', 'selected=demo',
   /* Такт 39: раскрытый повтор — только оснасткой; «Пустой осмотр» и окно запуска на нём. */
   'expand=eq', 'view=review&expand=eq', 'data=empty', 'open=wand&data=empty',
+  /* Такт 40: рамка выделения, уведомление с «Отменить». Панель выделения — `selected=demo`. */
+  'state=marquee', 'state=undo',
 ] as const
 
 const transparent = (c: string) => !c || c === 'transparent' || /rgba\([^)]*,\s*0\)$/.test(c)
