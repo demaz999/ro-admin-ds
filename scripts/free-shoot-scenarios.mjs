@@ -267,6 +267,30 @@ async function splitterDrag(page, handle, x) {
   await sleep(200)
 }
 
+/**
+ * Выделение текста мышью (С-19, фрагмент заметки): протяжка от первого знака расшифровки до `n`-го по первой строке,
+ * реальным вводом CDP — оба экрана ловят `mouseup` и читают выделение сами. Заметка сначала в видимую часть: прокрутка
+ * прячет полосу фрагмента, поэтому протяжка — после события прокрутки.
+ */
+/**
+ * Delete, стирающий выделенный текст поля. \`Input.dispatchKeyEvent\` с одним \`key\` доходит до \`keydown\`, но правки не
+ * делает — нужен \`windowsVirtualKeyCode\` 46. Без него очистка поля не срабатывала у обоих экранов: «очистить поиск» С-04
+ * (такт 42) совпадал вхолостую — строка оставалась «zzz» у обеих сторон; найдено тактом 43 на отказе формы С-18.
+ */
+const DEL = { windowsVirtualKeyCode: 46 }
+
+async function selectText(page, el, n) {
+  await page.evaluate(`(${el}.scrollIntoView({ block: 'center', behavior: 'instant' }), 1)`)
+  await sleep(300)
+  const pts = await page.evaluate(`(() => { const el = ${el}; const tn = [...el.childNodes].find(x => x.nodeType === 3 && x.textContent.trim())
+    const off = tn.textContent.search(/\\S/); const r = document.createRange(); r.setStart(tn, off); r.setEnd(tn, off + ${n})
+    const rs = [...r.getClientRects()]; const a = rs[0]; const b = rs[rs.length - 1]; const y = a.y + a.height / 2
+    const start = [a.x + 1, y]; const end = [b.right - 1, y]
+    return [start, ...[1, 2, 3, 4, 5].map(k => [start[0] + (end[0] - start[0]) * k / 5, y])] })()`)
+  await page.sweep(pts)
+  await sleep(300)
+}
+
 const prototype = page => ({
   name: 'прототип',
   async start(dataset, keepEntry) {
@@ -322,7 +346,7 @@ const prototype = page => ({
   bindFlashing: () => page.evaluate(`document.getElementById('lbBind').classList.contains('flash')`),
   lbIndex: () => page.evaluate(`document.getElementById('lb').classList.contains('show') ? state.lb : -1`),
   /* П5 */
-  async search(q) { await page.click(`document.getElementById('feedSearch')`); await page.evaluate(`document.getElementById('feedSearch').select()`); await page.key('Delete'); if (q) await page.type(q) },
+  async search(q) { await page.click(`document.getElementById('feedSearch')`); await page.evaluate(`document.getElementById('feedSearch').select()`); await page.key('Delete', 'Delete', DEL); if (q) await page.type(q) },
   finishOpen: () => page.click(`document.getElementById('btnDone')`),
   splitterTo: x => splitterDrag(page, `document.getElementById('splitter')`, x),
   paneWidth: () => page.evaluate(`Math.round(document.querySelector('.pane.right').getBoundingClientRect().width * 10) / 10`),
@@ -333,6 +357,34 @@ const prototype = page => ({
   tab: v => page.click(`document.querySelector('.rtab[data-r="${v}"]')`),
   hotkeys: () => page.click(`document.querySelector('#btnHelp')`),
   windowButton: text => page.click(`[...document.querySelectorAll('#mFoot button')].find(b => b.textContent.trim() === ${JSON.stringify(text)})`),
+  /* П6 */
+  noteToggle: i => page.click(`document.querySelector('#feed .card[data-i="${i}"] [data-act="exp"]')`),
+  noteCopy: i => page.click(`document.querySelector('#feed .card[data-i="${i}"] [data-act="copy"]')`),
+  notePlay: i => page.click(`document.querySelector('#feed .card[data-i="${i}"] [data-act="play"]')`),
+  noteSelect: (i, n) => selectText(page, `document.querySelector('#feed .card[data-i="${i}"] .vx')`, n),
+  fragment: st => page.click(`document.querySelector('#selact [data-st="${st}"]')`),
+  newObj: () => page.click(`document.querySelector('#btnNewObj')`),
+  newObjStage: st => page.click(`document.querySelector('#popList [data-newstage="${st}"]')`),
+  addRepeat: st => page.click(`document.querySelector('[data-add="${st}"]')`),
+  repeatEdit: id => page.click(`document.querySelector('.obj[data-obj="${id}"] .fp-foot [data-act="edit"]')`),
+  repeatDelete: id => page.click(`document.querySelector('.obj[data-obj="${id}"] [data-act="del"]')`),
+  lbCreate: st => page.click(`document.querySelector('#lbList [data-newobj="${st}"]')`),
+  suggestCreate: () => page.click(`document.querySelector('#lbBind [data-act="mk"]')`),
+  ocrHint: n => page.click(`document.querySelectorAll('#mBody [data-ocr]')[${n}]`),
+  async formField(k, value) {
+    const el = `document.querySelector('#mBody [data-k="${k}"]')`
+    if (await page.evaluate(`${el}.tagName === 'SELECT'`)) {
+      /* Нативный список прототипа кликом не раскрыть — значение выставляется, событие `change` — как у выбора. */
+      await page.evaluate(`(() => { const el = ${el}; el.value = ${JSON.stringify(value || '—')}; el.dispatchEvent(new Event('change', { bubbles: true })); return 1 })()`)
+      await sleep(250)
+    }
+    else {
+      await page.click(el)
+      await page.evaluate(`${el}.select()`)
+      await page.key('Delete', 'Delete', DEL)
+      if (value) await page.type(value)
+    }
+  },
   key: (name, code, extra) => page.key(name, code, extra),
   async general(k, value) {
     const isSelect = await page.evaluate(`document.querySelector('#rbody [data-g="${k}"]').tagName === 'SELECT'`)
@@ -357,16 +409,19 @@ const prototype = page => ({
     const sum = s => { const b = s.querySelector('b'); return [TONE[[...s.classList].find(c => TONE[c])], t(b?.textContent), t(s.textContent.replace(b?.textContent ?? '', ''))].join(' | ') }
     const win = modal ? {
       head: t(modal.querySelector('#mTitle').textContent) + ' / ' + t(modal.querySelector('#mSub').textContent),
-      text: [...modal.querySelectorAll('#mBody .wsrc, #mBody > p')].map(e => t(e.textContent)),
+      text: [...modal.querySelectorAll('#mBody .wsrc, #mBody > p'), ...[...modal.querySelectorAll('#mBody .ocrhint')].map(h => h.previousElementSibling)].map(e => t(e.textContent)),
       modes: [...modal.querySelectorAll('#mBody .wmode')].map(w => [t(w.querySelector('.wt').textContent), t(w.querySelector('.wd').textContent), t(w.querySelector('.wn').textContent), w.classList.contains('dis') ? 'выключен' : '', w.querySelector('input').checked ? 'выбран' : ''].join(' | ')),
       blocks: [...modal.querySelectorAll('#mBody .sum')].map(sum),
       buttons: [...modal.querySelectorAll('#mFoot button')].map(b => t(b.textContent)),
       rows: [],
+      fields: [...modal.querySelectorAll('#mBody [data-k]')].filter(el => getComputedStyle(el.closest('.f-row')).display !== 'none').map(el => el.dataset.k + '=' + (el.value === '—' ? '' : t(el.value))),
+      hints: [...modal.querySelectorAll('#mBody [data-ocr]')].map(b => t(b.textContent)),
     } : wov ? {
       head: t(wov.querySelector('.wh').firstChild.textContent) + ' / ' + t(wov.querySelector('.wh small').textContent),
       text: [], modes: [], blocks: [],
       buttons: [...wov.querySelectorAll('button')].map(b => t(b.textContent)),
       rows: [...wov.querySelectorAll('.wrow span')].map(s => t(s.textContent)),
+      fields: [], hints: [],
     } : null
     const rv = document.querySelector('#review.show')
     const tab = document.querySelector('.rtab.on')?.dataset.r
@@ -419,6 +474,10 @@ const prototype = page => ({
       closed: [...document.querySelectorAll('.stage.closed')].map(x => x.dataset.st),
       steps: [...document.querySelectorAll('#rbody .step')].filter(x => x.getClientRects().length).map(x => x.dataset.owner + '|' + x.dataset.step),
       tools: [...document.querySelectorAll('.schtools button')].map(b => t(b.textContent)),
+      notes: [...document.querySelectorAll('#feed .card.voice')].map(c => c.dataset.i + ':' + (c.querySelector('[data-act="exp"]') ? (c.classList.contains('exp') ? 'exp' : 'clamp') : '-')),
+      frag: document.querySelector('#selact.show') ? t(document.getElementById('selactTxt').textContent) : null,
+      newStages: [...document.querySelectorAll('#pop.show [data-newstage]')].map(x => t(x.querySelector('.n').textContent) + ' ' + t(x.querySelector('.c').textContent)),
+      del: [...document.querySelectorAll('.obj [data-act="del"]')].filter(b => b.getClientRects().length).map(b => b.dataset.obj),
     }
   })()`),
 })
@@ -476,7 +535,7 @@ const kit = page => ({
   bindFlashing: () => page.evaluate(`!!document.querySelector('[data-slot=frame-bind-bar][data-flash]')`),
   lbIndex: () => page.evaluate(`window.__freeShoot.state.lb`),
   /* П5 */
-  async search(q) { await page.click(`document.querySelector('[data-search] input')`); await page.evaluate(`document.querySelector('[data-search] input').select()`); await page.key('Delete'); if (q) await page.type(q) },
+  async search(q) { await page.click(`document.querySelector('[data-search] input')`); await page.evaluate(`document.querySelector('[data-search] input').select()`); await page.key('Delete', 'Delete', DEL); if (q) await page.type(q) },
   finishOpen: () => page.click(`[...document.querySelectorAll('[data-slot=app-bar] button')].find(b => b.textContent.trim() === 'Завершить распределение')`),
   splitterTo: x => splitterDrag(page, `document.querySelector('[data-slot=resizable-handle]')`, x),
   paneWidth: () => page.evaluate(`Math.round(document.querySelector('[data-pane-right]').getBoundingClientRect().width * 10) / 10`),
@@ -487,6 +546,34 @@ const kit = page => ({
   tab: v => page.click(`[...document.querySelectorAll('[role=tab]')].find(b => b.textContent.trim() === ${JSON.stringify(v === 'form' ? 'Форма осмотра' : 'Схема осмотра')})`),
   hotkeys: () => page.click(`[...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Горячие клавиши')`),
   windowButton: text => page.click(`[...document.querySelectorAll('[data-slot=modal-card] button')].find(b => b.textContent.trim() === ${JSON.stringify(text)})`),
+  /* П6 */
+  noteToggle: i => page.click(`[...document.querySelectorAll('[data-slot=feed-note][data-frame="${i}"] button')].find(b => ['Показать полностью', 'Свернуть'].includes(b.textContent.trim()))`),
+  noteCopy: i => page.click(`[...document.querySelectorAll('[data-slot=feed-note][data-frame="${i}"] button')].find(b => b.textContent.trim() === 'Копировать')`),
+  notePlay: i => page.click(`document.querySelector('[data-slot=feed-note][data-frame="${i}"] [data-slot=player-button], [data-slot=feed-note][data-frame="${i}"] button[aria-label="Текстовая заметка"]')`),
+  noteSelect: (i, n) => selectText(page, `document.querySelector('[data-slot=feed-note][data-frame="${i}"] [data-slot=feed-note-text]')`, n),
+  fragment: st => page.click(`[...document.querySelectorAll('[data-fragment] button')].find(b => b.textContent.trim() === ${JSON.stringify({ eq: 'Оборудование', bld: 'Здание' }[st])})`),
+  newObj: () => page.click(`[...document.querySelectorAll('[data-slot=action-bar] button')].find(b => b.textContent.trim() === 'Новый объект из выделенного')`),
+  newObjStage: st => page.click(`document.querySelector('[data-slot=popover] [data-value="stage|${st}"]')`),
+  addRepeat: st => page.click(`document.querySelector('[data-stage="${st}"] [data-slot=stage-add] button')`),
+  repeatEdit: id => page.click(`[...document.querySelectorAll('[data-obj="${id}"] button')].filter(b => b.textContent.trim() === 'Изменить').pop()`),
+  repeatDelete: id => page.click(`[...document.querySelectorAll('[data-obj="${id}"] button')].find(b => b.textContent.trim() === 'Удалить')`),
+  lbCreate: st => page.click(`document.querySelector('[role=dialog] [data-value="new|${st}"]')`),
+  suggestCreate: () => page.click(`[...document.querySelectorAll('[data-slot=frame-bind-bar] button')].find(b => b.textContent.trim().startsWith('Создать «'))`),
+  ocrHint: n => page.click(`document.querySelectorAll('[data-ocr-hints] button')[${n}]`),
+  async formField(k, value) {
+    const field = `document.querySelector('[data-slot=modal-card] [data-k="${k}"]')`
+    const isSelect = await page.evaluate(`!!(${field}).querySelector('button[aria-haspopup]')`)
+    if (isSelect) {
+      await page.click(`(${field}).querySelector('button[aria-haspopup]')`)
+      await page.click(`[...document.getElementById((${field}).querySelector('button[aria-haspopup]').getAttribute('aria-controls')).querySelectorAll('[role=option]')].find(o => o.textContent.trim() === ${JSON.stringify(value || '—')})`)
+    }
+    else {
+      await page.click(`(${field}).querySelector('input')`)
+      await page.evaluate(`(${field}).querySelector('input').select()`)
+      await page.key('Delete', 'Delete', DEL)
+      if (value) await page.type(value)
+    }
+  },
   key: (name, code, extra) => page.key(name, code, extra),
   async general(k, value) {
     const field = `[...document.querySelectorAll('[data-general] [data-slot=field-wrapper]')].find(w => w.querySelector('label').textContent.trim() === ${JSON.stringify(GENERAL_KEYS[k])})`
@@ -521,6 +608,8 @@ const kit = page => ({
       blocks: [...card.querySelectorAll('[data-slot=callout]')].map(c => [c.dataset.tone, t(c.querySelector('[data-slot=callout-title]')?.textContent), t(c.querySelector('[data-slot=callout-text]')?.textContent)].join(' | ')),
       buttons: [...card.querySelectorAll('[data-slot=modal-card-footer] button')].map(b => t(b.textContent)),
       rows: [...card.querySelectorAll('[data-slot=progress-counter]')].map(r => t(r.firstElementChild?.textContent)),
+      fields: [...card.querySelectorAll('[data-k]')].map(w => { const input = w.querySelector('input'); const v = t(input ? input.value : w.querySelector('button[aria-haspopup] [data-slot=field-input]')?.textContent); return w.dataset.k + '=' + (v === '—' ? '' : v) }),
+      hints: [...card.querySelectorAll('[data-ocr-hints] button')].map(b => t(b.textContent)),
     } : null
     const rv = document.querySelector('[data-review]')
     const M = window.__freeShoot
@@ -557,7 +646,7 @@ const kit = page => ({
       hints: [...document.querySelectorAll('[data-slot=stage-note]')].filter(h => h.getClientRects().length && !h.closest('[data-general]')).map(h => t(h.textContent)),
       bind: M.frames.filter(f => f.objId).map(f => f.i + '>' + f.objId + '|' + f.stepId + (f.auto ? '*' : '')),
       notices: [...document.querySelectorAll('[data-slot=toast]')].filter(e => e.dataset.state !== 'closed' && !e.dataset.seen).map(e => { e.dataset.seen = '1'; return t(e.querySelector('[data-slot=alert] p')?.textContent) }),
-      selbar: document.querySelector('[data-slot=action-bar][data-state=open]') ? { count: t(document.querySelector('[data-slot=action-bar-count]').textContent), sub: t(document.querySelector('[data-slot=action-bar-sub]')?.textContent) } : null,
+      selbar: document.querySelector('[data-slot=action-bar][data-state=open]:not([data-fragment])') ? { count: t(document.querySelector('[data-slot=action-bar]:not([data-fragment]) [data-slot=action-bar-count]').textContent), sub: t(document.querySelector('[data-slot=action-bar]:not([data-fragment]) [data-slot=action-bar-sub]')?.textContent) } : null,
       pop: !!document.querySelector('[data-slot=popover] [data-slot=assign-list]'),
       viewer: M.state.lb >= 0 ? M.visibleMedia()[M.state.lb]?.n ?? null : null,
       bind: (() => { if (M.state.lb < 0) return null; const b = document.querySelector('[data-slot=frame-bind-bar]'); if (!b) return null
@@ -572,6 +661,10 @@ const kit = page => ({
       closed: [...document.querySelectorAll('[data-stage][data-state=closed]')].map(x => x.dataset.stage),
       steps: [...document.querySelectorAll('[data-step-key]')].filter(x => x.getClientRects().length).map(x => x.dataset.stepKey),
       tools: [...document.querySelectorAll('[data-schtools] button')].map(b => t(b.textContent)),
+      notes: [...document.querySelectorAll('[data-slot=feed-note]')].map(c => c.dataset.frame + ':' + ({ expanded: 'exp', clamped: 'clamp' }[c.dataset.state] ?? '-')),
+      frag: document.querySelector('[data-fragment][data-state=open]') ? t(document.querySelector('[data-fragment] [data-slot=action-bar-sub]').textContent) : null,
+      newStages: [...document.querySelectorAll('[data-slot=popover] [data-value^="stage|"]')].map(x => t(x.querySelector('[data-slot=list-item-title]').textContent) + ' ' + t(x.querySelector('[data-slot=assign-option-count]').textContent)),
+      del: [...document.querySelectorAll('[data-obj] button')].filter(b => t(b.textContent) === 'Удалить' && b.getClientRects().length).map(b => b.closest('[data-obj]').dataset.obj),
     }
   })()`),
 })
@@ -952,6 +1045,69 @@ const SCENARIOS = {
   'С-36/вручную': ['окно входа: «Разложу вручную»', [
     ['«Разложу вручную»', a => a.windowButton('Разложу вручную')],
   ], { keepEntry: true }],
+  /* ------------------------------ П6, такт 43 ------------------------------ */
+  'С-33': ['заметка: «Показать полностью», «Копировать», воспроизведение (§8.4)', [
+    ['итоговая заметка — «Показать полностью»', a => a.noteToggle(9008)],
+    ['«Копировать»', a => a.noteCopy(9008)],
+    ['воспроизведение', a => a.notePlay(9008)],
+    ['текстовая заметка — кнопка', a => a.notePlay(9001)],
+    ['итоговая заметка — «Свернуть»', a => a.noteToggle(9008)],
+  ]],
+  'С-18': ['форма повтора: зависимые, проверка, сохранение в модель, «Форма сохранена» (§14)', [
+    ['заголовок o2 — текущий', a => a.repeat('o2')],
+    ['«Изменить»', a => a.repeatEdit('o2')],
+    ['эксплуатация — не эксплуатируется', a => a.formField('use', 'Не эксплуатируется')],
+    ['причины простоя', a => a.formField('idle', 'Нет заказов')],
+    ['наименование — пусто', a => a.formField('mark', '')],
+    ['«Сохранить» — отказ', a => a.windowButton('Сохранить')],
+    ['наименование', a => a.formField('mark', 'Пропиточная линия POLYPRISE-2')],
+    ['«Сохранить»', a => a.windowButton('Сохранить')],
+    ['«Изменить» — снова', a => a.repeatEdit('o2')],
+    ['«Отмена»', a => a.windowButton('Отмена')],
+  ]],
+  'С-19': ['создание повтора: «+ Новая единица», из выделенного (§10, §14.5)', [
+    ['«+ Новая единица»', a => a.addRepeat('eq')],
+    ['«Создать» — отказ', a => a.windowButton('Создать')],
+    ['наименование', a => a.formField('mark', 'Ткацкий станок SMIT')],
+    ['«Создать»', a => a.windowButton('Создать')],
+    ['кадр 6', a => a.tile(6)],
+    ['кадр 7', a => a.tile(7)],
+    ['«Новый объект из выделенного»', a => a.newObj()],
+    ['«Единица оборудования»', a => a.newObjStage('eq')],
+    ['подсказка распознанного', a => a.ocrHint(0)],
+    ['наименование', a => a.formField('mark', 'Станок SMIT 10902')],
+    ['«Создать»', a => a.windowButton('Создать')],
+  ]],
+  'С-19/фрагмент': ['создание повтора из фрагмента заметки (§8.5)', [
+    ['выделить «Итог по осмотру»', a => a.noteSelect(9008, 15)],
+    ['«Здание»', a => a.fragment('bld')],
+    ['«Создать»', a => a.windowButton('Создать')],
+  ]],
+  'С-19/просмотр': ['«Создать «этап»» в просмотре: список и подбор шага (§11.2, §12.14)', [
+    ['просмотр кадра 21', a => a.viewer(21)],
+    ['«Создать «Единица оборудования»»', a => a.lbCreate('eq')],
+    ['наименование', a => a.formField('mark', 'Кран-балка')],
+    /* Прототип после создания просмотр не перерисовывает (`render` без `renderLB`) — плашка прежняя до перехода; кит показывает
+       привязку сразу. Строка раздела 15, такт 43; привязки модели сравниваются. */
+    ['«Создать»', a => a.windowButton('Создать'), { skip: ['bind'] }],
+    ['Esc', a => a.key('Escape')],
+    ['просмотр кадра 7', a => a.viewer(7)],
+    ['«Подобрать шаг» — новый объект', a => a.suggest()],
+    ['«Создать «…»» подбора', a => a.suggestCreate()],
+    ['«Создать»', a => a.windowButton('Создать'), { skip: ['bind'] }],
+    ['Esc', a => a.key('Escape')],
+  ]],
+  'С-20': ['удаление повтора с подтверждением; у повтора с проверенными шагами «Удалить» нет (§6.2)', [
+    ['«+ Новое здание»', a => a.addRepeat('bld')],
+    ['номер', a => a.formField('no', 'Склад 2')],
+    ['«Создать»', a => a.windowButton('Создать')],
+    ['кадр 21', a => a.tile(21)],
+    ['2 — во второй шаг', a => a.key('2', 'Digit2')],
+    ['«Удалить»', a => a.repeatDelete('o3')],
+    ['«Отмена»', a => a.windowButton('Отмена')],
+    ['«Удалить» — снова', a => a.repeatDelete('o3')],
+    ['«Удалить» — подтвердить', a => a.windowButton('Удалить')],
+  ]],
 }
 
 /**

@@ -76,6 +76,7 @@ const title = computed(() => (props.type === 'create' ? `Создать «${prop
 const subtitle = computed(() => {
   if (props.type === 'create') return 'новый повтор, текущий кадр ляжет в него'
   if (props.type === 'object') return 'сделать текущим'
+  if (props.type === 'stage') return ''
   if (props.bound === 'here') return 'кадр привязан сюда'
   if (props.bound === 'locked') return 'привязано до вас — изменить нельзя'
   if (props.frozen) return 'проверен и закрыт — добавить нельзя'

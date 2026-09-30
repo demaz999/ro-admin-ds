@@ -56,7 +56,7 @@ export interface Dataset { frames: Frame[], objects: Repeat[], review: Record<st
 export interface Block { a: number, b: number, kind: 'eq' | 'bld' | 'terr', inv: string, shop: string, title: string, st: string }
 
 /** Окно поверх экрана: у прототипа одно (`#modal`), плюс прогресс автораспределения. */
-export type ScreenWindow = null | 'hotkeys' | 'form' | 'progress' | 'wand' | 'summary' | 'finish' | 'move' | 'entry'
+export type ScreenWindow = null | 'hotkeys' | 'form' | 'progress' | 'wand' | 'summary' | 'finish' | 'move' | 'entry' | 'delete'
 /** Подбор шага для кадра (§12.14) — прототип `suggestFor`: существующий шаг или новый объект. */
 export type Suggestion =
   | { kind: 'step', owner: string, stepId: string, stepName: string, ownerName: string, blocked?: 'frozen' | 'full' }
@@ -110,8 +110,13 @@ export interface UiState {
   /** Размер превью: у прототипа — CSS-переменная `--card` 176 / 272, в модели — состояние. */
   size: 'md' | 'lg'
   win: ScreenWindow
-  /** Окно формы повтора: какой повтор и на какой группе открыто (§14.3). */
-  formWin: { obj: string, group: string } | null
+  /**
+   * Окно формы повтора (§14.3): повтор и группа; у нового повтора (`obj: null`, П6) — этап, кадры, которые разложатся по его
+   * шагам, и подставленное имя (фрагмент заметки, подбор шага). Прототип `openObjForm(stageId, objId, ids, presetName)`.
+   */
+  formWin: { obj: string | null, stage: string, group: string, ids: number[], preset: string } | null
+  /** Окно «Удалить объект?» (§6.2, П6): повтор и его имя. */
+  del: { id: string, name: string } | null
   /** Стек отмены (§10.6) — прототип `state.undo`: на операцию — прежние привязки её кадров. Глубина не ограничена. */
   undo: { i: number, o: string | null, s: string | null }[][]
   /** Окно «Перенести кадр?» (§11.4, № 47): кадр, куда, тексты «Откуда» и «Куда». */
@@ -140,7 +145,7 @@ export interface ModelOptions {
   /** Сценарий исходного состояния — прототип `scen`: окно входа говорит о нём (`review` — «Частично проверен», `empty`). */
   scenario?: 'review' | 'empty'
   /** Начальное состояние интерфейса — оснастка адреса и выбор стенда. */
-  initial?: Partial<Omit<UiState, 'sel' | 'open' | 'closed' | 'formOpen' | 'undo' | 'move'>> & { sel?: number[], open?: string[] }
+  initial?: Partial<Omit<UiState, 'sel' | 'open' | 'closed' | 'formOpen' | 'undo' | 'move' | 'del'>> & { sel?: number[], open?: string[] }
 }
 
 export function createModel(opts: ModelOptions) {
@@ -172,6 +177,7 @@ export function createModel(opts: ModelOptions) {
     formWin: init.formWin ?? null,
     undo: [],
     move: null,
+    del: null,
     run: null,
     summary: null,
     saving: false,
@@ -327,9 +333,12 @@ export function createModel(opts: ModelOptions) {
   /** Поле общей формы; «—» — пустое значение, как у прототипа. */
   function setGeneral(k: string, v: string) { general[k] = v === '—' ? '' : v }
   function openWindow(win: Exclude<ScreenWindow, null>) { state.win = win }
-  function closeWindow() { state.win = null; state.formWin = null }
+  function closeWindow() { state.win = null; state.formWin = null; state.del = null }
   /** Окно формы повтора: без группы — форма целиком, с группой — сразу на ней (§14.3). */
-  function openForm(obj: string, group = '') { state.formWin = { obj, group }; state.win = 'form' }
+  function openForm(obj: string, group = '') {
+    state.formWin = { obj, stage: O(obj)!.stageId, group, ids: [], preset: '' }
+    state.win = 'form'
+  }
   /** Полноэкранный просмотр (§11): индекс кадра в списке просмотра, -1 — закрыт. */
   function setViewer(index: number) { state.lb = index }
 
@@ -341,6 +350,121 @@ export function createModel(opts: ModelOptions) {
     state.cur = o.id
     state.open.add(o.id)
     return o
+  }
+
+  /* ------------------------------ П6: создание, форма, удаление (§6.2, §10, §14) ------------------------------ */
+  /** Прототип `lastBuilding`: здание последнего повтора «Здания» подставляется новой единице оборудования. */
+  const lastBuilding = () => { const b = objects.filter(o => o.stageId === 'bld'); return b.length ? objName(b[b.length - 1]!) : '' }
+  /** Прототип `autoStep`: шаг этапа, в который ляжет кадр нового повтора. */
+  function autoStep(stageId: string, f: Frame) {
+    if (f.type === 'video') return stageId === 'eq' ? 'e8' : null
+    if (stageId === 'eq') return f.k === 'plate' ? 'e1' : f.k === 'inv' ? 'e2' : f.k === 'status' ? 'e6' : 'e3'
+    if (stageId === 'bld') return f.k === 'building' ? 'b1' : 'b2'
+    return null
+  }
+  /**
+   * Новый повтор (§10, С-19) — прототип `openObjForm` без объекта: этап, кадры (по умолчанию — выделенные) и имя. Кнопки:
+   * «Новый объект из выделенного» (№ 29), «+ Новая единица» (№ 35, без кадров), фрагмент заметки (№ 26, с именем),
+   * «Создать „этап“» просмотра (с кадром просмотра).
+   */
+  function openNewForm(stage: string, ids?: number[], preset = '') {
+    state.formWin = { obj: null, stage, group: '', ids: ids ?? [...state.sel], preset }
+    state.win = 'form'
+  }
+  /** Окно формы (§14.3–14.6): заголовок, подпись, начальные значения и подсказки распознанного — прототип `openObjForm`. */
+  const formWindow = computed(() => {
+    const w = state.formWin
+    if (!w) return null
+    const o = w.obj ? O(w.obj) : null
+    const stage = stageById[w.stage]!
+    const sel = w.ids.map(i => frameByI[i]).filter((f): f is Frame => !!f)
+    const init: Record<string, string> = o ? { ...o.form } : {}
+    if (!o) {
+      const p = sel.find(f => f.k === 'plate')
+      const inv = sel.find(f => f.k === 'inv')
+      const bl = sel.find(f => f.k === 'building')
+      if (w.stage === 'eq') {
+        if (p) init.mark = p.ocr
+        if (inv) { const m = inv.ocr.match(/(\d[\d/]{2,})/); if (m) init.inv = m[1]! }
+        init.bld = lastBuilding(); init.cond = 'Рабочее'; init.mount = 'Установлено'; init.use = 'Эксплуатируется'; init.def = 'Не выявлены'
+      }
+      else {
+        if (bl) init.no = bl.ocr
+        init.purpose = 'Производственный цех'; init.cond = 'Удовлетворительное'; init.access = 'Да'
+      }
+      if (w.preset) { if (w.stage === 'eq') init.mark = w.preset; else init.no = w.preset }
+    }
+    return {
+      title: `${o ? 'Форма' : 'Новый повтор'} · ${stage.title}`,
+      sub: !o && sel.length ? `${plural(sel.length, 'выделенный кадр', 'выделенных кадра', 'выделенных кадров')} разложится по шагам этапа` : 'Динамическая форма повторяемого этапа',
+      init,
+      hints: sel.filter(f => f.ocr).slice(0, 6).map(f => f.ocr),
+      primary: o ? 'Сохранить' : 'Создать',
+    }
+  })
+  /**
+   * «Сохранить» / «Создать» окна формы (С-18, С-19) — прототип: «—» — пустое значение; пустые обязательные — отказ §18
+   * `form.required`, окно открыто, возвращаются поля; иначе форма повтора сохраняется («Форма сохранена») либо создаётся
+   * новый повтор, кадры окна раскладываются по шагам этапа, выделение снимается («Создан «…»»).
+   */
+  function submitForm(raw: Record<string, string>): FormDef[] {
+    const w = state.formWin
+    if (!w) return []
+    const stage = stageById[w.stage]!
+    const form = Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, v === '—' ? '' : v.trim()]))
+    const need = (stage.form ?? []).filter(f => f.req && !form[f.k])
+    if (need.length) {
+      notify(`Заполните: ${need.map(f => f.l).join(', ')}`, 'err')
+      return need
+    }
+    const o = w.obj ? O(w.obj) : null
+    if (o) {
+      o.form = form
+      markSaving()
+      notify('Форма сохранена')
+    }
+    else {
+      const ob = createObject(w.stage, form)
+      w.ids.forEach((i) => {
+        const f = frameByI[i]
+        const st = f ? autoStep(w.stage, f) : null
+        if (f && st) { f.objId = ob.id; f.stepId = st }
+      })
+      state.sel.clear()
+      markSaving()
+      notify(`Создан «${objName(ob)}»`)
+    }
+    closeWindow()
+    return []
+  }
+  /** «Новый объект из выделенного» (№ 29) — прототип `#btnNewObj`: повторяемые этапы и число их повторов. */
+  const newObjectOptions = computed(() => STAGES.filter(s => s.rep).map(s => ({ stage: s.id, title: s.title, count: objects.filter(o => o.stageId === s.id).length })))
+  /** «Удалить» формы повтора (С-20) — прототип: при проверенных шагах отказ, иначе окно «Удалить объект?». */
+  function askDelete(id: string) {
+    if (objLocked(id)) { notify('В объекте есть проверенные шаги — удалить нельзя', 'err'); return }
+    state.del = { id, name: objName(O(id)!) }
+    state.win = 'delete'
+  }
+  /** Прототип `deleteObject`: кадры возвращаются в ленту, текущим становится последний повтор. */
+  function deleteObject(id: string) {
+    frames.forEach((f) => { if (f.objId === id) { f.objId = null; f.stepId = null } })
+    objects.splice(objects.findIndex(o => o.id === id), 1)
+    if (state.cur === id) state.cur = objects.length ? objects[objects.length - 1]!.id : null
+    markSaving()
+  }
+  /** «Удалить» окна «Удалить объект?» — повтор удаляется, «Объект удалён». */
+  function confirmDelete() {
+    const d = state.del
+    closeWindow()
+    if (!d) return
+    deleteObject(d.id)
+    notify('Объект удалён')
+  }
+  /** Кнопки заметки (С-33) — прототип, обработчик ленты: «Копировать» и воспроизведение отвечают уведомлением. */
+  function noteAction(i: number, act: 'copy' | 'play') {
+    const f = frameByI[i]
+    if (!f) return
+    notify(act === 'copy' ? 'Текст скопирован' : f.kind === 'note' ? 'Текстовая заметка' : 'Воспроизведение (демо)')
   }
 
   /* ------------------------------ П2: автораспределение (§12) ------------------------------ */
@@ -1054,6 +1178,15 @@ export function createModel(opts: ModelOptions) {
     finish,
     entryWindow,
     entryAuto,
+    /* П6 */
+    openNewForm,
+    formWindow,
+    submitForm,
+    newObjectOptions,
+    askDelete,
+    deleteObject,
+    confirmDelete,
+    noteAction,
   }
 }
 

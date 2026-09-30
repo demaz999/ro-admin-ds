@@ -56,5 +56,9 @@ export { default as AssignOption } from './AssignOption.vue'
  * просмотра и этапов панели — одно состояние (`state.closed` по id этапа), то есть одна
  * сущность. Разбор — `free-shoot.md`, 11.3.
  */
-export type AssignOptionType = 'step' | 'create' | 'object'
+/**
+ * `stage` — такт 43: этап нового повтора в поповере «Новый объект из выделенного» (№ 29, прототип `#btnNewObj`, пункт
+ * `data-newstage`): название этапа и число его повторов справа (`frames`), без подписи и держателя.
+ */
+export type AssignOptionType = 'step' | 'create' | 'object' | 'stage'
 export type AssignBound = 'here' | 'locked' | null

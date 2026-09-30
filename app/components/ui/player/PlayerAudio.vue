@@ -33,6 +33,9 @@ const props = withDefaults(defineProps<{
   playing: false,
   time: '6:48',
 })
+
+/** Нажатие кнопки плеера. Такт 43: заметка ленты (`FeedNote`) отвечает на него уведомлением — звук плеер сам не ведёт. */
+const emit = defineEmits<{ toggle: [] }>()
 </script>
 
 <template>
@@ -40,7 +43,7 @@ const props = withDefaults(defineProps<{
     data-slot="player-audio"
     class="flex h-15 w-full items-center gap-6 rounded-xl bg-muted-foreground/[var(--opacity-soft)] px-6 py-5"
   >
-    <PlayerButton :type="props.playing ? 'pause' : 'play'" size="sm" />
+    <PlayerButton :type="props.playing ? 'pause' : 'play'" size="sm" @click="emit('toggle')" />
 
     <span class="min-w-0 flex-1 truncate text-base">
       <slot />

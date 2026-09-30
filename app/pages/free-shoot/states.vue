@@ -511,6 +511,25 @@ const FRAME_EXAMPLE = `<!-- полоса приложения: бренд, на�
   <ResizablePanel :default-size="440" :min-size="320" :max-size="820" size-unit="px">панель</ResizablePanel>
 </ResizablePanelGroup>`
 
+/* ------------------------------ такт 43: FeedNote, ActionBar у выделенного текста, AssignOption type="stage" ------------------------------ */
+const LONG_NOTE = 'Итог по осмотру. Обошёл ткацкий участок цеха шесть, крутильный участок и компрессорную. В ткацком все станки SMIT на месте, номера с 10940 по 10950, у восемьсот четырнадцатого заедает прижимной вал — снял крупно.'
+const NOTES_EXAMPLE = `<!-- заметка ленты: во всю ширину сетки; развёрнутость держит страница, «Показать полностью» — от 110 знаков -->
+<FeedNote
+  :kind="f.kind === 'note' ? 'note' : 'voice'" :time="f.t" :duration="f.dur" :name="f.n" :text="f.text"
+  :expanded="expanded.has(f.i)"
+  @toggle="toggle(f.i)" @copy="copy(f)" @play="notify('Воспроизведение (демо)')"
+  @select-text="({ text, rect }) => showFragment(text, rect)"
+/>
+
+<!-- полоса у выделенного текста: нижний край — y, центр — x -->
+<ActionBar :open="!!fragment" count="Новый объект:" :sub="\`«\${fragment.text}»\`" :x="fragment.x" :y="fragment.y">
+  <Button size="sm" @click="create('eq')">Оборудование</Button>
+  <Button variant="secondary" size="sm" @click="create('bld')">Здание</Button>
+</ActionBar>
+
+<!-- этап нового повтора в поповере: название и число повторов -->
+<AssignOption type="stage" :value="\`stage|\${s.id}\`" :name="s.title" :frames="count" @select="create(s.id)" />`
+
 const ACTION_BAR_EXAMPLE = `<!-- панель выделения, §10.2: по центру ленты (x считает страница), закрытая уезжает вниз -->
 <ActionBar :open="selected.size > 0" :count="plural(n, 'кадр выбран', 'кадра выбрано', 'кадров выбрано')" :sub="sub" :x="feedCenter">
   <Popover v-model:open="assignOpen">
@@ -1808,6 +1827,64 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
       </div>
 
       <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ FRAME_EXAMPLE }}</pre>
+    </section>
+
+    <!-- ============================ заметки и создание, такт 43 ============================ -->
+    <section id="notes" data-section="notes" class="space-y-6">
+      <div class="space-y-1">
+        <h2 class="text-lg font-bold">
+          FeedNote · ActionBar у выделенного текста · AssignOption type="stage" — заметки и создание
+        </h2>
+        <p class="max-w-240 text-sm text-foreground-secondary">
+          Такт 43, карточка 5 такта 37 (ворота 2026-09-30). Мастера нет: состав — заметка ленты <code>voiceHTML</code> прототипа v17,
+          строка воспроизведения — <code>PlayerAudio</code> кита (решение ворот 5), тоны — <code>--secondary</code> с подписью
+          <code>--primary</code> и <code>--warning-surface</code> с подписью <code>--warning-strong</code>. «Показать полностью» — от 110 знаков.
+          Полоса фрагмента — второе размещение <code>ActionBar</code> (ось <code>y</code>); этап нового повтора — пункт поповера
+          <code>AssignOption type="stage"</code>. Разбор — <code>docs/free-shoot.md</code>, раздел 22.
+        </p>
+      </div>
+
+      <div data-subsection="feed-note" class="grid max-w-6xl grid-cols-[repeat(2,minmax(0,1fr))] items-start gap-6">
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">голосовой комментарий, короткий</p>
+          <FeedNote time="09:52" duration="0:26" name="AUDIO_17.m4a" text="Компрессорная. Четыре машины ALUP, три из них на консервации с десятого года" />
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">текстовая заметка</p>
+          <FeedNote kind="note" time="10:14" text="Компрессор ALUP инв. 10433 — на консервации, наклейка на дверце, снял крупно" />
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">длинная — свёрнута до двух строк, «Показать полностью»</p>
+          <FeedNote time="11:40" duration="2:07" name="AUDIO_19.m4a" :text="LONG_NOTE" />
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">длинная — развёрнута, «Свернуть»</p>
+          <FeedNote time="11:40" duration="2:07" name="AUDIO_19.m4a" :text="LONG_NOTE" expanded />
+        </div>
+      </div>
+
+      <div data-subsection="fragment" class="grid max-w-6xl grid-cols-[repeat(2,minmax(0,1fr))] items-start gap-6">
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">ActionBar у выделенного текста — цитата в одну строку до 208 с многоточием</p>
+          <ActionBar count="Новый объект:" sub="«Итог по осмотру. Обошёл ткацкий участок цеха шесть, крутильный участок»" x="0" y="0" class="relative translate-x-0 translate-y-0">
+            <Button size="sm">Оборудование</Button>
+            <Button variant="secondary" size="sm">Здание</Button>
+          </ActionBar>
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">поповер «Новый объект из выделенного» — этапы и число повторов</p>
+          <SelectContent :width="360">
+            <AssignList>
+              <SelectGroup header="Создать повтор этапа">
+                <AssignOption type="stage" value="stage|bld" name="Здание / цех" :frames="1" />
+                <AssignOption type="stage" value="stage|eq" name="Единица оборудования" :frames="1" demo-hover />
+              </SelectGroup>
+            </AssignList>
+          </SelectContent>
+        </div>
+      </div>
+
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ NOTES_EXAMPLE }}</pre>
     </section>
   </main>
 </template>

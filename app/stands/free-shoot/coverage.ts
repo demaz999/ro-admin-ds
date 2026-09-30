@@ -41,6 +41,8 @@ export const COVERAGE_STATES = [
   'state=marquee', 'state=undo',
   /* Такт 41: окно «Перенести кадр?» над просмотром. */
   'open=move',
+  /* Такт 43: форма нового повтора из выделенного, поповер нового объекта, «Удалить объект?», полоса фрагмента заметки. */
+  'open=new', 'open=newobj', 'open=delete', 'open=fragment',
 ] as const
 
 const transparent = (c: string) => !c || c === 'transparent' || /rgba\([^)]*,\s*0\)$/.test(c)

@@ -14,11 +14,17 @@ const props = withDefaults(defineProps<{
   open?: boolean
   /** Центр полосы по горизонтали — CSS-значение `left`, по умолчанию центр окна. */
   x?: string
+  /**
+   * Второе размещение (такт 43, §8.5): полоса у выделенного текста — нижний край на `y` (CSS-значение `top`), центр — `x`.
+   * Закрытая в этом размещении скрыта целиком. Без `y` — прибита к низу окна.
+   */
+  y?: string
   class?: string
 }>(), {
   sub: '',
   open: true,
   x: '50%',
+  y: undefined,
 })
 </script>
 
@@ -31,15 +37,16 @@ const props = withDefaults(defineProps<{
     :aria-hidden="props.open ? undefined : 'true'"
     :inert="props.open ? undefined : true"
     :class="cn(
-      'fixed bottom-5 z-40 flex -translate-x-1/2 items-center gap-2 rounded-lg bg-popover py-2 pr-2 pl-4 text-popover-foreground shadow-dropdown transition-transform',
-      props.open ? 'translate-y-0' : 'translate-y-[150%]',
+      'fixed z-40 flex -translate-x-1/2 items-center gap-2 rounded-lg bg-popover py-2 pr-2 pl-4 text-popover-foreground shadow-dropdown transition-transform',
+      props.y === undefined ? 'bottom-5' : '-translate-y-full',
+      props.y === undefined ? (props.open ? 'translate-y-0' : 'translate-y-[150%]') : (props.open ? '' : 'hidden'),
       props.class,
     )"
-    :style="{ left: props.x, transitionDuration: 'var(--duration-zoom)' }"
+    :style="{ left: props.x, top: props.y, transitionDuration: 'var(--duration-zoom)' }"
   >
     <div class="mr-1.5 flex flex-col whitespace-nowrap">
       <span data-slot="action-bar-count" class="text-sm font-medium">{{ props.count }}</span>
-      <span v-if="props.sub" data-slot="action-bar-sub" class="text-2xs text-muted-foreground">{{ props.sub }}</span>
+      <span v-if="props.sub" data-slot="action-bar-sub" class="max-w-52 truncate text-2xs text-muted-foreground">{{ props.sub }}</span>
     </div>
     <slot />
   </div>

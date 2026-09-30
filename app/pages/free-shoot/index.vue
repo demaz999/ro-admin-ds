@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { AssignBound } from '@/components/ui/assign'
+import type { FeedNoteSelection } from '@/components/ui/feed-note'
 import { frameTileColumns, frameTileGridVariants, type FrameTileState } from '@/components/ui/frame-tile'
 import type { StepThumbItem, StepVerdict } from '@/components/ui/step-row'
 import AsisMarks from '~/stands/free-shoot/AsisMarks.vue'
@@ -15,6 +16,8 @@ import proto from '~/stands/free-shoot/prototype-data.json'
  * **как есть**: его разметка и его CSS (`~/stands/free-shoot/asis.css`), без подгонки под
  * токены, — чтобы на глаз было видно, что ещё не закрыто. Каждый перенесённый блок несёт
  * `data-asis="<имя>"`; реестр покрытия — `docs/free-shoot.md`, раздел 8.
+ *
+ * **С такта 43 блоков «как есть» нет:** последний — заметка № 25 — на `FeedNote`; экран целиком на ките (раздел 22).
  *
  * Компонент кита внутри перенесённого блока стоит в `.kit-island` — островке, который
  * сбрасывает шрифт и цвет прототипа (правило в `asis.css`).
@@ -33,7 +36,8 @@ import proto from '~/stands/free-shoot/prototype-data.json'
  * форма осмотра. С такта 39 (П2) — автораспределение и приёмка: окно запуска с прогнозом трёх
  * режимов, прогресс с прерыванием, сводка результата, полоса приёмки, принятие и отклонение
  * объектов (§12–§13). Перетаскивание, клавиатура, отмена, автосохранение — по порциям П3–П6
- * (`docs/free-shoot.md`, 16.5).
+ * (`docs/free-shoot.md`, 16.5). С такта 43 (П6) — заметки, фрагмент заметки, создание повтора (форма, «+ Новая
+ * единица», из выделенного, из фрагмента, из просмотра), сохранение формы и удаление повтора (С-18–20, 33).
  *
  * **Старт стенда — старт прототипа** (решение чата 2026-09-30, такт 39): после загрузки все повторы
  * свёрнуты, текущего нет. Раскрытый повтор — только оснасткой `?expand=eq`.
@@ -65,6 +69,10 @@ import proto from '~/stands/free-shoot/prototype-data.json'
  * | `?expand=eq` | раскрыт повтор оборудования (в режиме приёмки — первый предложенный); без параметра все свёрнуты, как у прототипа — такт 39. Нужен состояниям `state=link`, `state=flash`, `state=drop` |
  * | `?data=empty` | набор «Пустой осмотр» — прототип `applyScenario('empty')`: повторов и вердиктов нет, режим «Только кадры» недоступен (С-27), такт 39 |
  * | `?tab=form` | вкладка «Форма осмотра» (§7) |
+ * | `?open=new` | окно «Новый повтор · Оборудование» из пяти выделенных кадров: подпись, начальные значения, подсказки распознанного (§10, §14.5) — такт 43 |
+ * | `?open=newobj` | панель выделения и поповер «Новый объект из выделенного» (№ 29) — такт 43 |
+ * | `?open=delete` | окно «Удалить объект?» у нового повтора «Объект без названия»: у повторов набора есть проверенные шаги (§6.2, С-20) — такт 43 |
+ * | `?open=fragment` | полоса «Новый объект:» над началом первой длинной голосовой заметки (§8.5, № 26) — такт 43 |
  * | по умолчанию | тонкий пунктир `--muted-foreground` вокруг каждого перенесённого блока — незакрытое видно глазом (довесок 2 к такту 35) |
  * | `?asis=mark` | пунктир толще и подпись вокруг каждого перенесённого блока |
  * | `?asis=off` | без обводки — для чистых снимков |
@@ -114,7 +122,7 @@ const m = createModel({
   scenario: q('data') === 'empty' ? 'empty' : 'review',
   initial: {
     cur: openWin === 'assign' ? P.selectCur : D.cur,
-    sel: state === 'drop' || openWin === 'assign' || q('selected') === 'demo' ? P.selected : [],
+    sel: state === 'drop' || ['assign', 'new', 'newobj'].includes(openWin) || q('selected') === 'demo' ? P.selected : [],
     rtab: q('tab') === 'form' ? 'form' : 'scheme',
     win: (WINDOWS as readonly string[]).includes(openWin) ? openWin as ScreenWindow : null,
     lb: viewer ? Math.max(0, LB_FRAMES.findIndex((f: any) => f.i === viewer.i)) : -1,
@@ -248,8 +256,6 @@ async function onLocate(i: number) {
   foundTimer = setTimeout(() => { if (found.value) found.value = { ...found.value, thumb: false } }, 1600)
 }
 
-/* ------------------------------ заметки (как есть) ------------------------------ */
-const noteWave = (f: any) => Array.from({ length: 80 }, (_, i) => Math.round((3 + Math.abs(Math.sin((i + (f.i - 9000) * 3) * 0.8)) * 11) * 10) / 10)
 
 /* ------------------------------ панель структуры ------------------------------ */
 const nfrz = computed(() => m.frzSteps())
@@ -412,15 +418,24 @@ const hotkeysOpen = windowModel('hotkeys')
 /**
  * Окно открывают оба «Изменить» `RepeatForm` (событие `edit(group?)`): без группы — форма целиком,
  * с группой — сразу на ней (§14.3); «Все поля (N)» разворачивает карточку. Прототип `openObjForm`.
- * Какое окно открыто — модель; черновик полей — окно, как у прототипа (поля `#mBody`). Сохранения
- * в модель нет до порции П6 (С-18): с заполненными обязательными окно закрывается.
+ * Какое окно открыто — модель; черновик полей — окно, как у прототипа (поля `#mBody`). С порции П6 (такт 43) окно
+ * сохраняет форму в модель (С-18) и создаёт новый повтор (С-19) — `submitForm`; заголовок, подпись, начальные значения
+ * и подсказки распознанного — `formWindow` модели.
  */
 const EMPTY = '—'
 const editWin = computed(() => m.state.formWin)
+const formWin = m.formWindow
 const editDraft = ref<Record<string, string>>({})
 const editErrors = ref(new Set<string>())
 const editOpen = windowModel('form')
-const editStage = computed(() => (editWin.value ? stageById[O(editWin.value.obj)!.stageId] : null))
+const editStage = computed(() => (editWin.value ? stageById[editWin.value.stage] : null))
+/** Черновик окна — начальные значения модели на момент открытия, как поля `#mBody` прототипа; у выбора пустое — «—». */
+watch(editWin, (w, prev) => {
+  if (!w || w === prev) return
+  const init = m.formWindow.value?.init ?? {}
+  editDraft.value = Object.fromEntries((stageById[w.stage]!.form ?? []).map(f => [f.k, init[f.k] || (f.opts ? EMPTY : '')]))
+  editErrors.value = new Set()
+}, { immediate: true })
 /** Группы — как у прототипа: `grp` стоит у первого поля группы, следующие поля идут в неё же. */
 const editGroups = computed(() => {
   const out: { title: string, fields: FormDef[] }[] = []
@@ -438,10 +453,19 @@ const formVisible = (f: FormDef) => !f.dep || editDraft.value[f.dep.k] === f.dep
 const formInvalid = (f: FormDef) => editErrors.value.has(f.k) && !filled(f.k)
 const formItems = (opts: string[]) => [EMPTY, ...opts].map(x => ({ value: x, label: x }))
 function openForm(objId: string, group?: string) {
-  const o = O(objId)!
-  editDraft.value = Object.fromEntries((stageById[o.stageId].form ?? []).map(f => [f.k, o.form[f.k] || (f.opts ? EMPTY : '')]))
-  editErrors.value = new Set()
   m.openForm(objId, group ?? '')
+}
+/**
+ * Подсказка распознанного (§14.5) — прототип `[data-ocr]`: номер после «ИНВ» — в инвентарный, иначе текст — в пустое первое
+ * поле (марка или номер здания), иначе номер — в пустой заводской.
+ */
+function applyOcr(t: string) {
+  const d = editDraft.value
+  const num = t.match(/(\d[\d/]{2,})/)
+  const first = 'mark' in d ? 'mark' : 'no' in d ? 'no' : ''
+  if (/ИНВ|Инв/i.test(t) && num && 'inv' in d) d.inv = num[1]!
+  else if (first && !d[first]) d[first] = t
+  else if ('sn' in d && !d.sn && num) d.sn = num[1]!
 }
 
 /** Уведомления экрана — очередь модели, отказы и подтверждения §18. Оснастка `?open=form-errors` держит отказ без таймера. */
@@ -450,14 +474,65 @@ const toasts = m.notices
 const toastDuration = (undo: boolean) => (openWin === 'form-errors' || state === 'undo' ? Number.POSITIVE_INFINITY : undo ? 6000 : 3000)
 /** §14.6: обязательные проверяются при сохранении — `form.required` «Заполните: <список полей>», окно открыто. */
 function saveForm() {
-  const need = (editStage.value?.form ?? []).filter(f => f.req && !filled(f.k))
-  if (need.length) {
-    editErrors.value = new Set(need.map(f => f.k))
-    m.notify(`Заполните: ${need.map(f => f.l).join(', ')}`, 'err')
-    return
-  }
-  m.closeWindow()
+  const need = m.submitForm({ ...editDraft.value })
+  if (need.length) editErrors.value = new Set(need.map(f => f.k))
+  /* Повтор создан из подбора шага — плашка просмотра показывает привязку, предложение снято (строка раздела 15, такт 43). */
+  else suggestion.value = null
 }
+
+/* ------------------------------ П6: заметки и создание, такт 43 (§8.4–8.5, §10, §6.2) ------------------------------ */
+/** Развёрнутые заметки — состояние страницы (строка раздела 15: у прототипа перерисовка ленты сворачивает). */
+const expandedNotes = ref(new Set<number>())
+function toggleNote(i: number) {
+  const s = new Set(expandedNotes.value)
+  if (s.has(i)) s.delete(i)
+  else s.add(i)
+  expandedNotes.value = s
+}
+/** «Копировать» — прототип `copyText`: буфер обмена, в небезопасном контексте — через скрытое поле. */
+function copyNote(f: any) {
+  try { void navigator.clipboard?.writeText(f.text).catch(() => {}) }
+  catch {}
+  m.noteAction(f.i, 'copy')
+}
+/** Фрагмент заметки (№ 26): полоса над выделенным текстом; центр — середина выделения, от краёв окна не ближе 240 (полоса до 480). */
+const fragment = ref<{ text: string, x: string, y: string } | null>(null)
+function onNoteSelect(sel: FeedNoteSelection) {
+  if (marquee.value) return
+  const cx = Math.max(240, Math.min(sel.rect.left + sel.rect.width / 2, window.innerWidth - 240))
+  fragment.value = { text: sel.text, x: `${Math.round(cx)}px`, y: `${Math.round(Math.max(58, sel.rect.top - 8))}px` }
+}
+/** Полоса фрагмента прячется, когда выделение снято или ушло из заметки, и при любой прокрутке — прототип `#selact`. */
+function onDocMouseup() {
+  setTimeout(() => {
+    const sel = window.getSelection()
+    const host = sel?.anchorNode ? (sel.anchorNode.nodeType === 1 ? sel.anchorNode as Element : sel.anchorNode.parentElement) : null
+    if (!sel || sel.isCollapsed || !host?.closest('[data-slot=feed-note]')) fragment.value = null
+  }, 10)
+}
+/* Оснастка `?open=fragment` держит полосу: догрузка картинок сдвигает прокрутку ленты и прятала бы её до снимка. */
+function onDocScroll() { if (openWin !== 'fragment') fragment.value = null }
+/** «Оборудование» / «Здание» — форма нового повтора с именем из фрагмента, без кадров. */
+function onFragment(stage: string) {
+  const t = fragment.value?.text ?? ''
+  fragment.value = null
+  window.getSelection()?.removeAllRanges()
+  m.openNewForm(stage, [], t)
+}
+/** Поповер «Новый объект из выделенного» (№ 29): этап — форма нового повтора с выделенными кадрами. */
+const newObjOpen = ref(false)
+function onNewObject(stage: string) {
+  newObjOpen.value = false
+  m.openNewForm(stage)
+}
+/** «Создать «<этап>»» подбора шага — форма нового повтора с кадром просмотра и именем, как прототип `data-act="mk"`. */
+function onSuggestCreate() {
+  const sg = suggestion.value
+  const f = viewerFrame.value
+  if (sg?.kind === 'create' && f) m.openNewForm(sg.stage, [f.i], sg.title)
+}
+/** Окно «Удалить объект?» (С-20). */
+const deleteOpen = windowModel('delete')
 
 /* ---------------------- пункт назначения, такт 33 (§10.3, §11.1–11.2) ---------------------- */
 function stepOption(owner: string, st: any, hotkey: number | null, bound: AssignBound = null) {
@@ -594,10 +669,11 @@ function onSuggestAccept() {
   const sg = suggestion.value
   if (sg?.kind === 'step' && !sg.blocked) viewerAssign(sg.owner, sg.stepId)
 }
-/** Пункт списка просмотра: шаг — привязка, объект — «сделать текущим»; «Создать «<этап>»» — порция П6. */
+/** Пункт списка просмотра: шаг — привязка, объект — «сделать текущим», «Создать «<этап>»» — форма нового повтора с кадром. */
 function onViewerSelect(it: any) {
   const [a, b] = String(it.value).split('|')
   if (it.type === 'object') { m.setCurrent(b!); suggestion.value = null; return }
+  if (it.type === 'create') { const f = viewerFrame.value; m.openNewForm(b!, f ? [f.i] : []); return }
   if (it.type === 'step') viewerAssign(a!, b!)
 }
 /** Нажат закрытый пункт списка просмотра — прототип `#lbList`: заморожен — отказ; заполнен — `lbAssign`; привязан до вас — отказ. */
@@ -729,6 +805,8 @@ onMounted(async () => {
   window.addEventListener('mousemove', onMarqueeMove)
   window.addEventListener('mouseup', onMarqueeEnd)
   document.addEventListener('dragend', onDragEnd)
+  document.addEventListener('mouseup', onDocMouseup)
+  document.addEventListener('scroll', onDocScroll, true)
   /* Оснастка `?open=move` (такт 41): кадр 21 привязан к «Узлам и агрегатам», в просмотре выбран «Органы управления» — окно № 47. */
   if (openWin === 'move' && eqId) {
     m.assign([21], eqId, 'e4', true)
@@ -741,6 +819,25 @@ onMounted(async () => {
     await nextTick()
     assignOpen.value = true
   }
+  /* Оснастка П6 (такт 43): форма нового повтора из выделенного, поповер «Новый объект из выделенного», «Удалить объект?»,
+     полоса фрагмента над первой длинной голосовой заметкой. */
+  if (openWin === 'new') m.openNewForm('eq')
+  if (openWin === 'newobj') {
+    await nextTick()
+    newObjOpen.value = true
+  }
+  /* У набора оба повтора с проверенными шагами — удалить нельзя, как у прототипа; оснастка создаёт повтор без названия. */
+  if (openWin === 'delete') m.askDelete(m.createObject('eq', {}).id)
+  if (openWin === 'fragment') {
+    const el = document.querySelector<HTMLElement>('[data-slot=feed-note][data-kind=voice][data-state] [data-slot=feed-note-text]')
+    if (el) {
+      /* Прокрутка прячет полосу — сначала заметка в видимую часть, полоса — после события прокрутки. */
+      el.scrollIntoView({ block: 'center', behavior: 'instant' })
+      await new Promise(r => setTimeout(r, 150))
+      const r = el.getBoundingClientRect()
+      onNoteSelect({ text: el.textContent!.trim().split(' ').slice(0, 4).join(' '), rect: { left: r.left, top: r.top, width: r.width / 3, height: 20 } })
+    }
+  }
 })
 onBeforeUnmount(() => {
   gridObserver?.disconnect()
@@ -749,6 +846,8 @@ onBeforeUnmount(() => {
   window.removeEventListener('mousemove', onMarqueeMove)
   window.removeEventListener('mouseup', onMarqueeEnd)
   document.removeEventListener('dragend', onDragEnd)
+  document.removeEventListener('mouseup', onDocMouseup)
+  document.removeEventListener('scroll', onDocScroll, true)
 })
 
 /* ------------------------------ выделение, такт 40 (§10.1–10.2) ------------------------------ */
@@ -910,8 +1009,6 @@ function onUndo(id: number) {
   m.dismissNotice(id)
 }
 
-const SVG_NOTE = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 2.5h10v11H3z"/><path d="M5.5 6h5M5.5 9h4"/></svg>'
-const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M5 3l8 5-8 5z"/></svg>'
 </script>
 
 <template>
@@ -1026,30 +1123,21 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
                       @dblclick="onTileDbl(f.i)"
                       @dragstart="onDragStart(f.i, $event)"
                     />
-                    <div v-else class="va">
-                      <div
-                        class="card voice"
-                        :class="{ note: f.kind === 'note', exp: f.text.length <= 110 }"
-                        :data-frame="f.i"
-                        data-asis="заметка"
-                      >
-                        <button class="pl" v-html="f.kind === 'note' ? SVG_NOTE : SVG_PLAY" />
-                        <div class="vb">
-                          <div class="vh">
-                            <span class="vt">{{ f.kind === 'note' ? 'Текстовая заметка' : 'Голосовой комментарий' }}</span>
-                            <span class="vm">{{ f.t }}</span><span v-if="f.dur" class="vm">{{ f.dur }}</span>
-                          </div>
-                          <div class="vx">{{ f.text }}</div>
-                          <div v-if="f.kind !== 'note'" class="wv">
-                            <i v-for="(h, k) in noteWave(f)" :key="k" :style="{ height: `${h}px` }" />
-                          </div>
-                        </div>
-                        <div class="acts">
-                          <button v-if="f.text.length > 110" class="copy">Показать полностью</button>
-                          <button class="copy">Копировать</button>
-                        </div>
-                      </div>
-                    </div>
+                    <!-- № 25: заметка — FeedNote, такт 43 (карточка 5); строка воспроизведения — PlayerAudio -->
+                    <FeedNote
+                      v-else
+                      :data-frame="f.i"
+                      :kind="f.kind === 'note' ? 'note' : 'voice'"
+                      :time="f.t"
+                      :duration="f.dur ?? ''"
+                      :name="f.n"
+                      :text="f.text"
+                      :expanded="expandedNotes.has(f.i)"
+                      @toggle="toggleNote(f.i)"
+                      @copy="copyNote(f)"
+                      @play="m.noteAction(f.i, 'play')"
+                      @select-text="onNoteSelect"
+                    />
                   </template>
                 </div>
               </div>
@@ -1087,6 +1175,7 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
                     :open="!closedStages.has(st.id)"
                     :add-label="st.rep ? (st.id === 'bld' ? 'Новое здание' : 'Новая единица') : ''"
                     @toggle="toggleStage(st.id)"
+                    @add="m.openNewForm(st.id, [])"
                   >
                     <template v-if="st.rep">
                       <RepeatCard
@@ -1115,6 +1204,7 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
                             :deletable="!formPreview(o).locked && !o.auto"
                             @toggle="toggleForm(o.id)"
                             @edit="openForm(o.id, $event)"
+                            @delete="m.askDelete(o.id)"
                           />
                         </template>
                         <template v-for="(x, k) in stageById[o.stageId].steps" :key="x.id">
@@ -1206,11 +1296,48 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
             </SelectContent>
           </PopoverContent>
         </Popover>
-        <Button variant="secondary" size="sm">Новый объект из выделенного</Button>
+        <!-- № 29: «Новый объект из выделенного» — такт 43: тот же поповер, что № 28; пункт — AssignOption type="stage" -->
+        <Popover v-model:open="newObjOpen">
+          <PopoverTrigger as-child>
+            <Button variant="secondary" size="sm">Новый объект из выделенного</Button>
+          </PopoverTrigger>
+          <PopoverContent
+            as-child
+            side="top"
+            align="start"
+            :align-offset="-40"
+            :side-offset="8"
+            :collision-padding="12"
+            :width="360"
+          >
+            <SelectContent :width="360" max-height="62vh">
+              <AssignList>
+                <SelectGroup header="Создать повтор этапа">
+                  <AssignOption
+                    v-for="it in m.newObjectOptions.value"
+                    :key="it.stage"
+                    type="stage"
+                    :value="`stage|${it.stage}`"
+                    :data-value="`stage|${it.stage}`"
+                    :name="it.title"
+                    :frames="it.count"
+                    @select="onNewObject(it.stage)"
+                  />
+                </SelectGroup>
+              </AssignList>
+            </SelectContent>
+          </PopoverContent>
+        </Popover>
         <Button variant="secondary" size="sm" @click="m.assignMisc()">В «Прочее»</Button>
         <Button variant="secondary" size="sm" @click="m.unassignSelection()">Открепить</Button>
         <ActionBarSeparator />
         <Button variant="secondary" size="sm" @click="m.clearSel()">Снять</Button>
+      </ActionBar>
+
+      <!-- № 26: фрагмент заметки — ActionBar, второе размещение (такт 43): над выделенным текстом, §8.5 -->
+      <ActionBar data-fragment :open="!!fragment" count="Новый объект:" :sub="fragment ? `«${fragment.text}»` : ''" :x="fragment?.x" :y="fragment?.y ?? '0px'">
+        <Button size="sm" @click="onFragment('eq')">Оборудование</Button>
+        <Button variant="secondary" size="sm" @click="onFragment('bld')">Здание</Button>
       </ActionBar>
 
       <!-- ============================ рамка и метка перетаскивания, §10.1, §9.5 — кит, такт 40 ============================ -->
@@ -1241,6 +1368,7 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
             :flash="bindFlash"
             @suggest="onSuggest"
             @accept="onSuggestAccept"
+            @create="onSuggestCreate"
             @dismiss="suggestion = null"
             @locate="onViewerLocate"
             @unbind="onViewerUnbind"
@@ -1446,7 +1574,7 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
     <!-- ============================ окно формы повтора, §14.3–14.6 — кит, такт 36 ============================ -->
     <ModalCard v-model:open="editOpen">
       <ModalCardContent>
-        <ModalCardHeader :title="`Форма · ${editStage?.title ?? ''}`" subtitle="Динамическая форма повторяемого этапа" />
+        <ModalCardHeader :title="formWin?.title ?? ''" :subtitle="formWin?.sub ?? ''" />
         <ModalCardBody>
           <FieldSet
             v-for="g in editGroups"
@@ -1455,19 +1583,48 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
             :autofocus="!!editWin?.group && g.title === editWin.group"
           >
             <template v-for="f in g.fields" :key="f.k">
-              <Field v-if="formVisible(f)" orientation="left" label-width="form" :label="f.l" :required="!!f.req" :invalid="formInvalid(f)">
+              <Field v-if="formVisible(f)" :data-k="f.k" orientation="left" label-width="form" :label="f.l" :required="!!f.req" :invalid="formInvalid(f)">
                 <Select v-if="f.opts" v-model="editDraft[f.k]" :items="formItems(f.opts)" :show-icon="false" placeholder="" />
                 <Input v-else v-model="editDraft[f.k]" :invalid="formInvalid(f)" :show-icon="false" placeholder="" />
               </Field>
             </template>
           </FieldSet>
+          <!-- Подсказки распознанного на кадрах окна — прототип `.ocrhint`, такт 43: подпись — ModalCardText, пилюли — Button secondary sm -->
+          <template v-if="formWin?.hints.length">
+            <ModalCardText>Распознано на выделенных кадрах:</ModalCardText>
+            <div data-ocr-hints class="flex flex-wrap gap-2">
+              <Button v-for="h in formWin.hints" :key="h" variant="secondary" size="sm" @click="applyOcr(h)">
+                {{ h }}
+              </Button>
+            </div>
+          </template>
         </ModalCardBody>
         <ModalCardFooter>
-          <Button variant="secondary" @click="editWin = null">
+          <Button variant="secondary" @click="m.closeWindow()">
             Отмена
           </Button>
           <Button @click="saveForm">
-            Сохранить
+            {{ formWin?.primary ?? 'Сохранить' }}
+          </Button>
+        </ModalCardFooter>
+      </ModalCardContent>
+    </ModalCard>
+
+    <!-- ============================ «Удалить объект?», §6.2 — кит, такт 43 (С-20): ModalCard + Callout ============================ -->
+    <ModalCard v-model:open="deleteOpen">
+      <ModalCardContent>
+        <ModalCardHeader title="Удалить объект?" :subtitle="m.state.del?.name ?? ''" />
+        <ModalCardBody>
+          <Callout tone="warning" title="Кадры вернутся в ленту">
+            Привязки будут сняты, объект удалён.
+          </Callout>
+        </ModalCardBody>
+        <ModalCardFooter>
+          <Button variant="secondary" @click="m.closeWindow()">
+            Отмена
+          </Button>
+          <Button @click="m.confirmDelete()">
+            Удалить
           </Button>
         </ModalCardFooter>
       </ModalCardContent>

@@ -1343,7 +1343,7 @@ const textareaVariants = [
     -->
     <section data-theme="rososmotr" class="space-y-3 bg-background font-sans text-foreground">
       <h2 class="text-lg font-bold">
-        FrameTile · StepRow · StepThumb · Progress · ProgressStat · StageSection · RepeatCard · AssignOption · FrameBindBar · ModalCard · FieldSet · Callout · RadioGroupItem card · ActionBar · SelectionMarquee · AppBar · Toolbar · Resizable — без эталона, такты 30–36, 39–42
+        FrameTile · StepRow · StepThumb · Progress · ProgressStat · StageSection · RepeatCard · AssignOption · FrameBindBar · ModalCard · FieldSet · Callout · RadioGroupItem card · ActionBar · SelectionMarquee · AppBar · Toolbar · Resizable · FeedNote — без эталона, такты 30–36, 39–43
       </h2>
       <p class="max-w-3xl text-sm text-muted-foreground">
         Мастера нет — сверка идёт с прототипом VA-9265 v17, пары «прототип / кит» лежат в
@@ -1552,6 +1552,25 @@ const textareaVariants = [
             </template>
           </RadioGroupItem>
         </RadioGroup>
+      </div>
+      <!--
+        Такт 43: заметка ленты FeedNote — голосовая на PlayerAudio и текстовая; полоса фрагмента — ActionBar у выделенного текста;
+        этап нового повтора — AssignOption type="stage".
+      -->
+      <div class="grid max-w-5xl grid-cols-2 items-start gap-4">
+        <FeedNote time="11:40" duration="2:07" name="AUDIO_19.m4a" text="Итог по осмотру. Обошёл ткацкий участок цеха шесть, крутильный участок и компрессорную. В ткацком все станки SMIT на месте, номера с 10940 по 10950." />
+        <FeedNote kind="note" time="10:14" text="Компрессор ALUP инв. 10433 — на консервации, наклейка на дверце" />
+        <ActionBar count="Новый объект:" sub="«Итог по осмотру»" x="0" y="0" class="relative translate-x-0 translate-y-0">
+          <Button size="sm">Оборудование</Button>
+          <Button variant="secondary" size="sm">Здание</Button>
+        </ActionBar>
+        <SelectContent :width="360">
+          <AssignList>
+            <SelectGroup header="Создать повтор этапа">
+              <AssignOption type="stage" value="stage|eq" name="Единица оборудования" :frames="1" />
+            </SelectGroup>
+          </AssignList>
+        </SelectContent>
       </div>
       <!--
         Такт 42: полоса приложения AppBar (крошки на тёмном, статус, кнопка sidebar), светлая полоса Toolbar, панели Resizable.
