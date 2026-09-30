@@ -29,12 +29,14 @@ export interface CoverageResult {
   findings: CoverageFinding[]
 }
 
-/** Все значения оснастки экрана — `naming.md`, «Такт 31», параметры оснастки. */
+/** Все значения оснастки экрана — `naming.md`, «Такт 31», параметры оснастки; с такта 39 состояния, которым нужен раскрытый повтор, несут `expand=eq`. */
 export const COVERAGE_STATES = [
   '', 'open=assign', 'open=viewer-free', 'open=viewer-assigned', 'open=viewer-locked', 'open=viewer-suggest',
   'open=viewer-flash', 'open=wand', 'open=progress', 'open=hotkeys', 'open=form', 'open=form-group', 'open=form-errors',
   'open=summary', 'open=finish',
-  'view=review', 'tab=form', 'state=link', 'state=flash', 'state=tooltip', 'state=drop', 'selected=demo',
+  'view=review', 'tab=form', 'state=link&expand=eq', 'state=flash&expand=eq', 'state=tooltip', 'state=drop&expand=eq', 'selected=demo',
+  /* Такт 39: раскрытый повтор — только оснасткой; «Пустой осмотр» и окно запуска на нём. */
+  'expand=eq', 'view=review&expand=eq', 'data=empty', 'open=wand&data=empty',
 ] as const
 
 const transparent = (c: string) => !c || c === 'transparent' || /rgba\([^)]*,\s*0\)$/.test(c)

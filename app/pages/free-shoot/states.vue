@@ -7,6 +7,9 @@ import type { FrameSuggestion } from '@/components/ui/frame-viewer'
 import type { FrameTileState } from '@/components/ui/frame-tile'
 import type { StepThumbItem, StepVerdict } from '@/components/ui/step-row'
 import type { RepeatFormField } from '@/components/ui/repeat'
+import type { CalloutTone } from '@/components/ui/callout'
+import { createModel, emptyDataset, MODE_T, type WandMode } from '~/stands/free-shoot/model'
+import proto from '~/stands/free-shoot/prototype-data.json'
 
 /**
  * Стенд-матрицы «Распределение свободной съёмки» — такт 30, часть 2; с такта 31 живёт
@@ -429,6 +432,53 @@ const MODAL_CARD_EXAMPLE = `<!-- центральное окно, 600; у кра
   </ModalCardContent>
 </ModalCard>`
 
+
+/* ------------------------------ такт 39: Callout, карточка режима, окна автораспределения ------------------------------ */
+/** Тексты — блоки окон прототипа (`.sum`, §12.12, §17.4); нейтральный тон у прототипа не встречается. */
+const CALLOUT_TONES: { tone: CalloutTone, title: string, text: string }[] = [
+  { tone: 'success', title: 'Предложено: 132 кадра в 42 объекта', text: 'Проверьте созданные объекты справа: примите или отклоните, поправьте названия и формы.' },
+  { tone: 'warning', title: '24 кадра пропущено', text: 'Шаги проверены и закрыты или уже заполнены до лимита.' },
+  { tone: 'destructive', title: 'Расхождение с общей формой', text: 'По документам 3 объекта, оформлено 2. Заполните «Имущество, которое не удалось осмотреть».' },
+  { tone: 'neutral', title: 'Голосовые комментарии не распределяются', text: 'Остаются в свободной съёмке как есть.' },
+]
+const CALLOUT_LIST = ['Здание цеха · Общий вид', 'Пропиточная линия POLYPRISE · Общий вид', 'Линия термообработки · Шильдик']
+/** Окна П2 — на модели экрана, как на `/free-shoot`: запуск от набора «Частично проверен», сводка — после полного. */
+const P39 = proto as any
+const wandModel = createModel({ data: P39.A, stages: P39.stages, general: P39.general, blocks: P39.blocks })
+const WAND = wandModel.wandWindow.value
+const WAND_EMPTY = createModel({ data: emptyDataset(P39.A), stages: P39.stages, general: P39.general, blocks: P39.blocks }).wandWindow.value
+const summaryModel = createModel({ data: P39.A, stages: P39.stages, general: P39.general, blocks: P39.blocks })
+summaryModel.applyWandNow('full')
+const SUMMARY = summaryModel.state.summary!
+const wandPick = ref<WandMode>('full')
+const radioLive = ref('struct')
+
+const CALLOUT_EXAMPLE = `<!-- блок окна: заголовок и текст в тоне; тона — success | warning | destructive | neutral -->
+<Callout tone="warning" title="24 кадра пропущено">Шаги проверены и закрыты или уже заполнены до лимита.</Callout>
+
+<!-- список — <ul> без классов в слоте, оформление даёт компонент -->
+<Callout tone="destructive" title="Не закрыты обязательные шаги: 3">
+  <ul><li v-for="s in open" :key="s">{{ s }}</li></ul>
+</Callout>
+
+<!-- полоса приёмки, §13.2: действия справа -->
+<Callout tone="warning" :title="\`Проверка: осталось \${left}\`">
+  Проверено {{ done }} из {{ total }}. Принятый объект сворачивается и уходит из списка
+  <template #actions>
+    <Checkbox v-model="onlyUnchecked">только непроверенные</Checkbox>
+    <Button variant="secondary" size="sm" @click="rejectAll()">Отменить автораспределение</Button>
+    <Button size="sm" @click="acceptAll()">Принять все объекты</Button>
+  </template>
+</Callout>`
+
+const RADIO_CARD_EXAMPLE = `<!-- карточка выбора: variant="card", под заголовком — description и meta -->
+<RadioGroup v-model="mode" class="gap-2">
+  <RadioGroupItem v-for="w in modes" :key="w.value" variant="card" :value="w.value" :disabled="w.disabled" :checked="mode === w.value">
+    {{ w.title }}
+    <template #description>{{ w.description }}</template>
+    <template #meta>{{ w.forecast }}</template>   <!-- у выключенной — причина: «в осмотре пока нет повторов» -->
+  </RadioGroupItem>
+</RadioGroup>`
 
 const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :total="frames.length">
   <template #actions>
@@ -1353,6 +1403,189 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
       </ModalCard>
 
       <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ REPEAT_FORM_WINDOW_EXAMPLE }}</pre>
+    </section>
+
+    <!-- ============================ Callout, такт 39 ============================ -->
+    <section id="callout" data-section="callout" class="space-y-6">
+      <div class="space-y-1">
+        <h2 class="text-lg font-bold">
+          Callout — плашка-сообщение в потоке
+        </h2>
+        <p class="max-w-240 text-sm text-foreground-secondary">
+          Такт 39, карточка 4 такта 37 (ворота 2026-09-30). Мастера нет: структура — блоки окон <code>.sum</code> и полоса
+          приёмки <code>.review</code> прототипа v17, вид — роли такта 30: фон <code>*-surface</code>, текст <code>*-strong</code>;
+          нейтральный — <code>--muted</code>. Заголовок 15/20 bold, текст 15/20, паддинг 12/16, радиус 8, рамки нет.
+          Разбор — <code>docs/free-shoot.md</code>, раздел 18.
+        </p>
+      </div>
+
+      <div data-subsection="callout-tones" class="grid max-w-6xl grid-cols-[10rem_repeat(3,minmax(0,1fr))] items-start gap-4">
+        <span class="text-2xs text-muted-foreground">тон</span>
+        <span class="text-2xs text-muted-foreground">заголовок и текст</span>
+        <span class="text-2xs text-muted-foreground">только текст</span>
+        <span class="text-2xs text-muted-foreground">только заголовок</span>
+        <template v-for="c in CALLOUT_TONES" :key="c.tone">
+          <code class="text-2xs">{{ c.tone }}</code>
+          <Callout :tone="c.tone" :title="c.title">{{ c.text }}</Callout>
+          <Callout :tone="c.tone">{{ c.text }}</Callout>
+          <Callout :tone="c.tone" :title="c.title" />
+        </template>
+      </div>
+
+      <div data-subsection="callout-compose" class="grid max-w-6xl grid-cols-[minmax(0,1fr)_minmax(0,2fr)] items-start gap-4">
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">список — сводка завершения, §17.5</p>
+          <Callout tone="destructive" title="Не закрыты обязательные шаги: 3">
+            <ul>
+              <li v-for="s in CALLOUT_LIST" :key="s">{{ s }}</li>
+            </ul>
+          </Callout>
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">действия справа — полоса приёмки, §13.2 (№ 8)</p>
+          <Callout tone="warning" title="Проверка: осталось 42 объекта">
+            Проверено 0 из 42. Принятый объект сворачивается и уходит из списка; его кадры принимаются вместе с ним
+            <template #actions>
+              <Checkbox :model-value="true">только непроверенные</Checkbox>
+              <Button variant="secondary" size="sm">Отменить автораспределение</Button>
+              <Button size="sm">Принять все объекты</Button>
+            </template>
+          </Callout>
+        </div>
+      </div>
+
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ CALLOUT_EXAMPLE }}</pre>
+    </section>
+
+    <!-- ============================ RadioGroupItem card, такт 39 ============================ -->
+    <section id="radio-card" data-section="radio-card" class="space-y-6">
+      <div class="space-y-1">
+        <h2 class="text-lg font-bold">
+          RadioGroupItem variant="card" — карточка выбора
+        </h2>
+        <p class="max-w-240 text-sm text-foreground-secondary">
+          Такт 39, ось подачи радиокнопки (решение агента, нехватка в ките): карточка режима окна запуска, прототип
+          <code>.wmode</code>, §12.1–12.2. Контрол и заголовок — строки мастера <code>590:5372</code>; слоты
+          <code>description</code> (13/16 <code>--foreground-secondary</code>) и <code>meta</code> (13/16 medium
+          <code>--primary</code>). Отмеченная — рамка и кольцо <code>--primary</code>, фон <code>--surface-selected</code>;
+          наведение неотмеченной — <code>--accent</code>; выключенная — 0.48.
+        </p>
+      </div>
+
+      <div data-subsection="radio-card-states" class="grid max-w-6xl grid-cols-[repeat(3,minmax(0,1fr))] items-start gap-4">
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">не отмечена</p>
+          <RadioGroup model-value="">
+            <RadioGroupItem variant="card" value="struct">
+              {{ WAND.modes[1]!.title }}
+              <template #description>{{ WAND.modes[1]!.description }}</template>
+              <template #meta>{{ WAND.modes[1]!.forecast }}</template>
+            </RadioGroupItem>
+          </RadioGroup>
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">отмечена</p>
+          <RadioGroup model-value="full">
+            <RadioGroupItem variant="card" value="full" checked>
+              {{ WAND.modes[0]!.title }}
+              <template #description>{{ WAND.modes[0]!.description }}</template>
+              <template #meta>{{ WAND.modes[0]!.forecast }}</template>
+            </RadioGroupItem>
+          </RadioGroup>
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">выключена с причиной — «Пустой осмотр» (§19)</p>
+          <RadioGroup model-value="">
+            <RadioGroupItem variant="card" value="photos" :disabled="WAND_EMPTY.modes[2]!.disabled">
+              {{ WAND_EMPTY.modes[2]!.title }}
+              <template #description>{{ WAND_EMPTY.modes[2]!.description }}</template>
+              <template #meta>{{ WAND_EMPTY.modes[2]!.forecast }}</template>
+            </RadioGroupItem>
+          </RadioGroup>
+        </div>
+      </div>
+
+      <div data-subsection="radio-card-live" class="grid max-w-6xl grid-cols-[repeat(2,minmax(0,1fr))] items-start gap-6">
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">живая группа — наведение и выбор мышью и стрелками</p>
+          <RadioGroup v-model="radioLive" class="gap-2">
+            <RadioGroupItem v-for="w in WAND.modes" :key="w.value" variant="card" :value="w.value" :disabled="w.disabled" :checked="radioLive === w.value">
+              {{ w.title }}
+              <template #description>{{ w.description }}</template>
+              <template #meta>{{ w.forecast }}</template>
+            </RadioGroupItem>
+          </RadioGroup>
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">строка мастера — без изменений, для сравнения</p>
+          <RadioGroup model-value="a">
+            <RadioGroupItem value="a" checked subtitle="подпись">Отмечена</RadioGroupItem>
+            <RadioGroupItem value="b">Не отмечена</RadioGroupItem>
+          </RadioGroup>
+        </div>
+      </div>
+
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ RADIO_CARD_EXAMPLE }}</pre>
+    </section>
+
+    <!-- ============================ окна автораспределения, такт 39 ============================ -->
+    <section id="wand-windows" data-section="wand-windows" class="space-y-6">
+      <div class="space-y-1">
+        <h2 class="text-lg font-bold">
+          Окна автораспределения — запуск (№ 48–49) и сводка результата (№ 54)
+        </h2>
+        <p class="max-w-240 text-sm text-foreground-secondary">
+          Такт 39: <code>ModalCard</code> center 600 из частей кита — <code>ModalCardText</code>, <code>RadioGroupItem card</code>,
+          <code>Callout</code>, <code>Button</code>. Тексты и прогнозы — модель экрана (<code>autoPlan</code>,
+          <code>planPhotosOnly</code>, <code>wandSummary</code> прототипа) на наборе «Частично проверен». Рамки — окно внутри
+          родителя (<code>inline</code>).
+        </p>
+      </div>
+
+      <div class="grid grid-cols-[repeat(2,minmax(0,1fr))] items-start gap-6">
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">запуск, §12.1–12.4</p>
+          <div class="relative h-220 overflow-hidden rounded-md border border-border-soft bg-background">
+            <ModalCard :open="true" :modal="false">
+              <ModalCardContent inline>
+                <ModalCardHeader title="Автораспределение" subtitle="Система предложит, вы проверите" />
+                <ModalCardBody class="flex flex-col gap-3">
+                  <ModalCardText>{{ WAND.source.before }}<b>{{ WAND.source.strong }}</b>{{ WAND.source.after }}</ModalCardText>
+                  <RadioGroup v-model="wandPick" class="gap-2">
+                    <RadioGroupItem v-for="w in WAND.modes" :key="w.value" variant="card" :value="w.value" :disabled="w.disabled" :checked="wandPick === w.value">
+                      {{ w.title }}
+                      <template #description>{{ w.description }}</template>
+                      <template #meta>{{ w.forecast }}</template>
+                    </RadioGroupItem>
+                  </RadioGroup>
+                  <Callout v-for="b in WAND.blocks" :key="b.title" :tone="b.tone" :title="b.title">{{ b.text }}</Callout>
+                </ModalCardBody>
+                <ModalCardFooter>
+                  <Button variant="secondary">Отмена</Button>
+                  <Button>Запустить</Button>
+                </ModalCardFooter>
+              </ModalCardContent>
+            </ModalCard>
+          </div>
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">сводка результата, §12.12 — режим «{{ MODE_T[SUMMARY.mode] }}»</p>
+          <div class="relative h-220 overflow-hidden rounded-md border border-border-soft bg-background">
+            <ModalCard :open="true" :modal="false">
+              <ModalCardContent inline>
+                <ModalCardHeader title="Автораспределение завершено" :subtitle="`Режим: ${MODE_T[SUMMARY.mode]}`" />
+                <ModalCardBody class="flex flex-col gap-3">
+                  <Callout v-for="b in SUMMARY.blocks" :key="b.title" :tone="b.tone" :title="b.title">{{ b.text }}</Callout>
+                  <ModalCardText>{{ SUMMARY.note }}</ModalCardText>
+                </ModalCardBody>
+                <ModalCardFooter>
+                  <Button v-for="b in SUMMARY.buttons" :key="b.t" :variant="b.primary ? 'default' : 'secondary'">{{ b.t }}</Button>
+                </ModalCardFooter>
+              </ModalCardContent>
+            </ModalCard>
+          </div>
+        </div>
+      </div>
     </section>
   </main>
 </template>

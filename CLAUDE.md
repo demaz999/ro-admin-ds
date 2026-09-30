@@ -360,7 +360,7 @@ Headless-браузер снимает страницу **от начала до
 умеет. Поэтому состояния для снимков задаются параметрами адреса, и они помечены в коде как
 оснастка приёмки: `?open=`, `?only=`, `?view=`, `?filters=`,
 `?selected=`, `?rows=`, `?scroll=`, `?q=`, `?actions=demo`, `?values=demo`, `?state=` (экран
-`/free-shoot`: `link`, `flash`, `tooltip`, `drop`), `?open=` (с такта 34 и `viewer-flash`, с такта 35 — `hotkeys`, с такта 36 — `form`, `form-group`, `form-errors`), `?asis=off` и `?view=review`, `?tab=form`, `?asis=mark` там же — список в `docs/naming.md`. В продукт они не идут.
+`/free-shoot`: `link`, `flash`, `tooltip`, `drop`), `?open=` (с такта 34 и `viewer-flash`, с такта 35 — `hotkeys`, с такта 36 — `form`, `form-group`, `form-errors`), `?asis=off` и `?view=review`, `?tab=form`, `?asis=mark` там же, с такта 39 — `?expand=eq`, `?data=empty` — список в `docs/naming.md`. В продукт они не идут.
 
 Наведение адресом не задать — у компонента для этого проп-оснастка `demoHover` (`FrameTile`,
 `StepRow`, `StepThumb`, такт 30; `AssignOption`, такт 33) и `tooltipOpen` у `FrameTile`: они повторяют вид наведения и
@@ -589,6 +589,15 @@ resolve component» и «Hydration completed but contains mismatches» — вы�
 оснастки `/free-shoot` расходились между двумя прогонами «до» на одном коде — плитки ленты догружались к моменту кадра
 по-разному (такт 38). Перед `Page.captureScreenshot`: `await document.fonts.ready`, для каждой картинки — дождаться
 `load` и `img.decode()`. Остаток нестабильности после этого — только анимации по кругу (`?state=flash`).
+
+**Фоновая вкладка headless Chrome живёт по другим часам.** Прогон сценариев держит прототип и стенд в двух вкладках
+одного Chrome. Фоновой вкладке Chrome тормозит таймеры: «Запустить» у прототипа стартует обработку через `setTimeout` 60 мс,
+и ожидание конца обработки проскакивало раньше её начала. Фоновая вкладка не рисует кадры: плавная прокрутка панели
+(`revealObj`) стоит и догоняет ровно между нажатием и отпусканием мыши — клик уходит в соседний элемент, хотя
+`elementFromPoint` перед кликом показывает верную цель (такт 39). Поэтому Chrome прогона поднимается с
+`--disable-background-timer-throttling --disable-renderer-backgrounding`, вкладка действия выходит вперёд
+(`Page.bringToFront`), цель центрируется `behavior: 'instant'` после остановки чужой прокрутки, ожидание идёт по
+результату — появлению окна сводки.
 
 **Vue отбрасывает пробел в начале `<template v-if>`.** `<b>1</b><template v-if="x"> <span>…</span></template>` даёт
 «1<span>» без пробела: пробельный текстовый узел в начале шаблона сжимается. Хвост сверки общей формы так прилип к

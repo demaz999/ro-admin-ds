@@ -13,8 +13,10 @@ import { computed, reactive } from 'vue'
  * - Сохранение — поле `state.saving` с таймером 700 мс, как `markSaving` прототипа (§17.2).
  * - Оснастка адреса выставляет состояние модели параметрами `createModel`.
  *
- * В П1 перенесены операции сценариев С-01–03, 16, 32, 38 (16.2); остальные операции прототипа
- * (`assign`, `unassign`, `undoLast`, `autoPlan`, `applyWand`, `acceptObj`…) — по своим порциям (16.5).
+ * В П1 перенесены операции сценариев С-01–03, 16, 32, 38 (16.2); в П2 (такт 39) — автораспределение и
+ * приёмка, сценарии С-15, 27–30: `autoPlan`, `planPhotosOnly`, `magicWand`, `runWand`, `applyWand`,
+ * `wandSummary`, `acceptObj`, `rejectObj`, `acceptAll`, `rejectAll`, `renderReview`. Остальные операции
+ * прототипа (`assign`, `unassign`, `undoLast`…) — по своим порциям (16.5).
  */
 
 export type FrameOrigin = 'free' | 'step'
@@ -34,7 +36,8 @@ export interface Frame {
   origin: FrameOrigin
   lock: boolean
   rej: boolean
-  auto: boolean
+  /** Предложен автоматом и не принят (§13.1). Прототип ключ снимает (`delete f.auto`), модель — тоже. */
+  auto?: boolean
 }
 export interface Repeat {
   id: string
@@ -49,10 +52,40 @@ export interface Step { id: string, n: string, req?: boolean, min: number, max: 
 export interface FormDef { k: string, l: string, req?: boolean, opts?: string[], dep?: { k: string, v: string }, grp?: string }
 export interface Stage { id: string, title: string, rep?: boolean, steps: Step[], form?: FormDef[] }
 export interface Dataset { frames: Frame[], objects: Repeat[], review: Record<string, Verdict> }
+/** Блок съёмки — `window.VA_BLOCKS` прототипа: диапазон кадров одного объекта, распознанное с кадров и заметок. */
+export interface Block { a: number, b: number, kind: 'eq' | 'bld' | 'terr', inv: string, shop: string, title: string, st: string }
 
 /** Окно поверх экрана: у прототипа одно (`#modal`), плюс прогресс автораспределения. */
 export type ScreenWindow = null | 'hotkeys' | 'form' | 'progress' | 'wand' | 'summary' | 'finish'
 export interface Notice { id: number, text: string, kind: 'ok' | 'err', undo: boolean }
+
+/** Режим автораспределения (§12.1): полное, только структура, только кадры. */
+export type WandMode = 'full' | 'struct' | 'photos'
+export const MODE_T: Record<WandMode, string> = { full: 'полное', struct: 'только структура', photos: 'только кадры' }
+/** Идущее автораспределение (§12.5) — прототип `runWand`: доля `k` растёт по таймеру. */
+export interface WandRun { mode: WandMode, total: number, notes: number, objN: number, k: number }
+/** Блок окна: `.sum` прототипа — тон, заголовок, текст. */
+export interface WindowBlock { tone: 'success' | 'warning' | 'destructive', title: string, text: string }
+/** Сводка результата (§12.12) — прототип `wandSummary`, тексты собраны в момент вызова, как у прототипа. */
+export interface WandSummary {
+  mode: WandMode
+  blocks: WindowBlock[]
+  note: string
+  /** Кнопки подвала: «Показать кадры без места» — при кадрах без места, «К проверке» — всегда. */
+  buttons: { t: string, primary: boolean, action: 'left' | 'review' }[]
+}
+
+/**
+ * «Пустой осмотр» — прототип `applyScenario('empty')` (`resetScenario`): все кадры свободной съёмки,
+ * повторов и вердиктов нет. Набор для С-27 (режим «Только кадры» недоступен), `free-shoot.md`, 16.4.
+ */
+export function emptyDataset(data: Dataset): Dataset {
+  return {
+    frames: data.frames.map(({ auto: _auto, ...f }) => ({ ...f, origin: 'free' as const, objId: null, stepId: null, lock: false, rej: false })),
+    objects: [],
+    review: {},
+  }
+}
 
 export interface UiState {
   sel: Set<number>
@@ -66,6 +99,8 @@ export interface UiState {
   lb: number
   review: boolean
   reviewOnly: boolean
+  /** Сколько объектов предложено последним автораспределением — «Проверено N из M» (§13.2). */
+  reviewTotal: number
   onlyOpen: boolean
   formOpen: Set<string>
   /** Размер превью: у прототипа — CSS-переменная `--card` 176 / 272, в модели — состояние. */
@@ -73,6 +108,10 @@ export interface UiState {
   win: ScreenWindow
   /** Окно формы повтора: какой повтор и на какой группе открыто (§14.3). */
   formWin: { obj: string, group: string } | null
+  /** Идущее автораспределение — окно прогресса (§12.5). */
+  run: WandRun | null
+  /** Сводка результата автораспределения — окно `summary` (§12.12). */
+  summary: WandSummary | null
   saving: boolean
 }
 
@@ -88,6 +127,8 @@ export interface ModelOptions {
   data: Dataset
   stages: Stage[]
   general: Record<string, string>
+  /** Блоки съёмки для автораспределения — `window.VA_BLOCKS` прототипа. */
+  blocks?: Block[]
   /** Начальное состояние интерфейса — оснастка адреса и выбор стенда. */
   initial?: Partial<Omit<UiState, 'sel' | 'open' | 'closed' | 'formOpen'>> & { sel?: number[], open?: string[] }
 }
@@ -113,15 +154,23 @@ export function createModel(opts: ModelOptions) {
     lb: init.lb ?? -1,
     review: init.review ?? false,
     reviewOnly: init.reviewOnly ?? true,
+    reviewTotal: init.reviewTotal ?? 0,
     onlyOpen: init.onlyOpen ?? false,
     formOpen: new Set(),
     size: init.size ?? 'md',
     win: init.win ?? null,
     formWin: init.formWin ?? null,
+    run: null,
+    summary: null,
     saving: false,
   }) as UiState
 
   const notices = reactive<Notice[]>([])
+  const BLOCKS = opts.blocks ?? []
+  /** Прототип `frameByI` — кадр по номеру; элементы реактивного массива, запись идёт в модель. */
+  const frameByI: Record<number, Frame> = Object.fromEntries(frames.map(f => [f.i, f]))
+  /** Прототип `objSeq`: номер следующего повтора продолжает уже выданные (`o1`, `o2` набора → `o3`). */
+  let objSeq = objects.reduce((a, o) => Math.max(a, Number(o.id.slice(1)) || 0), 0)
 
   /* ------------------------------ справочные ------------------------------ */
   const isMedia = (f: Frame) => f.type !== 'voice'
@@ -272,6 +321,334 @@ export function createModel(opts: ModelOptions) {
   /** Полноэкранный просмотр (§11): индекс кадра в списке просмотра, -1 — закрыт. */
   function setViewer(index: number) { state.lb = index }
 
+  /* ------------------------------ П2: повторы ------------------------------ */
+  /** Прототип `createObject`: новый повтор становится текущим и раскрывается. */
+  function createObject(stageId: string, form: Record<string, string>) {
+    objects.push({ id: `o${++objSeq}`, stageId, form: { ...form } })
+    const o = objects[objects.length - 1]!
+    state.cur = o.id
+    state.open.add(o.id)
+    return o
+  }
+
+  /* ------------------------------ П2: автораспределение (§12) ------------------------------ */
+  type PlanObj = { stageId: string, form: Record<string, string>, frames: { i: number, stepId: string }[] }
+  type Place = { i: number, owner: string, stepId: string }
+  type Plan = { objs: PlanObj[], loose: Place[], skipped: number[] }
+  type PhotosPlan = { place: Place[], nomatch: number[], skipped: number[] }
+
+  const autoStepEq = (f: Frame) => (f.type === 'video' ? 'e8' : f.k === 'plate' ? 'e1' : f.k === 'inv' ? 'e2' : f.k === 'status' ? 'e6' : 'e3')
+  /** Прототип `autoPlan`: блоки съёмки → предложенные повторы, кадры общих шагов, пропущенные (шаг заморожен). */
+  function autoPlan(): Plan {
+    const objs: PlanObj[] = []
+    const loose: Place[] = []
+    const skipped: number[] = []
+    BLOCKS.forEach((b) => {
+      const ids: number[] = []
+      for (let i = b.a; i <= b.b; i++) {
+        const f = frameByI[i]
+        if (f && isMedia(f) && f.origin === 'free' && !f.objId) ids.push(i)
+      }
+      if (!ids.length) return
+      if (b.kind === 'eq' && !b.inv) return // номер не распознан — оставляем эксперту
+      if (b.kind === 'eq') {
+        objs.push({
+          stageId: 'eq',
+          form: { mark: b.title, inv: b.inv || '', shop: b.shop || '', cond: 'Рабочее', mount: 'Установлено', use: b.st ? 'Консервация' : 'Эксплуатируется', def: 'Не выявлены', bld: '' },
+          frames: ids.map(i => ({ i, stepId: autoStepEq(frameByI[i]!) })),
+        })
+      }
+      else if (b.kind === 'bld') {
+        objs.push({
+          stageId: 'bld',
+          form: { no: b.shop || b.title, purpose: 'Производственный цех', cond: 'Удовлетворительное', access: 'Да' },
+          frames: ids.map(i => ({ i, stepId: frameByI[i]!.k === 'building' ? 'b1' : 'b2' })),
+        })
+      }
+      else {
+        ids.forEach((i) => {
+          const sid = frameByI[i]!.k === 'plan' ? 'g1' : 'g4'
+          if (isFrozen('gen', sid)) { skipped.push(i); return } // шаг проверен и закрыт
+          loose.push({ i, owner: 'gen', stepId: sid })
+        })
+      }
+    })
+    return { objs, loose, skipped }
+  }
+  /**
+   * Прототип `planPhotosOnly` — режим «только кадры»: в уже существующие объекты, новых не создаёт.
+   * Совпадение — по инвентарному номеру или названию; без совпадения кадр остаётся в ленте.
+   */
+  function planPhotosOnly(): PhotosPlan {
+    const { objs, loose, skipped } = autoPlan()
+    const place: Place[] = []
+    const nomatch: number[] = []
+    const cap: Record<string, number> = {}
+    const room = (owner: string, st: Step) => {
+      const k = `${owner}|${st.id}`
+      if (!(k in cap)) cap[k] = st.max ? st.max - cnt(owner, st.id) : Number.POSITIVE_INFINITY
+      return cap[k]!
+    }
+    objs.forEach((b) => {
+      const same = (x: Repeat) => x.stageId === b.stageId
+      const o = b.stageId === 'eq'
+        ? (b.form.inv && objects.find(x => same(x) && x.form.inv === b.form.inv)) || objects.find(x => same(x) && !x.form.inv && x.form.mark === b.form.mark)
+        : objects.find(x => same(x) && x.form.no === b.form.no)
+      if (!o) { nomatch.push(...b.frames.map(f => f.i)); return }
+      b.frames.forEach((f) => {
+        const st = stageById[o.stageId]!.steps.find(x => x.id === f.stepId)!
+        if (isFrozen(o.id, f.stepId) || room(o.id, st) <= 0) { skipped.push(f.i); return }
+        cap[`${o.id}|${st.id}`]!--
+        place.push({ i: f.i, owner: o.id, stepId: f.stepId })
+      })
+    })
+    return { place: [...loose, ...place], nomatch, skipped }
+  }
+
+  /** Окно запуска (§12.1–12.4) — тексты и прогнозы прототипа `magicWand`, считаются от текущих данных. */
+  const wandWindow = computed(() => {
+    const plan = autoPlan()
+    const nFull = plan.loose.length + plan.objs.reduce((a, o) => a + o.frames.length, 0)
+    const ne = plan.objs.filter(o => o.stageId === 'eq').length
+    const nb = plan.objs.filter(o => o.stageId === 'bld').length
+    const po = planPhotosOnly()
+    const notes = frames.filter(f => !isMedia(f)).length
+    const eqT = plural(ne, 'единица', 'единицы', 'единиц')
+    const bT = plural(nb, 'здание', 'здания', 'зданий')
+    const blocks: WindowBlock[] = []
+    if (plan.skipped.length) blocks.push({ tone: 'warning', title: `${plural(plan.skipped.length, 'кадр', 'кадра', 'кадров')} пропущено`, text: 'Их шаги проверены и закрыты — туда автомат не пишет.' })
+    blocks.push({ tone: 'warning', title: 'Результат — черновик', text: 'Ничего не применится, пока вы не проверите объекты. Пока идёт обработка, структуру редактировать нельзя — операцию можно прервать.' })
+    return {
+      empty: !nFull && !plan.objs.length,
+      source: {
+        before: 'Будет прочитано: ',
+        strong: plural(notes, 'заметка', 'заметки', 'заметок'),
+        after: ' — голосовые и текстовые; надписи на кадрах — шильдики, инвентарные номера, таблички; хронология съёмки.',
+      },
+      modes: [
+        {
+          value: 'full' as WandMode,
+          title: 'Полное автораспределение',
+          description: 'Создаст повторы, заполнит часть их форм и разложит кадры. Максимум изменений — и больше всего проверки потом.',
+          forecast: `${plural(nFull, 'кадр', 'кадра', 'кадров')} · ${eqT} оборудования · ${bT}`,
+          disabled: false,
+        },
+        {
+          value: 'struct' as WandMode,
+          title: 'Только структура',
+          description: 'Создаст повторы и заполнит формы по заметкам и надписям. Кадры не трогает: сначала проверяете список объектов, потом отдельно раскладываете.',
+          forecast: `${eqT} оборудования · ${bT} · кадры остаются в ленте`,
+          disabled: false,
+        },
+        {
+          value: 'photos' as WandMode,
+          title: 'Только кадры',
+          description: 'Разложит по уже существующим шагам и повторам. Новых объектов не создаёт, состав осмотра не меняет.',
+          forecast: objects.length
+            ? `${plural(po.place.length, 'кадр', 'кадра', 'кадров')} в ${plural(objects.length, 'объект', 'объекта', 'объектов')}${po.nomatch.length ? ` · ${po.nomatch.length} без подходящего объекта` : ''}`
+            : 'в осмотре пока нет повторов',
+          disabled: !objects.length,
+        },
+      ],
+      blocks,
+    }
+  })
+
+  /** «Распределить автоматически» (№ 16) — прототип `magicWand`: окно запуска или отказ «Нечего распределять». */
+  function magicWand() {
+    if (wandWindow.value.empty) { notify('Нечего распределять автоматически'); return }
+    state.win = 'wand'
+  }
+  let wandTimer: ReturnType<typeof setInterval> | null = null
+  /** «Запустить» окна запуска: окно закрывается, обработка стартует через 60 мс — как у прототипа. */
+  function launchWand(mode: WandMode) {
+    closeWindow()
+    setTimeout(() => runWand(mode), 60)
+  }
+  /**
+   * Прототип `runWand` (§12.5): план считается при запуске, доля растёт по таймеру 40 мс за
+   * `min(4600, 1500 + total × 16)` мс, в конце — `applyWand` с тем же планом. `hold` — оснастка
+   * приёмки: окно прогресса на заданной доле, без таймера.
+   */
+  function runWand(mode: WandMode, hold?: number) {
+    const plan = autoPlan()
+    const po = mode === 'photos' ? planPhotosOnly() : null
+    const notes = frames.filter(f => !isMedia(f)).length
+    const frameIds = mode === 'full'
+      ? [...plan.loose.map(x => x.i), ...plan.objs.flatMap(o => o.frames.map(f => f.i))]
+      : mode === 'photos' ? po!.place.map(x => x.i) : []
+    const objN = mode === 'photos' ? objects.length : plan.objs.length
+    const total = mode === 'struct' ? objN : frameIds.length
+    state.run = { mode, total, notes, objN, k: hold ?? 0 }
+    state.win = 'progress'
+    if (hold !== undefined) return
+    const dur = Math.min(4600, 1500 + total * 16)
+    const t0 = Date.now()
+    if (wandTimer) clearInterval(wandTimer)
+    wandTimer = setInterval(() => {
+      const k = Math.min(1, (Date.now() - t0) / dur)
+      if (state.run) state.run.k = k
+      if (k >= 1) {
+        clearInterval(wandTimer!)
+        wandTimer = null
+        state.run = null
+        state.win = null
+        applyWand(mode, plan, po)
+      }
+    }, 40)
+  }
+  /** «Прервать» (§12.6): таймер снят, окно закрыто, ничего не применено. */
+  function abortWand() {
+    if (wandTimer) clearInterval(wandTimer)
+    wandTimer = null
+    state.run = null
+    state.win = null
+    notify('Автораспределение прервано — ничего не применено')
+  }
+  /** Окно прогресса — строки прототипа `runWand`. */
+  const progressWindow = computed(() => {
+    const r = state.run
+    if (!r) return null
+    const rows = [
+      { label: r.mode === 'struct' ? 'Объектов создано' : 'Кадров обработано', value: `${Math.round(r.total * r.k)} / ${r.total}` },
+      { label: 'Заметок прочитано', value: `${Math.round(r.notes * Math.min(1, r.k * 1.7))} / ${r.notes}` },
+    ]
+    if (r.mode !== 'struct') rows.push({ label: r.mode === 'photos' ? 'Объектов сопоставлено' : 'Объектов создано', value: `${Math.round(r.objN * Math.min(1, r.k * 1.25))} / ${r.objN}` })
+    return { title: 'Автораспределение', sub: `режим: ${MODE_T[r.mode]}`, value: r.k * 100, rows }
+  })
+  /** Прототип `applyWand`: предложенные повторы и кадры с меткой `auto`, режим приёмки, сводка. */
+  function applyWand(mode: WandMode, plan: Plan, po: PhotosPlan | null) {
+    let nObj = 0
+    let nFr = 0
+    let nomatch = 0
+    if (mode !== 'photos') {
+      plan.objs.forEach((o) => {
+        const ob = createObject(o.stageId, o.form)
+        ob.auto = true
+        const REC = new Set(['mark', 'inv', 'shop', 'no']) // распознано на кадрах или в заметках
+        ob.autoSrc = {}
+        Object.keys(o.form).forEach((k) => { if (o.form[k]) ob.autoSrc![k] = REC.has(k) ? 'rec' : 'def' })
+        nObj++
+        if (mode === 'full') o.frames.forEach((x) => { const f = frameByI[x.i]!; f.objId = ob.id; f.stepId = x.stepId; f.auto = true; nFr++ })
+      })
+      if (mode === 'full') plan.loose.forEach((x) => { const f = frameByI[x.i]!; f.objId = x.owner; f.stepId = x.stepId; f.auto = true; nFr++ })
+    }
+    else {
+      po!.place.forEach((x) => { const f = frameByI[x.i]!; f.objId = x.owner; f.stepId = x.stepId; f.auto = true; nFr++ })
+      nomatch = po!.nomatch.length
+    }
+    objects.forEach((o) => { if (o.auto) state.open.delete(o.id) })
+    state.cur = null
+    state.review = true
+    state.reviewOnly = true
+    state.reviewTotal = objects.filter(o => o.auto).length
+    markSaving()
+    wandSummary(mode, nObj, nFr, nomatch, po ? po.skipped.length : plan.skipped.length)
+  }
+  /** Применить автораспределение сразу, без окон и таймера — оснастка приёмки (`?view=review`, `?open=summary`). */
+  function applyWandNow(mode: WandMode) {
+    applyWand(mode, autoPlan(), mode === 'photos' ? planPhotosOnly() : null)
+  }
+  /** Прототип `wandSummary` (§12.12): тексты собираются в момент вызова. */
+  function wandSummary(mode: WandMode, nObj: number, nFr: number, nomatch: number, skipped: number) {
+    const objs = mode === 'photos' ? objects.length : nObj
+    const head = mode === 'struct'
+      ? `Предложено ${plural(nObj, 'объект', 'объекта', 'объектов')}, кадры не тронуты`
+      : `Предложено: ${plural(nFr, 'кадр', 'кадра', 'кадров')} в ${plural(objs, 'объект', 'объекта', 'объектов')}`
+    const next = mode === 'struct'
+      ? 'Проверьте список объектов: названия, формы, лишние. Примите каждый или отклоните. Потом запустите автораспределение в режиме «Только кадры».'
+      : mode === 'photos'
+        ? 'Проверьте кадры в объектах справа. Каждую фотографию подтверждать не нужно — если объект выглядит правильно, примите его целиком.'
+        : 'Проверьте созданные объекты справа: примите или отклоните, поправьте названия и формы. Спорные кадры перетащите. Каждую фотографию отдельно подтверждать не нужно — принятие объекта принимает и его кадры.'
+    const left = frames.filter(f => isMedia(f) && f.origin === 'free' && !f.objId).length
+    const blocks: WindowBlock[] = [{ tone: 'success', title: head, text: next }]
+    if (nomatch) blocks.push({ tone: 'warning', title: `${plural(nomatch, 'кадр', 'кадра', 'кадров')} без подходящего объекта`, text: 'Похожи на оборудование, которого нет в осмотре. Остались в ленте — создайте объект из них вручную или запустите «Только структура».' })
+    if (skipped) blocks.push({ tone: 'warning', title: `${plural(skipped, 'кадр', 'кадра', 'кадров')} пропущено`, text: 'Шаги проверены и закрыты или уже заполнены до лимита.' })
+    if (mode !== 'struct' && left - nomatch > 0) blocks.push({ tone: 'warning', title: `${plural(left, 'кадр', 'кадра', 'кадров')} осталось в ленте`, text: 'Идентификатор не распознан — автомат не угадывает. Разберите их вручную или оставьте в свободной съёмке.' })
+    const buttons: WandSummary['buttons'] = [{ t: 'К проверке', primary: true, action: 'review' }]
+    if (left) buttons.unshift({ t: 'Показать кадры без места', primary: false, action: 'left' })
+    state.summary = { mode, blocks, note: 'Черновик сохраняется автоматически. Пока вы не завершите распределение, всё можно изменить.', buttons }
+    state.win = 'summary'
+  }
+  /**
+   * Кнопки сводки: «К проверке» — первый предложенный становится текущим и раскрывается; «Показать кадры
+   * без места» — «Разобранные: убирать». Окно закрывается. Возвращает повтор, к которому странице прокрутить панель.
+   */
+  function summaryAction(action: 'left' | 'review') {
+    let reveal: string | null = null
+    if (action === 'review') {
+      const n = objects.find(o => o.auto)
+      if (n) { state.cur = n.id; state.open.add(n.id); reveal = n.id }
+    }
+    else setMode('hide')
+    closeWindow()
+    return reveal
+  }
+
+  /* ------------------------------ П2: приёмка (§13) ------------------------------ */
+  /** Полоса приёмки (№ 8) — прототип `renderReview`; `null` — полосы нет. */
+  const reviewBar = computed(() => {
+    const n = frames.filter(f => f.auto).length
+    const mm = objects.filter(o => o.auto).length
+    if (!state.review || !(n > 0 || mm > 0)) return null
+    const done = state.reviewTotal - mm
+    return {
+      title: mm ? `Проверка: осталось ${plural(mm, 'объект', 'объекта', 'объектов')}` : `Проверка: ${plural(n, 'кадр', 'кадра', 'кадров')} в общих шагах`,
+      text: `${state.reviewTotal ? `Проверено ${done} из ${state.reviewTotal}. ` : ''}Принятый объект сворачивается и уходит из списка; его кадры принимаются вместе с ним`,
+      /** «только непроверенные» — есть, пока остались предложенные объекты. */
+      only: mm ? state.reviewOnly : null,
+    }
+  })
+  /** «только непроверенные» (№ 9). */
+  function setReviewOnly(v: boolean) { state.reviewOnly = v }
+  /** «Принять все объекты» — прототип `acceptAll`. */
+  function acceptAll() {
+    objects.forEach((o) => { delete o.auto; delete o.autoSrc })
+    frames.forEach((f) => { delete f.auto })
+    state.review = false
+    markSaving()
+    notify('Все объекты приняты')
+  }
+  /** «Отменить автораспределение» — прототип `rejectAll`: снимает непринятое, принятые остаются. */
+  function rejectAll() {
+    frames.forEach((f) => { if (f.auto) { f.objId = null; f.stepId = null; delete f.auto } })
+    for (let i = objects.length - 1; i >= 0; i--) if (objects[i]!.auto) objects.splice(i, 1)
+    state.review = false
+    state.cur = null
+    markSaving()
+    notify('Непринятое отменено — принятые объекты остались')
+  }
+  /**
+   * «Принять объект» — прототип `acceptObj`: объект сворачивается, открывается следующий непроверенный;
+   * последний принятый заканчивает режим приёмки. Возвращает следующий — странице прокрутить к нему.
+   */
+  function acceptObj(id: string) {
+    const o = O(id)
+    if (!o) return null
+    delete o.auto
+    delete o.autoSrc
+    frames.forEach((f) => { if (f.objId === id) delete f.auto })
+    state.open.delete(id)
+    const next = objects.find(x => x.auto)
+    if (next) { state.cur = next.id; state.open.add(next.id) }
+    else state.cur = null
+    if (!objects.some(x => x.auto) && !frames.some(f => f.auto)) { state.review = false; notify('Все объекты проверены') }
+    markSaving()
+    return next?.id ?? null
+  }
+  /** «Отклонить» — прототип `rejectObj`: кадры объекта возвращаются в ленту, объект удаляется. */
+  function rejectObj(id: string) {
+    frames.forEach((f) => { if (f.objId === id) { f.objId = null; f.stepId = null; delete f.auto } })
+    const i = objects.findIndex(o => o.id === id)
+    if (i >= 0) objects.splice(i, 1)
+    const next = objects.find(x => x.auto)
+    if (next) { state.cur = next.id; state.open.add(next.id) }
+    else if (state.cur === id) state.cur = null
+    if (!objects.some(x => x.auto) && !frames.some(f => f.auto)) state.review = false
+    markSaving()
+    return next?.id ?? null
+  }
+
   return {
     STAGES,
     stageById,
@@ -318,6 +695,24 @@ export function createModel(opts: ModelOptions) {
     closeWindow,
     openForm,
     setViewer,
+    /* П2 */
+    createObject,
+    autoPlan,
+    planPhotosOnly,
+    wandWindow,
+    progressWindow,
+    reviewBar,
+    magicWand,
+    launchWand,
+    runWand,
+    abortWand,
+    applyWandNow,
+    summaryAction,
+    setReviewOnly,
+    acceptAll,
+    rejectAll,
+    acceptObj,
+    rejectObj,
   }
 }
 

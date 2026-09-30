@@ -137,3 +137,11 @@ Skeleton, Accordion, детерминированный Progress bar, Date picke
 
 Всё перечисленное **не блокирует работу**: берётся дефолтом shadcn-vue сразу и учитывается в
 [design-debt.md](design-debt.md). Кит закрывает любой экран админки.
+
+Такт 39 (экран VA-9265, порция П2) — ещё две позиции, которых в ките нет, собраны по прототипу v17 на ролях кита,
+запросы дизайнерам — в [figma-fixes.md](figma-fixes.md):
+
+| Чего нет | Ближайшее в ките | В коде |
+|---|---|---|
+| плашка-сообщение в потоке страницы или окна, в тоне | `alert_error`, `alert_success`, `notification` — всплывающие уведомления | `Callout` (`ui/callout/`), тона `success`, `warning`, `destructive`, `neutral` |
+| карточка выбора с описанием | `radiobtn`, `radiobtn_title` — строка с подписью | `RadioGroupItem variant="card"`, слоты `description` и `meta` |

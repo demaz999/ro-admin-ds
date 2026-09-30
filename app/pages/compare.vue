@@ -1343,7 +1343,7 @@ const textareaVariants = [
     -->
     <section data-theme="rososmotr" class="space-y-3 bg-background font-sans text-foreground">
       <h2 class="text-lg font-bold">
-        FrameTile · StepRow · StepThumb · Progress · ProgressStat · StageSection · RepeatCard · AssignOption · FrameBindBar · ModalCard · FieldSet — без эталона, такты 30–36
+        FrameTile · StepRow · StepThumb · Progress · ProgressStat · StageSection · RepeatCard · AssignOption · FrameBindBar · ModalCard · FieldSet · Callout · RadioGroupItem card — без эталона, такты 30–36 и 39
       </h2>
       <p class="max-w-3xl text-sm text-muted-foreground">
         Мастера нет — сверка идёт с прототипом VA-9265 v17, пары «прототип / кит» лежат в
@@ -1493,6 +1493,65 @@ const textareaVariants = [
             </ModalCardContent>
           </ModalCard>
         </div>
+      </div>
+      <!--
+        Такт 39: плашка-сообщение Callout в четырёх тонах (с действиями — полоса приёмки) и карточка режима
+        RadioGroupItem variant="card" — отмеченная, неотмеченная, выключенная с причиной.
+      -->
+      <div class="grid max-w-5xl grid-cols-2 items-start gap-4">
+        <div class="flex flex-col gap-2">
+          <Callout tone="success" title="Предложено: 132 кадра в 42 объекта">
+            Проверьте созданные объекты справа: примите или отклоните.
+          </Callout>
+          <Callout tone="warning" title="24 кадра пропущено">
+            Шаги проверены и закрыты или уже заполнены до лимита.
+          </Callout>
+          <Callout tone="destructive" title="Не закрыты обязательные шаги: 2">
+            <ul>
+              <li>Здание цеха · Общий вид</li>
+              <li>Линия термообработки · Шильдик</li>
+            </ul>
+          </Callout>
+          <Callout tone="neutral">
+            Голосовые комментарии не распределяются и остаются в свободной съёмке как есть.
+          </Callout>
+          <Callout tone="warning" title="Проверка: осталось 42 объекта">
+            Проверено 0 из 42.
+            <template #actions>
+              <Checkbox :model-value="true">только непроверенные</Checkbox>
+              <Button size="sm">Принять все объекты</Button>
+            </template>
+          </Callout>
+        </div>
+        <RadioGroup model-value="full" class="gap-2">
+          <RadioGroupItem variant="card" value="full" checked>
+            Полное автораспределение
+            <template #description>
+              Создаст повторы, заполнит часть их форм и разложит кадры.
+            </template>
+            <template #meta>
+              132 кадра · 39 единиц оборудования · 3 здания
+            </template>
+          </RadioGroupItem>
+          <RadioGroupItem variant="card" value="struct">
+            Только структура
+            <template #description>
+              Создаст повторы и заполнит формы по заметкам и надписям.
+            </template>
+            <template #meta>
+              39 единиц оборудования · 3 здания · кадры остаются в ленте
+            </template>
+          </RadioGroupItem>
+          <RadioGroupItem variant="card" value="photos" disabled>
+            Только кадры
+            <template #description>
+              Разложит по уже существующим шагам и повторам.
+            </template>
+            <template #meta>
+              в осмотре пока нет повторов
+            </template>
+          </RadioGroupItem>
+        </RadioGroup>
       </div>
       <!--
         Такт 36: строка формы — Field left с колонкой подписи 170 и знаком обязательности, группа — FieldSet;

@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import type { AssignBound } from '@/components/ui/assign'
 import { frameTileGridVariants, type FrameTileState } from '@/components/ui/frame-tile'
 import type { StepThumbItem, StepVerdict } from '@/components/ui/step-row'
 import AsisMarks from '~/stands/free-shoot/AsisMarks.vue'
-import { createModel, plural, type FormDef, type ScreenWindow } from '~/stands/free-shoot/model'
+import { createModel, emptyDataset, MODE_T, plural, type FormDef, type ScreenWindow, type WandMode } from '~/stands/free-shoot/model'
 import proto from '~/stands/free-shoot/prototype-data.json'
 
 /**
@@ -27,11 +27,16 @@ import proto from '~/stands/free-shoot/prototype-data.json'
  * же набор после полного автораспределения (режим приёмки); `html` — разметка окон,
  * отрисованная прототипом. Изображения — демо-кадры `public/free-shoot/`.
  *
- * ## Бизнес-логики нет
+ * ## Поведение — модель `~/stands/free-shoot/model.ts`
  *
- * Прецедент стендов: перетаскивание, клавиатура, автораспределение, отмена, автосохранение
- * не реализованы. Работает то, что несёт сам компонент кита (наведение, отметка выделения),
- * и переключатели вида — размер превью, «Разобранные», вкладки панели.
+ * С такта 38 (П1) состояние экрана — модель прототипа: переключатели вида, текущий повтор, окна,
+ * форма осмотра. С такта 39 (П2) — автораспределение и приёмка: окно запуска с прогнозом трёх
+ * режимов, прогресс с прерыванием, сводка результата, полоса приёмки, принятие и отклонение
+ * объектов (§12–§13). Перетаскивание, клавиатура, отмена, автосохранение — по порциям П3–П6
+ * (`docs/free-shoot.md`, 16.5).
+ *
+ * **Старт стенда — старт прототипа** (решение чата 2026-09-30, такт 39): после загрузки все повторы
+ * свёрнуты, текущего нет. Раскрытый повтор — только оснасткой `?expand=eq`.
  *
  * ## Оснастка приёмки — не продукт
  *
@@ -45,15 +50,17 @@ import proto from '~/stands/free-shoot/prototype-data.json'
  * | `?open=assign` | панель выделения и поповер «Назначить на шаг», текущий объект (§10.3); с такта 33 поповер и пункты — кит (`Popover`, `SelectContent`, `SelectGroup`, `AssignOption`) |
  * | `?open=viewer-free` / `viewer-assigned` / `viewer-locked` / `viewer-suggest` | полноэкранный просмотр, четыре состояния нижней плашки (§11.2); с такта 33 список шагов — кит (`StageSection`, `AssignOption`), с такта 34 весь просмотр — кит (`Lightbox` со слотом `aside`, `FrameStage`, `FrameBindBar`, `FrameMeta`) |
  * | `?open=viewer-flash` | просмотр привязанного кадра со вспышкой «Распределено» по кругу — вспышка длится 820 мс, снимок её застаёт (§11.3), такт 34 |
- * | `?open=wand` | окно запуска автораспределения (§12.1–12.4) |
- * | `?open=progress` | окно прогресса автораспределения (§12.5); с такта 35 — на ките (`ModalCard` center 440, закрытие заблокировано) |
+ * | `?open=wand` | окно запуска автораспределения (§12.1–12.4) — с такта 39 на ките и на модели: прогнозы трёх режимов считает `autoPlan` |
+ * | `?open=progress` | окно прогресса автораспределения (§12.5); с такта 35 — на ките (`ModalCard` center 440, закрытие заблокировано), с такта 39 — на модели: полное автораспределение, остановленное на доле снимка прототипа (59 из 132 кадров) |
  * | `?open=hotkeys` | окно «Горячие клавиши» (§16) — на ките (`ModalCard` center 600, `ShortcutList`); такт 35 |
  * | `?open=form` | окно формы повтора оборудования целиком (§14.4) — кит, такт 36 (`ModalCard`, `FieldSet`, `Field` с колонкой подписи) |
  * | `?open=form-group` | то же окно, открытое «Изменить» у группы «Состояние и эксплуатация»: тело прокручено к группе, фокус на её первом поле (§14.3) |
  * | `?open=form-errors` | окно после «Сохранить» с пустым «Наименование, марка, модель»: ошибка у поля и уведомление «Заполните: …» без таймера (§14.6) |
- * | `?open=summary` | сводка результата автораспределения (§12.12) |
+ * | `?open=summary` | сводка результата автораспределения (§12.12) — с такта 39 модель применяет полное автораспределение и открывает сводку, как прототип после прогресса |
  * | `?open=finish` | сводка завершения распределения (§17.4) |
- * | `?view=review` | режим приёмки: полоса приёмки, предложенные объекты и кадры (§13) |
+ * | `?view=review` | режим приёмки: полоса приёмки, предложенные объекты и кадры (§13) — с такта 39 модель применяет полное автораспределение к набору (результат совпадает со снимком прототипа) |
+ * | `?expand=eq` | раскрыт повтор оборудования (в режиме приёмки — первый предложенный); без параметра все свёрнуты, как у прототипа — такт 39. Нужен состояниям `state=link`, `state=flash`, `state=drop` |
+ * | `?data=empty` | набор «Пустой осмотр» — прототип `applyScenario('empty')`: повторов и вердиктов нет, режим «Только кадры» недоступен (С-27), такт 39 |
  * | `?tab=form` | вкладка «Форма осмотра» (§7) |
  * | по умолчанию | тонкий пунктир `--muted-foreground` вокруг каждого перенесённого блока — незакрытое видно глазом (довесок 2 к такту 35) |
  * | `?asis=mark` | пунктир толще и подпись вокруг каждого перенесённого блока |
@@ -73,7 +80,8 @@ const asisOutline = q('asis') !== 'off'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const P = proto as any
-const D = view === 'review' ? P.B : P.A
+/** Набор: «Частично проверен» (`A`) или «Пустой осмотр» (`?data=empty`). Режим приёмки модель строит сама — `P.B` не читается. */
+const D = q('data') === 'empty' ? emptyDataset(P.A) : P.A
 const H = P.html
 
 /** Демо-кадр по индексу кадра прототипа: 24 снимка по кругу. */
@@ -86,8 +94,6 @@ const img = (i: number) => `/free-shoot/demo-${String(((i - 1) % 24) + 1).padSta
  * Оснастка адреса выставляет начальное состояние модели.
  */
 const eqId: string = D.objects.find((o: any) => o.stageId === 'eq')?.id
-/** Раскрытые повторы. У прототипа после загрузки свёрнуты все — здесь раскрыт один, чтобы строки шагов были видны (такт 31). */
-const firstAuto = D.objects.find((o: any) => o.auto && o.stageId === 'eq')?.id
 
 const viewerKey = openWin === 'viewer-flash' ? 'assigned' : openWin.startsWith('viewer-') ? openWin.slice(7) : ''
 const viewer = viewerKey
@@ -95,24 +101,34 @@ const viewer = viewerKey
   : null
 /** Кадры просмотра — прототип `visibleMedia` в режиме «оставлять»: медиа свободной съёмки. */
 const LB_FRAMES = D.frames.filter((f: any) => f.type !== 'voice' && f.origin !== 'step')
-const WINDOWS = ['hotkeys', 'progress', 'wand', 'summary', 'finish'] as const
+const WINDOWS = ['hotkeys', 'wand', 'finish'] as const
 
 const m = createModel({
   data: D,
   stages: P.stages,
   general: P.general,
+  blocks: P.blocks,
   initial: {
     cur: openWin === 'assign' ? P.selectCur : D.cur,
-    open: [view === 'review' ? firstAuto : eqId].filter(Boolean),
     sel: state === 'drop' || openWin === 'assign' || q('selected') === 'demo' ? P.selected : [],
     rtab: q('tab') === 'form' ? 'form' : 'scheme',
-    review: view === 'review',
     win: (WINDOWS as readonly string[]).includes(openWin) ? openWin as ScreenWindow : null,
     lb: viewer ? Math.max(0, LB_FRAMES.findIndex((f: any) => f.i === viewer.i)) : -1,
   },
 })
+/* Оснастка П2 — состояние выставляет модель своими операциями, как прототип после автораспределения. */
+if (view === 'review' || openWin === 'summary') {
+  m.applyWandNow('full')
+  if (openWin !== 'summary') m.closeWindow()
+}
+if (openWin === 'progress') m.runWand('full', parseFloat(H.progress.width) / 100)
+/* Раскрытый повтор — только оснасткой (решение чата 2026-09-30, такт 39): у прототипа после загрузки свёрнуты все. */
+if (q('expand') === 'eq') {
+  const id = m.state.review ? m.objects.find(o => o.auto && o.stageId === 'eq')?.id : eqId
+  if (id) m.state.open.add(id)
+}
 const { STAGES, stageById, O, ownerStage, objName, objSub, isFrozen, framesIn, frameWhy, cnt } = m
-const { feed, stats: S, sessMeta, curHint, eqCount } = m
+const { feed, stats: S, sessMeta, curHint, eqCount, reviewBar, wandWindow, progressWindow } = m
 const verdictOf = m.verdict
 
 /* Обёртки состояния под именами шаблона: чтение — из модели, запись — операцией модели. */
@@ -245,8 +261,24 @@ function repList(st: any) {
   return { list, hidden }
 }
 
-/* ------------------------------ подшапка ------------------------------ */
-const reviewTitle = computed(() => (D.reviewHtml.match(/<span class="t">([\s\S]*?)<\/span>\s*<span class="sp">/)?.[1] ?? ''))
+/* ------------------------------ приёмка, такт 39 (§13) ------------------------------ */
+/** Панель прокручивается к объекту, который модель сделала текущим, — прототип `revealObj`. */
+async function reveal(id: string | null) {
+  if (!id) return
+  await nextTick()
+  document.querySelector(`[data-obj="${id}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+}
+/** Кнопки карточки повтора (№ 37) — обработчик панели прототипа: операция и подтверждение. */
+function acceptRepeat(id: string) {
+  const next = m.acceptObj(id)
+  m.notify('Объект принят')
+  reveal(next)
+}
+function rejectRepeat(id: string) {
+  const next = m.rejectObj(id)
+  m.notify('Объект отклонён, кадры вернулись в ленту')
+  reveal(next)
+}
 
 /* --------------------------- форма осмотра (кит) --------------------------- */
 const generalVisible = (f: any) => !f.dep || m.general[f.dep.k] === f.dep.v
@@ -262,20 +294,28 @@ const windowModel = (win: Exclude<ScreenWindow, null>) => computed({
   get: () => m.state.win === win,
   set: (v: boolean) => (v ? m.openWindow(win) : m.closeWindow()),
 })
-const modalWin = computed(() => ({ wand: H.wand, summary: H.summary, finish: H.finish } as Record<string, any>)[m.state.win ?? ''] ?? null)
-const progressValue = parseFloat(H.progress.width)
+/** Окно «как есть» — только сводка завершения (№ 55, порция П5). */
+const modalWin = computed(() => (m.state.win === 'finish' ? H.finish : null))
+
+/* ------------------------- автораспределение, такт 39 (§12) ------------------------- */
+/** Окно запуска (№ 48–49): выбранный режим — черновик окна, как радио `#mBody` прототипа; при открытии — «полное». */
+const wandOpen = windowModel('wand')
+const wandMode = ref<WandMode>('full')
+watch(() => m.state.win, (w) => { if (w === 'wand') wandMode.value = 'full' })
+/** Сводка результата (№ 54): кнопки — операции модели, прокрутка ленты и панели — страница. */
+const summaryOpen = windowModel('summary')
+function onSummary(action: 'left' | 'review') {
+  const id = m.summaryAction(action)
+  if (action === 'left' && feedEl.value) feedEl.value.scrollTop = 0
+  reveal(id)
+}
 
 /* ------------------------- окна на ките, такт 35 (§12.5, §16) ------------------------- */
-/** Окно прогресса — данные окна, отрисованного прототипом (`runWand`): шапка и строки счётчиков. */
-const PROGRESS = {
-  title: String(H.progress.head).replace(/<small>[\s\S]*$/, '').replace(/<[^>]+>/g, '').trim(),
-  mode: String(H.progress.head).match(/<small>([^<]+)<\/small>/)?.[1] ?? '',
-  rows: (H.progress.rows as string[]).map(r => ({
-    label: r.match(/<span>([^<]+)<\/span>/)?.[1] ?? '',
-    value: r.match(/<b[^>]*>([^<]+)<\/b>/)?.[1] ?? '',
-  })),
-}
-const progressOpen = windowModel('progress')
+/** Окно прогресса — модель (`runWand`): доля и строки счётчиков; «Прервать» — `abortWand`, ничего не применяется. */
+const progressOpen = computed({
+  get: () => m.state.win === 'progress',
+  set: (v: boolean) => { if (!v) m.abortWand() },
+})
 
 /** Окно «Горячие клавиши» — состав прототипа `#btnHelp`, клавиши — в квадратных скобках. */
 const HOTKEYS = [
@@ -332,7 +372,8 @@ function openForm(objId: string, group?: string) {
 
 /** Уведомления экрана — очередь модели, отказы и подтверждения §18. Оснастка `?open=form-errors` держит отказ без таймера. */
 const toasts = m.notices
-const toastDuration = openWin === 'form-errors' ? Number.POSITIVE_INFINITY : 5000
+/** Сроки прототипа `toast`: 3 с, с действием «Отменить» — 6 с (§10.6). */
+const toastDuration = (undo: boolean) => (openWin === 'form-errors' ? Number.POSITIVE_INFINITY : undo ? 6000 : 3000)
 /** §14.6: обязательные проверяются при сохранении — `form.required` «Заполните: <список полей>», окно открыто. */
 function saveForm() {
   const need = (editStage.value?.form ?? []).filter(f => f.req && !filled(f.k))
@@ -489,6 +530,8 @@ function onAssignCloseFocus(e: Event) {
 const feedEl = ref<HTMLElement | null>(null)
 const selbarLeft = ref('50%')
 onMounted(async () => {
+  /* Оснастка прогона сценариев (`scripts/free-shoot-scenarios.mjs`): модель — слепку привязок и состояния. Не продукт. */
+  if (import.meta.dev) (window as any).__freeShoot = m
   /* Вспышка длится 1.5 с — оснастка повторяет её по кругу, чтобы снимок её застал. */
   /* Вспышка плашки длится 820 мс — оснастка ?open=viewer-flash повторяет её по кругу. */
   if (openWin === 'viewer-flash') {
@@ -555,15 +598,19 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
 
         <!-- ============================ подшапка, §7 ============================ -->
         <div class="subhead" data-asis="подшапка">
-          <div v-if="view === 'review'" class="review show" data-asis="полоса приёмки">
-            <span class="t" v-html="reviewTitle" />
-            <span class="sp" />
-            <span class="kit-island">
-              <Checkbox :model-value="true">только непроверенные</Checkbox>
-              <Button variant="secondary" size="sm">Отменить автораспределение</Button>
-              <Button size="sm">Принять все объекты</Button>
-            </span>
-          </div>
+          <!-- полоса приёмки, §13.2 — кит, такт 39: Callout warning, текст — модель (`renderReview`) -->
+          <span v-if="reviewBar" class="kit-island">
+            <Callout tone="warning" :title="reviewBar.title" class="mb-3">
+              {{ reviewBar.text }}
+              <template #actions>
+                <Checkbox v-if="reviewBar.only !== null" :model-value="reviewBar.only" @update:model-value="m.setReviewOnly(!!$event)">
+                  только непроверенные
+                </Checkbox>
+                <Button variant="secondary" size="sm" @click="m.rejectAll()">Отменить автораспределение</Button>
+                <Button size="sm" @click="m.acceptAll()">Принять все объекты</Button>
+              </template>
+            </Callout>
+          </span>
           <div class="sh-row">
             <span class="sess-badge" data-asis="бейдж «Свободная съёмка»">Свободная съёмка</span>
             <span class="sess-meta" data-asis="сводка сессии">{{ sessMeta }}</span>
@@ -604,7 +651,7 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
             <!-- тулбар ленты, §7 -->
             <div class="bar-tools" data-asis="тулбар ленты">
               <span class="kit-island">
-                <Button variant="secondary">Распределить автоматически</Button>
+                <Button variant="secondary" @click="m.magicWand()">Распределить автоматически</Button>
                 <Button variant="secondary">Выделить всё</Button>
                 <div class="w-55 shrink">
                   <Input v-model="search" placeholder="Поиск по расшифровкам и именам файлов…" />
@@ -719,6 +766,8 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
                         :errors="objState(o).bad"
                         :highlighted="state === 'link' && o.id === LINK.owner"
                         @header="clickRepeat(o.id)"
+                        @accept="acceptRepeat(o.id)"
+                        @reject="rejectRepeat(o.id)"
                       >
                         <template #form>
                           <RepeatForm
@@ -732,9 +781,9 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
                         <StepRow v-for="(x, k) in stageById[o.stageId].steps" :key="x.id" v-bind="stepProps(o.id, x, k)" :data-step-key="`${o.id}|${x.id}`" />
                       </RepeatCard>
                       <StageNote v-if="!repList(st).list.length">
-                        {{ view === 'review' && repList(st).hidden ? 'Все повторы этапа проверены' : 'Повторов пока нет — выделите кадры и нажмите «Новый объект из выделенного»' }}
+                        {{ repList(st).hidden ? 'Все повторы этапа проверены' : 'Повторов пока нет — выделите кадры и нажмите «Новый объект из выделенного»' }}
                       </StageNote>
-                      <StageNote v-if="repList(st).hidden && view === 'review' && repList(st).list.length">
+                      <StageNote v-if="repList(st).hidden && repList(st).list.length">
                         Принято и скрыто: {{ plural(repList(st).hidden, 'объект', 'объекта', 'объектов') }}
                       </StageNote>
                     </template>
@@ -856,7 +905,73 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
         </template>
       </Lightbox>
 
-      <!-- ============================ окна: запуск, сводки, §12, §17 ============================ -->
+      <!-- ============================ окно запуска автораспределения, §12.1–12.4 — кит, такт 39 ============================ -->
+      <!-- № 48–49: ModalCard center 600, источники — ModalCardText, режимы — RadioGroupItem card, «пропущено» и «черновик» — Callout warning. -->
+      <ModalCard v-model:open="wandOpen">
+        <ModalCardContent>
+          <ModalCardHeader title="Автораспределение" subtitle="Система предложит, вы проверите" />
+          <ModalCardBody class="flex flex-col gap-3">
+            <ModalCardText>
+              {{ wandWindow.source.before }}<b>{{ wandWindow.source.strong }}</b>{{ wandWindow.source.after }}
+            </ModalCardText>
+            <RadioGroup v-model="wandMode" class="gap-2">
+              <RadioGroupItem
+                v-for="w in wandWindow.modes"
+                :key="w.value"
+                variant="card"
+                :value="w.value"
+                :disabled="w.disabled"
+                :checked="wandMode === w.value"
+              >
+                {{ w.title }}
+                <template #description>
+                  {{ w.description }}
+                </template>
+                <template #meta>
+                  {{ w.forecast }}
+                </template>
+              </RadioGroupItem>
+            </RadioGroup>
+            <Callout v-for="b in wandWindow.blocks" :key="b.title" :tone="b.tone" :title="b.title">
+              {{ b.text }}
+            </Callout>
+          </ModalCardBody>
+          <ModalCardFooter>
+            <Button variant="secondary" @click="wandOpen = false">
+              Отмена
+            </Button>
+            <Button @click="m.launchWand(wandMode)">
+              Запустить
+            </Button>
+          </ModalCardFooter>
+        </ModalCardContent>
+      </ModalCard>
+
+      <!-- ============================ сводка результата, §12.12 — кит, такт 39 ============================ -->
+      <!-- № 54: ModalCard center 600, блоки — Callout, примечание — ModalCardText, кнопки — Button. -->
+      <ModalCard v-model:open="summaryOpen">
+        <ModalCardContent>
+          <ModalCardHeader title="Автораспределение завершено" :subtitle="m.state.summary ? `Режим: ${MODE_T[m.state.summary.mode]}` : ''" />
+          <ModalCardBody class="flex flex-col gap-3">
+            <Callout v-for="b in m.state.summary?.blocks ?? []" :key="b.title" :tone="b.tone" :title="b.title">
+              {{ b.text }}
+            </Callout>
+            <ModalCardText>{{ m.state.summary?.note }}</ModalCardText>
+          </ModalCardBody>
+          <ModalCardFooter>
+            <Button
+              v-for="b in m.state.summary?.buttons ?? []"
+              :key="b.t"
+              :variant="b.primary ? 'default' : 'secondary'"
+              @click="onSummary(b.action)"
+            >
+              {{ b.t }}
+            </Button>
+          </ModalCardFooter>
+        </ModalCardContent>
+      </ModalCard>
+
+      <!-- ============================ сводка завершения, §17.4 — как есть до П5 ============================ -->
       <div v-if="modalWin" class="modal show" data-asis="модальное окно">
         <div class="mbox">
           <h3>{{ modalWin.title }}</h3>
@@ -871,14 +986,14 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
       </div>
 
       <!-- ============================ окно прогресса, §12.5 — кит, такт 35 ============================ -->
-      <!-- Закрыть можно только «Прервать»: ни крестика, ни Esc, ни клика мимо (§12.5). Прерывание — логика страницы. -->
+      <!-- Закрыть можно только «Прервать»: ни крестика, ни Esc, ни клика мимо (§12.5). Прерывание — модель, ничего не применяется (§12.6). -->
       <ModalCard v-model:open="progressOpen">
         <ModalCardContent :closable="false" size="sm">
-          <ModalCardHeader :title="PROGRESS.title" :subtitle="PROGRESS.mode" />
+          <ModalCardHeader :title="progressWindow?.title ?? ''" :subtitle="progressWindow?.sub ?? ''" />
           <ModalCardBody class="flex flex-col gap-3">
-            <Progress :value="progressValue" :max="100" label="Автораспределение" />
+            <Progress :value="progressWindow?.value ?? 0" :max="100" label="Автораспределение" />
             <div>
-              <ProgressCounter v-for="r in PROGRESS.rows" :key="r.label" :label="r.label" :value="r.value" />
+              <ProgressCounter v-for="r in progressWindow?.rows ?? []" :key="r.label" :label="r.label" :value="r.value" />
             </div>
           </ModalCardBody>
           <ModalCardFooter>
@@ -945,7 +1060,7 @@ const SVG_PLAY = '<svg width="12" height="12" viewBox="0 0 16 16" fill="currentC
         v-for="t in toasts"
         :key="t.id"
         :open="true"
-        :duration="toastDuration"
+        :duration="toastDuration(t.undo)"
         :show-action="false"
         @update:open="m.dismissNotice(t.id)"
       >

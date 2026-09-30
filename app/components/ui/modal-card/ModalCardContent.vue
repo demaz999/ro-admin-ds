@@ -44,6 +44,19 @@ function guard(event: Event) {
   if (!props.closable) event.preventDefault()
 }
 
+/**
+ * Фокус при открытии — на карточку окна (решение чата 2026-09-30, такт 39; реестр расхождений
+ * `free-shoot.md`, раздел 15): прототип фокус в окне не ставит, ловушка фокуса Reka требует, чтобы
+ * он был внутри, — ближе всего карточка. Где прототип фокус ставит сам (форма повтора на группе,
+ * §14.3), его переносит содержимое окна — `FieldSet autofocus` уводит фокус с карточки после
+ * монтирования. Потребитель, отменивший событие сам, решает за окно.
+ */
+function focusCard(event: Event) {
+  if (event.defaultPrevented) return
+  event.preventDefault()
+  ;(event.currentTarget as HTMLElement | null)?.focus({ preventScroll: true })
+}
+
 const position = computed(() => (props.inline ? 'absolute' : 'fixed'))
 </script>
 
@@ -68,9 +81,11 @@ const position = computed(() => (props.inline ? 'absolute' : 'fixed'))
           : cn('top-1/2 left-1/2 max-h-[88vh] -translate-x-1/2 -translate-y-1/2', props.size === 'sm' ? 'w-modal-narrow' : 'w-modal'),
         props.class,
       )"
+      tabindex="-1"
       @escape-key-down="guard"
       @pointer-down-outside="guard"
       @interact-outside="guard"
+      @open-auto-focus="focusCard"
     >
       <slot />
     </DialogContent>
