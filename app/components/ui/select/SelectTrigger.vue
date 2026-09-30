@@ -37,6 +37,15 @@ const props = withDefaults(defineProps<{
 
 /** Состояние `filled` мастера — наличие выбранного значения. */
 const isFilled = computed(() => props.label.length > 0)
+
+/**
+ * Заполненное поле поднимает плейсхолдер подписью — так в мастере. При пустом плейсхолдере
+ * подписи нет, и строка под неё не резервируется: значение по центру поля. Так выбор стоит под
+ * внешней подписью `Field`. Провенанс: прототип VA-9265 v17 (значение по центру), мастер кита 1
+ * `input` `720:11753`; отклонение от матрицы Атома — решение чата 2026-09-30 в режиме владельца
+ * от 2026-09-30 (довесок 2 к такту 36). С непустым плейсхолдером поведение прежнее.
+ */
+const isFloating = computed(() => isFilled.value && props.placeholder !== '')
 </script>
 
 <template>
@@ -45,15 +54,15 @@ const isFilled = computed(() => props.label.length > 0)
     type="button"
     :disabled="props.disabled"
     :data-state="props.open ? 'open' : 'closed'"
-    :class="selectTriggerVariants({ variant, size, floating: isFilled, disabled })"
+    :class="selectTriggerVariants({ variant, size, floating: isFloating, disabled })"
   >
     <slot v-if="props.showIcon" name="icon">
       <Icon name="link" :size="16" />
     </slot>
 
-    <span class="flex min-w-0 flex-1 flex-col items-start text-left" :class="isFilled ? 'h-9' : 'h-5'">
+    <span class="flex min-w-0 flex-1 flex-col items-start text-left" :class="isFloating ? 'h-9' : 'h-5'">
       <span
-        v-if="isFilled"
+        v-if="isFloating"
         data-slot="field-label"
         class="h-4 w-full truncate text-xs font-medium text-field-placeholder group-hover/field:text-field-placeholder-hover"
       >

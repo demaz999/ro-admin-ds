@@ -39,8 +39,18 @@ const model = defineModel<string>({ default: '' })
  */
 const focused = ref(false)
 
-/** Подпись всплывает при фокусе ИЛИ при наличии значения — так в спеке. */
-const isFloating = computed(() => focused.value || model.value.length > 0)
+/** Поле активно — в фокусе или со значением: так в спеке. От этого зависит кнопка очистки. */
+const isActive = computed(() => focused.value || model.value.length > 0)
+
+/**
+ * Подпись всплывает у активного поля — так в спеке. Исключение — пустой плейсхолдер: всплывать
+ * нечему, и строка подписи не резервируется ни при фокусе, ни при значении — значение и каретка
+ * по центру поля, как в покое. Так поле стоит под внешней подписью `Field`. Провенанс: прототип
+ * VA-9265 v17 (значение по центру поля), мастер кита 1 `input` `720:11753` («Text» по центру);
+ * отклонение от матрицы Атома `249:2768` — решение чата 2026-09-30 в режиме владельца от
+ * 2026-09-30 (довесок 2 к такту 36). С непустым плейсхолдером поведение прежнее.
+ */
+const isFloating = computed(() => isActive.value && props.placeholder !== '')
 </script>
 
 <template>
@@ -93,7 +103,7 @@ const isFloating = computed(() => focused.value || model.value.length > 0)
       </div>
 
       <button
-        v-if="props.clearable && isFloating"
+        v-if="props.clearable && isActive"
         data-slot="field-clear"
         type="button"
         :disabled="props.disabled"
