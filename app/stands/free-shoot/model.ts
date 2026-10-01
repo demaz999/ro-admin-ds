@@ -67,7 +67,8 @@ export interface Notice { id: number, text: string, kind: 'ok' | 'err', undo: bo
 export type WandMode = 'full' | 'struct' | 'photos'
 export const MODE_T: Record<WandMode, string> = { full: 'полное', struct: 'только структура', photos: 'только кадры' }
 /** Идущее автораспределение (§12.5) — прототип `runWand`: доля `k` растёт по таймеру. */
-export interface WandRun { mode: WandMode, total: number, notes: number, objN: number, k: number }
+/** `ids` — кадры, которые раскладывает план (прототип `frameIds`): по ним страница ведёт пролёт миниатюр (такт 45). */
+export interface WandRun { mode: WandMode, total: number, notes: number, objN: number, k: number, ids: number[] }
 /** Блок окна: `.sum` прототипа — тон, заголовок, текст. */
 export interface WindowBlock { tone: 'success' | 'warning' | 'destructive', title: string, text: string, list?: string[] }
 /** Сводка результата (§12.12) — прототип `wandSummary`, тексты собраны в момент вызова, как у прототипа. */
@@ -615,7 +616,7 @@ export function createModel(opts: ModelOptions) {
       : mode === 'photos' ? po!.place.map(x => x.i) : []
     const objN = mode === 'photos' ? objects.length : plan.objs.length
     const total = mode === 'struct' ? objN : frameIds.length
-    state.run = { mode, total, notes, objN, k: hold ?? 0 }
+    state.run = { mode, total, notes, objN, k: hold ?? 0, ids: frameIds }
     state.win = 'progress'
     if (hold !== undefined) return
     const dur = Math.min(4600, 1500 + total * 16)

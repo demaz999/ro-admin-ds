@@ -129,13 +129,13 @@ async function openPage() {
      * Кадр для пары снимков (такт 44): вкладка вперёд, шрифты и видимые картинки загружены и декодированы, элемент `sel` —
      * в видимую часть (`scroll`), кадр — в координатах документа (`scrollX`/`scrollY`), с полем 8. Без `sel` — окно целиком.
      */
-    async shot(sel, scroll = true) {
+    async shot(sel, scroll = true, quick = false) {
       await send('Page.bringToFront')
       if (sel && scroll) await evaluate(`(() => { const el = ${sel}; el?.scrollIntoView({ block: 'nearest', behavior: 'instant' }); return 1 })()`)
-      await evaluate(`(async () => { await document.fonts.ready
+      if (!quick) await evaluate(`(async () => { await document.fonts.ready
         await Promise.all([...document.images].filter(i => i.getClientRects().length).map(i => Promise.race([(i.complete ? Promise.resolve() : new Promise(r => { i.onload = i.onerror = r })).then(() => i.decode?.().catch(() => {})), new Promise(r => setTimeout(r, 3000))])))
         return 1 })()`)
-      await sleep(400)
+      if (!quick) await sleep(400)
       const clip = sel ? await evaluate(`(() => { const el = ${sel}; if (!el) return null; const r = el.getBoundingClientRect(); const q = 8
         const x = Math.max(0, r.x - q); const y = Math.max(0, r.y - q)
         return { x: x + scrollX, y: y + scrollY, width: Math.min(r.right + q, innerWidth) - x, height: Math.min(r.bottom + q, innerHeight) - y, scale: 1 } })()`) : null
@@ -297,6 +297,22 @@ async function splitterDrag(page, handle, x) {
  */
 const DEL = { windowsVirtualKeyCode: 46 }
 
+/**
+ * Наблюдатель пролёта миниатюр (такт 45, № 51): внутри страницы раз в 10 мс отмечает летящие узлы `sel` — сколько их было,
+ * время от появления первого до снятия последнего, центр первого при появлении и перед снятием. Задержка CDP в числа не входит.
+ */
+const flyWatch = (page, sel) => page.evaluate(`(() => { clearInterval(window.__flyI)
+  const w = window.__fly = { n: 0, t0: null, t1: null, start: null, end: null, last: new Map() }
+  const pos = el => { const r = el.getBoundingClientRect(); return [Math.round(r.x + r.width / 2), Math.round(r.y + r.height / 2)] }
+  window.__flyI = setInterval(() => {
+    document.querySelectorAll('${sel}').forEach(el => { if (!w.last.has(el)) { w.n++; w.t0 ??= performance.now(); w.start ??= pos(el); w.firstEl ??= el } w.last.set(el, pos(el)) })
+    for (const [el, q] of w.last) if (!el.isConnected) { w.t1 = performance.now(); if (el === w.firstEl) w.end = q; w.last.delete(el) }
+  }, 10)
+  return 1 })()`)
+const flyRead = (page, sel) => page.evaluate(`(() => { clearInterval(window.__flyI); const w = window.__fly
+  return JSON.stringify({ n: w.n, dur: w.t0 != null && w.t1 != null ? Math.round(w.t1 - w.t0) : null, start: w.start, end: w.end, left: document.querySelectorAll('${sel}').length }) })()`)
+const flyLeft = (page, sel) => page.evaluate(`document.querySelectorAll('${sel}').length`)
+
 async function selectText(page, el, n) {
   await page.evaluate(`(${el}.scrollIntoView({ block: 'center', behavior: 'instant' }), 1)`)
   await sleep(300)
@@ -376,6 +392,9 @@ const prototype = page => ({
   hotkeys: () => page.click(`document.querySelector('#btnHelp')`),
   windowButton: text => page.click(`[...document.querySelectorAll('#mFoot button')].find(b => b.textContent.trim() === ${JSON.stringify(text)})`),
   /* П6 */
+  flyWatch: () => flyWatch(page, 'img.flyer'),
+  flyRead: () => flyRead(page, 'img.flyer'),
+  flyLeft: () => flyLeft(page, 'img.flyer'),
   noteToggle: i => page.click(`document.querySelector('#feed .card[data-i="${i}"] [data-act="exp"]')`),
   noteCopy: i => page.click(`document.querySelector('#feed .card[data-i="${i}"] [data-act="copy"]')`),
   notePlay: i => page.click(`document.querySelector('#feed .card[data-i="${i}"] [data-act="play"]')`),
@@ -565,6 +584,9 @@ const kit = page => ({
   hotkeys: () => page.click(`[...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Горячие клавиши')`),
   windowButton: text => page.click(`[...document.querySelectorAll('[data-slot=modal-card] button')].find(b => b.textContent.trim() === ${JSON.stringify(text)})`),
   /* П6 */
+  flyWatch: () => flyWatch(page, 'img[data-flyer]'),
+  flyRead: () => flyRead(page, 'img[data-flyer]'),
+  flyLeft: () => flyLeft(page, 'img[data-flyer]'),
   noteToggle: i => page.click(`[...document.querySelectorAll('[data-slot=feed-note][data-frame="${i}"] button')].find(b => ['Показать полностью', 'Свернуть'].includes(b.textContent.trim()))`),
   noteCopy: i => page.click(`[...document.querySelectorAll('[data-slot=feed-note][data-frame="${i}"] button')].find(b => b.textContent.trim() === 'Копировать')`),
   notePlay: i => page.click(`document.querySelector('[data-slot=feed-note][data-frame="${i}"] [data-slot=player-button], [data-slot=feed-note][data-frame="${i}"] button[aria-label="Текстовая заметка"]')`),
@@ -761,15 +783,23 @@ const SCENARIOS = {
     ['открыть запуск', a => a.wand(), { remember: 'до запуска' }],
     ['запустить полное', a => a.windowButton('Запустить')],
     ['«Прервать»', a => a.stop(), { same: 'до запуска' }],
-    ['открыть запуск снова', a => a.wand()],
+    /* Такт 45: через 1.3 с после «Прервать» летящих узлов нет у обеих сторон (прототип ещё выпускает запланированные). */
+    ['открыть запуск снова', async (a) => { await sleep(1300); a.probe = [await a.flyLeft()]; await a.wand() }],
     ['режим «Только структура»', a => a.wandMode('struct')],
     ['запустить структуру', a => a.windowButton('Запустить')],
     ['«Прервать» структуру', a => a.stop(), { same: 'до запуска' }],
   ]],
   'С-29': ['сводка результата и её действия (§12.12–12.13) · полное', [
     ['открыть запуск', a => a.wand()],
-    ['запустить полное', a => a.windowButton('Запустить')],
-    ['конец обработки — сводка', a => a.waitWand()],
+    /* Пролёт миниатюр (такт 45): число летящих и остаток — в сравнение, длительность и точки — в замеры. */
+    ['запустить полное', async (a) => { await a.flyWatch(); await a.windowButton('Запустить') }],
+    ['конец обработки — сводка', async (a) => {
+      await a.waitWand()
+      const w = JSON.parse(await a.flyRead())
+      /* Число летящих — видимые в окне плитки плана: зависит от раскладки (вёрстка, строка раздела 15) — в замеры. */
+      a.probe = [w.left]
+      a.measure = { 'летящих': w.n, 'пролёт, мс': w.dur, 'старт первого': w.start?.join(', '), 'финиш первого': w.end?.join(', ') }
+    }],
     ['«Показать кадры без места»', a => a.windowButton('Показать кадры без места')],
     ['оставлять разобранные', a => a.mode('keep')],
   ]],
@@ -1179,6 +1209,13 @@ const SHOTS = {
   '21': [cur('o2'), a => a.repeatEdit('o2'), a => a.formField('mark', ''), a => a.windowButton('Сохранить'), ['shot', null, null]],
   '22': [a => a.hotkeys(), ['shot', ...MODAL]],
   '23': [...bind21, ['shot', null, null]],
+  /* Такт 45: середина пролёта — кадр сразу за «Запустить» у каждой стороны, без ожидания картинок. */
+  flight: [a => a.wand(), ['act-shot', a => a.windowButton('Запустить')]],
+  /* Такт 45, строка 64: «Запустить» и через 0.2 с «Прервать» — нажатия скриптом, без ожидания адаптера; кадр через 60 мс после «Прервать». */
+  '64': [a => a.wand(), ['act-shot', async (a, proto, page) => {
+    await page.evaluate(proto ? "([...document.querySelectorAll('#mFoot button')].find(b => b.textContent.trim() === 'Запустить').click(), 1)" : "([...document.querySelectorAll('[data-slot=modal-card] button')].find(b => b.textContent.trim() === 'Запустить').click(), 1)")
+    await sleep(200)
+    await page.evaluate(proto ? "(document.getElementById('wStop').click(), 1)" : "([...document.querySelectorAll('[data-slot=modal-card] button')].find(b => b.textContent.trim() === 'Прервать').click(), 1)"); await sleep(60) }]],
 }
 
 /** Склейка пары: кадры прототипа слева, кита справа, по строке на каждый кадр шага; подписи сторон сверху. */
@@ -1219,7 +1256,13 @@ async function shots(only) {
       for (const [a] of sides) await a.start()
       const rows = []
       for (const st of steps) {
-        if (Array.isArray(st)) {
+        /* Действие и кадр сразу у каждой стороны — середина пролёта: картинки и шрифты не ждутся. */
+        if (Array.isArray(st) && st[0] === 'act-shot') {
+          const pair = []
+          for (const [a, proto, page] of sides) { await st[1](a, proto, page); pair.push(await page.shot(null, false, true)) }
+          rows.push(pair)
+        }
+        else if (Array.isArray(st)) {
           const pair = []
           for (const [, proto, page] of sides) pair.push(await page.shot(proto ? st[1] : st[2]))
           rows.push(pair)
@@ -1227,7 +1270,7 @@ async function shots(only) {
         else for (const [a, proto, page] of sides) { await st(a, proto, page); await sleep(150) }
       }
       const r = JSON.parse(await compose(pp, rows))
-      const file = join(ROOT, `docs/free-shoot-registry-${nn}.png`)
+      const file = join(ROOT, nn === 'flight' ? 'docs/free-shoot-pair-flight.png' : `docs/free-shoot-registry-${nn}.png`)
       writeFileSync(file, Buffer.from(r.data, 'base64'))
       const bytes = Buffer.from(r.data, 'base64').length
       out.push({ nn, w: r.w, h: r.h, bytes })

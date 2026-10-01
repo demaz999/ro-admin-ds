@@ -86,13 +86,17 @@ export { default as IconButton } from './IconButton.vue'
  * состояния фокуса нет; кит 1 не сверен — Figma MCP в сессии не авторизован. Взят прецедент составных
  * компонентов тактов 30–33: `focus-visible:ring-2` `--ring`. Только по `focus-visible` — в покое и
  * под мышью кнопка не меняется. Расширение матрицы — `waves.md`, запрос дизайнерам — `figma-fixes.md`.
+ *
+ * Такт 45, решение владельца 2026-10-01 (вопрос 7 входа приёмки): у залитых вариантов кольцо отступает от кнопки на 2
+ * цветом фона (`ring-offset-2`, `--background`) — у `default` заливка `--primary` совпадает с `--ring`, и кольцо без
+ * отступа не видно: кнопка лишь растёт на 2. У вариантов без заливки кольцо прежнее. Отклонение — `figma-fixes.md`.
  */
 export const iconButtonVariants = cva(
   'group/button inline-flex shrink-0 items-center justify-center outline-none select-none disabled:pointer-events-none focus-visible:ring-2 focus-visible:ring-ring',
   {
     variants: {
       variant: {
-        default: 'bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-pressed',
+        default: 'bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-pressed focus-visible:ring-offset-2 focus-visible:ring-offset-background',
         secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary-hover active:bg-secondary-pressed',
         // Наведение у этих двух в мастере не нарисовано — добавлено решением
         // владельца от 2026-08-17 «у всего интерактивного системное наведение».

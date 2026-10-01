@@ -81,15 +81,19 @@ export { default as Button } from './Button.vue'
  * состояния фокуса нет; кит 1 не сверен — Figma MCP в сессии не авторизован. Взят прецедент составных
  * компонентов тактов 30–33: `focus-visible:ring-2` `--ring`. Только по `focus-visible` — в покое и
  * под мышью кнопка не меняется. Расширение матрицы — `waves.md`, запрос дизайнерам — `figma-fixes.md`.
+ *
+ * Такт 45, решение владельца 2026-10-01 (вопрос 7 входа приёмки): у залитых вариантов кольцо отступает от кнопки на 2
+ * цветом фона (`ring-offset-2`, `--background`) — у `default` заливка `--primary` совпадает с `--ring`, и кольцо без
+ * отступа не видно: кнопка лишь растёт на 2. У вариантов без заливки кольцо прежнее. Отклонение — `figma-fixes.md`.
  */
 export const buttonVariants = cva(
   'group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap font-medium outline-none select-none disabled:pointer-events-none focus-visible:ring-2 focus-visible:ring-ring',
   {
     variants: {
       variant: {
-        default: 'bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-pressed',
-        secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary-hover active:bg-secondary-pressed',
-        destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive-hover active:bg-destructive-pressed',
+        default: 'bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-pressed focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+        secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary-hover active:bg-secondary-pressed focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+        destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive-hover active:bg-destructive-pressed focus-visible:ring-offset-2 focus-visible:ring-offset-background',
         /**
          * Текстовая кнопка на тёмной полосе приложения — такт 42, нехватка в ките (дыра с такта 8). Прецедент —
          * `IconButton variant="sidebar"`: фона нет, текст `--sidebar-foreground`, наведение — ступень `--sidebar-accent`.

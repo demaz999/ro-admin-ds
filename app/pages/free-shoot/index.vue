@@ -394,8 +394,52 @@ function onSummary(action: 'left' | 'review') {
 /** Окно прогресса — модель (`runWand`): доля и строки счётчиков; «Прервать» — `abortWand`, ничего не применяется. */
 const progressOpen = computed({
   get: () => m.state.win === 'progress',
-  set: (v: boolean) => { if (!v) m.abortWand() },
+  set: (v: boolean) => { if (!v) { stopFly(); m.abortWand() } },
 })
+
+/* --------------------- пролёт миниатюр в панель, такт 45 (№ 51, §12.5) --------------------- */
+/**
+ * Разовый эффект стенда — решение владельца 2026-10-01 (вопрос 1 входа приёмки): в кит не заносится, ни компонента, ни
+ * оси, ни токена; исключение из правила страницы — `naming.md`, «Разовые эффекты стенда». Прототип `animateFly`: до 14
+ * видимых плиток кадров плана, старт каждой через 55 мс; клон картинки плитки летит 0.55 с (`cubic-bezier(.4, 0, .2, 1)`)
+ * к точке «середина панели, 130 от её верха», уменьшаясь до 0.12 с поворотом 7° и угасая; через 580 мс клон снят.
+ * Движение — Web Animations API; клон без классов, отметка `data-flyer` — для прогона. Особого случая для
+ * `prefers-reduced-motion` у прототипа нет — у стенда тоже. «Прервать» снимает и летящие, и ещё не выпущенные.
+ */
+const flyTimers: ReturnType<typeof setTimeout>[] = []
+function stopFly() {
+  flyTimers.splice(0).forEach(clearTimeout)
+  document.querySelectorAll('[data-flyer]').forEach(x => x.remove())
+}
+function animateFly(ids: number[]) {
+  const panel = panelEl.value?.getBoundingClientRect()
+  if (!panel || !feedEl.value) return
+  const vis = ids
+    .map(i => feedEl.value!.querySelector<HTMLElement>(`[data-slot=frame-tile][data-frame="${i}"]`))
+    .filter((el): el is HTMLElement => { if (!el) return false; const r = el.getBoundingClientRect(); return r.bottom > 60 && r.top < window.innerHeight - 60 })
+    .slice(0, 14)
+  vis.forEach((el, k) => flyTimers.push(setTimeout(() => {
+    const img = el.querySelector('img')
+    if (!img) return
+    const r = img.getBoundingClientRect()
+    const c = img.cloneNode() as HTMLImageElement
+    c.removeAttribute('class')
+    c.dataset.flyer = ''
+    Object.assign(c.style, {
+      position: 'fixed', left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px`, margin: '0',
+      zIndex: '60', objectFit: 'cover', pointerEvents: 'none', borderRadius: 'var(--radius-sm)', boxShadow: 'var(--shadow-dropdown)',
+    })
+    document.body.appendChild(c)
+    const tx = panel.left + panel.width / 2 - (r.left + r.width / 2)
+    const ty = panel.top + 130 - (r.top + r.height / 2)
+    c.animate([{ transform: 'none', opacity: 1 }, { transform: `translate(${tx}px, ${ty}px) scale(.12) rotate(7deg)`, opacity: 0 }],
+      { duration: 550, easing: 'cubic-bezier(.4, 0, .2, 1)', fill: 'forwards' })
+    flyTimers.push(setTimeout(() => c.remove(), 580))
+  }, k * 55)))
+}
+/* Пролёт стартует с обработкой — как у прототипа, сразу за окном прогресса; оснастка `?open=progress` держит долю без пролёта. */
+watch(() => m.state.run, (run, prev) => { if (run && !prev && openWin !== 'progress') animateFly(run.ids) })
+onBeforeUnmount(stopFly)
 
 /** Окно «Горячие клавиши» — состав прототипа `#btnHelp`, клавиши — в квадратных скобках. */
 const HOTKEYS = [
