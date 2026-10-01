@@ -46,13 +46,22 @@ const model = defineModel<boolean>({ default: false })
 
 /** Заливка появляется и у отмеченного, и у частичного — так в мастере. */
 const filled = computed(() => model.value || props.indeterminate)
+
+/**
+ * Состояние для Reka. Частичный уходит значением `indeterminate` — контрол получает `aria-checked="mixed"`, а клик из
+ * частичного отмечает (такт 49: «Выделить всё» экрана VA-9265 — пусто, часть, все).
+ */
+const state = computed<boolean | 'indeterminate'>({
+  get: () => (props.indeterminate ? 'indeterminate' : model.value),
+  set: (value) => { model.value = value === true },
+})
 </script>
 
 <template>
   <label data-slot="choice" :class="choiceRowVariants({ disabled })">
     <span class="flex h-5 shrink-0 items-center">
       <CheckboxRoot
-        v-model="model"
+        v-model="state"
         :disabled="props.disabled"
         data-slot="choice-control"
         class="flex size-4 items-center justify-center rounded-xs border-2 border-primary text-primary-foreground outline-none transition-colors"

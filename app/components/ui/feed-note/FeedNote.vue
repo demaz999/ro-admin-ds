@@ -80,6 +80,12 @@ function onMouseup() {
         :class="cn('text-2xs font-bold uppercase', props.kind === 'note' ? 'text-warning-strong' : 'text-primary')"
       >{{ props.kind === 'note' ? 'Текстовая заметка' : 'Голосовой комментарий' }}</span>
       <span data-slot="feed-note-time" class="text-2xs text-muted-foreground">{{ props.time }}</span>
+      <!-- «Копировать» — правый верхний угол, на строке типа и времени: такт 49, решение владельца 2026-10-01. -->
+      <span data-slot="feed-note-copy" class="ml-auto flex">
+        <ButtonAction size="sm" :show-icon="false" @click="emit('copy')">
+          Копировать
+        </ButtonAction>
+      </span>
     </div>
     <PlayerAudio v-if="props.kind === 'voice'" surface="none" :time="props.duration" @toggle="emit('play')">
       {{ props.name }}
@@ -92,12 +98,9 @@ function onMouseup() {
     >
       {{ props.text }}
     </p>
-    <div data-slot="feed-note-actions" class="flex items-center gap-3">
-      <ButtonAction v-if="toggleable" size="sm" :show-icon="false" @click="emit('toggle')">
+    <div v-if="toggleable" data-slot="feed-note-actions" class="flex items-center gap-3">
+      <ButtonAction size="sm" :show-icon="false" @click="emit('toggle')">
         {{ props.expanded ? 'Свернуть' : 'Показать полностью' }}
-      </ButtonAction>
-      <ButtonAction size="sm" :show-icon="false" @click="emit('copy')">
-        Копировать
       </ButtonAction>
     </div>
   </div>

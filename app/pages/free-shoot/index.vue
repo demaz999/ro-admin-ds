@@ -140,7 +140,22 @@ if (q('expand') === 'eq') {
   if (id) m.state.open.add(id)
 }
 const { STAGES, stageById, O, ownerStage, objName, objSub, isFrozen, framesIn, frameWhy, cnt } = m
-const { feed, stats: S, sessMeta, curHint, eqCount, reviewBar, wandWindow, progressWindow } = m
+const { feed, stats: S, sessMeta, eqCount, reviewBar, wandWindow, progressWindow } = m
+
+/**
+ * «Выделить всё» — флажок в трёх состояниях (такт 49, решение владельца 2026-10-01): ничего не выделено — пусто,
+ * выделена часть — неопределённое, выделены все видимые кадры — отмечен. Клик из пустого или неопределённого выделяет
+ * все (`selectAll` модели), из отмеченного — снимает выделение, как «Снять».
+ */
+const selectAllState = computed<'none' | 'some' | 'all'>(() => {
+  if (!m.state.sel.size) return 'none'
+  const media = feed.value.filter((f: any) => f.type !== 'voice')
+  return media.length && media.every((f: any) => m.state.sel.has(f.i)) ? 'all' : 'some'
+})
+function onSelectAll() {
+  if (selectAllState.value === 'all') m.clearSel()
+  else m.selectAll()
+}
 const verdictOf = m.verdict
 
 /* Обёртки состояния под именами шаблона: чтение — из модели, запись — операцией модели. */
@@ -1127,18 +1142,27 @@ function onUndo(id: number) {
         <ResizablePanelGroup direction="horizontal" class="min-h-0 flex-1">
           <ResizablePanel class="flex flex-col">
             <!--
-              тулбар ленты, §7 — кит, такт 42: Toolbar (№ 15–21). Такт 46, приёмка владельца 2026-10-01: поиск занимает
-              свободное место строки, не уже 320 (п. 3); вторая строка — «Текущий объект» у левого края, переключатели —
-              сегмент-контролом справа (п. 4).
+              тулбар ленты, §7 — кит, такт 42: Toolbar (№ 15–21). Такт 49, решение владельца 2026-10-01 — полоса по ролям.
+              Строка 1 «найти и разложить»: поиск на всё свободное место, справа «Распределить автоматически» с иконкой.
+              Строка 2 «что показывать»: слева флажок «Выделить всё» в трёх состояниях, справа сегменты вида ленты.
+              Индикатор текущего объекта (№ 19) с экрана снят: текущий отмечен в панели; `curHint` остаётся в модели.
             -->
             <Toolbar>
-              <Button variant="secondary" @click="m.magicWand()">Распределить автоматически</Button>
-              <Button variant="secondary" @click="m.selectAll()">Выделить всё</Button>
               <div class="min-w-80 flex-1" data-search>
                 <Input v-model="search" placeholder="Поиск по расшифровкам и именам файлов…" />
               </div>
+              <Button variant="secondary" show-icon @click="m.magicWand()">
+                <template #icon>
+                  <Icon name="auto-awesome" :size="20" />
+                </template>
+                Распределить автоматически
+              </Button>
               <div class="flex basis-full items-center gap-4">
-                <ToolbarText id="curHint" truncate grow>{{ curHint }}</ToolbarText>
+                <div data-select-all class="mr-auto flex">
+                  <Checkbox :model-value="selectAllState === 'all'" :indeterminate="selectAllState === 'some'" @update:model-value="onSelectAll">
+                    Выделить всё
+                  </Checkbox>
+                </div>
                 <ToolbarGroup label="Разобранные">
                   <Tabs v-model="mode">
                     <TabsList variant="segmented">
