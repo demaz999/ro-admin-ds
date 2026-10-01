@@ -1382,6 +1382,8 @@ const textareaVariants = [
           :thumbs="[{ id: 1, src: '/free-shoot/demo-01.jpg', state: 'locked' }]"
         />
         <StepRow name="Контрольное видео" required kind="video" :min="1" :max="1" :count="1" :thumbs="[{ id: 1, src: '/free-shoot/demo-07.jpg' }]" />
+        <!-- Такт 55: переносят не тот тип кадра — строка приглушена. -->
+        <StepRow name="Узлы и агрегаты" :min="0" :count="0" instruction="Приводы, валы, редукторы" muted />
         <StepRow name="Фото с представителем" :min="0" :max="1" :count="2" :thumbs="[{ id: 1, src: '/free-shoot/demo-12.jpg' }, { id: 2, src: '/free-shoot/demo-13.jpg' }]" />
       </div>
       <div class="flex flex-wrap gap-8">
@@ -1415,6 +1417,9 @@ const textareaVariants = [
               <AssignOption value="c1" name="Шильдик, заводская табличка" :min="1" :count="1" frozen />
               <AssignOption value="c3" name="Общий вид оборудования" :min="3" :count="1" />
               <AssignOption value="c8" name="Контрольное видео" kind="video" :min="1" :max="1" :count="1" />
+              <!-- Такты 55–56: шаг не того типа — выключен с причиной; цель приёма при переносе кадра в просмотре. -->
+              <AssignOption value="c4" name="Узлы и агрегаты" :count="0" reason="Шаг принимает только фото" />
+              <AssignOption value="c5" name="Органы управления и показания" :count="0" drop-target />
             </SelectGroup>
             <SelectGroup header="Другие объекты">
               <AssignOption value="co" type="object" name="ЦЕХ-6" />

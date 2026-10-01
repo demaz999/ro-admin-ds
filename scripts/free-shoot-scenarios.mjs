@@ -86,6 +86,8 @@ async function openPage(width = KIT_W) {
   await send('Emulation.setFocusEmulationEnabled', { enabled: true })
   await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false })
   const page = {
+    /** Клики, не попавшие в цель, — см. `point`. */
+    blind: [],
     evaluate,
     async goto(url, wait) { await send('Page.navigate', { url }); await sleep(wait) },
     /** Реальный клик мышью по центру элемента: выражение `sel` возвращает элемент; `modifiers` CDP: Alt 1, Ctrl 2, ⌘ 4, Shift 8. */
@@ -124,9 +126,12 @@ async function openPage(width = KIT_W) {
             if (hit && (el === hit || el.contains(hit))) return { x, y }
           }
           return null })()`)
-        if (free) { p = free; break }
+        if (free) return free
         await sleep(250)
       }
+      /* Цель так и не под указателем (накрыта либо не принимает события): клик уйдёт мимо. Такт 57: такой клик — в журнал
+         страницы, прогон считает его провалом шага, если шаг не помечен `blind` (пустая зелень такта 41, раздел 37). */
+      page.blind.push(sel.length > 110 ? sel.slice(0, 107) + '…' : sel)
       return p
     },
     /** Двойной клик по центру элемента: два нажатия, второе с `clickCount: 2` — браузер даёт click, click, dblclick. */
@@ -221,6 +226,18 @@ async function openPage(width = KIT_W) {
   }
   return page
 }
+
+/**
+ * Журнал уведомлений (такт 57). Слепок снимается после действия обеих сторон: пока вторая действует, уведомление первой
+ * успевает истечь (3 с), и «видимые плашки» у обеих оказывались пустыми — отказ, который до кита не доходил, совпадал
+ * вхолостую (пустая зелень такта 41). Наблюдатель в странице записывает каждую появившуюся плашку; слепок забирает журнал.
+ */
+const NOTICE_LOG = (root, toast, text) => `(() => { window.__notices = []
+  const t = s => (s ?? '').replace(/\\s+/g, ' ').trim()
+  const take = el => setTimeout(() => { const x = t(el.querySelector('${text}')?.textContent); if (x) window.__notices.push(x) }, 0)
+  new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => { if (n.nodeType !== 1) return
+    if (n.matches?.('${toast}')) take(n); else n.querySelectorAll?.('${toast}').forEach(take) }))).observe(${root}, { childList: true, subtree: true })
+  return 1 })()`
 
 /* ------------------------------ адаптеры ------------------------------ */
 /**
@@ -347,6 +364,9 @@ const prototype = page => ({
   async start(dataset, keepEntry) {
     await page.goto(PROTO_URL, 1500)
     await page.evaluate(PROTO_DATA)
+    await page.evaluate(NOTICE_LOG(`document.getElementById('toasts')`, '.toast', 'span'))
+    /* Обычный сценарий стенда (строка 124) — данные «Пустой осмотр» прототипа: переключатель сценариев окна входа, окно показано заново. */
+    if (dataset === 'plain') { await page.click(`document.querySelector('#mBody [data-scen="empty"]')`); await sleep(500) }
     if (keepEntry) return
     /* Окно входа (`showEntry`) открывается при загрузке — закрыть «Разложу вручную». Окно входа на ките — П5. */
     await page.click(`[...document.querySelectorAll('#mFoot button')].find(b => b.textContent.trim() === 'Разложу вручную')`)
@@ -392,6 +412,9 @@ const prototype = page => ({
   dblTile: i => page.dblclick(`document.querySelector('#feed .card[data-i="${i}"] img')`),
   thumbOpen: (k, n) => page.click(`document.querySelectorAll('.step[data-owner="${k.split('|')[0]}"][data-step="${k.split('|')[1]}"] .th')[${n}]`),
   lbItem: v => page.click(v.startsWith('obj|') ? `document.querySelector('#lbList [data-setcur="${v.slice(4)}"]')` : `document.querySelector('#lbList .it[data-owner="${v.split('|')[0]}"][data-step="${v.split('|')[1]}"]')`),
+  /* Перенос кадра просмотра на пункт: у прототипа его нет — то же нажатие по пункту (строка 139). */
+  lbDrag: v => page.click(v.startsWith('new|') ? `document.querySelector('#lbList [data-newobj="${v.slice(4)}"]')` : `document.querySelector('#lbList .it[data-owner="${v.split('|')[0]}"][data-step="${v.split('|')[1]}"]')`),
+  acceptTop: () => page.evaluate(`(() => { const b = document.querySelector('.obj.cur [data-act="acc"]'); return b ? Math.round(b.getBoundingClientRect().top * 10) / 10 : null })()`),
   suggest: () => page.click(`document.querySelector('#lbBind [data-act="suggest"]')`),
   suggestNo: () => page.click(`document.querySelector('#lbBind [data-act="no"]')`),
   /* «Принять» предложенный шаг: у прототипа кнопка, у кита — ссылка на шаг (строка 114). */
@@ -467,7 +490,8 @@ const prototype = page => ({
     const sum = s => { const b = s.querySelector('b'); return [TONE[[...s.classList].find(c => TONE[c])], t(b?.textContent), t(s.textContent.replace(b?.textContent ?? '', ''))].join(' | ') }
     const win = modal ? {
       head: t(modal.querySelector('#mTitle').textContent) + ' / ' + t(modal.querySelector('#mSub').textContent),
-      text: [...modal.querySelectorAll('#mBody .wsrc, #mBody > p'), ...[...modal.querySelectorAll('#mBody .ocrhint')].map(h => h.previousElementSibling)].map(e => t(e.textContent)),
+      /* Фраза о клавишах в примечании окна клавиш у кита снята вместе с цифрами (строка 133). */
+      text: [...modal.querySelectorAll('#mBody .wsrc, #mBody > p'), ...[...modal.querySelectorAll('#mBody .ocrhint')].map(h => h.previousElementSibling)].map(e => t(e.textContent).replace(' Перетаскивание работает так же, как клавиши.', '')),
       modes: [...modal.querySelectorAll('#mBody .wmode')].map(w => [t(w.querySelector('.wt').textContent), t(w.querySelector('.wd').textContent), t(w.querySelector('.wn').textContent), w.classList.contains('dis') ? 'выключен' : '', w.querySelector('input').checked ? 'выбран' : ''].join(' | ')),
       blocks: [...modal.querySelectorAll('#mBody .sum')].map(sum),
       buttons: [...modal.querySelectorAll('#mFoot button')].map(b => t(b.textContent)),
@@ -502,7 +526,8 @@ const prototype = page => ({
       tab,
       cur: document.querySelector('.obj.cur')?.dataset.obj ?? null,
       open: [...document.querySelectorAll('.obj.open')].map(o => o.dataset.obj).sort(),
-      curHint: t(document.querySelector('#curHint')?.textContent),
+      /* Распределения цифрами у кита нет (строка 132): хвост «· клавиши 1–N» индикатора снимается. */
+      curHint: t(document.querySelector('#curHint')?.textContent).replace(/ · клавиши 1–\\d+$/, ''),
       sessMeta: t(document.querySelector('#sessMeta')?.textContent),
       stats: ['stFrames', 'stFramesSub', 'stReq', 'stReqSub', 'stObj', 'stObjSub'].map(id => t(document.getElementById(id)?.textContent)),
       window: win,
@@ -516,7 +541,7 @@ const prototype = page => ({
       /* Кнопка у кита названа «Новый объект» (строка 103) — имя в подсказке пустого этапа приводится к нему. */
       hints: [...document.querySelectorAll('#rbody .hintbox')].filter(h => h.getClientRects().length).map(h => t(h.textContent).replace('«Новый объект из выделенного»', '«Новый объект»')),
       bind: frames.filter(f => f.objId).map(f => f.i + '>' + f.objId + '|' + f.stepId + (f.auto ? '*' : '')),
-      notices: [...document.querySelectorAll('#toasts .toast')].filter(e => !e.dataset.seen).map(e => { e.dataset.seen = '1'; return t(e.querySelector('span').textContent) }),
+      notices: (window.__notices ?? []).splice(0),
       selbar: document.querySelector('#selbar.show') ? { count: t(document.getElementById('selN').textContent), sub: t(document.getElementById('selSub').textContent) } : null,
       pop: !!document.querySelector('#pop.show'),
       viewer: document.getElementById('lb').classList.contains('show') ? lbList()[state.lb]?.n ?? null : null,
@@ -545,12 +570,15 @@ const prototype = page => ({
 const kit = page => ({
   name: 'кит',
   async start(dataset, keepEntry) {
-    /* Без параметров адреса экран открывает окно входа, как прототип (решение чата 3, такт 42) — закрыть «Разложу вручную».
-       «Пустой осмотр» — оснастка `?data=empty`: окна входа нет, у прототипа адаптер закрыл его до смены сценария. */
-    await page.goto(KIT_URL + (dataset === 'empty' ? '?data=empty' : ''), 4000)
-    if (dataset !== 'empty' && !keepEntry) await page.click(`[...document.querySelectorAll('[data-slot=modal-card] button')].find(b => b.textContent.trim() === 'Разложу вручную')`)
+    /* Сценарий данных — адресом (строка 124, такт 55): прототип открывается сценарием «Частично проверен» — у кита это
+       `?data=reviewed`; `plain` — обычный сценарий без параметров; «Пустой осмотр» — `?data=empty`. Окно входа открывается
+       при любом из них — закрыть «Разложу вручную». */
+    await page.goto(KIT_URL + (dataset === 'empty' ? '?data=empty' : dataset === 'plain' ? '' : '?data=reviewed'), 4000)
+    await page.evaluate(NOTICE_LOG('document.body', '[data-slot=toast]', '[data-slot=alert] p'))
+    if (!keepEntry) await page.click(`[...document.querySelectorAll('[data-slot=modal-card] button')].find(b => b.textContent.trim() === 'Разложу вручную')`)
   },
-  wand: () => page.click(`[...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Распределить автоматически')`),
+  /* При узкой ленте кнопка — иконка с тем же `aria-label` (строка 123). */
+  wand: () => page.click(`[...document.querySelectorAll('[data-feed-tools] button')].find(b => b.textContent.trim() === 'Распределить автоматически' || b.getAttribute('aria-label') === 'Распределить автоматически')`),
   wandMode: v => page.click(`[...document.querySelectorAll('[data-slot=choice][data-variant=card]')].find(c => c.querySelector('[data-slot=choice-title]').textContent.trim() === ${JSON.stringify(MODE_TITLES[v])})?.querySelector('[data-slot=choice-control]')`),
   stop: () => page.click(`[...document.querySelectorAll('[data-slot=modal-card] button')].find(b => b.textContent.trim() === 'Прервать')`),
   waitWand: () => until(page, `document.querySelector('[data-slot=modal-card] [data-slot=modal-card-title]')?.textContent.trim() === 'Автораспределение завершено'`),
@@ -562,7 +590,8 @@ const kit = page => ({
   tileMod: (i, modifiers) => page.click(`document.querySelector('[data-slot=frame-tile][data-frame="${i}"] img')`, modifiers),
   /* «Выделить всё» — флажок в трёх состояниях (строка 96): из пустого и неопределённого выделяет все, из отмеченного снимает. */
   selectAllButton: () => page.click(`document.querySelector('[data-select-all] [data-slot=choice-control]')`),
-  selbar: b => page.click(`[...document.querySelectorAll('[data-slot=action-bar] button')].find(x => x.textContent.trim() === ${JSON.stringify({ toStep: 'Назначить на шаг', misc: 'В «Прочее»', unassign: 'Открепить', clear: 'Снять' }[b])})`),
+  /* «Снять» прототипа у кита — «Отменить» (строка 128). */
+  selbar: b => page.click(`[...document.querySelectorAll('[data-slot=action-bar] button')].find(x => x.textContent.trim() === ${JSON.stringify({ toStep: 'Назначить на шаг', misc: 'В «Прочее»', unassign: 'Открепить', clear: 'Отменить' }[b])})`),
   popOption: v => page.click(`document.querySelector('[data-slot=popover] [data-value="${v}"]')`),
   step: k => page.click(`document.querySelector('[data-step-key="${k}"] [data-slot=step-row-name]')`),
   async thumbRemove(k, n) { const th = `document.querySelectorAll('[data-step-key="${k}"] [data-slot=step-thumb]')[${n}]`; await page.hover(th); await page.click(`${th}.querySelector('[data-slot=step-thumb-remove]')`) },
@@ -575,8 +604,8 @@ const kit = page => ({
   dragTo: (i, k) => page.drag(`document.querySelector('[data-slot=frame-tile][data-frame="${i}"] img')`, `document.querySelector('[data-step-key="${k}"] [data-slot=step-row-name]')`),
   savingNow: () => page.evaluate(`document.querySelector('[data-slot=app-bar-status]').textContent.trim()`),
   /* П4 */
-  toggleAll: async () => { await page.evaluate(`(document.querySelector('[data-panel]').scrollTop = 0, 1)`); await page.click(`document.querySelectorAll('[data-schtools] button')[0]`) },
-  onlyOpen: async () => { await page.evaluate(`(document.querySelector('[data-panel]').scrollTop = 0, 1)`); await page.click(`document.querySelectorAll('[data-schtools] button')[1]`) },
+  toggleAll: async () => { await page.evaluate(`(document.querySelector('[data-pane-right] [data-panel]').scrollTop = 0, 1)`); await page.click(`document.querySelectorAll('[data-schtools] button')[0]`) },
+  onlyOpen: async () => { await page.evaluate(`(document.querySelector('[data-pane-right] [data-panel]').scrollTop = 0, 1)`); await page.click(`document.querySelectorAll('[data-schtools] button')[1]`) },
   clickAway: () => page.clickAt(700, 10),
   foundWatch: () => page.watch({ step: `!!document.querySelector('[data-step-key][data-flash]')`, thumb: `!!document.querySelector('[data-step-key] [data-located]')` }),
   bindWatch: () => page.watch({ flash: `!!document.querySelector('[data-slot=frame-bind-bar][data-flash]')`, index: `window.__freeShoot.state.lb` }),
@@ -590,6 +619,9 @@ const kit = page => ({
   dblTile: i => page.dblclick(`document.querySelector('[data-slot=frame-tile][data-frame="${i}"] img')`),
   thumbOpen: (k, n) => page.click(`document.querySelectorAll('[data-step-key="${k}"] [data-slot=step-thumb-open]')[${n}]`),
   lbItem: v => page.click(`document.querySelector('[role=dialog] [data-value="${v}"]')`),
+  /* Перенос кадра просмотра на пункт панели просмотра настоящим переносом (строка 139). */
+  lbDrag: v => page.drag(`document.querySelector('[data-slot=frame-stage] img')`, `document.querySelector('[role=dialog] [data-value="${v}"]')`),
+  acceptTop: () => page.evaluate(`(() => { const b = [...document.querySelectorAll('[data-current] [data-slot=repeat-review] button')].find(x => x.textContent.trim() === 'Принять объект'); return b ? Math.round(b.getBoundingClientRect().top * 10) / 10 : null })()`),
   suggest: () => page.click(`[...document.querySelectorAll('[data-slot=frame-bind-bar] button')].find(b => b.textContent.trim() === 'Подобрать шаг')`),
   /* «Не то»: у кита предложения закрытого шага нет (строка 115) — тогда и кнопки нет, шаг пропускается. */
   async suggestNo() { const b = `[...document.querySelectorAll('[data-slot=frame-bind-bar] button')].find(b => b.textContent.trim() === 'Не то')`; if (await page.evaluate(`!!(${b})`)) await page.click(b) },
@@ -625,7 +657,7 @@ const kit = page => ({
   repeatEdit: id => page.click(`[...document.querySelectorAll('[data-obj="${id}"] button')].filter(b => b.textContent.trim() === 'Изменить').pop()`),
   repeatDelete: id => page.click(`[...document.querySelectorAll('[data-obj="${id}"] button')].find(b => b.textContent.trim() === 'Удалить')`),
   lbCreate: st => page.click(`document.querySelector('[role=dialog] [data-value="new|${st}"]')`),
-  suggestCreate: () => page.click(`[...document.querySelectorAll('[data-slot=frame-bind-bar] button')].find(b => b.textContent.trim().startsWith('Создать «'))`),
+  suggestCreate: () => page.click(`[...document.querySelectorAll('[data-slot=frame-bind-bar] button')].find(b => b.textContent.trim() === 'Новый объект')`),
   ocrHint: n => page.click(`document.querySelectorAll('[data-ocr-hints] button')[${n}]`),
   async formField(k, value) {
     const field = `document.querySelector('[data-slot=modal-card] [data-k="${k}"]')`
@@ -687,7 +719,9 @@ const kit = page => ({
         return t(w.querySelector('label').textContent) + ' = ' + (v === '—' ? '' : v) }),
       check: t(document.querySelector('[data-general] [data-slot=field-hint]')?.textContent),
     } : null
-    const frames = stat('Кадры разложены'), req = stat('Обязательные шаги'), obj = stat('Объекты')
+    const frames = stat('Кадры разложены'), req = stat('Обязательные шаги')
+    /* Блока «Объекты» на экране нет (строка 126) — значения из модели: расчёт остался. */
+    const ST = M.stats.value ?? M.stats
     return {
       feed: items.map(e => +e.dataset.frame),
       cols: (() => { if (!tiles.length) return 0; const top = tiles[0].getBoundingClientRect().top; return tiles.filter(x => Math.abs(x.getBoundingClientRect().top - top) < 2).length })(),
@@ -702,7 +736,7 @@ const kit = page => ({
       /* Индикатора текущего объекта на экране нет (строка 97) — значение из модели: расчёт остался. */
       curHint: t(M.curHint.value ?? M.curHint),
       sessMeta: t(document.querySelector('[data-sess-meta]')?.textContent),
-      stats: [val(frames, 'value'), val(frames, 'sub'), val(req, 'value'), val(req, 'sub'), val(obj, 'value'), val(obj, 'sub')],
+      stats: [val(frames, 'value'), val(frames, 'sub'), val(req, 'value'), val(req, 'sub'), t(ST.objText), t(ST.objSub)],
       window: win,
       form,
       review: rv ? {
@@ -713,7 +747,7 @@ const kit = page => ({
       repeats: [...document.querySelectorAll('[data-obj]')].filter(o => o.getClientRects().length).map(o => o.dataset.obj + ([...o.querySelectorAll('[data-slot=repeat-header] span')].some(s => t(s.textContent) === 'предложено') ? '*' : '')),
       hints: [...document.querySelectorAll('[data-slot=stage-note]')].filter(h => h.getClientRects().length && !h.closest('[data-general]')).map(h => t(h.textContent)),
       bind: M.frames.filter(f => f.objId).map(f => f.i + '>' + f.objId + '|' + f.stepId + (f.auto ? '*' : '')),
-      notices: [...document.querySelectorAll('[data-slot=toast]')].filter(e => e.dataset.state !== 'closed' && !e.dataset.seen).map(e => { e.dataset.seen = '1'; return t(e.querySelector('[data-slot=alert] p')?.textContent) }),
+      notices: (window.__notices ?? []).splice(0),
       selbar: document.querySelector('[data-slot=action-bar][data-state=open]:not([data-fragment])') ? { count: t(document.querySelector('[data-slot=action-bar]:not([data-fragment]) [data-slot=action-bar-count]').textContent), sub: t(document.querySelector('[data-slot=action-bar]:not([data-fragment]) [data-slot=action-bar-sub]')?.textContent) } : null,
       pop: !!document.querySelector('[data-slot=popover] [data-slot=assign-list]'),
       viewer: M.state.lb >= 0 ? M.visibleMedia()[M.state.lb]?.n ?? null : null,
@@ -814,7 +848,7 @@ const SCENARIOS = {
   ]],
   'С-27/пустой': ['запуск: недоступный режим, полное на пустом (§12.1–12.4, §19) · «Пустой осмотр»', [
     ['открыть запуск', a => a.wand()],
-    ['режим «Только кадры» — недоступен', a => a.wandMode('photos')],
+    ['режим «Только кадры» — недоступен', a => a.wandMode('photos'), { blind: true }],
     ['запустить полное', a => a.windowButton('Запустить')],
     ['конец обработки', a => a.waitWand()],
     ['«К проверке»', a => a.windowButton('К проверке')],
@@ -861,7 +895,8 @@ const SCENARIOS = {
     ['запустить полное', a => a.windowButton('Запустить')],
     ['конец обработки', a => a.waitWand()],
     ['«К проверке»', a => a.windowButton('К проверке')],
-    ['принять o3', a => a.repeatAct('o3', 'accept')],
+    /* Строка 138: «Принять объект» следующего объекта встаёт на место кнопки принятого — у каждой стороны на своём. */
+    ['принять o3', a => acceptProbe(a, 'o3'), { note: 'замер: кнопка следующего объекта на месте принятой — у каждой стороны своё число', row: 138 }],
     ['отклонить o4', a => a.repeatAct('o4', 'reject')],
     ['«только непроверенные» — снять', a => a.reviewOnly()],
     ['«только непроверенные» — вернуть', a => a.reviewOnly()],
@@ -901,8 +936,9 @@ const SCENARIOS = {
     ['«Назначить на шаг» — снова', a => a.selbar('toStep')],
     ['«сделать текущим» o2', a => a.popOption('obj|o2')],
     ['«Назначить на шаг» — с текущим', a => a.selbar('toStep')],
-    ['«Контрольное видео» — не тот тип', a => a.popOption('o2|e8')],
-    ['Shift + кадр 24', a => a.tileMod(24, 8)],
+    /* Строка 131: у кита пункт не того типа выключен заранее — нажатие даёт тот же отказ, плашка остаётся открытой. */
+    ['«Контрольное видео» — не тот тип', a => a.popOption('o2|e8'), { expect: { pop: true }, row: 131 }],
+    ['Shift + кадр 24', async (a) => { if (a.name === 'кит') await a.clickAway(); await a.tileMod(24, 8) }],
     ['«Назначить на шаг» — два кадра', a => a.selbar('toStep')],
     ['«Фото с представителем» — сверх предела', a => a.popOption('fin|f3')],
     ['«В «Прочее»»', a => a.selbar('misc')],
@@ -923,29 +959,32 @@ const SCENARIOS = {
     ['тянуть кадр 25 на g1 — закрыт', a => a.dragTo(25, 'gen|g1')],
     ['Esc', a => a.key('Escape')],
   ]],
-  'С-10': ['клавиши 1–8, «Сначала выберите текущий объект» (§16.2)', [
+  /* Строка 132 (такт 55): распределения цифрами у кита нет — после цифры слепок кита прежний целиком; прототип привязывает. */
+  'С-10': ['клавиши 1–8: у кита цифры ничего не делают (строка 132; у прототипа — §16.2)', [
     ['кадр 21', a => a.tile(21)],
-    ['1 без текущего', a => a.key('1', 'Digit1')],
+    ['1 без текущего', a => a.key('1', 'Digit1'), { still: true, row: 132 }],
     ['заголовок o2 — текущий', a => a.repeat('o2')],
-    ['4 — «Узлы и агрегаты»', a => a.key('4', 'Digit4')],
-    ['кадр 23', a => a.tile(23)],
-    ['9 — шага нет', a => a.key('9', 'Digit9')],
-    ['Esc', a => a.key('Escape')],
+    ['4 — «Узлы и агрегаты»', a => a.key('4', 'Digit4'), { still: true, row: 132 }],
+  ]],
+  'С-10/просмотр': ['цифра в просмотре: у кита ничего не делает (строка 132; у прототипа — привязка, §11.3)', [
+    ['заголовок o2 — текущий', a => a.repeat('o2')],
+    ['просмотр кадра 20', a => a.viewer(20)],
+    ['4 в просмотре', a => a.key('4', 'Digit4'), { still: true, row: 132 }],
   ]],
   'С-11': ['открепление: крестик миниатюры, Del, крестик плашки, «Открепить» в просмотре (§6, §9.6, §11.2)', [
     ['заголовок o2 — текущий', a => a.repeat('o2')],
     ['кадр 21', a => a.tile(21)],
-    ['4', a => a.key('4', 'Digit4')],
+    ['шаг e4 — привязка', a => a.step('o2|e4')],
     ['крестик миниатюры', a => a.thumbRemove('o2|e4', 0)],
     ['кадр 21 — снова', a => a.tile(21)],
-    ['4 — снова', a => a.key('4', 'Digit4')],
+    ['шаг e4 — снова', a => a.step('o2|e4')],
     ['кадр 21 — выделить распределённый', a => a.tile(21)],
     ['Del', a => a.key('Delete')],
     ['кадр 21 — третий раз', a => a.tile(21)],
-    ['4 — третий раз', a => a.key('4', 'Digit4')],
+    ['шаг e4 — третий раз', a => a.step('o2|e4')],
     ['крестик плашки кадра', a => a.tileUnassign(21)],
     ['кадр 21 — четвёртый раз', a => a.tile(21)],
-    ['4 — четвёртый раз', a => a.key('4', 'Digit4')],
+    ['шаг e4 — четвёртый раз', a => a.step('o2|e4')],
     ['просмотр кадра 21', a => a.viewer(21)],
     ['«Открепить» на плашке просмотра', a => a.bindUnbind()],
     ['Del в просмотре — «и так не распределён»', a => a.key('Delete')],
@@ -953,23 +992,27 @@ const SCENARIOS = {
   ]],
   'С-12': ['отказы с причиной (§6.1, тексты §18), привязки не меняются', [
     ['кадр 21', a => a.tile(21)],
-    ['1 — «Сначала выберите текущий объект»', a => a.key('1', 'Digit1'), { remember: 'до отказов' }],
+    /* Строка 132: у прототипа цифра без текущего объекта даёт «Сначала выберите текущий объект», у кита цифры ничего не делают. */
+    ['1 без текущего', a => a.key('1', 'Digit1'), { remember: 'до отказов', still: true, row: 132 }],
     ['заголовок o2 — текущий', a => a.repeat('o2')],
-    ['1 — шаг проверен и закрыт', a => a.key('1', 'Digit1')],
-    ['8 — фото в шаг видео', a => a.key('8', 'Digit8')],
+    ['шаг e1 — проверен и закрыт', a => a.step('o2|e1')],
+    ['шаг e8 — фото в шаг видео', a => a.step('o2|e8')],
     ['кадр 21 — снять', a => a.tile(21)],
     ['кадр 22 — видео', a => a.tile(22)],
-    ['4 — видео в шаг фото', a => a.key('4', 'Digit4')],
+    ['шаг e4 — видео в шаг фото', a => a.step('o2|e4')],
     ['кадр 85 — второе видео', a => a.tile(85)],
-    ['8 — сверх предела 1', a => a.key('8', 'Digit8')],
+    ['шаг e8 — сверх предела 1', a => a.step('o2|e8')],
     ['Del — «и так не распределено»', a => a.key('Delete')],
     ['кадр 1 — в проверенном шаге', a => a.tile(1)],
     ['Del — открепить нельзя', a => a.key('Delete')],
     ['кадр 3 — отклонён', a => a.tile(3)],
     ['Del — отклонённый открепить нельзя', a => a.key('Delete')],
     ['тянуть кадр 21 на e1 — закрыт', a => a.dragTo(21, 'o2|e1'), { sameBind: 'до отказов' }],
+    /* Перенос выделил кадр 21 — снять: дальше в шаг видео идёт только видео (до такта 57 фото оставалось в выделении, и шаги
+       «видео в „Контрольное видео“» и «заполненный e8» сверяли отказ по типу вместо привязки и заполненности). */
+    ['кадр 21 — снять после переноса', a => a.tile(21)],
     ['кадр 22 — видео снова', a => a.tile(22)],
-    ['8 — видео в «Контрольное видео»', a => a.key('8', 'Digit8')],
+    ['шаг e8 — видео в «Контрольное видео»', a => a.step('o2|e8')],
     ['кадр 85', a => a.tile(85)],
     ['клик по заполненному e8 — «Шаг уже заполнен»', a => a.step('o2|e8')],
     ['тянуть кадр 85 на заполненный e8', a => a.dragTo(85, 'o2|e8')],
@@ -977,22 +1020,22 @@ const SCENARIOS = {
   'С-13': ['отмена: «Отменить» в уведомлении, Ctrl+Z, «Нечего отменять» (§10.6)', [
     ['заголовок o2 — текущий', a => a.repeat('o2')],
     ['кадр 21', a => a.tile(21)],
-    ['4', a => a.key('4', 'Digit4')],
+    ['шаг e4 — привязка', a => a.step('o2|e4')],
     ['«Отменить» в уведомлении', a => a.toastUndo()],
     ['кадр 21 — снова', a => a.tile(21)],
-    ['4 — снова', a => a.key('4', 'Digit4')],
+    ['шаг e4 — снова', a => a.step('o2|e4')],
     ['Ctrl+Z', a => a.key('z', 'KeyZ', { modifiers: 2 })],
     ['Ctrl+Z — нечего отменять', a => a.key('z', 'KeyZ', { modifiers: 2 })],
   ]],
   'С-13/глубина': ['отмена: 21 привязка и 21 отмена — модель как до них (§10.6, глубина не меньше 20)', [
     ['заголовок o2 — текущий', a => a.repeat('o2')],
-    ['21 кадр по одному клавишей 4', async (a) => { for (const i of DEPTH) { await a.tile(i); await a.key('4', 'Digit4') } }, { remember: 'до привязок', skip: ['notices'] }],
-    ['21 × Ctrl+Z', async (a) => { for (let k = 0; k < DEPTH.length; k++) await a.key('z', 'KeyZ', { modifiers: 2 }) }, { same: 'до привязок', skip: ['notices'] }],
+    ['21 кадр по одному кликом по шагу e4', async (a) => { for (const i of DEPTH) { await a.tile(i); await a.step('o2|e4') } }, { remember: 'до привязок' }],
+    ['21 × Ctrl+Z', async (a) => { for (let k = 0; k < DEPTH.length; k++) await a.key('z', 'KeyZ', { modifiers: 2 }) }, { same: 'до привязок' }],
   ]],
   'С-14': ['автосохранение: «Сохранение…» 700 мс после операции, затем «сохранены» (§17.2)', [
     ['заголовок o2 — текущий', a => a.repeat('o2')],
     ['кадр 21', a => a.tile(21)],
-    ['4 — сохранение идёт, через 0.9 с — сохранено', async (a) => { await a.key('4', 'Digit4'); a.probe = [await a.savingNow()]; await sleep(900); a.probe.push(await a.savingNow()) }],
+    ['шаг e4 — сохранение идёт, через 0.9 с — сохранено', async (a) => { await a.step('o2|e4'); a.probe = [await a.savingNow()]; await sleep(900); a.probe.push(await a.savingNow()) }],
   ]],
   'С-35': ['Esc по приоритету: просмотр → окно → выделение (§16)', [
     ['кадр 21', a => a.tile(21)],
@@ -1056,10 +1099,10 @@ const SCENARIOS = {
     ['← у первого кадра', a => a.key('ArrowLeft')],
     ['Esc — после миниатюры', a => a.key('Escape')],
   ]],
-  'С-24': ['просмотр, сценарий А: привязка, вспышка, переход через 820 мс; 1–N (§11.3)', [
+  'С-24': ['просмотр, сценарий А: привязка, вспышка, переход через 820 мс (§11.3)', [
     ['заголовок o2 — текущий', a => a.repeat('o2')],
     ['просмотр кадра 20', a => a.viewer(20)],
-    ['4 — вспышка и переход', a => flashProbe(a, () => a.key('4', 'Digit4'))],
+    ['пункт «Узлы и агрегаты» для кадра 20 — вспышка и переход', a => flashProbe(a, () => a.lbItem('o2|e4'))],
     ['пункт «Узлы и агрегаты» для кадра 21', a => flashProbe(a, () => a.lbItem('o2|e4'))],
     ['пункт «Узлы и агрегаты» для видео 22 — не тот тип', a => a.lbItem('o2|e4')],
     ['закрытый пункт «Шильдик» — отказ', a => a.lbItem('o2|e1')],
@@ -1069,16 +1112,16 @@ const SCENARIOS = {
   'С-25': ['просмотр, сценарий Б: «Перенести кадр?», без перехода (§11.4)', [
     ['заголовок o2 — текущий', a => a.repeat('o2')],
     ['просмотр кадра 21', a => a.viewer(21)],
-    ['4 — привязка', a => flashProbe(a, () => a.key('4', 'Digit4'))],
+    ['пункт «Узлы и агрегаты» — привязка', a => flashProbe(a, () => a.lbItem('o2|e4'))],
     ['← к кадру 21', a => a.key('ArrowLeft')],
-    ['5 — окно «Перенести кадр?»', a => a.key('5', 'Digit5')],
+    ['пункт «Органы управления» — окно «Перенести кадр?»', a => a.lbItem('o2|e5')],
     ['«Отмена»', a => a.windowButton('Отмена')],
-    ['5 — снова', a => a.key('5', 'Digit5')],
+    ['пункт «Органы управления» — снова', a => a.lbItem('o2|e5')],
     ['«Перенести» — вспышка, кадр остаётся', a => flashProbe(a, () => a.windowButton('Перенести'))],
     ['«Открепить» на плашке', a => a.bindUnbind()],
     ['Esc', a => a.key('Escape')],
     ['просмотр кадра 1 — привязан до вас', a => a.viewer(1)],
-    ['5 — перенести нельзя', a => a.key('5', 'Digit5')],
+    ['пункт «Органы управления» — перенести нельзя', a => a.lbItem('o2|e5')],
     /* Строка 117: кит просмотр не закрывает — шаг вспыхивает в панели просмотра, основная панель прежняя; прототип
        закрывает просмотр и находит шаг в основной панели. */
     ['«Показать в структуре» на плашке', a => a.bindLocate().then(() => sleep(400)),
@@ -1088,7 +1131,7 @@ const SCENARIOS = {
      шаг из подбора исключён (строка 115), кнопка выключена, причина — в подсказке (строка 116). */
   'С-26': ['«Подобрать шаг»: закрытый шаг, новый объект, «Не то», честный отказ (§12.14)', [
     ['просмотр кадра 16', a => a.viewer(16), { expect: { suggestOff: REASON_CLOSED }, row: 116 }],
-    ['«Подобрать шаг» — шаг закрыт', a => a.suggest(), { expect: { bind: 'свободен', suggestOff: REASON_CLOSED }, row: 115 }],
+    ['«Подобрать шаг» — шаг закрыт', a => a.suggest(), { expect: { bind: 'свободен', suggestOff: REASON_CLOSED }, row: 115, blind: true }],
     ['Enter — у закрытого не действует', a => a.key('Enter', 'Enter', { text: '\r' }), { expect: { bind: 'свободен' }, row: 115 }],
     ['«Не то»', a => a.suggestNo()],
     ['Esc', a => a.key('Escape')],
@@ -1098,7 +1141,7 @@ const SCENARIOS = {
     ['Esc — после «Не то»', a => a.key('Escape')],
     ['просмотр кадра 23', a => a.viewer(23), { expect: { suggestOff: REASON_UNKNOWN }, row: 116 }],
     /* Прототип: отказ уведомлением после нажатия; кит: кнопка выключена, уведомления нет. */
-    ['«Подобрать шаг» — не распознан', a => a.suggest(), { expect: { notices: [], suggestOff: REASON_UNKNOWN }, row: 116 }],
+    ['«Подобрать шаг» — не распознан', a => a.suggest(), { expect: { notices: [], suggestOff: REASON_UNKNOWN }, row: 116, blind: true }],
     ['Esc — после отказа', a => a.key('Escape')],
   ]],
   /* Такт 53. Кадр 6 в демо-данных обеих сторон лежит в блоке «Пропиточная линия POLYPRISE» (строка 118): подбор предлагает
@@ -1126,7 +1169,7 @@ const SCENARIOS = {
   'С-14/вид': ['индикатор автосохранения в шапке: «Сохранение…» → «Все изменения сохранены» (§17.2)', [
     ['заголовок o2 — текущий', a => a.repeat('o2')],
     ['кадр 21', a => a.tile(21)],
-    ['4 — индикатор', async (a) => { await a.key('4', 'Digit4'); a.probe = [await a.savingNow()]; await sleep(900); a.probe.push(await a.savingNow()) }],
+    ['шаг e4 — индикатор', async (a) => { await a.step('o2|e4'); a.probe = [await a.savingNow()]; await sleep(900); a.probe.push(await a.savingNow()) }],
   ]],
   'С-31': ['завершение: сводка, незакрытые поимённо до шести, расхождение с общей формой (§17.4–17.6)', [
     ['«Завершить распределение»', a => a.finishOpen()],
@@ -1137,7 +1180,8 @@ const SCENARIOS = {
     ['«Завершить»', a => a.windowButton('Завершить')],
   ]],
   'С-34': ['ширина панели 320–820 разделителем (§7)', [
-    ['разделитель к левому краю — 820', async (a) => { await a.splitterTo(5); a.probe = [await a.paneWidth()] }],
+    /* Строка 123: лента у кита не уже 600 — при окне 1440 (рабочая зона 1356) панель расширяется до 746; у прототипа — до 820. */
+    ['разделитель к левому краю — 820 (у кита — 746)', async (a) => { await a.splitterTo(5); a.probe = [await a.paneWidth()] }, { expect: { probe: [746] }, skip: ['cols'], row: 123 }],
     ['разделитель к правому краю — 320', async (a) => { await a.splitterTo(1435); a.probe = [await a.paneWidth()] }],
     /* Середину — в замеры: прототип ставит край панели под указатель, Reka сохраняет смещение точки захвата (раздел 15). */
     ['разделитель на 900', async (a) => { await a.splitterTo(900); a.measure = { 'ширина панели, px': await a.paneWidth() } }, { skip: ['cols'], row: 6 }],
@@ -1187,7 +1231,7 @@ const SCENARIOS = {
     ['«Здание»', a => a.fragment('bld')],
     ['«Создать»', a => a.windowButton('Создать')],
   ]],
-  'С-19/просмотр': ['«Создать «этап»» в просмотре: список и подбор шага (§11.2, §12.14)', [
+  'С-19/просмотр': ['«Новый объект» в просмотре (у прототипа — «Создать «этап»», строка 140): список и подбор шага (§11.2, §12.14)', [
     ['просмотр кадра 21', a => a.viewer(21)],
     ['«Создать «Единица оборудования»»', a => a.lbCreate('eq')],
     ['наименование', a => a.formField('mark', 'Кран-балка')],
@@ -1206,7 +1250,7 @@ const SCENARIOS = {
     ['номер', a => a.formField('no', 'Склад 2')],
     ['«Создать»', a => a.windowButton('Создать')],
     ['кадр 21', a => a.tile(21)],
-    ['2 — во второй шаг', a => a.key('2', 'Digit2')],
+    ['шаг b2 нового здания', a => a.step('o3|b2')],
     ['«Удалить»', a => a.repeatDelete('o3')],
     ['«Отмена»', a => a.windowButton('Отмена')],
     ['«Удалить» — снова', a => a.repeatDelete('o3')],
@@ -1222,10 +1266,40 @@ SCENARIOS['С-05/флажок'] = ['«Выделить всё» флажком: 
   ['флажок из пустого — все', a => a.selectAllButton(), { expect: { selectAll: 'all' }, row: 96 }],
   ['«Снять»', a => a.selbar('clear'), { expect: { selectAll: 'none' }, row: 96 }],
 ]]
-SCENARIOS['С-34/меню'] = ['каркас: меню, развёрнутое бургером, ложится поверх — рабочая зона на месте (строки 81, 105)', [
-  ['бургер — развернуть', a => a.burger(), { expect: { menu: 256, feedLeft: MENU_W }, row: 105 }],
-  ['кадр 21 при развёрнутом меню', a => a.tile(21), { expect: { menu: 256, feedLeft: MENU_W }, row: 105 }],
+SCENARIOS['С-34/меню'] = ['каркас: меню, развёрнутое бургером, двигает содержимое (строки 81, 105 — пересмотрена тактом 55)', [
+  ['бургер — развернуть', a => a.burger(), { expect: { menu: 256, feedLeft: 256 }, skip: ['cols'], row: 105 }],
+  ['кадр 21 при развёрнутом меню', a => a.tile(21), { expect: { menu: 256, feedLeft: 256 }, skip: ['cols'], row: 105 }],
   ['бургер — свернуть', a => a.burger(), { expect: { menu: MENU_W, feedLeft: MENU_W }, row: 105 }],
+]]
+
+/* ------------------------------ такт 57: решения тактов 55–56 ------------------------------ */
+/* Строка 124: обычный сценарий стенда — данные «Пустой осмотр» прототипа; окно входа — по сценарию. */
+SCENARIOS['С-36/обычный'] = ['окно входа обычного сценария: «Разложу вручную» (строка 124)', [
+  ['«Разложу вручную»', a => a.windowButton('Разложу вручную')],
+], { keepEntry: true, dataset: 'plain' }]
+/* Строка 131: при переносе у кита шаг не того типа приглушён и броска не принимает — как закрытый шаг; прототип бросок
+   принимает и отказывает уведомлением «Шаг принимает только фото». Привязки не меняются у обеих сторон. */
+SCENARIOS['С-09/тип'] = ['перенос видео на шаг «только фото»: у кита шаг приглушён, приёма нет (строка 131)', [
+  ['заголовок o2 — текущий', a => a.repeat('o2'), { remember: 'до переноса' }],
+  ['тянуть видео 22 на e4 — не тот тип', a => a.dragTo(22, 'o2|e4'), { expect: { notices: [] }, sameBind: 'до переноса', row: 131 }],
+  ['Esc', a => a.key('Escape')],
+]]
+/* Строка 139: кит переносит кадр просмотра на пункт панели просмотра, прототип нажимает тот же пункт — итог обязан совпасть. */
+const DRAG = { note: 'кит — перенос кадра на пункт, прототип — нажатие по пункту', row: 139 }
+SCENARIOS['С-39'] = ['перенос кадра в просмотре: бросок на пункт — как нажатие по нему (строка 139)', [
+  ['заголовок o2 — текущий', a => a.repeat('o2')],
+  ['просмотр кадра 23', a => a.viewer(23)],
+  ['фото на «Узлы и агрегаты» — привязка, вспышка, переход', a => flashProbe(a, () => a.lbDrag('o2|e4')), DRAG],
+  ['фото на закрытый «Шильдик» — отказ', a => a.lbDrag('o2|e1'), DRAG],
+  ['Esc', a => a.key('Escape')],
+  ['просмотр видео 22', a => a.viewer(22)],
+  ['видео на «Узлы и агрегаты» — не тот тип', a => a.lbDrag('o2|e4'), DRAG],
+  ['видео на «Контрольное видео» — привязка', a => flashProbe(a, () => a.lbDrag('o2|e8')), DRAG],
+  ['Esc — после видео', a => a.key('Escape')],
+  ['просмотр кадра 25', a => a.viewer(25)],
+  ['кадр на «Новый объект» — форма нового повтора', a => a.lbDrag('new|eq'), DRAG],
+  ['«Отмена»', a => a.windowButton('Отмена')],
+  ['Esc — после формы', a => a.key('Escape')],
 ]]
 
 /* ------------------------------ такт 44: остаток поведения ------------------------------ */
@@ -1247,7 +1321,7 @@ SCENARIOS['С-38/создание'] = ['сверка «Оформлено еди
 const Q = s => `document.querySelector('${s}')`
 const MODAL = ['document.querySelector(\'#modal .mbox\')', 'document.querySelector(\'[data-slot=modal-card]\')']
 const cur = id => a => a.repeat(id)
-const bind21 = [cur('o2'), a => a.tile(21), a => a.key('4', 'Digit4')]
+const bind21 = [cur('o2'), a => a.tile(21), a => a.step('o2|e4')]
 /* Привязка и уход уведомления «Отменить» (6 с): иначе плашка ложится на панель. */
 const bound21 = [...bind21, () => sleep(6500)]
 const SHOTS = {
@@ -1313,6 +1387,15 @@ const SHOTS = {
   '112': [a => a.viewer(6), a => a.suggest(), ['shot', Q('#lbBind'), Q('[data-slot=frame-bind-bar]')]],
   /* 120 — закрытый шаг: прототип предлагает, у кита «Подобрать шаг» выключена, причина — в подсказке (курсор на кнопке). */
   '120': [a => a.viewer(16), a => a.suggest(), async (a, proto, page) => { if (!proto) { await page.hover(Q('[data-slot=frame-bind-suggest]')); await sleep(900) } }, ['shot', null, null]],
+  /* ------------------------------ такт 57: строки двух классов, добавленные тактами 55–56 ------------------------------ */
+  /* 123 — полоса ленты одной строкой. */
+  '123': [['shot', Q('.bar-tools'), Q('[data-feed-tools]')]],
+  /* 130 — уведомление над панелью выделения: «Нечего отменять» при выделенном кадре. */
+  '130': [a => a.tile(21), a => a.key('z', 'KeyZ', { modifiers: 2 }), ['shot', null, null]],
+  /* 133 — строка шага без номера клавиши и отступа под него. */
+  '133': [cur('o2'), ['shot', Q('.step[data-owner="o2"][data-step="e4"]'), Q('[data-step-key="o2|e4"]')]],
+  /* 138 — «Принять объект» следующего объекта после принятия. */
+  '138': [a => a.wand(), a => a.windowButton('Запустить'), a => a.waitWand(), a => a.windowButton('К проверке'), a => a.repeatAct('o3', 'accept'), () => sleep(1200), ['shot', null, null]],
   /* Такт 45, строка 64: «Запустить» и через 0.2 с «Прервать» — нажатия скриптом, без ожидания адаптера; кадр через 60 мс после «Прервать». */
   '64': [a => a.wand(), ['act-shot', async (a, proto, page) => {
     await page.evaluate(proto ? "([...document.querySelectorAll('#mFoot button')].find(b => b.textContent.trim() === 'Запустить').click(), 1)" : "([...document.querySelectorAll('[data-slot=modal-card] button')].find(b => b.textContent.trim() === 'Запустить').click(), 1)")
@@ -1415,6 +1498,19 @@ async function flashProbe(a, act) {
   }
 }
 
+/**
+ * Замер приёмки (С-30, строка 138): положение «Принять объект» текущего объекта до принятия и у следующего после него.
+ * В сравнение — стоит ли кнопка на том же месте (у каждой стороны на своём); числа — в замеры.
+ */
+async function acceptProbe(a, id) {
+  const settled = async () => { let p = null; for (let k = 0; k < 30; k++) { await sleep(120); const q = await a.acceptTop(); if (q != null && q === p) break; p = q } return p }
+  const before = await settled()
+  await a.repeatAct(id, 'accept')
+  const after = await settled()
+  a.probe = [before != null && after != null && Math.abs(after - before) <= 1]
+  a.measure = { '«Принять объект» до, y': before, 'после, y': after }
+}
+
 /** Кадры для глубины отмены: 21 свободное фото ленты. */
 const DEPTH = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 23, 24, 25, 26, 27]
 
@@ -1440,6 +1536,8 @@ function diff(a, b, path = '') {
  */
 /** Журнал исключений прогона: заменённые ожидания и снятые поля с номерами строк раздела 15 — печатается в конце. */
 const EXCEPTIONS = []
+/** Шаги, где хотя бы одна сторона показала уведомление, — итог проверки пустой зелени (такт 57). */
+const NOTICED = []
 async function run(id) {
   const [title, steps, opts = {}] = SCENARIOS[id]
   const pp = await openPage(PROTO_W)
@@ -1458,6 +1556,11 @@ async function run(id) {
     for (const [name, act, o = {}] of all) {
       if (o.remember) kept[o.remember] = [await P.dump(), await K.dump()]
       if (act) { await act(P); await act(K); await sleep(150) }
+      for (const [side, pg] of [[P, pp], [K, kp]]) {
+        const blind = pg.blind.splice(0)
+        if (blind.length && !o.blind) fails.push({ step: name, lines: blind.map(x => `${side.name}: клик не попал в цель — ${x}`) })
+        if (blind.length && o.blind) EXCEPTIONS.push({ id, step: name, row: o.row ?? null, what: `${side.name}: клик по выключенному элементу — в цель не попадает, как и задумано`, tech: true })
+      }
       if (o.sameBind) {
         const now = [await P.dump(), await K.dump()]
         const bindOf = j => { const d = JSON.parse(j); return JSON.stringify([d.frames, d.objects, d.review]) }
@@ -1472,6 +1575,7 @@ async function run(id) {
         })
       }
       const [a, b] = [await P.snapshot(), await K.snapshot()]
+      if (a.notices?.length || b.notices?.length) NOTICED.push({ id, step: name, p: a.notices, k: b.notices })
       /* Замер действия (С-14): сохранение идёт сразу после операции и закончилось через 0.9 с. */
       ;[[a, P], [b, K]].forEach(([x, side]) => { if (side.probe) { x.probe = side.probe; side.probe = null } })
       if (process.env.DEBUG_PROBE && (a.probe || b.probe)) console.log('   замер', name, JSON.stringify(a.probe), JSON.stringify(b.probe))
@@ -1480,6 +1584,19 @@ async function run(id) {
          прежним значением, из общего сравнения оно выходит. Поля, которых у прототипа нет, лежат в `kitOnly`. */
       const kitFull = JSON.parse(JSON.stringify(b))
       const kv = (snap, k) => (snap && k in (snap.kitOnly ?? {}) ? snap.kitOnly[k] : snap?.[k])
+      /* Строка раздела 15, где кит не делает того, что делает прототип: слепок кита прежний целиком (кроме замера),
+         уведомлений нет; стороны на этом шаге не сравниваются. */
+      if (o.still) {
+        const strip = (x) => { const c = JSON.parse(JSON.stringify(x ?? {})); delete c.notices; delete c.probe; return c }
+        const d = diff(strip(prevKit), strip(b)).map(l => l.replace('прототип', 'было').replace('кит', 'стало'))
+        if (d.length) fails.push({ step: name, lines: [`кит, строка ${o.row}: слепок должен остаться прежним`, ...d.slice(0, 6)] })
+        if (b.notices?.length) fails.push({ step: name, lines: [`кит, строка ${o.row}: уведомлений быть не должно — ${JSON.stringify(b.notices)}`] })
+        EXCEPTIONS.push({ id, step: name, row: o.row, what: 'у кита слепок прежний целиком, уведомлений нет; стороны не сравниваются' })
+        prevKit = kitFull
+        snaps += 2
+        continue
+      }
+      if (o.note) EXCEPTIONS.push({ id, step: name, row: o.row, what: o.note })
       if (o.expect) {
         for (const [k, want] of Object.entries(o.expect)) {
           if (JSON.stringify(kv(b, k)) !== JSON.stringify(want)) fails.push({ step: name, lines: [`кит, строка ${o.row}: ${k} — ожидалось ${JSON.stringify(want)}, получено ${JSON.stringify(kv(b, k))}`] })
@@ -1541,11 +1658,18 @@ console.log(`\nСценариев ${ids.length}, зелёных ${ids.length - f
 console.log('\nИсключения прогона (решение чата, такт 53) — у всех шагов:')
 console.log(`  данные: кадр 6 в блоке «Пропиточная линия POLYPRISE» у обеих сторон — строка 118`)
 console.log(`  ширина окна прототипа ${PROTO_W} при окне кита ${KIT_W}: рабочая зона кита уже на меню ${MENU_W} — строка 81`)
-console.log('  curHint у кита — из модели: индикатора на экране нет — строка 97')
+console.log('  старт: кит — `?data=reviewed`, сценарий прототипа «Частично проверен»; обычный сценарий кита — данные «Пустой осмотр» прототипа — строка 124')
+console.log('  curHint у кита — из модели: индикатора на экране нет — строка 97; у прототипа хвост «· клавиши 1–N» снят — строка 132')
+console.log('  stats у кита: значения блока «Объекты» — из модели, на экране блока нет — строка 126')
+console.log('  окно клавиш у прототипа: фраза «Перетаскивание работает так же, как клавиши.» снята — строка 133')
+console.log('  привязка в сценариях — кликом по строке шага и по пункту просмотра у обеих сторон: цифр у кита нет — строка 132')
 console.log('  hints у прототипа: «Новый объект из выделенного» читается как «Новый объект» — строка 103')
 console.log('  подсветка наведения (linked, dim, hl, hlObj) сравнивается только в сценариях наведения — строка 2')
 const seen = new Map()
-for (const e of EXCEPTIONS) { const k = `${e.id} · «${e.step}»`; seen.set(k, [...(seen.get(k) ?? []), `${e.what}${e.row ? ` — строка ${e.row}` : ' — техническое: стороны действуют по очереди'}`]) }
+for (const e of EXCEPTIONS) { const k = `${e.id} · «${e.step}»`; seen.set(k, [...(seen.get(k) ?? []), `${e.what}${e.row ? ` — строка ${e.row}` : ' — техническое'}`]) }
 console.log(`Исключения по шагам — ${seen.size}:`)
 for (const [k, v] of seen) console.log(`  ${k}: ${v.join(' | ')}`)
+const same = NOTICED.filter(n => JSON.stringify(n.p) === JSON.stringify(n.k)).length
+console.log(`Шагов с уведомлениями — ${NOTICED.length}: у обеих сторон одинаковые — ${same}, по строкам раздела 15 различаются — ${NOTICED.length - same}`)
+if (process.env.NOTICES) for (const n of NOTICED) console.log(`  ${n.id} · «${n.step}»: прототип ${JSON.stringify(n.p)} · кит ${JSON.stringify(n.k)}`)
 process.exit(failed ? 1 : 0)

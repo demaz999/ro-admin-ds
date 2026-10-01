@@ -45,6 +45,8 @@ export const COVERAGE_STATES = [
   'open=new', 'open=newobj', 'open=delete', 'open=fragment',
   /* Такт 55: два сценария страницы — без параметров обычный (осмотр до распределения), `data=reviewed` — частично проверенный. */
   'data=reviewed',
+  /* Такт 57: перенос кадра в просмотре над пунктом-шагом — цель приёма. */
+  'state=viewer-drag',
 ] as const
 
 const transparent = (c: string) => !c || c === 'transparent' || /rgba\([^)]*,\s*0\)$/.test(c)
