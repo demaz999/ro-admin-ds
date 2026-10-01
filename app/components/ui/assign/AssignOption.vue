@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { ListboxItem } from 'reka-ui'
 import { ButtonAction } from '../button-action'
 import { Icon } from '../icon'
@@ -41,6 +41,11 @@ const props = withDefaults(defineProps<{
   frames?: number | null
   /** Оснастка приёмки: вид наведения без курсора. В продукт не идёт. */
   demoHover?: boolean
+  /**
+   * Смена значения — вспышка пункта 1.5 с (`--duration-flash`), как у строки шага: «Показать в структуре» внутри
+   * просмотра находит шаг в его списке (такт 52).
+   */
+  flash?: number | null
   class?: string
 }>(), {
   type: 'step',
@@ -53,6 +58,7 @@ const props = withDefaults(defineProps<{
   bound: null,
   frames: null,
   demoHover: false,
+  flash: null,
 })
 
 /**
@@ -61,6 +67,19 @@ const props = withDefaults(defineProps<{
  * 2026-09-30, такт 41 (до него пункт был выключен и нажатие не доходило).
  */
 const emit = defineEmits<{ select: []; unbind: []; refuse: [reason: 'frozen' | 'full' | 'locked'] }>()
+
+const flashing = ref(false)
+let flashTimer: ReturnType<typeof setTimeout> | undefined
+watch(() => props.flash, async (value) => {
+  if (value == null) return
+  clearTimeout(flashTimer)
+  flashing.value = false
+  await nextTick()
+  flashing.value = true
+  const ms = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--duration-flash')) * 1000 || 1500
+  flashTimer = setTimeout(() => { flashing.value = false }, ms)
+})
+onBeforeUnmount(() => clearTimeout(flashTimer))
 
 const fill = computed(() => stepFill(props.count, props.min, props.max, false))
 const isStep = computed(() => props.type === 'step')
@@ -116,6 +135,7 @@ function onSelect(event: Event) {
       data-assign-option
       :data-type="props.type"
       :data-bound="props.bound ?? undefined"
+      :data-flash="flashing || undefined"
       :subtitle="subtitle"
       :selected="!!props.bound"
       :tone="props.bound ? 'success' : 'default'"
@@ -132,6 +152,7 @@ function onSelect(event: Event) {
         props.bound ? '' : 'group-focus-within/assign:data-highlighted:bg-list-hover',
         props.bound === 'locked' ? 'cursor-default' : '',
         props.demoHover && !props.bound ? 'bg-list-hover' : '',
+        flashing ? 'animate-step-flash motion-reduce:animate-none' : '',
         props.class,
       )"
     >

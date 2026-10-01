@@ -114,11 +114,21 @@ const viewer = viewerKey
 const LB_FRAMES = D.frames.filter((f: any) => f.type !== 'voice' && f.origin !== 'step')
 const WINDOWS = ['hotkeys', 'wand', 'finish'] as const
 
+/**
+ * Демо-данные стенда — такт 52, решение владельца 2026-10-01: нужен пример подбора в обычный открытый шаг. У прототипа
+ * кадр 6 лежит в блоке «территория», его шаг проверен и закрыт. На стенде кадр 6 отнесён к блоку «Пропиточная линия
+ * POLYPRISE» (кадры 1–5, инв. 10798): подбор предлагает открытый шаг «Общий вид оборудования» этой единицы.
+ * Отклонение от данных прототипа — строка раздела 15.
+ */
+const DEMO_BLOCKS = (P.blocks as any[])
+  .filter(b => !(b.a === 6 && b.b === 6))
+  .map(b => (b.a === 1 && b.b === 5 ? { ...b, b: 6 } : b))
+
 const m = createModel({
   data: D,
   stages: P.stages,
   general: P.general,
-  blocks: P.blocks,
+  blocks: DEMO_BLOCKS,
   scenario: q('data') === 'empty' ? 'empty' : 'review',
   initial: {
     cur: openWin === 'assign' ? P.selectCur : D.cur,
@@ -671,6 +681,8 @@ const bindProps = computed(() => {
     keys: cur.value ? stageById[O(cur.value)!.stageId].steps.length : null,
     rejected: !!f?.rej,
     reason: f ? frameWhy(f) : '',
+    /* Подбор недоступен — причина заранее, при показе кадра: кнопка выключена, причина в подсказке (такт 52). */
+    suggestReason: f && !st ? m.suggestReason(f.i) : '',
   }
 })
 const metaRows = computed(() => {
@@ -751,11 +763,22 @@ function onViewerUnbind() {
   m.unassignFrame(f.i)
   suggestion.value = null
 }
-/** «Показать в структуре» из плашки — прототип: просмотр закрыть, через 120 мс найти шаг. */
-function onViewerLocate() {
+/**
+ * «Показать в структуре» из плашки — такт 52, решение владельца 2026-10-01: просмотр остаётся открытым, шаг показывается
+ * в его правой панели — группа раскрывается, список прокручивается к шагу, пункт вспыхивает на 1.5 с. Прототип просмотр
+ * закрывает и ищет шаг в основной панели — строка раздела 15 для аналитика. Вне просмотра поведение прежнее (`onLocate`).
+ */
+const viewerFound = ref<{ value: string, nonce: number } | null>(null)
+async function onViewerLocate() {
   const f = viewerFrame.value
-  viewerOpen.value = false
-  if (f) setTimeout(() => onLocate(f.i), 120)
+  if (!f?.objId) return
+  const value = `${f.objId}|${f.stepId}`
+  const group = viewerGroups.value.find(g => g.items.some((it: any) => it.value === value))
+  if (!group) { m.notify('Шаг не найден в структуре', 'err'); return }
+  m.state.closed.delete(group.id)
+  await nextTick()
+  document.querySelector(`[data-slot=lightbox-aside] [data-value="${value}"]`)?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  viewerFound.value = { value, nonce: Date.now() }
 }
 
 const viewerGroups = computed(() => {
@@ -1494,7 +1517,7 @@ function onUndo(id: number) {
             @toggle="toggleStage(g.id)"
           >
             <AssignList class="p-1">
-              <AssignOption v-for="it in g.items" :key="it.value" v-bind="it" :data-value="it.value" @select="onViewerSelect(it)" @refuse="onViewerRefuse(it, $event)" @unbind="onViewerUnbind" />
+              <AssignOption v-for="it in g.items" :key="it.value" v-bind="it" :data-value="it.value" :flash="viewerFound?.value === it.value ? viewerFound.nonce : null" @select="onViewerSelect(it)" @refuse="onViewerRefuse(it, $event)" @unbind="onViewerUnbind" />
             </AssignList>
           </StageSection>
         </template>

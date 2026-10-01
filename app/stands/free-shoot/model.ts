@@ -988,6 +988,29 @@ export function createModel(opts: ModelOptions) {
   }
   /** Прототип `suggestFor`: блок съёмки кадра → шаг существующего объекта, новый объект или `null` (не распознано). */
   function suggestFor(f: Frame): Suggestion | null {
+    return suggestState(f).sg
+  }
+  const SUGGEST_UNKNOWN = 'Не удалось подобрать: идентификатор рядом с кадром не распознан'
+  /**
+   * Подбор и причина отказа — такт 52, решения владельца 2026-10-01. Закрытый для приёма шаг (проверен и закрыт либо
+   * заполнен) из кандидатов исключается: из такого предложения нет выхода. Прототип v17 такой шаг предлагает — строка
+   * раздела 15 для аналитика. Причина нужна заранее: кнопка «Подобрать шаг» выключена, причина — в её подсказке.
+   */
+  function suggestState(f: Frame): { sg: Suggestion | null, reason: string } {
+    const raw = suggestRaw(f)
+    if (!raw) return { sg: null, reason: SUGGEST_UNKNOWN }
+    if (raw.kind === 'step' && raw.blocked) {
+      return { sg: null, reason: `Не удалось подобрать: шаг «${raw.stepName}» · ${raw.ownerName} ${raw.blocked === 'frozen' ? 'проверен и закрыт' : 'уже заполнен'}` }
+    }
+    return { sg: raw, reason: '' }
+  }
+  /** Причина, по которой подобрать шаг нельзя; пусто — подбор доступен. */
+  function suggestReason(i: number) {
+    const f = frameByI[i]
+    return f ? suggestState(f).reason : ''
+  }
+  /** Прототип `suggestFor` как есть: закрытый шаг помечен `blocked`. */
+  function suggestRaw(f: Frame): Suggestion | null {
     const b = BLOCKS.find(x => f.i >= x.a && f.i <= x.b)
     if (!b) return null
     if (b.kind === 'terr') return stepSuggestion('gen', f.k === 'plan' ? 'g1' : 'g4')
@@ -1009,8 +1032,8 @@ export function createModel(opts: ModelOptions) {
   function lbSuggest(i: number) {
     const f = frameByI[i]
     if (!f) return null
-    const sg = suggestFor(f)
-    if (!sg) notify('Не удалось подобрать: идентификатор рядом с кадром не распознан', 'err')
+    const { sg, reason } = suggestState(f)
+    if (!sg) notify(reason, 'err')
     return sg
   }
 
@@ -1172,6 +1195,7 @@ export function createModel(opts: ModelOptions) {
     lbAssign,
     confirmMove,
     suggestFor,
+    suggestReason,
     lbSuggest,
     /* П5 */
     setQuery,

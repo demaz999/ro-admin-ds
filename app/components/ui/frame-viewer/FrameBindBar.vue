@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ButtonAction } from '../button-action'
 import { Kbd } from '../kbd'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../tooltip'
 import { stepCounterVariants } from '../step-row'
 import { cn } from '@/lib/utils'
 import type { FrameBindState, FrameSuggestion } from '.'
@@ -27,6 +28,13 @@ const props = withDefaults(defineProps<{
   reason?: string
   /** Результат «Подобрать шаг» — у `free` (§11.2). */
   suggestion?: FrameSuggestion | null
+  /**
+   * Подобрать шаг для кадра нельзя — причина: «Подобрать шаг» выключена, причина — в подсказке на кнопке (такт 52).
+   * Доступность считает страница заранее, при показе кадра.
+   */
+  suggestReason?: string
+  /** Оснастка приёмки: подсказка причины открыта сразу. В продукт не идёт. */
+  reasonOpen?: boolean
   /** Смена значения — вспышка «Распределено» 820 мс, кнопки выключены (§11.3). */
   flash?: number | null
   class?: string
@@ -38,6 +46,8 @@ const props = withDefaults(defineProps<{
   rejected: false,
   reason: '',
   suggestion: null,
+  suggestReason: '',
+  reasonOpen: undefined,
   flash: null,
 })
 
@@ -108,6 +118,8 @@ const blockedText = computed(() => {
           :disabled="flashing"
           @click="emit('accept')"
         >{{ props.suggestion.stepName }}</button><b v-else class="font-bold">{{ props.suggestion.stepName }}</b> · {{ props.suggestion.ownerName }}{{ blockedText }}
+        <!-- Такт 52: кнопки «Принять» нет — ссылка на шаг уже привязывает кадр; после неё — подсказка клавиши. -->
+        <Kbd v-if="!props.suggestion.blocked" surface="card" class="ml-1">Enter</Kbd>
       </template>
       <template v-else-if="props.suggestion?.kind === 'create'">
         Похоже на новый объект: <b class="font-bold">{{ props.suggestion.title }}</b><template v-if="props.suggestion.inv"> · инв. {{ props.suggestion.inv }}</template>
@@ -124,10 +136,6 @@ const blockedText = computed(() => {
     <div data-slot="frame-bind-actions" class="flex shrink-0 flex-wrap items-center justify-end gap-2">
       <!-- Такт 50, решение владельца 2026-10-01: все кнопки плашки — текстовые без подложки (ButtonAction). -->
       <template v-if="props.suggestion?.kind === 'step'">
-        <ButtonAction v-if="!props.suggestion.blocked" size="sm" :show-icon="false" :disabled="flashing" @click="emit('accept')">
-          Принять
-          <Kbd surface="card">Enter</Kbd>
-        </ButtonAction>
         <ButtonAction size="sm" :show-icon="false" :disabled="flashing" @click="emit('dismiss')">
           Не то
         </ButtonAction>
@@ -150,6 +158,22 @@ const blockedText = computed(() => {
         </ButtonAction>
         <span v-else data-slot="frame-bind-reason" class="max-w-60 text-right">{{ props.reason }} — изменить нельзя</span>
       </template>
+      <!--
+        Подобрать нельзя — кнопка выключена, причина — в подсказке (такт 52). Выключенная кнопка событий не получает,
+        поэтому подсказку держит обёртка; она же принимает фокус с клавиатуры.
+      -->
+      <TooltipProvider v-else-if="props.suggestReason">
+        <Tooltip :open="props.reasonOpen">
+          <TooltipTrigger as-child>
+            <span data-slot="frame-bind-suggest" tabindex="0" :aria-label="props.suggestReason" class="flex outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <ButtonAction size="sm" :show-icon="false" disabled>
+                Подобрать шаг
+              </ButtonAction>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent class="max-w-80 whitespace-normal">{{ props.suggestReason }}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       <ButtonAction v-else size="sm" :show-icon="false" :disabled="flashing" @click="emit('suggest')">
         Подобрать шаг
       </ButtonAction>

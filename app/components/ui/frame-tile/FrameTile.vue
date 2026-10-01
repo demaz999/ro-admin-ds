@@ -127,10 +127,10 @@ function onKeydown(event: KeyboardEvent) {
     @keydown="onKeydown"
   >
     <!--
-      Картинка и её углы — такт 47, приёмка владельца 2026-10-01 (п. 5). Места закреплены и не сдвигаются: слева вверху —
-      флажок, справа вверху — «во весь экран», слева от него — «открепить»; справа внизу картинки — лупа «показать в
-      структуре»; слева внизу — маркер видео. Одна геометрия на все углы: зона нажатия 32, видимая плашка 28 `--scrim-dark`
-      с белым глифом 16 (у «во весь экран» — глиф оптического размера 20, такт 51), отступ плашки 8 от края
+      Картинка и её углы — такт 47, приёмка владельца 2026-10-01 (п. 5). Такт 52: углы плитки — только действия, места
+      закреплены и не сдвигаются: слева вверху — флажок, справа вверху — «во весь экран», справа внизу — лупа «показать
+      в структуре», слева внизу — крестик «открепить». Маркер видео — глиф в полосе подписи перед текстом. Одна геометрия на все углы: зона нажатия 32, видимая плашка 28 `--scrim-dark`
+      с белым глифом 16, отступ плашки 8 от края
       (зона — 6); центрирование флексом, координаты целые.
     -->
     <div data-slot="frame-tile-media" class="@container relative">
@@ -162,16 +162,16 @@ function onKeydown(event: KeyboardEvent) {
         :class="props.demoHover ? 'opacity-100' : 'opacity-0'"
         @click.stop="emit('open')"
       >
-        <span class="flex size-7 items-center justify-center rounded-sm bg-scrim-dark text-primary-foreground"><Icon name="fullscreen" :size="14" /></span>
+        <span class="flex size-7 items-center justify-center rounded-sm bg-scrim-dark text-primary-foreground"><Icon name="fullscreen" :size="16" /></span>
       </button>
 
-      <!-- «Открепить» — слева от «во весь экран», место закреплено (зона 32 вплотную к зоне соседа). -->
+      <!-- «Открепить» — левый нижний угол картинки (такт 52). -->
       <button
         v-if="placed && !protectedFrame"
         type="button"
         data-slot="frame-tile-unassign"
         aria-label="Открепить"
-        class="absolute top-1.5 right-9.5 z-20 flex size-8 items-center justify-center outline-none"
+        class="absolute bottom-1.5 left-1.5 z-20 flex size-8 items-center justify-center outline-none"
         @click.stop="emit('unassign')"
       >
         <span class="flex size-7 items-center justify-center rounded-sm bg-scrim-dark text-primary-foreground"><Icon name="close" :size="16" /></span>
@@ -188,16 +188,6 @@ function onKeydown(event: KeyboardEvent) {
       >
         <span class="flex size-7 items-center justify-center rounded-sm bg-scrim-dark text-primary-foreground"><Icon name="search" :size="16" /></span>
       </button>
-
-      <!-- Маркер видео — левый нижний угол картинки, не действие. -->
-      <span
-        v-if="props.kind === 'video'"
-        data-slot="frame-tile-video"
-        aria-hidden="true"
-        class="pointer-events-none absolute bottom-1.5 left-1.5 z-20 flex size-8 items-center justify-center outline-none"
-      >
-        <span class="flex size-7 items-center justify-center rounded-sm bg-scrim-dark text-primary-foreground"><Icon name="play" :size="16" /></span>
-      </span>
     </div>
 
     <!--
@@ -212,10 +202,12 @@ function onKeydown(event: KeyboardEvent) {
       class="flex h-6 items-center gap-1 border-t border-border-soft px-2 text-xs text-foreground-secondary"
     >
       <span>{{ props.time }}</span>
+      <!-- Видео: глиф перед длительностью, как у прототипа («▶ 0:36»). -->
       <span
-        v-if="props.kind === 'video' && props.duration"
-        class="ml-auto font-medium"
-      >{{ props.duration }}</span>
+        v-if="props.kind === 'video'"
+        data-slot="frame-tile-video"
+        class="ml-auto flex items-center gap-1 font-medium"
+      ><Icon name="play" :size="8" />{{ props.duration }}</span>
     </span>
 
     <TooltipProvider v-else>
@@ -223,6 +215,10 @@ function onKeydown(event: KeyboardEvent) {
         data-slot="frame-tile-plate"
         :class="frameTilePlateVariants({ state: props.state === 'free' ? 'assigned' : props.state })"
       >
+        <!-- Видео: глиф перед названием шага — маркер ушёл из угла картинки (такт 52). -->
+        <span v-if="props.kind === 'video'" data-slot="frame-tile-video" aria-hidden="true" class="flex shrink-0 items-center">
+          <Icon name="play" :size="8" />
+        </span>
         <Tooltip :open="props.tooltipOpen">
           <TooltipTrigger as-child>
             <button

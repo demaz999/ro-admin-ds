@@ -88,7 +88,7 @@ function onMouseup() {
         <PlayerButton size="xs" @click="emit('play')" />
       </span>
       <!-- У текстовой заметки — глиф в тоне заметки, без круга и подложки: он не интерактивен (такт 51). -->
-      <Icon v-if="props.kind === 'note'" name="article" :size="20" class="text-warning-strong" />
+      <Icon v-if="props.kind === 'note'" name="article" :size="16" class="text-warning-strong" />
       <span
         data-slot="feed-note-type"
         :class="cn('shrink-0 text-sm font-bold', props.kind === 'note' ? 'text-warning-strong' : 'text-primary')"
