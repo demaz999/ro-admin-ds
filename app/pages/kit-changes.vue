@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { CHANGE_CLASS, CHANGES, COMPONENTS, HANDOVER, type ChangeClass } from '~/stands/kit-changes/handover-2026-10-01'
+import { CHANGE_CLASS, CHANGES, COMPONENTS, HANDOVER, type ChangeClass } from '~/stands/kit-changes/draft'
 
 /**
  * Стенд изменений кирпичиков версии передачи — правило 23 `docs/chat-protocol.md`, такт 54. Предложение чата, принятое
  * владельцем 2026-10-01: все изменённые простые компоненты версии, по компоненту; у каждой строки — класс изменения и живой
- * пример без экранного контекста. Список строк — `~/stands/kit-changes/handover-2026-10-01.ts`, тот же текст — `CHANGELOG.md`.
+ * пример без экранного контекста. Список строк — `~/stands/kit-changes/draft.ts`, тот же текст — `CHANGELOG.md`.
  */
 definePageMeta({ layout: false })
 useHead({ title: `Изменения кирпичиков — ${HANDOVER}` })
@@ -41,7 +41,8 @@ const mutedClicks = ref(0)
         Изменения кирпичиков
       </Heading>
       <p class="max-w-3xl text-sm text-foreground-secondary">
-        Версия передачи <code>{{ HANDOVER }}</code> относительно передачи 2026-09-30. Только простые компоненты, без экранного
+        Следующая версия передачи — черновик, относительно передачи 2026-09-30: имя метки и дату впишет такт закрытия круга
+        правок экрана. Только простые компоненты, без экранного
         контекста: что изменилось в API, виде и поведении. Тот же список — <code>CHANGELOG.md</code> в корне репо и разделы
         «Изменения после передачи» в <code>index.ts</code> компонентов.
       </p>
