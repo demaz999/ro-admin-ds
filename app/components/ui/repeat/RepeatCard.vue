@@ -103,7 +103,7 @@ const rail = computed(() => (props.highlighted ? 'highlighted' : props.current ?
       <div
         v-if="props.suggested"
         data-slot="repeat-review"
-        class="flex flex-wrap items-center gap-2 border-b border-border-soft px-0.5 pb-2"
+        class="flex flex-wrap items-center gap-4 border-b border-border-soft px-0.5 pb-2"
       >
         <Button size="sm" @click="emit('accept')">Принять объект</Button>
         <Button variant="secondary" size="sm" @click="emit('reject')">Отклонить</Button>

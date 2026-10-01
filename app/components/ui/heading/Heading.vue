@@ -2,7 +2,7 @@
 import type { HeadingLevel } from '.'
 import { computed } from 'vue'
 import { cn } from '@/lib/utils'
-import { headingVariants } from '.'
+import { headingMetaShift, headingVariants } from '.'
 
 /**
  * Заголовок страницы (`page`, h1) или блока (`section`, h2) — разбор в `index.ts`.
@@ -32,7 +32,7 @@ const tag = computed(() => props.as ?? (props.level === 'page' ? 'h1' : 'h2'))
       <slot />
     </component>
     <span data-slot="heading-meta" :class="cn(headingVariants({ level: props.level }), 'relative bottom-[0.5ex] font-normal leading-none')">
-      <span class="relative top-[0.5ex] text-xs text-muted-foreground"><slot name="meta" /></span>
+      <span :class="cn('relative text-xs text-muted-foreground', headingMetaShift[props.level])"><slot name="meta" /></span>
     </span>
   </div>
   <component :is="tag" v-else data-slot="heading" :data-level="props.level" :class="cn(headingVariants({ level: props.level }), props.class)">

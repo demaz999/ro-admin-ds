@@ -36,7 +36,7 @@ export { default as ButtonNavigation } from './ButtonNavigation.vue'
  * Ось `surface` такта 42 (подача на тёмной полосе) снята тактом 48: крошки из полосы убраны, потребителей нет.
  */
 export const buttonNavigationVariants = cva(
-  'inline-flex w-fit items-center bg-transparent font-bold outline-none select-none disabled:pointer-events-none disabled:opacity-[var(--opacity-disabled)]',
+  'inline-flex w-fit items-center bg-transparent font-bold outline-none transition-colors select-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-[var(--opacity-disabled)]',
   {
     variants: {
       size: {
@@ -51,8 +51,9 @@ export const buttonNavigationVariants = cva(
       },
       /** Ось `Color` мастера: тёмный против приглушённого. */
       muted: {
-        true: 'text-muted-foreground',
-        false: 'text-foreground',
+        // Системное наведение (правило владельца 2026-08-17, для «Назад» — такт 51): подпись и шеврон темнеют на ступень.
+        true: 'text-muted-foreground hover:text-foreground',
+        false: 'text-foreground hover:text-foreground-hover',
       },
     },
     defaultVariants: {

@@ -130,14 +130,17 @@ function onKeydown(event: KeyboardEvent) {
       Картинка и её углы — такт 47, приёмка владельца 2026-10-01 (п. 5). Места закреплены и не сдвигаются: слева вверху —
       флажок, справа вверху — «во весь экран», слева от него — «открепить»; справа внизу картинки — лупа «показать в
       структуре»; слева внизу — маркер видео. Одна геометрия на все углы: зона нажатия 32, видимая плашка 28 `--scrim-dark`
-      с белым глифом 16 (у «во весь экран» — 18: целые пиксели штриха, довесок такта 48), отступ плашки 8 от края
+      с белым глифом 16 (у «во весь экран» — глиф оптического размера 20, такт 51), отступ плашки 8 от края
       (зона — 6); центрирование флексом, координаты целые.
     -->
-    <div data-slot="frame-tile-media" class="relative">
-      <Image ratio="4:3" :src="props.src" :alt="props.alt" :class="imageClass" />
+    <div data-slot="frame-tile-media" class="@container relative">
+      <!-- Высота картинки — 3/4 ширины, вниз до кратного 4 (целые пиксели устройства при масштабах 1–2, такт 51). -->
+      <Image ratio="4:3" :src="props.src" :alt="props.alt" :class="cn(imageClass, 'h-[round(down,75cqw,--spacing(1))]')" />
 
       <!--
-        Флажок — `Checkbox on-image` по правилу «Контрол поверх изображения», по центру плашки. Он только показывает
+        Флажок — `Checkbox on-image` по правилу «Контрол поверх изображения», как в карточке осмотра «Моих осмотров»: без тёмной
+        подложки (такт 51, решение владельца 2026-10-01), по центру той же зоны 32 — на одной линии со значком «во весь экран».
+        Он только показывает
         выделение: цель клика — вся плитка, поэтому флажок выведен из фокуса и из дерева доступности (`inert`).
       -->
       <span
@@ -147,7 +150,7 @@ function onKeydown(event: KeyboardEvent) {
         :class="props.selected || props.selectionMode || props.demoHover ? 'opacity-100' : 'opacity-0 group-hover/tile:opacity-100'"
         :style="{ transitionDuration: 'var(--duration-hover)' }"
       >
-        <span class="flex size-7 items-center justify-center rounded-sm bg-scrim-dark text-primary-foreground"><Checkbox :model-value="props.selected" on-image /></span>
+        <Checkbox :model-value="props.selected" on-image />
       </span>
 
       <!-- Открыть на весь экран — всегда правый верхний угол, появляется на наведении (§8.3). -->
@@ -159,7 +162,7 @@ function onKeydown(event: KeyboardEvent) {
         :class="props.demoHover ? 'opacity-100' : 'opacity-0'"
         @click.stop="emit('open')"
       >
-        <span class="flex size-7 items-center justify-center rounded-sm bg-scrim-dark text-primary-foreground"><Icon name="fullscreen" :size="18" /></span>
+        <span class="flex size-7 items-center justify-center rounded-sm bg-scrim-dark text-primary-foreground"><Icon name="fullscreen" :size="14" /></span>
       </button>
 
       <!-- «Открепить» — слева от «во весь экран», место закреплено (зона 32 вплотную к зоне соседа). -->
@@ -198,28 +201,24 @@ function onKeydown(event: KeyboardEvent) {
     </div>
 
     <!--
-      Строка подписи есть всегда: высота плитки не зависит от состояния. Время и
-      длительность выводятся только у свободного кадра — у кадра с привязкой
-      строку перекрывает плашка (решение владельца 2, спека §4).
+      Полоса под картинкой есть всегда: высота плитки не зависит от состояния. Такт 51, решение владельца 2026-10-01:
+      подпись живёт в полосе, а не поверх картинки; градиента и тени нет. У свободного кадра — время и длительность (§4),
+      у кадра с привязкой полоса залита цветом статуса сплошняком, текст 13/16 medium; подчёркивание — на наведении:
+      название шага — действие «Показать в структуре» (§15.4). Замок защищённого кадра — справа в той же полосе.
     -->
     <span
+      v-if="!placed"
       data-slot="frame-tile-caption"
-      class="flex h-6 items-center gap-1 border-t border-border-soft px-2 text-2xs text-foreground-secondary"
+      class="flex h-6 items-center gap-1 border-t border-border-soft px-2 text-xs text-foreground-secondary"
     >
-      <template v-if="!placed">
-        <span>{{ props.time }}</span>
-        <span
-          v-if="props.kind === 'video' && props.duration"
-          class="ml-auto font-medium"
-        >{{ props.duration }}</span>
-      </template>
+      <span>{{ props.time }}</span>
+      <span
+        v-if="props.kind === 'video' && props.duration"
+        class="ml-auto font-medium"
+      >{{ props.duration }}</span>
     </span>
 
-    <!--
-      Полоса привязки — текст статуса в одну строку с многоточием, отступ слева 8; у защищённого кадра справа замок
-      с причиной (такт 47 вернул его в полосу, как до такта 46). Название шага — действие «Показать в структуре» (§15.4).
-    -->
-    <TooltipProvider v-if="placed">
+    <TooltipProvider v-else>
       <div
         data-slot="frame-tile-plate"
         :class="frameTilePlateVariants({ state: props.state === 'free' ? 'assigned' : props.state })"
@@ -229,7 +228,7 @@ function onKeydown(event: KeyboardEvent) {
             <button
               type="button"
               data-slot="frame-tile-step"
-              class="min-w-0 truncate text-left underline decoration-dotted underline-offset-2 outline-none hover:decoration-solid focus-visible:decoration-solid"
+              class="min-w-0 truncate text-left outline-none hover:underline focus-visible:underline"
               @click.stop="emit('locate')"
             >
               {{ plateText }}

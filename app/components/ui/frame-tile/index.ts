@@ -39,9 +39,8 @@ export { default as FrameTile } from './FrameTile.vue'
  * Шестое состояние спеки — «снят в шаге» — в ленте не выводится (§4.1): такой
  * кадр живёт только миниатюрой `StepThumb` внутри шага.
  *
- * **Плашка лежит поверх строки подписи**, как в прототипе: у кадра с привязкой
- * время и длительность видео не видны. Время выводится только у свободного
- * кадра (§4) — решение владельца 2.
+ * **Подпись — полоса под картинкой** (такт 51): у свободного кадра — время и длительность видео (§4, решение
+ * владельца 2), у кадра с привязкой — полоса в цвете статуса с названием шага; время у него не выводится.
  *
  * ## Граница со страницей
  *
@@ -51,14 +50,22 @@ export { default as FrameTile } from './FrameTile.vue'
  * сюда они приходят пропами `selected`, `selectionMode`, `dragging`, `dimmed`,
  * `linked`.
  */
+/**
+ * ## Целые пиксели устройства — такт 51
+ *
+ * Значок «во весь экран» выглядел кривым: SVG рисуется с дробным сдвигом, если плашка стоит на дробном пикселе устройства.
+ * При масштабе 1.25 целые пиксели — координаты, кратные 4. Поэтому: рамка плитки — контур внутрь (`outline`, в раскладке
+ * не участвует), ширина колонки сетки и высота картинки кратны 4, плашки стоят в 8 от краёв картинки, полоса подписи 24.
+ * Высота картинки — 3/4 ширины, округлённые вниз до 4: от пропорции 4:3 кадр отходит меньше чем на 4 по высоте.
+ */
 export const frameTileVariants = cva(
-  'group/tile relative flex cursor-pointer flex-col overflow-hidden rounded-sm border bg-card outline-none select-none focus-visible:ring-2 focus-visible:ring-ring',
+  'group/tile relative flex cursor-pointer flex-col overflow-hidden rounded-sm bg-card outline -outline-offset-1 select-none focus-visible:ring-2 focus-visible:ring-ring',
   {
     variants: {
       /** Выделен: рамка брендовая, кольцо светлой брендовой ступенью (`.card.sel`). */
       selected: {
-        true: 'border-stroke-accent ring-2 ring-secondary-hover',
-        false: 'border-border-soft hover:shadow-elevated',
+        true: 'outline-stroke-accent ring-2 ring-secondary-hover',
+        false: 'outline-border-soft hover:shadow-elevated',
       },
       /** У кадра есть привязка — фон корня светлой нейтралью (`.card.placed`). */
       placed: {
@@ -97,20 +104,19 @@ export const frameTileVariants = cva(
 )
 
 /**
- * Плашка привязки: градиент от прозрачного к тёмной ступени роли, сплошной с
- * 45% высоты (`.mark`). Прототип держит заливку на 90–94%; такой ступени
- * прозрачности в ките нет, поэтому заливка сплошная — контраст только выше.
- * Прецедент градиента поверх кадра — `NavigationTile` (`to-scrim-dark`).
+ * Полоса привязки под картинкой — такт 51, решение владельца 2026-10-01: подпись ушла из картинки в полосу 24 под ней,
+ * градиента и тени нет; полоса залита тёмной ступенью роли сплошняком, текст 13/16 medium белым. До такта 51 — плашка
+ * с градиентом поверх нижнего края кадра (`.mark` прототипа).
  */
 export const frameTilePlateVariants = cva(
-  'absolute inset-x-0 bottom-0 z-10 flex items-center gap-1 bg-linear-to-b from-transparent via-45% px-2 pt-4 pb-1 text-2xs font-medium text-primary-foreground',
+  'flex h-6 items-center gap-1 px-2 text-xs font-medium text-primary-foreground',
   {
     variants: {
       state: {
-        assigned: 'via-success-strong to-success-strong',
-        suggested: 'via-warning-strong to-warning-strong',
-        locked: 'via-surface-contrast to-surface-contrast',
-        rejected: 'via-destructive-strong to-destructive-strong',
+        assigned: 'bg-success-strong',
+        suggested: 'bg-warning-strong',
+        locked: 'bg-surface-contrast',
+        rejected: 'bg-destructive-strong',
       },
     },
     defaultVariants: { state: 'assigned' },
@@ -133,23 +139,24 @@ const frameTileGrid = cva('grid items-start justify-start gap-2', {
      * Число колонок явно — такт 42, решение чата 2026-09-30: число колонок ленты — структура прототипа при той же
      * ширине окна и панели. Страница считает его правилом `frameTileColumns` и передаёт сюда; без него — `auto-fill`.
      *
-     * Довесок такта 48: ширина колонки округляется вниз до целого пикселя (`round`, шаг — четверть единицы шкалы).
+     * Довесок такта 48: ширина колонки округляется вниз (`round`); с такта 51 шаг — 4, единица шкалы: при масштабе 1.25
+     * целыми пикселями устройства выходят только координаты, кратные 4.
      * При дробной колонке (874 на 4 колонки — 212.5) плитки со второй вставали на полпикселя, и глифы плашек
-     * размывались несимметрично; остаток до N − 1 пикселя уходит к правому краю сетки.
+     * размывались несимметрично; остаток — до 3 на колонку — уходит к правому краю сетки.
      */
     columns: {
       1: 'grid-cols-[repeat(1,minmax(0,1fr))]',
-      2: 'grid-cols-[repeat(2,round(down,calc((100%_-_1_*_--spacing(2))_/_2),--spacing(0.25)))]',
-      3: 'grid-cols-[repeat(3,round(down,calc((100%_-_2_*_--spacing(2))_/_3),--spacing(0.25)))]',
-      4: 'grid-cols-[repeat(4,round(down,calc((100%_-_3_*_--spacing(2))_/_4),--spacing(0.25)))]',
-      5: 'grid-cols-[repeat(5,round(down,calc((100%_-_4_*_--spacing(2))_/_5),--spacing(0.25)))]',
-      6: 'grid-cols-[repeat(6,round(down,calc((100%_-_5_*_--spacing(2))_/_6),--spacing(0.25)))]',
-      7: 'grid-cols-[repeat(7,round(down,calc((100%_-_6_*_--spacing(2))_/_7),--spacing(0.25)))]',
-      8: 'grid-cols-[repeat(8,round(down,calc((100%_-_7_*_--spacing(2))_/_8),--spacing(0.25)))]',
-      9: 'grid-cols-[repeat(9,round(down,calc((100%_-_8_*_--spacing(2))_/_9),--spacing(0.25)))]',
-      10: 'grid-cols-[repeat(10,round(down,calc((100%_-_9_*_--spacing(2))_/_10),--spacing(0.25)))]',
-      11: 'grid-cols-[repeat(11,round(down,calc((100%_-_10_*_--spacing(2))_/_11),--spacing(0.25)))]',
-      12: 'grid-cols-[repeat(12,round(down,calc((100%_-_11_*_--spacing(2))_/_12),--spacing(0.25)))]',
+      2: 'grid-cols-[repeat(2,round(down,calc((100%_-_1_*_--spacing(2))_/_2),--spacing(1)))]',
+      3: 'grid-cols-[repeat(3,round(down,calc((100%_-_2_*_--spacing(2))_/_3),--spacing(1)))]',
+      4: 'grid-cols-[repeat(4,round(down,calc((100%_-_3_*_--spacing(2))_/_4),--spacing(1)))]',
+      5: 'grid-cols-[repeat(5,round(down,calc((100%_-_4_*_--spacing(2))_/_5),--spacing(1)))]',
+      6: 'grid-cols-[repeat(6,round(down,calc((100%_-_5_*_--spacing(2))_/_6),--spacing(1)))]',
+      7: 'grid-cols-[repeat(7,round(down,calc((100%_-_6_*_--spacing(2))_/_7),--spacing(1)))]',
+      8: 'grid-cols-[repeat(8,round(down,calc((100%_-_7_*_--spacing(2))_/_8),--spacing(1)))]',
+      9: 'grid-cols-[repeat(9,round(down,calc((100%_-_8_*_--spacing(2))_/_9),--spacing(1)))]',
+      10: 'grid-cols-[repeat(10,round(down,calc((100%_-_9_*_--spacing(2))_/_10),--spacing(1)))]',
+      11: 'grid-cols-[repeat(11,round(down,calc((100%_-_10_*_--spacing(2))_/_11),--spacing(1)))]',
+      12: 'grid-cols-[repeat(12,round(down,calc((100%_-_11_*_--spacing(2))_/_12),--spacing(1)))]',
     },
   },
   defaultVariants: { size: 'md' },

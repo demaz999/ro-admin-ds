@@ -31,7 +31,7 @@ const props = withDefaults(defineProps<{
         <slot />
       </div>
     </div>
-    <div v-if="$slots.actions" data-slot="callout-actions" class="flex shrink-0 flex-wrap items-center justify-end gap-3">
+    <div v-if="$slots.actions" data-slot="callout-actions" class="flex shrink-0 flex-wrap items-center justify-end gap-4">
       <slot name="actions" />
     </div>
   </div>

@@ -15,7 +15,8 @@ const props = defineProps<{ class?: string }>()
     <span v-if="$slots.note" data-slot="modal-card-note" class="min-w-0 flex-1 text-2xs text-foreground-secondary">
       <slot name="note" />
     </span>
-    <div class="ml-auto flex shrink-0 items-center gap-6">
+    <!-- Между кнопками действий — 16 (такт 51, решение владельца 2026-10-01; было 24). -->
+    <div data-slot="modal-card-actions" class="ml-auto flex shrink-0 items-center gap-4">
       <slot />
     </div>
   </div>

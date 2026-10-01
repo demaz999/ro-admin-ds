@@ -99,7 +99,15 @@ const blockedText = computed(() => {
     <!-- Текст состояния. -->
     <span data-slot="frame-bind-text" class="min-w-0 flex-1">
       <template v-if="props.suggestion?.kind === 'step'">
-        Предложение: <b class="font-bold">{{ props.suggestion.stepName }}</b> · {{ props.suggestion.ownerName }}{{ blockedText }}
+        <!-- Такт 51, решение владельца 2026-10-01: название предложенного шага — кнопка-ссылка, клик привязывает кадр, как Enter. -->
+        Предложение: <button
+          v-if="!props.suggestion.blocked"
+          type="button"
+          data-slot="frame-bind-step"
+          class="font-bold text-primary outline-none transition-colors hover:text-primary-hover focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none"
+          :disabled="flashing"
+          @click="emit('accept')"
+        >{{ props.suggestion.stepName }}</button><b v-else class="font-bold">{{ props.suggestion.stepName }}</b> · {{ props.suggestion.ownerName }}{{ blockedText }}
       </template>
       <template v-else-if="props.suggestion?.kind === 'create'">
         Похоже на новый объект: <b class="font-bold">{{ props.suggestion.title }}</b><template v-if="props.suggestion.inv"> · инв. {{ props.suggestion.inv }}</template>

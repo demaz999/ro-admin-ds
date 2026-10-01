@@ -37,6 +37,7 @@ const glyphSize = computed(() => (props.size === 'sm' ? 12 : 16))
     :type="props.type"
     :disabled="props.disabled"
     :class="buttonNavigationVariants({ size, muted })"
+    :style="{ transitionDuration: 'var(--duration-hover)' }"
   >
     <!-- `base` — btn_back: шеврон высотой 16 в контейнере шириной 8. -->
     <span v-if="props.direction === 'left' && props.size === 'base'" class="flex w-2 shrink-0 justify-center">

@@ -1124,22 +1124,22 @@ function onUndo(id: number) {
             </Heading>
           </div>
           <!-- Справа: счётчики и «Завершить распределение» (№ 7) — из полосы в подшапку, такт 48. -->
-          <div class="ml-auto flex items-center gap-5">
+          <div class="ml-auto flex items-center gap-4">
             <ProgressStat
-              class="min-w-38 max-w-47.5"
+              class="min-w-32 max-w-47.5"
               label="Кадры разложены"
               :value="S.framesText"
               :progress="{ value: S.placed, max: S.total, locked: S.pre }"
               :sub="S.framesSub"
             />
             <ProgressStat
-              class="min-w-38 max-w-47.5"
+              class="min-w-32 max-w-47.5"
               label="Обязательные шаги"
               :value="S.reqText"
               :progress="{ value: S.ok, max: S.req, locked: S.frz }"
               :sub="S.reqSub"
             />
-            <ProgressStat class="min-w-38 max-w-47.5" label="Объекты" :value="S.objText" :sub="S.objSub" />
+            <ProgressStat class="min-w-32 max-w-47.5" label="Объекты" :value="S.objText" :sub="S.objSub" />
             <Button @click="m.openWindow('finish')">Завершить распределение</Button>
           </div>
         </Toolbar>
@@ -1234,8 +1234,9 @@ function onUndo(id: number) {
           <ResizablePanel data-pane-right :default-size="440" :min-size="320" :max-size="820" size-unit="px" class="flex flex-col">
             <!--
               Заголовочный блок панели — такт 48, решение владельца 2026-10-01: линия вкладок на всю ширину панели
-              (TabsList stretch), поля блока слева и справа 12, ряд инструментов схемы (№ 32–33) — сразу под вкладками;
-              20 до содержимого — под рядом, в прокручиваемой части. Блок стоит над прокруткой и с ней не уезжает.
+              (TabsList stretch), поля блока слева и справа 12, ряд инструментов схемы (№ 32–33) — сразу под вкладками.
+              Такт 51: поля ряда 12 сверху и 8 снизу; после линии под рядом отступа нет — этапы начинаются сразу
+              (у вкладки «Форма осмотра» ряда нет, до содержимого 20). Блок стоит над прокруткой и с ней не уезжает.
             -->
             <div class="flex shrink-0 flex-col">
               <Tabs v-model="tab">
@@ -1245,7 +1246,7 @@ function onUndo(id: number) {
                 </TabsList>
               </Tabs>
               <!-- инструменты схемы, §9.1–9.2 — кит, такт 42: Toolbar (№ 32–33) -->
-              <Toolbar v-if="tab === 'scheme'" data-schtools class="px-3">
+              <Toolbar v-if="tab === 'scheme'" data-schtools class="px-3 pt-3 pb-2">
                 <Button variant="secondary" size="sm" @click="m.toggleAllStages()">{{ m.allClosed.value ? 'Развернуть все' : 'Свернуть все' }}</Button>
                 <Button v-if="nfrz" :variant="m.state.onlyOpen ? 'default' : 'secondary'" size="sm" @click="m.toggleOnlyOpen()">
                   {{ m.state.onlyOpen ? `Показать все (+${nfrz})` : 'Только открытые' }}
@@ -1254,7 +1255,7 @@ function onUndo(id: number) {
               </Toolbar>
             </div>
 
-            <div ref="panelEl" data-panel class="min-h-0 flex-1 overflow-auto pt-5 pb-30" @dragover="onPanelDragover" @drop="onPanelDrop" @mouseover="onPanelOver" @mouseleave="hoverPanel = null">
+            <div ref="panelEl" data-panel class="min-h-0 flex-1 overflow-auto pb-30" :class="tab === 'form' ? 'pt-5' : ''" @dragover="onPanelDragover" @drop="onPanelDrop" @mouseover="onPanelOver" @mouseleave="hoverPanel = null">
               <template v-if="tab === 'scheme'">
                 <template v-for="st in visibleStages" :key="st.id">
                   <StageSection

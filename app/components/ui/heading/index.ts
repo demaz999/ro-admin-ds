@@ -23,12 +23,23 @@ export { default as Heading } from './Heading.vue'
 export const headingVariants = cva('m-0 font-bold text-foreground', {
   variants: {
     level: {
-      page: 'text-2xl',
+      // Такт 51, решение владельца 2026-10-01: 32/36 (24 мало, ступени 28 в шкале нет); такт 47 — 24/28.
+      page: 'text-3xl',
       section: 'text-lg',
     },
   },
   defaultVariants: { level: 'section' },
 })
+
+/**
+ * Сдвиг текста слота `meta` вниз от базовой линии: половина высоты своих строчных — выравнивание по середине строчных
+ * (такт 50). У заголовка страницы сверх того оптическая поправка 2 (такт 51): при кегле 32 против 13 текст, стоящий
+ * строго по середине строчных, смотрится задранным.
+ */
+export const headingMetaShift: Record<HeadingLevel, string> = {
+  page: 'top-[calc(0.5ex+--spacing(0.5))]',
+  section: 'top-[0.5ex]',
+}
 
 export type HeadingVariants = VariantProps<typeof headingVariants>
 export type HeadingLevel = NonNullable<HeadingVariants['level']>

@@ -3,6 +3,7 @@ import type { FeedNoteKind, FeedNoteSelection } from '.'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { cn } from '@/lib/utils'
 import { ButtonAction } from '@/components/ui/button-action'
+import { Icon } from '@/components/ui/icon'
 import { PlayerButton } from '@/components/ui/player'
 import { feedNoteVariants } from '.'
 
@@ -79,16 +80,18 @@ function onMouseup() {
   >
     <!--
       Строка мета — такт 50, решение владельца 2026-10-01: главное в заметке — текст расшифровки. В одной строке: кнопка
-      воспроизведения 28 (зона 32) у голосовой, тип 13/16 bold в тоне заметки обычным регистром, время · имя файла ·
+      воспроизведения 28 (зона 32) у голосовой, тип 15/20 bold в тоне заметки обычным регистром (такт 51: «тип > мета»), время · имя файла ·
       длительность — приглушённо (`--opacity-on-tone`), справа «Копировать».
     -->
-    <div data-slot="feed-note-head" class="flex items-center gap-2">
+    <div data-slot="feed-note-head" class="flex min-h-8 items-center gap-2">
       <span v-if="props.kind === 'voice'" data-slot="feed-note-play" class="flex size-8 shrink-0 items-center justify-center">
         <PlayerButton size="xs" @click="emit('play')" />
       </span>
+      <!-- У текстовой заметки — глиф в тоне заметки, без круга и подложки: он не интерактивен (такт 51). -->
+      <Icon v-if="props.kind === 'note'" name="article" :size="20" class="text-warning-strong" />
       <span
         data-slot="feed-note-type"
-        :class="cn('shrink-0 text-xs font-bold', props.kind === 'note' ? 'text-warning-strong' : 'text-primary')"
+        :class="cn('shrink-0 text-sm font-bold', props.kind === 'note' ? 'text-warning-strong' : 'text-primary')"
       >{{ props.kind === 'note' ? 'Текстовая заметка' : 'Голосовой комментарий' }}</span>
       <span data-slot="feed-note-time" class="min-w-0 truncate text-xs text-foreground/[var(--opacity-on-tone)]">{{ meta }}</span>
       <span data-slot="feed-note-copy" class="ml-auto flex shrink-0">
