@@ -290,9 +290,13 @@ const mutedClicks = ref(0)
             <div data-checkbox-gap class="flex items-center gap-6">
               <Checkbox>Подпись флажка</Checkbox>
               <Checkbox :model-value="true">Отмечен</Checkbox>
+              <RadioGroup model-value="a">
+                <RadioGroupItem value="a" checked>Радио</RadioGroupItem>
+              </RadioGroup>
+              <Switch>Переключатель</Switch>
             </div>
             <p class="text-2xs text-muted-foreground">
-              От квадрата до подписи — 8.
+              От контрола до подписи — 8 у флажка, радио и переключателя.
             </p>
           </template>
           <template v-else-if="c.id === 'checkbox-bare'">

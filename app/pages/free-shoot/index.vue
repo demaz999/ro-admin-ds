@@ -837,13 +837,15 @@ const viewerGroups = computed(() => {
 /**
  * Кадр просмотра перетаскивается на шаг в правой панели просмотра. Правила — те же, что у нажатия по пункту: тип кадра,
  * лимит, закрытый шаг дают отказ с причиной; бросок на подходящий шаг — `viewerAssign`: вспышка и переход к следующему
- * кадру. Подходящий шаг под курсором — цель приёма (`AssignOption dropTarget`), неподходящие приглушены и без переноса.
+ * кадру; бросок на «Новый объект» — как нажатие по нему. Подходящий шаг под курсором — цель приёма (`AssignOption dropTarget`), неподходящие приглушены и без переноса.
  * Прототип кадр из просмотра не перетаскивает — строка раздела 15 для аналитика.
  */
 const viewerDrag = ref(false)
 const viewerHot = ref('')
 const viewerItem = (value: string) => viewerGroups.value.flatMap(g => g.items).find((it: any) => it.value === value)
 function viewerAccepts(it: any) {
+  /* «Новый объект» принимает кадр всегда: бросок на него — как нажатие (решение чата 2026-10-01, довесок к такту 56). */
+  if (it?.type === 'create') return true
   if (!it || it.type !== 'step' || it.bound || it.frozen || it.reason) return false
   const [owner, sid] = String(it.value).split('|')
   const st = m.ownerStage(owner!)?.steps.find(x => x.id === sid)
@@ -861,7 +863,7 @@ function onViewerDragEnd() {
   viewerDrag.value = false
   viewerHot.value = ''
 }
-const asideValue = (e: Event) => ((e.target as HTMLElement).closest('[data-assign-option][data-type=step]') as HTMLElement | null)?.dataset.value ?? ''
+const asideValue = (e: Event) => ((e.target as HTMLElement).closest('[data-assign-option]') as HTMLElement | null)?.dataset.value ?? ''
 function onAsideDragover(e: DragEvent) {
   if (!viewerDrag.value) return
   e.preventDefault()
@@ -874,6 +876,8 @@ function onAsideDrop(e: DragEvent) {
   e.preventDefault()
   const it = viewerItem(asideValue(e))
   onViewerDragEnd()
+  /* «Новый объект» — форма нового повтора с кадром просмотра; «сделать текущим» и привязанный пункт броска не принимают. */
+  if (it?.type === 'create') { onViewerSelect(it); return }
   if (!it || it.type !== 'step' || it.bound) return
   const [a, b] = String(it.value).split('|')
   if (it.frozen) m.notify('Шаг проверен и закрыт — добавить нельзя', 'err')

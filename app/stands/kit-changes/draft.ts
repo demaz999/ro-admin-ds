@@ -40,7 +40,7 @@ export const CHANGES: KitChange[] = [
   { id: 'select-group', component: 'Select', cls: 'changes', text: 'Заголовок `SelectGroup` — по высоте текста с полем 8 сверху, зазор до списка 2 (было: высота 32 и зазор 8): от текста заголовка до текста первого двухстрочного пункта — 12. Отделение групп линией — прежнее.' },
   { id: 'field-label', component: 'Field', cls: 'added', text: 'Проп `labelWidth` (`content` · `form` — колонка подписи 170 при `orientation="left"`) и проп `required` — знак « *» цветом `--destructive` у подписи.' },
   { id: 'checkbox-indeterminate', component: 'Checkbox', cls: 'fixed', text: 'Состояние `indeterminate` доходит до контрола: `aria-checked="mixed"`, клик из него отмечает флажок (`update:modelValue` — `true`). Вид прежний.' },
-  { id: 'checkbox-gap', component: 'Checkbox', cls: 'changes', text: 'Зазор от флажка до подписи — 8 (было 12): флажок с подписью уже на 4. У `RadioGroupItem` и `Switch` зазор прежний, 12.' },
+  { id: 'checkbox-gap', component: 'Checkbox', cls: 'changes', text: 'Зазор от флажка до подписи — 8 (было 12): флажок с подписью уже на 4. Тот же зазор — у всего семейства выбора: `RadioGroupItem` и `Switch` (в передачу 2026-09-30 не входили).' },
   { id: 'checkbox-bare', component: 'Checkbox', cls: 'changes', text: 'Без подписи (нет слота и `subtitle`) выводится только контрол: компонент занимает 16 вместо 28 по ширине и встаёт по центру отведённого места. С подписью — прежний.' },
   { id: 'icon-glyphs', component: 'Icon', cls: 'added', text: 'Глифы `keyboard`, `bar-chart`, `auto-awesome` — Material Symbols, официальная выгрузка `default/24px`.' },
 ]

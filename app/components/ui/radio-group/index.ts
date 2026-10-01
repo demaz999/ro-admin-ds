@@ -38,8 +38,9 @@ export { default as RadioGroupItem } from './RadioGroupItem.vue'
  * | прогноз (`meta`) | 13/16 medium `--primary` | `.wn` 12 600 `#2A6496` |
  * | строки текста | через 2 | 2 |
  */
+/* Зазор от точки до подписи — 8, как у строки выбора (довесок к такту 56, решение владельца 2026-10-01; было 12). */
 export const choiceCardVariants = cva(
-  'flex w-full items-start gap-3 rounded-md border border-stroke-neutral bg-card p-3 outline-none has-data-[state=checked]:border-primary has-data-[state=checked]:bg-surface-selected has-data-[state=checked]:ring-1 has-data-[state=checked]:ring-primary',
+  'flex w-full items-start gap-2 rounded-md border border-stroke-neutral bg-card p-3 outline-none has-data-[state=checked]:border-primary has-data-[state=checked]:bg-surface-selected has-data-[state=checked]:ring-1 has-data-[state=checked]:ring-primary',
   {
     variants: {
       disabled: {

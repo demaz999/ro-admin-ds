@@ -2,7 +2,6 @@
 import { computed } from 'vue'
 import { CheckboxIndicator, CheckboxRoot } from 'reka-ui'
 import { Icon } from '../icon'
-import { cn } from '@/lib/utils'
 import { choiceRowVariants, choiceTitleVariants } from '.'
 
 /**
@@ -59,8 +58,7 @@ const state = computed<boolean | 'indeterminate'>({
 </script>
 
 <template>
-  <!-- Зазор от флажка до подписи — 8: решение владельца 2026-10-01, такт 56 (у строки выбора мастера — 12; `Switch` и радио — прежние 12). -->
-  <label data-slot="choice" :class="cn(choiceRowVariants({ disabled }), 'gap-2')">
+  <label data-slot="choice" :class="choiceRowVariants({ disabled })">
     <span class="flex h-5 shrink-0 items-center">
       <CheckboxRoot
         v-model="state"
