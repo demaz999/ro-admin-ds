@@ -119,3 +119,14 @@ export const fieldLabelVariants = cva(
 
 export type FieldVariants = VariantProps<typeof fieldVariants>
 export type FieldLabelVariants = VariantProps<typeof fieldLabelVariants>
+
+/**
+ * ## Изменения после передачи
+ *
+ * Компонент передан фронтам 2026-09-30. Правило 23 `docs/chat-protocol.md`: каждое изменение переданного компонента
+ * маркируется здесь, в `CHANGELOG.md` и в «Передано фронтам»; живые примеры — стенд `/kit-changes`.
+ *
+ * ### handover-2026-10-01
+ *
+ * - **Добавлено.** Проп `labelWidth` (`content` · `form` — колонка подписи 170 при `orientation="left"`) и проп `required` — знак « *» цветом `--destructive` у подписи.
+ */

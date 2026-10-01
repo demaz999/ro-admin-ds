@@ -101,3 +101,17 @@ export const tabsTriggerVariants = cva(
 
 export type TabsListVariants = VariantProps<typeof tabsListVariants>
 export type TabsTriggerVariants = VariantProps<typeof tabsTriggerVariants>
+
+/**
+ * ## Изменения после передачи
+ *
+ * Компонент передан фронтам 2026-09-30. Правило 23 `docs/chat-protocol.md`: каждое изменение переданного компонента
+ * маркируется здесь, в `CHANGELOG.md` и в «Передано фронтам»; живые примеры — стенд `/kit-changes`.
+ *
+ * ### handover-2026-10-01
+ *
+ * - **Добавлено.** Вид `variant="segmented"` у `TabsList` и `TabsTrigger` — сегмент-контрол: дорожка 32 `--muted` с полем 2, сегмент 28, выбранный — `--background` с тенью, 13/16 medium.
+ * - **Добавлено.** У вида `line`: проп `count` у `TabsTrigger` — счётчик вкладки (0 показывается); слот `end` у `TabsList` — правый слот высотой 44.
+ * - **Добавлено.** Проп `stretch` у `TabsList` вида `line` — список во всю ширину контейнера, линия 1 `--border` идёт под всем списком вместе с его полями. `TabsList` принимает `class`.
+ * - **Меняет существующее.** Вид `line` выглядит как VaTabs (va-ui 0.2.0): вкладка 44, поля 0 16, 15/20 bold `--foreground-secondary`, нижняя граница 1 `--border` у каждой вкладки; активная — `--foreground` над подложкой `--background` с радиусом 8 8 0 0 и полосой 2 `--primary`, переезд 0.16 с. Было: линия 4 под текстом активной вкладки.
+ */
