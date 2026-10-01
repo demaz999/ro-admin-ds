@@ -18,7 +18,7 @@ const props = withDefaults(defineProps<{
 </script>
 
 <template>
-  <span data-slot="frame-title" :class="cn('flex min-w-0 items-center gap-3', props.class)">
+  <span data-slot="frame-title" :class="cn('flex min-w-0 items-baseline gap-3', props.class)">
     <span class="truncate text-sm font-medium text-foreground">{{ props.name }}</span>
     <FrameStatus :assigned="props.assigned" />
   </span>

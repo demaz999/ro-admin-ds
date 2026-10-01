@@ -512,6 +512,15 @@ const FRAME_EXAMPLE = `<!-- полоса приложения: бренд, на�
 </ResizablePanelGroup>`
 
 /* ------------------------------ такт 43: FeedNote, ActionBar у выделенного текста, AssignOption type="stage" ------------------------------ */
+const HEADING_EXAMPLE = `<!-- заголовок страницы и строка «заголовок + текст» на базовой линии -->
+<div class="flex items-baseline gap-2">
+  <Heading level="page">Свободная съёмка</Heading>
+  <ToolbarText>{{ sessMeta }}</ToolbarText>
+</div>
+
+<!-- заголовок блока; тег меняет as -->
+<Heading>О кадре</Heading>
+<Heading as="h3">Реквизиты осмотра</Heading>`
 const LONG_NOTE = 'Итог по осмотру. Обошёл ткацкий участок цеха шесть, крутильный участок и компрессорную. В ткацком все станки SMIT на месте, номера с 10940 по 10950, у восемьсот четырнадцатого заедает прижимной вал — снял крупно.'
 const NOTES_EXAMPLE = `<!-- заметка ленты: во всю ширину сетки; развёрнутость держит страница, «Показать полностью» — от 110 знаков -->
 <FeedNote
@@ -1827,6 +1836,34 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
       </div>
 
       <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ FRAME_EXAMPLE }}</pre>
+    </section>
+
+    <!-- ============================ заголовки, такт 47 ============================ -->
+    <section id="heading" data-section="heading" class="space-y-6">
+      <div class="space-y-1">
+        <h2 class="text-lg font-bold">
+          Heading — заголовок страницы и заголовок блока
+        </h2>
+        <p class="max-w-240 text-sm text-foreground-secondary">
+          Такт 47, ворота владельца 2026-10-01. <code>level="page"</code> — h1 24/28 bold, <code>level="section"</code> — h2 17/24 bold,
+          цвет основного текста; <code>as</code> — смена тега. Правило базовой линии: в строке «заголовок + текст» элементы стоят на
+          базовой линии заголовка (<code>items-baseline</code>).
+        </p>
+      </div>
+      <div data-subsection="heading" class="grid max-w-6xl grid-cols-[repeat(2,minmax(0,1fr))] items-start gap-6">
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">page — с текстом в строке, на базовой линии</p>
+          <div class="flex items-baseline gap-2">
+            <Heading level="page">Свободная съёмка</Heading>
+            <ToolbarText>189 фото · 7 видео · 9 заметок</ToolbarText>
+          </div>
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">section — заголовок блока и группы полей (FieldSet)</p>
+          <Heading>Шаги осмотра</Heading>
+        </div>
+      </div>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ HEADING_EXAMPLE }}</pre>
     </section>
 
     <!-- ============================ заметки и создание, такт 43 ============================ -->

@@ -1097,9 +1097,14 @@ function onUndo(id: number) {
               <Button size="sm" @click="m.acceptAll()">Принять все объекты</Button>
             </template>
           </Callout>
-          <!-- № 11 — заголовок страницы h1 (приёмка владельца 2026-10-01, такт 46, п. 2): ToolbarText variant="title" -->
-          <ToolbarText as="h1" variant="title">Свободная съёмка</ToolbarText>
-          <ToolbarText data-sess-meta>{{ sessMeta }}</ToolbarText>
+          <!--
+            № 11 — заголовок страницы: Heading page (h1), такт 47, ворота владельца 2026-10-01. Правило базовой линии:
+            в строке «заголовок + текст» элементы стоят на базовой линии заголовка (items-baseline).
+          -->
+          <div class="flex items-baseline gap-2">
+            <Heading level="page">Свободная съёмка</Heading>
+            <ToolbarText data-sess-meta>{{ sessMeta }}</ToolbarText>
+          </div>
           <div class="ml-auto flex items-center gap-5">
             <ProgressStat
               class="min-w-38 max-w-47.5"
@@ -1198,8 +1203,8 @@ function onUndo(id: number) {
 
           <!-- панель структуры, §9 -->
           <ResizablePanel data-pane-right :default-size="440" :min-size="320" :max-size="820" size-unit="px" class="flex flex-col">
-            <!-- Вкладки панели — воздух 12 сверху и снизу (приёмка владельца 2026-10-01, такт 46, п. 6). -->
-            <div class="px-3 py-3">
+            <!-- Вкладки панели: 12 сверху (такт 46, п. 6), 20 до содержимого — VaTabs (такт 47). -->
+            <div class="px-3 pt-3 pb-5">
               <Tabs v-model="tab">
                 <TabsList>
                   <TabsTrigger value="scheme">Схема осмотра</TabsTrigger>
@@ -1429,14 +1434,16 @@ function onUndo(id: number) {
         </FrameStage>
         <template #aside>
           <!--
-            Заголовки разделов «О кадре» и «Шаги осмотра» — роль заголовка раздела панели структуры: StageSection без
-            сворачивания (приёмка владельца 2026-10-01, такт 46, п. 13). Группы шагов идут следом соседями: их липкие
-            заголовки не наезжают на заголовок раздела.
+            «О кадре» и «Шаги осмотра» — заголовки блоков: Heading section, без подложки и рамки строки, сверху 20, снизу
+            меньше (такт 47, приёмка владельца 2026-10-01; такт 46 ставил StageSection без сворачивания).
           -->
-          <StageSection title="О кадре" :collapsible="false">
-            <FrameMeta :rows="metaRows" />
-          </StageSection>
-          <StageSection title="Шаги осмотра" :collapsible="false" />
+          <div class="px-4 pt-5">
+            <Heading>О кадре</Heading>
+          </div>
+          <FrameMeta :rows="metaRows" />
+          <div class="px-4 pt-5 pb-2">
+            <Heading>Шаги осмотра</Heading>
+          </div>
           <!-- список шагов, §11.1–11.2 — такт 33: группа — StageSection, пункт — AssignOption -->
           <StageSection
             v-for="g in viewerGroups"

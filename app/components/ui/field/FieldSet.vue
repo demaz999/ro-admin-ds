@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onMounted, ref, useId, watch } from 'vue'
 import { cn } from '@/lib/utils'
+import { Heading } from '../heading'
 
 /**
  * Группа полей формы — окно формы повтора VA-9265 (§14.3), такт 36. Имя — каноническое у
@@ -8,7 +9,7 @@ import { cn } from '@/lib/utils'
  *
  * | часть | кит | прототип |
  * |---|---|---|
- * | заголовок группы | 12/16 medium `--muted-foreground`, строчными — роль заголовка группы `RepeatForm`, такт 32 | `.fgrp` 11 700 прописными `#8A9AAB`; прописных в ките нет |
+ * | заголовок группы | с такта 47 — `Heading` `section` 17/24 bold `--foreground` (приёмка владельца 2026-10-01: группы были слишком мелкими); до того 12/16 medium `--muted-foreground` | `.fgrp` 11 700 прописными `#8A9AAB`; прописных в ките нет |
  * | заголовок → первая строка | 8 | 8 |
  * | между строками | 8 — кит 1 «внутри блока» `19942:192432` | 10 |
  * | между группами | 24 — «зазор блоков» карточки `817:34525`: 12, линия 1px `--border-soft`, 12 | 14 + линия `#EEF2F7` + 12 |
@@ -61,9 +62,9 @@ watch(() => props.autofocus, (on) => {
     :aria-labelledby="props.legend ? id : undefined"
     :class="cn('flex flex-col gap-2 not-first:mt-3 not-first:border-t not-first:border-border-soft not-first:pt-3', props.class)"
   >
-    <div v-if="props.legend" :id="id" data-slot="field-set-legend" class="text-2xs font-medium text-muted-foreground">
+    <Heading v-if="props.legend" :id="id" data-slot="field-set-legend" level="section" as="h3">
       {{ props.legend }}
-    </div>
+    </Heading>
     <slot />
   </div>
 </template>

@@ -120,7 +120,7 @@ const removable = computed(() => props.state === 'free' || props.state === 'sugg
         type="button"
         data-slot="step-thumb-remove"
         aria-label="Открепить"
-        class="absolute top-1/2 left-1/2 flex size-8 -translate-1/2 items-center justify-center text-primary-foreground outline-none group-hover/thumb:opacity-100 focus-visible:opacity-100"
+        class="absolute inset-0 m-auto flex size-8 items-center justify-center text-primary-foreground outline-none group-hover/thumb:opacity-100 focus-visible:opacity-100"
         :class="props.demoHover ? 'opacity-100' : 'opacity-0'"
         @click.stop="emit('remove')"
       >

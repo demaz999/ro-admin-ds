@@ -2,7 +2,6 @@
 import { computed } from 'vue'
 import { Checkbox } from '../checkbox'
 import { Icon } from '../icon'
-import { IconButton } from '../icon-button'
 import { Image } from '../image'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../tooltip'
 import { cn } from '@/lib/utils'
@@ -127,83 +126,75 @@ function onKeydown(event: KeyboardEvent) {
     @click="emit('toggle-select', $event)"
     @keydown="onKeydown"
   >
-    <Image ratio="4:3" :src="props.src" :alt="props.alt" :class="imageClass" />
-
     <!--
-      Углы картинки — такт 46, приёмка владельца 2026-10-01 (п. 11): одно правило на все — зона 32×32, иконка 16,
-      отступ 8 от края, подложка одна — `--field-elevated` с тенью `--shadow-on-image`, радиус 6. Слева вверху —
-      флажок выделения, справа вверху — «просмотр», «показать в структуре», «открепить» через 4; замок защищённого кадра —
-      маркер в той же сетке, не действие.
+      Картинка и её углы — такт 47, приёмка владельца 2026-10-01 (п. 5). Места закреплены и не сдвигаются: слева вверху —
+      флажок, справа вверху — «во весь экран», слева от него — «открепить»; справа внизу картинки — лупа «показать в
+      структуре»; слева внизу — маркер видео. Одна геометрия на все углы: зона нажатия 32, видимая плашка 28 `--scrim-dark`
+      с белым глифом 16, отступ плашки 8 от края (зона — 6); центрирование флексом, координаты целые.
     -->
-    <!--
-      Флажок — `Checkbox on-image` по правилу «Контрол поверх изображения». Он только показывает выделение: цель
-      клика — вся плитка, поэтому флажок выведен из фокуса и из дерева доступности (`inert`), роль несёт корень.
-    -->
-    <span
-      data-slot="frame-tile-check"
-      inert
-      class="pointer-events-none absolute top-2 left-2 z-20 flex size-8 items-center justify-center rounded-sm bg-field-elevated shadow-on-image transition-opacity"
-      :class="props.selected || props.selectionMode || props.demoHover ? 'opacity-100' : 'opacity-0 group-hover/tile:opacity-100'"
-      :style="{ transitionDuration: 'var(--duration-hover)' }"
-    >
-      <Checkbox :model-value="props.selected" on-image />
-    </span>
+    <div data-slot="frame-tile-media" class="relative">
+      <Image ratio="4:3" :src="props.src" :alt="props.alt" :class="imageClass" />
 
-    <TooltipProvider>
-      <div data-slot="frame-tile-actions" class="absolute top-2 right-2 z-20 flex gap-1">
-        <!-- Открыть на весь экран — появляется на наведении (§8.3). -->
-        <IconButton
-          data-slot="frame-tile-open"
-          variant="elevated"
-          size="md"
-          label="Открыть во весь экран"
-          class="shadow-on-image group-hover/tile:opacity-100 focus-visible:opacity-100"
-          :class="props.demoHover ? 'opacity-100' : 'opacity-0'"
-          @click.stop="emit('open')"
-        >
-          <Icon name="fullscreen" :size="16" />
-        </IconButton>
+      <!--
+        Флажок — `Checkbox on-image` по правилу «Контрол поверх изображения», по центру плашки. Он только показывает
+        выделение: цель клика — вся плитка, поэтому флажок выведен из фокуса и из дерева доступности (`inert`).
+      -->
+      <span
+        data-slot="frame-tile-check"
+        inert
+        class="pointer-events-none absolute top-1.5 left-1.5 z-20 flex size-8 items-center justify-center outline-none transition-opacity"
+        :class="props.selected || props.selectionMode || props.demoHover ? 'opacity-100' : 'opacity-0 group-hover/tile:opacity-100'"
+        :style="{ transitionDuration: 'var(--duration-hover)' }"
+      >
+        <span class="flex size-7 items-center justify-center rounded-sm bg-scrim-dark text-primary-foreground"><Checkbox :model-value="props.selected" on-image /></span>
+      </span>
 
-        <template v-if="placed">
-          <IconButton
-            data-slot="frame-tile-locate"
-            variant="elevated"
-            size="md"
-            label="Показать в структуре справа"
-            class="shadow-on-image"
-            @click.stop="emit('locate')"
-          >
-            <Icon name="search" :size="16" />
-          </IconButton>
+      <!-- Открыть на весь экран — всегда правый верхний угол, появляется на наведении (§8.3). -->
+      <button
+        type="button"
+        data-slot="frame-tile-open"
+        aria-label="Открыть во весь экран"
+        class="absolute top-1.5 right-1.5 z-20 flex size-8 items-center justify-center outline-none group-hover/tile:opacity-100 focus-visible:opacity-100"
+        :class="props.demoHover ? 'opacity-100' : 'opacity-0'"
+        @click.stop="emit('open')"
+      >
+        <span class="flex size-7 items-center justify-center rounded-sm bg-scrim-dark text-primary-foreground"><Icon name="fullscreen" :size="16" /></span>
+      </button>
 
-          <Tooltip v-if="protectedFrame">
-            <TooltipTrigger as-child>
-              <span
-                data-slot="frame-tile-lock"
-                tabindex="0"
-                :aria-label="`${props.lockReason} — открепить нельзя`"
-                class="flex size-8 items-center justify-center rounded-sm bg-field-elevated text-secondary-foreground shadow-on-image outline-none"
-                @click.stop
-              >
-                <Icon name="lock" :size="16" />
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>{{ props.lockReason }} — открепить нельзя</TooltipContent>
-          </Tooltip>
-          <IconButton
-            v-else
-            data-slot="frame-tile-unassign"
-            variant="elevated"
-            size="md"
-            label="Открепить"
-            class="shadow-on-image"
-            @click.stop="emit('unassign')"
-          >
-            <Icon name="close" :size="16" />
-          </IconButton>
-        </template>
-      </div>
-    </TooltipProvider>
+      <!-- «Открепить» — слева от «во весь экран», место закреплено (зона 32 вплотную к зоне соседа). -->
+      <button
+        v-if="placed && !protectedFrame"
+        type="button"
+        data-slot="frame-tile-unassign"
+        aria-label="Открепить"
+        class="absolute top-1.5 right-9.5 z-20 flex size-8 items-center justify-center outline-none"
+        @click.stop="emit('unassign')"
+      >
+        <span class="flex size-7 items-center justify-center rounded-sm bg-scrim-dark text-primary-foreground"><Icon name="close" :size="16" /></span>
+      </button>
+
+      <!-- «Показать в структуре» — правый нижний угол картинки, над полосой статуса. -->
+      <button
+        v-if="placed"
+        type="button"
+        data-slot="frame-tile-locate"
+        aria-label="Показать в структуре справа"
+        class="absolute right-1.5 bottom-1.5 z-20 flex size-8 items-center justify-center outline-none"
+        @click.stop="emit('locate')"
+      >
+        <span class="flex size-7 items-center justify-center rounded-sm bg-scrim-dark text-primary-foreground"><Icon name="search" :size="16" /></span>
+      </button>
+
+      <!-- Маркер видео — левый нижний угол картинки, не действие. -->
+      <span
+        v-if="props.kind === 'video'"
+        data-slot="frame-tile-video"
+        aria-hidden="true"
+        class="pointer-events-none absolute bottom-1.5 left-1.5 z-20 flex size-8 items-center justify-center outline-none"
+      >
+        <span class="flex size-7 items-center justify-center rounded-sm bg-scrim-dark text-primary-foreground"><Icon name="play" :size="16" /></span>
+      </span>
+    </div>
 
     <!--
       Строка подписи есть всегда: высота плитки не зависит от состояния. Время и
@@ -218,17 +209,14 @@ function onKeydown(event: KeyboardEvent) {
         <span>{{ props.time }}</span>
         <span
           v-if="props.kind === 'video' && props.duration"
-          class="ml-auto flex items-center gap-0.5 font-medium"
-        >
-          <Icon name="play" :size="12" />
-          {{ props.duration }}
-        </span>
+          class="ml-auto font-medium"
+        >{{ props.duration }}</span>
       </template>
     </span>
 
     <!--
-      Нижняя полоса привязки — только текст статуса, одна строка с многоточием, отступ слева 8 (такт 46, п. 11 и 14):
-      иконки у подписи статуса нет. Название шага — действие «Показать в структуре», пунктир и подсказка (§15.4).
+      Полоса привязки — текст статуса в одну строку с многоточием, отступ слева 8; у защищённого кадра справа замок
+      с причиной (такт 47 вернул его в полосу, как до такта 46). Название шага — действие «Показать в структуре» (§15.4).
     -->
     <TooltipProvider v-if="placed">
       <div
@@ -252,6 +240,21 @@ function onKeydown(event: KeyboardEvent) {
               <br>{{ props.locateHint }}<template v-if="props.lockReason"> · {{ props.lockReason }}</template>
             </template>
           </TooltipContent>
+        </Tooltip>
+
+        <Tooltip v-if="protectedFrame">
+          <TooltipTrigger as-child>
+            <span
+              data-slot="frame-tile-lock"
+              tabindex="0"
+              :aria-label="`${props.lockReason} — открепить нельзя`"
+              class="ml-auto flex size-4 shrink-0 items-center justify-center opacity-[var(--opacity-icon-muted)] outline-none"
+              @click.stop
+            >
+              <Icon name="lock" :size="12" />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{{ props.lockReason }} — открепить нельзя</TooltipContent>
         </Tooltip>
       </div>
     </TooltipProvider>

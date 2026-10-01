@@ -1553,6 +1553,14 @@ const textareaVariants = [
           </RadioGroupItem>
         </RadioGroup>
       </div>
+      <!-- Такт 47: Heading — заголовок страницы и заголовок блока; строка «заголовок + текст» — на базовой линии заголовка. -->
+      <div class="max-w-5xl space-y-3">
+        <div class="flex items-baseline gap-2">
+          <Heading level="page">Свободная съёмка</Heading>
+          <ToolbarText>189 фото · 7 видео · 9 заметок</ToolbarText>
+        </div>
+        <Heading>О кадре</Heading>
+      </div>
       <!--
         Такт 43: заметка ленты FeedNote — голосовая на PlayerAudio и текстовая; полоса фрагмента — ActionBar у выделенного текста;
         этап нового повтора — AssignOption type="stage".

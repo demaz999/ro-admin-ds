@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { TabsTrigger } from 'reka-ui'
+import { cn } from '@/lib/utils'
 import { tabsTriggerVariants, type TabsTriggerVariants } from '.'
 
 /**
@@ -11,14 +12,19 @@ import { tabsTriggerVariants, type TabsTriggerVariants } from '.'
  *
  * Индикатор виден только у активной. Это измерено, а не выведено: у трёх
  * неактивных состояний узел линии помечен видимым, но не отрисовывает ничего.
+ *
+ * С такта 47 вид `line` — по VaTabs фронтов: подложка и полоса активной — у списка (`TabsIndicator`), разбор — `index.ts`.
  */
 const props = withDefaults(defineProps<{
   value: string
   variant?: NonNullable<TabsTriggerVariants['variant']>
   disabled?: boolean
+  /** Счётчик вкладки (VaTabs, такт 47): число показывается и при 0. Не задан — счётчика нет. */
+  count?: number | string
 }>(), {
   variant: 'line',
   disabled: false,
+  count: undefined,
 })
 </script>
 
@@ -27,20 +33,14 @@ const props = withDefaults(defineProps<{
     :value="props.value"
     :disabled="props.disabled"
     data-slot="tabs-trigger"
-    :class="tabsTriggerVariants({ variant })"
+    :class="cn(tabsTriggerVariants({ variant }))"
   >
-    <!--
-      У подчёркивания текст и линия — один столбец шириной по тексту, зазор 8.
-      У таблетки столбца нет: подпись лежит прямо в кнопке.
-    -->
-    <span v-if="props.variant === 'line'" class="flex flex-col gap-2">
-      <span class="h-5"><slot /></span>
-      <span
-        data-slot="tabs-indicator"
-        class="h-1 rounded-2xs bg-primary opacity-0 group-data-[state=active]/tab:opacity-100"
-      />
-    </span>
-    <slot v-else />
+    <slot />
+    <span
+      v-if="props.count !== undefined"
+      data-slot="tabs-counter"
+      class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-xs font-bold text-foreground-secondary"
+    >{{ props.count }}</span>
 
     <!-- Счётчик стоит вне столбца с линией — так в мастере. -->
     <slot name="counter" />

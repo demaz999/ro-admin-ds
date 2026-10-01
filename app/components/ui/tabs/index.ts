@@ -40,6 +40,14 @@ export { default as TabsTrigger } from './TabsTrigger.vue'
  * > в экспорте: брендовый цвет встречается ровно дважды — таблетка и одна линия.
  * > Правило «индикатор только у активного» измерено, а не выведено по аналогии.
  *
+ * ## Вид `line` — по VaTabs фронтов, такт 47
+ *
+ * Приёмка владельца 2026-10-01: `line` собран по вкладкам фронтов (va-ui 0.2.0, `docs/sources/va-ui-tabs.md`). Вкладка 44,
+ * поля 0 16, 15/20 bold `--foreground-secondary`, снизу 1 `--border` у каждой — линия равна ширине списка; активная —
+ * `--foreground` над подложкой `TabsIndicator` Reka: `--background`, радиус 8 8 0 0, полоса снизу 2 `--primary`,
+ * переезд 0.16 s. Счётчик — проп `count`: 20, поля 0 6, `--accent`, 13/16 bold `--foreground-secondary`, 0 показывается.
+ * Слот `end` списка — правый слот 44. Отклонение от мастера `_Tab` (линия 4 по ширине текста) — `figma-fixes.md`.
+ *
  * ## Сегмент-контрол — ось `segmented`, такт 46
  *
  * Приёмка владельца 2026-10-01: переключатели «оставлять / убирать» и «M / L» экрана VA-9265 — сегмент-контрол. У
@@ -50,7 +58,8 @@ export { default as TabsTrigger } from './TabsTrigger.vue'
 export const tabsListVariants = cva('inline-flex items-center', {
   variants: {
     variant: {
-      line: 'gap-5',
+      /** Такт 47, VaTabs: вкладки встык, список — опора подложки (`relative`), длинный — прокрутка по горизонтали. */
+      line: 'relative max-w-full gap-0 overflow-x-auto',
       pill: 'gap-0',
       /** Сегмент-контрол — дорожка 32 `--muted` с полем 2 (такт 46). */
       segmented: 'h-8 gap-0.5 rounded-md bg-muted p-0.5',
@@ -64,8 +73,10 @@ export const tabsTriggerVariants = cva(
   {
     variants: {
       variant: {
-        // Высота 32 = текст 20 + зазор 8 + линия 4. Паддингов у мастера нет.
-        line: 'h-8 flex-col justify-start text-field-foreground hover:text-field-foreground-hover data-[state=active]:text-field-foreground-hover',
+        // Такт 47, VaTabs (`docs/sources/va-ui-tabs.md`): 44, поля 0 16, зазор 8, 15/20 bold `--foreground-secondary`, нижняя
+        // граница 1 `--border` у каждой вкладки; активная — `--foreground`, граница прозрачная; над подложкой; наведение без вида;
+        // выключенная — `--opacity-disabled` 0.48 (у VaTabs 0.5); фокус — кольцо кита 2 `--ring` (у VaTabs 3 accent 22 %).
+        line: 'z-10 h-11 shrink-0 justify-center gap-2 border-b border-border px-4 font-bold text-foreground-secondary disabled:opacity-[var(--opacity-disabled)] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset data-[state=active]:border-transparent data-[state=active]:text-foreground',
         // Радиус 20 при высоте 40 — ровно половина, то есть пилюля.
         // Наведение у невыбранной таблетки — поверхность, а не только текст:
         // правило владельца «у всего интерактивного системное наведение»

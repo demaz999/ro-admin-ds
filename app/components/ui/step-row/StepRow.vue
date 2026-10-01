@@ -176,14 +176,15 @@ onBeforeUnmount(() => clearTimeout(timer))
       :style="{ transitionDuration: 'var(--duration-hover)' }"
       @click="onRowClick"
     >
-      <div class="flex min-h-4 items-center gap-2">
+      <!-- Имя и счётчик — на базовой линии имени (правило такта 47); номер клавиши — по центру строки. -->
+      <div class="flex min-h-4 items-baseline gap-2">
         <!-- Номер клавиши; без номера — пустое место той же ширины, строки не пляшут. -->
         <span
           v-if="showKey"
           data-slot="step-row-key"
-          :class="stepKeyClass"
+          :class="[stepKeyClass, 'self-center']"
         >{{ props.hotkey }}</span>
-        <span v-else class="size-4 shrink-0" aria-hidden="true" />
+        <span v-else class="size-4 shrink-0 self-center" aria-hidden="true" />
 
         <span
           data-slot="step-row-name"
