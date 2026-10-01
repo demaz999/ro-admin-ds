@@ -440,9 +440,9 @@ function selectAll(list: readonly string[]) {
         <!-- Шапка списка. -->
         <div data-slot="page-header" class="flex h-11 min-w-0 flex-1 items-center gap-4">
           <!-- Заголовок прижат к верху строки, соседи центрированы — так в макете. -->
-          <h1 class="self-start text-4xl font-bold">
+          <Heading level="page" class="self-start">
             Мои осмотры
-          </h1>
+          </Heading>
 
           <Switch v-model="autoUpdate" class="w-auto">
             Автообновление списка

@@ -1137,7 +1137,7 @@ function onUndo(id: number) {
             btn_back 24442:45220 (ButtonNavigation base), до заголовка 12. Заголовок и сводка — по середине строчных:
             контраст кеглей page против текста (слот meta у Heading).
           -->
-          <div class="flex flex-col gap-3">
+          <div class="flex min-w-0 flex-1 flex-col gap-3">
             <ButtonNavigation size="base" direction="left">Назад</ButtonNavigation>
             <Heading level="page">
               Свободная съёмка
@@ -1147,7 +1147,7 @@ function onUndo(id: number) {
             </Heading>
           </div>
           <!-- Справа: счётчики и «Завершить распределение» (№ 7) — из полосы в подшапку, такт 48. -->
-          <div class="ml-auto flex items-center gap-4">
+          <div class="ml-auto flex shrink-0 items-center gap-3">
             <ProgressStat
               class="min-w-32 max-w-47.5"
               label="Кадры разложены"

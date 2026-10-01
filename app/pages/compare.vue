@@ -251,9 +251,10 @@ const textareaVariants = [
       <p class="font-mono text-xs uppercase tracking-widest text-muted-foreground">
         кит 2 · сверка
       </p>
-      <h1 class="text-4xl font-bold">
+      <!-- Цвет заголовка — унаследованный, как до перевода на Heading: узел темы atom цвет текста не переставляет. -->
+      <Heading level="page" class="text-inherit">
         Наложение на Атом
-      </h1>
+      </Heading>
       <p class="max-w-3xl text-muted-foreground">
         Эталоны — экспорт мастеров Атома 1x по node-id, лежат в <code>public/compare/atom</code>.
         Слева режим, справа прозрачность. «Разница» инвертирует наложенный слой: совпавшее

@@ -157,9 +157,9 @@ if (route.query.q) search.value = String(route.query.q)
     </li>
   </Breadcrumb>
 
-  <h1 class="text-4xl font-bold">
+  <Heading level="page">
     Статусы
-  </h1>
+  </Heading>
 
   <div class="flex min-w-0 flex-col">
     <!-- Шапка — канон (A): поиск 440 слева, «Добавить» справа, одна ось, без счётчика. -->

@@ -607,9 +607,9 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
 <template>
   <main data-theme="rososmotr" class="space-y-14 bg-background px-6 py-10 font-sans text-foreground">
     <header class="space-y-2">
-      <h1 class="text-4xl font-bold">
+      <Heading level="page">
         Свободная съёмка — стенд компонентов
-      </h1>
+      </Heading>
       <p class="max-w-240 text-sm text-foreground-secondary">
         Такт 30, экран «Распределение свободной съёмки» (VA-9265). Мастеров в Figma нет: источник —
         прототип v17 и спека, редакция 1, разбор с замерами и провенансом — <code>docs/free-shoot.md</code>.

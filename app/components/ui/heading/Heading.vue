@@ -27,11 +27,12 @@ const tag = computed(() => props.as ?? (props.level === 'page' ? 'h1' : 'h2'))
     с кеглем заголовка поднимает текст на половину высоты строчных заголовка, внутренний с кеглем текста опускает на
     половину своей: середины строчных совпадают.
   -->
-  <div v-if="$slots.meta" data-slot="heading-row" class="flex items-baseline gap-2">
-    <component :is="tag" data-slot="heading" :data-level="props.level" :class="cn(headingVariants({ level: props.level }), props.class)">
+  <div v-if="$slots.meta" data-slot="heading-row" class="flex min-w-0 items-baseline gap-2">
+    <component :is="tag" data-slot="heading" :data-level="props.level" :class="cn(headingVariants({ level: props.level }), 'shrink-0', props.class)">
       <slot />
     </component>
-    <span data-slot="heading-meta" :class="cn(headingVariants({ level: props.level }), 'relative bottom-[0.5ex] font-normal leading-none')">
+    <!-- Текст рядом с заголовком уступает место: в тесной строке обрезается многоточием, заголовок цел. -->
+    <span data-slot="heading-meta" :class="cn(headingVariants({ level: props.level }), 'relative bottom-[0.5ex] min-w-0 truncate font-normal leading-none')">
       <span :class="cn('relative text-xs text-muted-foreground', headingMetaShift[props.level])"><slot name="meta" /></span>
     </span>
   </div>

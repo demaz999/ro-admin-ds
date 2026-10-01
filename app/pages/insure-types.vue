@@ -213,9 +213,9 @@ if (route.query.q) search.value = String(route.query.q)
     </li>
   </Breadcrumb>
 
-  <h1 class="text-4xl font-bold">
+  <Heading level="page">
     Типы схем осмотров
-  </h1>
+  </Heading>
 
   <!--
     Панель действий, таблица и подвал — один контейнер: так собран фрейм
