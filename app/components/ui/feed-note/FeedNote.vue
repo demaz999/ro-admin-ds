@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import type { FeedNoteKind, FeedNoteSelection } from '.'
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { cn } from '@/lib/utils'
 import { ButtonAction } from '@/components/ui/button-action'
-import { Icon } from '@/components/ui/icon'
-import { IconButton } from '@/components/ui/icon-button'
 import { PlayerAudio } from '@/components/ui/player'
 import { feedNoteVariants } from '.'
 
@@ -35,9 +33,26 @@ const emit = defineEmits<{
   'select-text': [selection: FeedNoteSelection]
 }>()
 
-/** «Показать полностью» — от 110 знаков, как у прототипа (`clamp = text.length > 110`). */
+/** Длинная — от 110 знаков, как у прототипа (`clamp = text.length > 110`). */
 const long = computed(() => props.text.length > 110)
 const textEl = ref<HTMLElement>()
+/**
+ * Свёрнутая расшифровка — три строки (такт 46, п. 16). «Показать полностью» — только когда три строки её правда режут:
+ * при мере около 90 знаков текст до 270 знаков встаёт целиком, и кнопка ничего бы не раскрывала.
+ */
+const overflowing = ref(false)
+function measure() {
+  const el = textEl.value
+  if (el && !props.expanded) overflowing.value = el.scrollHeight > el.clientHeight + 1
+}
+let ro: ResizeObserver | undefined
+onMounted(() => {
+  measure()
+  if (textEl.value) { ro = new ResizeObserver(measure); ro.observe(textEl.value) }
+})
+onBeforeUnmount(() => ro?.disconnect())
+watch(() => [props.text, props.expanded], () => requestAnimationFrame(measure))
+const toggleable = computed(() => long.value && (props.expanded || overflowing.value))
 
 /** Выделение мышью внутри расшифровки: 2–120 знаков — прототип, обработчик `mouseup` документа. */
 function onMouseup() {
@@ -56,37 +71,34 @@ function onMouseup() {
   <div
     data-slot="feed-note"
     :data-kind="props.kind"
-    :data-state="long ? (props.expanded ? 'expanded' : 'clamped') : undefined"
+    :data-state="toggleable ? (props.expanded ? 'expanded' : 'clamped') : undefined"
     :class="cn(feedNoteVariants({ kind: props.kind }), props.class)"
   >
     <div data-slot="feed-note-head" class="flex items-center gap-2">
-      <IconButton v-if="props.kind === 'note'" variant="ghost" size="sm" label="Текстовая заметка" @click="emit('play')">
-        <Icon name="article" :size="16" />
-      </IconButton>
       <span
         data-slot="feed-note-type"
         :class="cn('text-2xs font-bold uppercase', props.kind === 'note' ? 'text-warning-strong' : 'text-primary')"
       >{{ props.kind === 'note' ? 'Текстовая заметка' : 'Голосовой комментарий' }}</span>
       <span data-slot="feed-note-time" class="text-2xs text-muted-foreground">{{ props.time }}</span>
-      <div class="ml-auto flex shrink-0 items-center gap-3">
-        <ButtonAction v-if="long" size="sm" :show-icon="false" @click="emit('toggle')">
-          {{ props.expanded ? 'Свернуть' : 'Показать полностью' }}
-        </ButtonAction>
-        <ButtonAction size="sm" :show-icon="false" @click="emit('copy')">
-          Копировать
-        </ButtonAction>
-      </div>
     </div>
-    <PlayerAudio v-if="props.kind === 'voice'" :time="props.duration" @toggle="emit('play')">
+    <PlayerAudio v-if="props.kind === 'voice'" surface="none" :time="props.duration" @toggle="emit('play')">
       {{ props.name }}
     </PlayerAudio>
     <p
       ref="textEl"
       data-slot="feed-note-text"
-      :class="cn('cursor-text text-sm text-foreground select-text', long && !props.expanded && 'line-clamp-2')"
+      :class="cn('max-w-measure cursor-text text-sm text-foreground select-text', long && !props.expanded && 'line-clamp-3')"
       @mouseup="onMouseup"
     >
       {{ props.text }}
     </p>
+    <div data-slot="feed-note-actions" class="flex items-center gap-3">
+      <ButtonAction v-if="toggleable" size="sm" :show-icon="false" @click="emit('toggle')">
+        {{ props.expanded ? 'Свернуть' : 'Показать полностью' }}
+      </ButtonAction>
+      <ButtonAction size="sm" :show-icon="false" @click="emit('copy')">
+        Копировать
+      </ButtonAction>
+    </div>
   </div>
 </template>

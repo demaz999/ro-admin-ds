@@ -29,9 +29,16 @@ const props = withDefaults(defineProps<{
   playing?: boolean
   /** Длительность или текущее время. */
   time?: string
+  /**
+   * `card` — плашка мастера 60 во всю ширину с мягкой подложкой; `none` — без подложки и полей, по содержимому: кнопка,
+   * подпись, время в одну строку. Такт 46, решение агента по приёмке владельца 2026-10-01 (п. 10): заметка ленты — одна
+   * поверхность, плеер внутри неё подложки не несёт.
+   */
+  surface?: 'card' | 'none'
 }>(), {
   playing: false,
   time: '6:48',
+  surface: 'card',
 })
 
 /** Нажатие кнопки плеера. Такт 43: заметка ленты (`FeedNote`) отвечает на него уведомлением — звук плеер сам не ведёт. */
@@ -41,11 +48,14 @@ const emit = defineEmits<{ toggle: [] }>()
 <template>
   <div
     data-slot="player-audio"
-    class="flex h-15 w-full items-center gap-6 rounded-xl bg-muted-foreground/[var(--opacity-soft)] px-6 py-5"
+    :data-surface="props.surface"
+    :class="props.surface === 'card'
+      ? 'flex h-15 w-full items-center gap-6 rounded-xl bg-muted-foreground/[var(--opacity-soft)] px-6 py-5'
+      : 'inline-flex w-fit max-w-full items-center gap-3'"
   >
     <PlayerButton :type="props.playing ? 'pause' : 'play'" size="sm" @click="emit('toggle')" />
 
-    <span class="min-w-0 flex-1 truncate text-base">
+    <span class="min-w-0 truncate text-base" :class="props.surface === 'card' ? 'flex-1' : ''">
       <slot />
     </span>
 

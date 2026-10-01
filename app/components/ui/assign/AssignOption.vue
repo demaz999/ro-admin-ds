@@ -157,7 +157,7 @@ function onSelect(event: Event) {
         </ButtonAction>
         <Icon v-else-if="props.bound === 'locked'" name="lock" :size="12" class="text-success-strong" />
         <span v-else data-slot="assign-option-count" class="flex items-center gap-1 text-2xs text-muted-foreground tabular-nums">
-          <Icon v-if="props.frozen" name="lock" :size="12" />{{ isStep ? counter : props.frames }}
+          {{ isStep ? counter : props.frames }}
         </span>
       </template>
     </SelectItem>

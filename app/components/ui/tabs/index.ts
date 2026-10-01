@@ -39,12 +39,21 @@ export { default as TabsTrigger } from './TabsTrigger.vue'
  * > равен `null`, то есть они не рисуют ничего. Подтверждено подсчётом пикселей
  * > в экспорте: брендовый цвет встречается ровно дважды — таблетка и одна линия.
  * > Правило «индикатор только у активного» измерено, а не выведено по аналогии.
+ *
+ * ## Сегмент-контрол — ось `segmented`, такт 46
+ *
+ * Приёмка владельца 2026-10-01: переключатели «оставлять / убирать» и «M / L» экрана VA-9265 — сегмент-контрол. У
+ * мастера `Tabs` такого вида нет — канон shadcn-vue: дорожка `--muted` высотой 32 с полем 2, радиус 8; сегмент 28,
+ * радиус 6, 13/16 medium; выбранный — `--background` с тенью `--shadow-button` и текстом `--foreground`. Отклонение
+ * от мастера — `figma-fixes.md`.
  */
 export const tabsListVariants = cva('inline-flex items-center', {
   variants: {
     variant: {
       line: 'gap-5',
       pill: 'gap-0',
+      /** Сегмент-контрол — дорожка 32 `--muted` с полем 2 (такт 46). */
+      segmented: 'h-8 gap-0.5 rounded-md bg-muted p-0.5',
     },
   },
   defaultVariants: { variant: 'line' },
@@ -62,6 +71,8 @@ export const tabsTriggerVariants = cva(
         // правило владельца «у всего интерактивного системное наведение»
         // (2026-08-18). У выбранной наведения нет: она уже брендовая.
         pill: 'h-10 justify-center rounded-full px-4 text-field-foreground transition-colors hover:text-field-foreground-hover data-[state=inactive]:hover:bg-secondary data-[state=active]:bg-primary data-[state=active]:text-primary-foreground',
+        // Сегмент 28 в дорожке 32: выбранный — `--background` с тенью `--shadow-button`, текст `--foreground`; 13/16 medium.
+        segmented: 'h-7 justify-center rounded-sm px-3 text-xs text-field-foreground transition-colors hover:text-field-foreground-hover data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-button',
       },
     },
     defaultVariants: { variant: 'line' },

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { Icon } from '../icon'
 import { TooltipProvider } from '../tooltip'
 import { cn } from '@/lib/utils'
 import StepThumb from './StepThumb.vue'
@@ -188,8 +187,7 @@ onBeforeUnmount(() => clearTimeout(timer))
 
         <span
           data-slot="step-row-name"
-          class="min-w-0 flex-1 text-xs font-medium"
-          :class="frozen ? 'text-foreground-secondary' : 'text-foreground'"
+          class="min-w-0 flex-1 text-xs font-bold text-foreground"
         >
           {{ props.name }}<span v-if="props.required" class="text-destructive"> *</span>
           <span v-if="full" class="text-2xs font-medium text-success-strong"> · заполнен</span>
@@ -215,7 +213,6 @@ onBeforeUnmount(() => clearTimeout(timer))
         data-slot="step-row-verdict"
         class="mt-1 flex items-start gap-1 pl-6 text-2xs font-medium text-muted-foreground"
       >
-        <Icon name="lock" :size="12" class="mt-0.5" />
         <span>Проверен и закрыт {{ props.verdict?.at }}<span class="font-normal"> · содержимое изменить нельзя</span></span>
       </div>
       <div
@@ -223,7 +220,6 @@ onBeforeUnmount(() => clearTimeout(timer))
         data-slot="step-row-verdict"
         class="mt-1 flex items-start gap-1 pl-6 text-2xs font-medium text-warning-strong"
       >
-        <Icon name="refresh" :size="12" class="mt-0.5" />
         <span>«Повторить» от {{ props.verdict?.at }}<span class="font-normal"> · {{ props.verdict?.note || 'нужно переснять' }}</span></span>
       </div>
 
@@ -273,7 +269,7 @@ onBeforeUnmount(() => clearTimeout(timer))
         <span
           v-for="n in slots"
           :key="n"
-          class="w-9 rounded-xs border border-dashed aspect-4/3"
+          class="w-20 rounded-xs border border-dashed aspect-4/3"
           :class="props.required ? 'border-destructive-disabled bg-destructive-surface' : 'border-stroke-secondary bg-accent'"
         />
       </div>

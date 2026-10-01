@@ -2,7 +2,6 @@
 import { computed } from 'vue'
 import { Badge } from '../badge'
 import { Button } from '../button'
-import { Icon } from '../icon'
 import { StageNote } from '../stage'
 import { stepCounterVariants } from '../step-row'
 import { cn } from '@/lib/utils'
@@ -86,7 +85,7 @@ const rail = computed(() => (props.highlighted ? 'highlighted' : props.current ?
       <!-- Правило такта 33: на заголовке предложенного (та же мягкая ступень) пилюля — на --card; у текущего фон свой, пилюля в своей заливке. -->
       <span v-if="props.suggested" :class="stepCounterVariants({ tone: 'warning', surface: tone === 'suggested' ? 'card' : 'tone' })">предложено</span>
       <span v-if="props.checkedSteps" :class="cn(stepCounterVariants({ tone: 'frozen' }), 'gap-1')">
-        <Icon name="lock" :size="10" />{{ props.checkedSteps }} проверено
+        {{ props.checkedSteps }} проверено
       </span>
       <Badge v-if="props.current" size="sm">текущий</Badge>
       <span v-if="props.errors" :class="stepCounterVariants({ tone: 'error' })">{{ props.errors }}</span>

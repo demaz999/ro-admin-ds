@@ -115,9 +115,13 @@ export type StepCounterTone = 'neutral' | 'error' | 'warning' | 'success' | 'fro
  */
 export const stepKeyClass = 'flex size-4 shrink-0 items-center justify-center rounded-xs bg-tag text-3xs font-bold text-secondary-foreground'
 
-/** Миниатюра 36×27 — пропорция 4:3, как у кадра (`.th`). */
+/**
+ * Миниатюра 80×60 — пропорция 4:3, как у кадра (`.th` 36×27; такт 46, приёмка владельца 2026-10-01: крупнее в 2.2 раза).
+ * Маркеры «камера» и «замок» — по правилу углов плитки (п. 11) в масштабе миниатюры: зона 20, иконка 12, отступ 4,
+ * подложка `--field-elevated` с тенью `--shadow-on-image`; крестик на наведении — зона 32, иконка 16.
+ */
 export const stepThumbVariants = cva(
-  'group/thumb relative w-9 shrink-0 overflow-hidden rounded-xs border outline-none aspect-4/3 focus-visible:ring-2 focus-visible:ring-ring',
+  'group/thumb relative w-20 shrink-0 overflow-hidden rounded-xs border outline-none aspect-4/3 focus-visible:ring-2 focus-visible:ring-ring',
   {
     variants: {
       state: {

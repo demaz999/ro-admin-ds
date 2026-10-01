@@ -108,10 +108,10 @@ const removable = computed(() => props.state === 'free' || props.state === 'sugg
     <span
       v-if="props.state === 'locked' || props.state === 'from-step'"
       data-slot="step-thumb-badge"
-      class="pointer-events-none absolute right-0 bottom-0 flex items-center justify-center rounded-tl-2xs px-0.5 py-px text-primary-foreground"
-      :class="props.state === 'locked' ? 'bg-muted-foreground' : 'bg-primary'"
+      class="pointer-events-none absolute right-1 bottom-1 flex size-5 items-center justify-center rounded-xs bg-field-elevated shadow-on-image"
+      :class="props.state === 'locked' ? 'text-muted-foreground' : 'text-primary'"
     >
-      <Icon :name="props.state === 'locked' ? 'lock' : 'photo-camera'" :size="8" />
+      <Icon :name="props.state === 'locked' ? 'lock' : 'photo-camera'" :size="12" />
     </span>
 
     <template v-if="removable">
@@ -120,11 +120,11 @@ const removable = computed(() => props.state === 'free' || props.state === 'sugg
         type="button"
         data-slot="step-thumb-remove"
         aria-label="Открепить"
-        class="absolute top-1/2 left-1/2 flex size-4 -translate-1/2 items-center justify-center text-primary-foreground outline-none group-hover/thumb:opacity-100 focus-visible:opacity-100"
+        class="absolute top-1/2 left-1/2 flex size-8 -translate-1/2 items-center justify-center text-primary-foreground outline-none group-hover/thumb:opacity-100 focus-visible:opacity-100"
         :class="props.demoHover ? 'opacity-100' : 'opacity-0'"
         @click.stop="emit('remove')"
       >
-        <Icon name="close" :size="12" />
+        <Icon name="close" :size="16" />
       </button>
     </template>
   </div>

@@ -130,32 +130,80 @@ function onKeydown(event: KeyboardEvent) {
     <Image ratio="4:3" :src="props.src" :alt="props.alt" :class="imageClass" />
 
     <!--
-      Флажок — `Checkbox on-image` по правилу «Контрол поверх изображения».
-      Он только показывает выделение: цель клика — вся плитка, поэтому флажок
-      выведен из фокуса и из дерева доступности (`inert`), роль несёт корень.
+      Углы картинки — такт 46, приёмка владельца 2026-10-01 (п. 11): одно правило на все — зона 32×32, иконка 16,
+      отступ 8 от края, подложка одна — `--field-elevated` с тенью `--shadow-on-image`, радиус 6. Слева вверху —
+      флажок выделения, справа вверху — «просмотр», «показать в структуре», «открепить» через 4; замок защищённого кадра —
+      маркер в той же сетке, не действие.
+    -->
+    <!--
+      Флажок — `Checkbox on-image` по правилу «Контрол поверх изображения». Он только показывает выделение: цель
+      клика — вся плитка, поэтому флажок выведен из фокуса и из дерева доступности (`inert`), роль несёт корень.
     -->
     <span
       data-slot="frame-tile-check"
       inert
-      class="pointer-events-none absolute top-2 left-2 z-20 transition-opacity"
+      class="pointer-events-none absolute top-2 left-2 z-20 flex size-8 items-center justify-center rounded-sm bg-field-elevated shadow-on-image transition-opacity"
       :class="props.selected || props.selectionMode || props.demoHover ? 'opacity-100' : 'opacity-0 group-hover/tile:opacity-100'"
       :style="{ transitionDuration: 'var(--duration-hover)' }"
     >
       <Checkbox :model-value="props.selected" on-image />
     </span>
 
-    <!-- Открыть на весь экран — появляется на наведении (§8.3). -->
-    <IconButton
-      data-slot="frame-tile-open"
-      variant="elevated"
-      size="sm"
-      label="Открыть во весь экран"
-      class="absolute top-2 right-2 z-20 shadow-on-image group-hover/tile:opacity-100 focus-visible:opacity-100"
-      :class="props.demoHover ? 'opacity-100' : 'opacity-0'"
-      @click.stop="emit('open')"
-    >
-      <Icon name="fullscreen" :size="16" />
-    </IconButton>
+    <TooltipProvider>
+      <div data-slot="frame-tile-actions" class="absolute top-2 right-2 z-20 flex gap-1">
+        <!-- Открыть на весь экран — появляется на наведении (§8.3). -->
+        <IconButton
+          data-slot="frame-tile-open"
+          variant="elevated"
+          size="md"
+          label="Открыть во весь экран"
+          class="shadow-on-image group-hover/tile:opacity-100 focus-visible:opacity-100"
+          :class="props.demoHover ? 'opacity-100' : 'opacity-0'"
+          @click.stop="emit('open')"
+        >
+          <Icon name="fullscreen" :size="16" />
+        </IconButton>
+
+        <template v-if="placed">
+          <IconButton
+            data-slot="frame-tile-locate"
+            variant="elevated"
+            size="md"
+            label="Показать в структуре справа"
+            class="shadow-on-image"
+            @click.stop="emit('locate')"
+          >
+            <Icon name="search" :size="16" />
+          </IconButton>
+
+          <Tooltip v-if="protectedFrame">
+            <TooltipTrigger as-child>
+              <span
+                data-slot="frame-tile-lock"
+                tabindex="0"
+                :aria-label="`${props.lockReason} — открепить нельзя`"
+                class="flex size-8 items-center justify-center rounded-sm bg-field-elevated text-secondary-foreground shadow-on-image outline-none"
+                @click.stop
+              >
+                <Icon name="lock" :size="16" />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>{{ props.lockReason }} — открепить нельзя</TooltipContent>
+          </Tooltip>
+          <IconButton
+            v-else
+            data-slot="frame-tile-unassign"
+            variant="elevated"
+            size="md"
+            label="Открепить"
+            class="shadow-on-image"
+            @click.stop="emit('unassign')"
+          >
+            <Icon name="close" :size="16" />
+          </IconButton>
+        </template>
+      </div>
+    </TooltipProvider>
 
     <!--
       Строка подписи есть всегда: высота плитки не зависит от состояния. Время и
@@ -178,14 +226,15 @@ function onKeydown(event: KeyboardEvent) {
       </template>
     </span>
 
+    <!--
+      Нижняя полоса привязки — только текст статуса, одна строка с многоточием, отступ слева 8 (такт 46, п. 11 и 14):
+      иконки у подписи статуса нет. Название шага — действие «Показать в структуре», пунктир и подсказка (§15.4).
+    -->
     <TooltipProvider v-if="placed">
       <div
         data-slot="frame-tile-plate"
         :class="frameTilePlateVariants({ state: props.state === 'free' ? 'assigned' : props.state })"
       >
-        <Icon :name="props.state === 'rejected' ? 'refresh' : 'check'" :size="12" />
-
-        <!-- Название шага — действие, поэтому пунктир и подсказка (§15.4). -->
         <Tooltip :open="props.tooltipOpen">
           <TooltipTrigger as-child>
             <button
@@ -204,45 +253,6 @@ function onKeydown(event: KeyboardEvent) {
             </template>
           </TooltipContent>
         </Tooltip>
-
-        <!--
-          Служебные кнопки плашки: глиф 12 в боксе 16, хит-зона расширена до 24
-          невидимым `::after` — правило чипа «хит-зона служебной иконки ≥24×24».
-        -->
-        <button
-          type="button"
-          data-slot="frame-tile-locate"
-          aria-label="Показать в структуре справа"
-          class="relative ml-auto flex size-4 shrink-0 items-center justify-center rounded-xs bg-scrim-light outline-none after:absolute after:-inset-1 after:content-[''] hover:bg-primary-foreground hover:text-foreground focus-visible:bg-primary-foreground focus-visible:text-foreground"
-          @click.stop="emit('locate')"
-        >
-          <Icon name="search" :size="12" />
-        </button>
-
-        <Tooltip v-if="protectedFrame">
-          <TooltipTrigger as-child>
-            <span
-              data-slot="frame-tile-lock"
-              tabindex="0"
-              :aria-label="`${props.lockReason} — открепить нельзя`"
-              class="flex size-4 shrink-0 items-center justify-center opacity-[var(--opacity-icon-muted)] outline-none"
-              @click.stop
-            >
-              <Icon name="lock" :size="12" />
-            </span>
-          </TooltipTrigger>
-          <TooltipContent>{{ props.lockReason }} — открепить нельзя</TooltipContent>
-        </Tooltip>
-        <button
-          v-else
-          type="button"
-          data-slot="frame-tile-unassign"
-          aria-label="Открепить"
-          class="relative flex size-4 shrink-0 items-center justify-center rounded-xs bg-scrim-light outline-none after:absolute after:-inset-1 after:content-[''] hover:bg-primary-foreground hover:text-foreground focus-visible:bg-primary-foreground focus-visible:text-foreground"
-          @click.stop="emit('unassign')"
-        >
-          <Icon name="close" :size="12" />
-        </button>
       </div>
     </TooltipProvider>
   </div>

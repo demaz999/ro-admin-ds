@@ -74,11 +74,11 @@ const position = computed(() => (props.inline ? 'absolute' : 'fixed'))
       :data-closable="props.closable || undefined"
       v-bind="{ ...forwarded, ...$attrs }"
       :class="cn(
-        'z-50 flex flex-col gap-6 rounded-tl-4xl bg-card px-4 py-8 text-foreground shadow-modal outline-none',
+        'z-50 flex flex-col gap-6 bg-card px-4 py-8 text-foreground shadow-modal outline-none',
         position,
         props.placement === 'edge'
-          ? 'inset-y-0 right-0 w-modal-edge'
-          : cn('top-1/2 left-1/2 max-h-[88vh] -translate-x-1/2 -translate-y-1/2', props.size === 'sm' ? 'w-modal-narrow' : 'w-modal'),
+          ? 'inset-y-0 right-0 w-modal-edge rounded-tl-4xl'
+          : cn('top-1/2 left-1/2 max-h-[88vh] rounded-md -translate-x-1/2 -translate-y-1/2', props.size === 'sm' ? 'w-modal-narrow' : 'w-modal'),
         props.class,
       )"
       tabindex="-1"

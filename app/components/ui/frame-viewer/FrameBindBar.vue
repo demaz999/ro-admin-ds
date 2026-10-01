@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { Button } from '../button'
-import { Icon } from '../icon'
+import { ButtonAction } from '../button-action'
 import { Kbd } from '../kbd'
 import { stepCounterVariants } from '../step-row'
 import { cn } from '@/lib/utils'
@@ -70,13 +70,6 @@ watch(() => props.flash, (value) => {
 })
 onBeforeUnmount(() => clearTimeout(timer))
 
-const icon = computed(() => {
-  if (props.suggestion) return 'auto-fix'
-  if (props.state === 'locked') return 'lock'
-  if (props.state === 'assigned') return 'check'
-  return 'info'
-})
-
 const blockedText = computed(() => {
   const s = props.suggestion
   if (s?.kind !== 'step' || !s.blocked) return ''
@@ -98,8 +91,6 @@ const blockedText = computed(() => {
       props.class,
     )"
   >
-    <Icon :name="icon" :size="16" class="shrink-0" />
-
     <span
       v-if="flashing"
       data-slot="frame-bind-flash"
@@ -142,12 +133,13 @@ const blockedText = computed(() => {
         </Button>
       </template>
       <template v-else-if="bound">
-        <Button variant="secondary" size="sm" :disabled="flashing" @click="emit('locate')">
+        <!-- Такт 46, приёмка владельца 2026-10-01 (п. 12): текстовые кнопки без подложки — ButtonAction. -->
+        <ButtonAction size="sm" :show-icon="false" :disabled="flashing" @click="emit('locate')">
           Показать в структуре
-        </Button>
-        <Button v-if="props.state === 'assigned'" variant="secondary" size="sm" :disabled="flashing" @click="emit('unbind')">
+        </ButtonAction>
+        <ButtonAction v-if="props.state === 'assigned'" size="sm" :show-icon="false" :disabled="flashing" @click="emit('unbind')">
           Открепить
-        </Button>
+        </ButtonAction>
         <span v-else data-slot="frame-bind-reason" class="max-w-60 text-right">{{ props.reason }} — изменить нельзя</span>
       </template>
       <Button v-else variant="secondary" size="sm" :disabled="flashing" @click="emit('suggest')">

@@ -15,7 +15,8 @@ export { default as FrameTile } from './FrameTile.vue'
  * галереи кита — 16:10 и срезала бы 16.7% высоты кадра, на котором эксперт ищет
  * шильдик или номер. Поэтому изображение — `Image ratio="4:3"` (пропорция из
  * мастера `Image` `174:3128`), а от `MediaGalleryItem` md взяты только ступени:
- * радиус 16 и подложка `--muted`. `MediaGalleryItem` не тронут.
+ * радиус 16 и подложка `--muted`. `MediaGalleryItem` не тронут. С такта 46 радиус плитки и картинки — 4
+ * (`--radius-xs`, приёмка владельца 2026-10-01).
  *
  * ## Пять состояний кадра (спека §4)
  *
@@ -26,6 +27,10 @@ export { default as FrameTile } from './FrameTile.vue'
  * | `suggested` | как `assigned`, кольцо `--warning`, плашка `--warning-strong` | крестик |
  * | `locked` | как `assigned`, плашка `--surface-contrast` | замок с причиной |
  * | `rejected` | как `assigned`, плашка `--destructive-strong`, «отклонён · шаг» | замок с причиной |
+ *
+ * С такта 46 (приёмка владельца 2026-10-01, п. 11, 14) «хвост» плашки — в правом верхнем углу картинки: лупа
+ * «Показать в структуре», крестик «Открепить» или замок-маркер — в общей сетке углов (зона 32, иконка 16, отступ 8,
+ * подложка `--field-elevated`, зазор 4); в плашке — только текст статуса без иконки.
  *
  * Шестое состояние спеки — «снят в шаге» — в ленте не выводится (§4.1): такой
  * кадр живёт только миниатюрой `StepThumb` внутри шага.
@@ -43,7 +48,7 @@ export { default as FrameTile } from './FrameTile.vue'
  * `linked`.
  */
 export const frameTileVariants = cva(
-  'group/tile relative flex cursor-pointer flex-col overflow-hidden rounded-xl border bg-card outline-none select-none focus-visible:ring-2 focus-visible:ring-ring',
+  'group/tile relative flex cursor-pointer flex-col overflow-hidden rounded-xs border bg-card outline-none select-none focus-visible:ring-2 focus-visible:ring-ring',
   {
     variants: {
       /** Выделен: рамка брендовая, кольцо светлой брендовой ступенью (`.card.sel`). */

@@ -1097,8 +1097,8 @@ function onUndo(id: number) {
               <Button size="sm" @click="m.acceptAll()">Принять все объекты</Button>
             </template>
           </Callout>
-          <!-- № 11 — нейтральная метка сессии (решение чата 2026-09-30, прецедент такта 26) -->
-          <Chip variant="neutral" trailing="none">Свободная съёмка</Chip>
+          <!-- № 11 — заголовок страницы h1 (приёмка владельца 2026-10-01, такт 46, п. 2): ToolbarText variant="title" -->
+          <ToolbarText as="h1" variant="title">Свободная съёмка</ToolbarText>
           <ToolbarText data-sess-meta>{{ sessMeta }}</ToolbarText>
           <div class="ml-auto flex items-center gap-5">
             <ProgressStat
@@ -1122,30 +1122,36 @@ function onUndo(id: number) {
         <!-- ============================ рабочая зона — кит, такт 42: Resizable (№ 1, 30), панель 320–820, по умолчанию 440 ============================ -->
         <ResizablePanelGroup direction="horizontal" class="min-h-0 flex-1">
           <ResizablePanel class="flex flex-col">
-            <!-- тулбар ленты, §7 — кит, такт 42: Toolbar (№ 15–21) -->
+            <!--
+              тулбар ленты, §7 — кит, такт 42: Toolbar (№ 15–21). Такт 46, приёмка владельца 2026-10-01: поиск занимает
+              свободное место строки, не уже 320 (п. 3); вторая строка — «Текущий объект» у левого края, переключатели —
+              сегмент-контролом справа (п. 4).
+            -->
             <Toolbar>
               <Button variant="secondary" @click="m.magicWand()">Распределить автоматически</Button>
               <Button variant="secondary" @click="m.selectAll()">Выделить всё</Button>
-              <div class="w-55 shrink" data-search>
+              <div class="min-w-80 flex-1" data-search>
                 <Input v-model="search" placeholder="Поиск по расшифровкам и именам файлов…" />
               </div>
-              <ToolbarText id="curHint" truncate grow align="end">{{ curHint }}</ToolbarText>
-              <ToolbarGroup label="Разобранные">
-                <Tabs v-model="mode">
-                  <TabsList variant="pill">
-                    <TabsTrigger value="keep" variant="pill">оставлять</TabsTrigger>
-                    <TabsTrigger value="hide" variant="pill">убирать</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </ToolbarGroup>
-              <ToolbarGroup label="Размер">
-                <Tabs v-model="size">
-                  <TabsList variant="pill">
-                    <TabsTrigger value="md" variant="pill">M</TabsTrigger>
-                    <TabsTrigger value="lg" variant="pill">L</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </ToolbarGroup>
+              <div class="flex basis-full items-center gap-4">
+                <ToolbarText id="curHint" truncate grow>{{ curHint }}</ToolbarText>
+                <ToolbarGroup label="Разобранные">
+                  <Tabs v-model="mode">
+                    <TabsList variant="segmented">
+                      <TabsTrigger value="keep" variant="segmented">оставлять</TabsTrigger>
+                      <TabsTrigger value="hide" variant="segmented">убирать</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </ToolbarGroup>
+                <ToolbarGroup label="Размер">
+                  <Tabs v-model="size">
+                    <TabsList variant="segmented">
+                      <TabsTrigger value="md" variant="segmented">M</TabsTrigger>
+                      <TabsTrigger value="lg" variant="segmented">L</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </ToolbarGroup>
+              </div>
             </Toolbar>
 
             <!-- лента материалов, §8 -->
@@ -1192,12 +1198,15 @@ function onUndo(id: number) {
 
           <!-- панель структуры, §9 -->
           <ResizablePanel data-pane-right :default-size="440" :min-size="320" :max-size="820" size-unit="px" class="flex flex-col">
-            <Tabs v-model="tab">
-              <TabsList>
-                <TabsTrigger value="scheme">Схема осмотра</TabsTrigger>
-                <TabsTrigger value="form">Форма осмотра</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <!-- Вкладки панели — воздух 12 сверху и снизу (приёмка владельца 2026-10-01, такт 46, п. 6). -->
+            <div class="px-3 py-3">
+              <Tabs v-model="tab">
+                <TabsList>
+                  <TabsTrigger value="scheme">Схема осмотра</TabsTrigger>
+                  <TabsTrigger value="form">Форма осмотра</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
 
             <div ref="panelEl" data-panel class="min-h-0 flex-1 overflow-auto pb-30" @dragover="onPanelDragover" @drop="onPanelDrop" @mouseover="onPanelOver" @mouseleave="hoverPanel = null">
               <template v-if="tab === 'scheme'">
@@ -1419,7 +1428,15 @@ function onUndo(id: number) {
           />
         </FrameStage>
         <template #aside>
-          <FrameMeta :rows="metaRows" />
+          <!--
+            Заголовки разделов «О кадре» и «Шаги осмотра» — роль заголовка раздела панели структуры: StageSection без
+            сворачивания (приёмка владельца 2026-10-01, такт 46, п. 13). Группы шагов идут следом соседями: их липкие
+            заголовки не наезжают на заголовок раздела.
+          -->
+          <StageSection title="О кадре" :collapsible="false">
+            <FrameMeta :rows="metaRows" />
+          </StageSection>
+          <StageSection title="Шаги осмотра" :collapsible="false" />
           <!-- список шагов, §11.1–11.2 — такт 33: группа — StageSection, пункт — AssignOption -->
           <StageSection
             v-for="g in viewerGroups"

@@ -8,7 +8,7 @@ const id = useId()
 
 <template>
   <div data-slot="toolbar-group" role="group" :aria-labelledby="props.label ? id : undefined" class="flex shrink-0 items-center gap-2">
-    <span v-if="props.label" :id="id" data-slot="toolbar-group-label" class="text-2xs text-muted-foreground">{{ props.label }}</span>
+    <span v-if="props.label" :id="id" data-slot="toolbar-group-label" class="text-xs text-muted-foreground">{{ props.label }}</span>
     <slot />
   </div>
 </template>

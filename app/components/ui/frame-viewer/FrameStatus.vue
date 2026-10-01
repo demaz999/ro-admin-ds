@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { Icon } from '../icon'
 import { stepCounterVariants } from '../step-row'
 import { cn } from '@/lib/utils'
 
@@ -19,6 +18,6 @@ const props = withDefaults(defineProps<{
     data-slot="frame-status"
     :class="cn(stepCounterVariants({ tone: props.assigned ? 'success' : 'neutral' }), 'gap-1', props.class)"
   >
-    <Icon v-if="props.assigned" name="check" :size="12" />{{ props.assigned ? 'распределён' : 'не распределён' }}
+    {{ props.assigned ? 'распределён' : 'не распределён' }}
   </span>
 </template>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { Button } from '../button'
 import { Icon } from '../icon'
 import { cn } from '@/lib/utils'
@@ -22,8 +23,15 @@ const props = withDefaults(defineProps<{
   addLabel?: string
   /** Оснастка приёмки: вид наведения без курсора. В продукт не идёт. */
   demoHover?: boolean
+  /**
+   * `false` — заголовок раздела без сворачивания: та же строка заголовка, без шеврона и нажатия, тело открыто всегда.
+   * Такт 46, приёмка владельца 2026-10-01 (п. 13): «О кадре» и «Шаги осмотра» в правой панели просмотра — роль заголовка
+   * раздела, принятая в панели структуры.
+   */
+  collapsible?: boolean
   class?: string
 }>(), {
+  collapsible: true,
   repeatable: false,
   count: '',
   open: true,
@@ -32,11 +40,18 @@ const props = withDefaults(defineProps<{
 })
 
 const emit = defineEmits<{ toggle: []; add: [] }>()
+/** Раздел без сворачивания открыт всегда. */
+const open = computed(() => !props.collapsible || props.open)
 </script>
 
 <template>
-  <section data-slot="stage-section" :data-state="props.open ? 'open' : 'closed'" :class="cn('border-b border-border-soft', props.class)">
+  <section data-slot="stage-section" :data-state="open ? 'open' : 'closed'" :class="cn('border-b border-border-soft', props.class)">
+    <h3 v-if="!props.collapsible" data-slot="stage-header" class="sticky top-0 z-10 m-0 flex w-full items-center gap-2 border-b border-border-soft bg-accent px-3 py-2.5">
+      <span data-slot="stage-title" class="min-w-0 flex-1 truncate text-xs font-bold text-foreground">{{ props.title }}</span>
+      <span v-if="props.count" data-slot="stage-count" class="shrink-0 text-2xs text-muted-foreground">{{ props.count }}</span>
+    </h3>
     <button
+      v-else
       type="button"
       data-slot="stage-header"
       :aria-expanded="props.open"
@@ -59,7 +74,7 @@ const emit = defineEmits<{ toggle: []; add: [] }>()
       >повторяемый</span>
       <span v-if="props.count" data-slot="stage-count" class="shrink-0 text-2xs text-muted-foreground">{{ props.count }}</span>
     </button>
-    <div v-if="props.open" data-slot="stage-body">
+    <div v-if="open" data-slot="stage-body">
       <div v-if="props.addLabel" data-slot="stage-add" class="border-b border-border-soft bg-card px-2.5 py-2">
         <Button variant="secondary" size="sm" @click="emit('add')">+ {{ props.addLabel }}</Button>
       </div>
