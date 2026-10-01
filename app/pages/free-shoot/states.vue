@@ -1703,7 +1703,7 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
           <p class="text-2xs text-muted-foreground">ActionBar — счёт с подписью, действия, разделитель</p>
           <ActionBar count="5 кадров выбрано" sub="1 видео · 2 уже распределено" x="0" class="relative bottom-0 translate-x-0">
             <Button>Назначить на шаг</Button>
-            <Button variant="secondary">Новый объект из выделенного</Button>
+            <Button variant="secondary">Новый объект</Button>
             <Button variant="secondary">В «Прочее»</Button>
             <Button variant="secondary">Открепить</Button>
             <ActionBarSeparator />

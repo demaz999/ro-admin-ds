@@ -26,6 +26,10 @@
  *
  * Решение владельца 2026-10-01: зазор 8 мастера между заголовком и списком велик — заголовок отрывался от своей группы.
  * Зазор — 4; отделение группы сверху (линия с отступами 4 / 4) прежнее. Отклонение от мастера — `figma-fixes.md`.
+ *
+ * Такт 50: видимый зазор всё ещё был велик — заголовок высотой 32 держал под текстом 8. Заголовок — по тексту с полем 8
+ * сверху (над текстом, как было), снизу поля нет: от низа текста заголовка до верха текста первого пункта — зазор 4 плюс
+ * поле самого пункта.
  * Контейнер с группами зазор между ними не добавляет —
  * `SelectContent` гасит свой зазор, когда в нём лежат группы. Удаление и другие
  * опасные действия — последней группой.
@@ -39,12 +43,12 @@ const props = withDefaults(defineProps<{
 <template>
   <div
     data-slot="list-group"
-    class="flex flex-col gap-1 [[data-slot=list-group]+&]:mt-1 [[data-slot=list-group]+&]:border-t [[data-slot=list-group]+&]:border-stroke-neutral [[data-slot=list-group]+&]:pt-1"
+    class="flex flex-col gap-0.5 [[data-slot=list-group]+&]:mt-1 [[data-slot=list-group]+&]:border-t [[data-slot=list-group]+&]:border-stroke-neutral [[data-slot=list-group]+&]:pt-1"
   >
     <div
       v-if="props.header"
       data-slot="list-group-header"
-      class="flex h-8 items-center px-4 text-xs font-medium text-field-foreground"
+      class="flex items-center px-4 pt-2 text-xs font-medium text-field-foreground"
     >
       {{ props.header }}
     </div>

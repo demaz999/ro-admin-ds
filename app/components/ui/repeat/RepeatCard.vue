@@ -64,23 +64,30 @@ const rail = computed(() => (props.highlighted ? 'highlighted' : props.current ?
     data-slot="repeat-card"
     :data-state="props.open ? 'open' : 'closed'"
     :data-highlighted="props.highlighted || undefined"
-    :class="cn('border-b border-border-soft', props.class)"
+    :class="cn('relative overflow-hidden rounded-md border border-border bg-card', props.class)"
   >
+    <!-- Полоса по всей высоте карточки: текущая единица либо подсвеченная связью. -->
+    <span
+      v-if="rail !== 'none'"
+      data-slot="repeat-rail"
+      aria-hidden="true"
+      class="pointer-events-none absolute inset-y-0 left-0 z-10 w-0.75"
+      :class="rail === 'current' ? 'bg-primary' : 'bg-accent-soft'"
+    />
     <button
       type="button"
       data-slot="repeat-header"
       :aria-expanded="props.open"
-      :class="cn(repeatHeaderVariants({ tone, rail }), props.demoHover && tone === 'default' ? 'bg-accent' : '')"
+      :class="cn(repeatHeaderVariants({ tone }), props.demoHover && tone === 'default' ? 'bg-accent' : '')"
       :style="{ transitionProperty: 'background-color', transitionDuration: 'var(--duration-hover)' }"
       @click="emit('header')"
     >
       <span class="flex min-w-0 flex-1 flex-col">
         <span
           data-slot="repeat-name"
-          class="truncate text-xs font-medium"
-          :class="props.checkedSteps ? 'text-foreground-secondary' : 'text-foreground'"
+          class="truncate text-sm font-bold text-foreground"
         >{{ props.name }}</span>
-        <span data-slot="repeat-details" class="truncate text-2xs text-muted-foreground">{{ props.details || 'реквизиты не заполнены' }}</span>
+        <span data-slot="repeat-details" class="truncate text-xs text-foreground/[var(--opacity-on-tone)]">{{ props.details || 'реквизиты не заполнены' }}</span>
       </span>
       <!-- Правило такта 33: на заголовке предложенного (та же мягкая ступень) пилюля — на --card; у текущего фон свой, пилюля в своей заливке. -->
       <span v-if="props.suggested" :class="stepCounterVariants({ tone: 'warning', surface: tone === 'suggested' ? 'card' : 'tone' })">предложено</span>
@@ -89,10 +96,10 @@ const rail = computed(() => (props.highlighted ? 'highlighted' : props.current ?
       </span>
       <Badge v-if="props.current" size="sm">текущий</Badge>
       <span v-if="props.errors" :class="stepCounterVariants({ tone: 'error' })">{{ props.errors }}</span>
-      <span data-slot="repeat-frames" class="shrink-0 text-2xs text-muted-foreground tabular-nums">{{ props.frames }}</span>
+      <span data-slot="repeat-frames" class="shrink-0 text-2xs text-foreground/[var(--opacity-on-tone)] tabular-nums">{{ props.frames }}</span>
     </button>
 
-    <div v-if="props.open" data-slot="repeat-body" class="flex flex-col gap-2 bg-card px-1.5 pt-1 pb-2">
+    <div v-if="props.open" data-slot="repeat-body" class="flex flex-col gap-2 border-t border-border-soft bg-card px-1.5 pt-2 pb-2">
       <div
         v-if="props.suggested"
         data-slot="repeat-review"

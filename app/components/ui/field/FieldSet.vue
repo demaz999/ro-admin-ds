@@ -60,11 +60,14 @@ watch(() => props.autofocus, (on) => {
     data-slot="field-set"
     role="group"
     :aria-labelledby="props.legend ? id : undefined"
-    :class="cn('flex flex-col gap-2 not-first:mt-3 not-first:border-t not-first:border-border-soft not-first:pt-3', props.class)"
+    :class="cn('flex flex-col gap-3 not-first:mt-3 not-first:border-t not-first:border-border-soft not-first:pt-3', props.class)"
   >
     <Heading v-if="props.legend" :id="id" data-slot="field-set-legend" level="section" as="h3">
       {{ props.legend }}
     </Heading>
-    <slot />
+    <!-- Заголовок блока → содержимое — 12 (такт 50, единый отступ); между полями — 8. -->
+    <div data-slot="field-set-body" class="flex flex-col gap-2">
+      <slot />
+    </div>
   </div>
 </template>

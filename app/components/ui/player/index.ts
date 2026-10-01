@@ -42,6 +42,8 @@ export const playerButtonVariants = cva(
         lg: 'size-32',
         md: 'size-20',
         sm: 'size-10',
+        // Кнопка в строке мета заметки ленты (`FeedNote`, такт 50): круг 28, зона нажатия 32 — псевдоэлементом.
+        xs: 'relative size-7 after:absolute after:-inset-0.5 after:content-[\'\']',
       },
     },
     defaultVariants: { size: 'md' },

@@ -11,8 +11,8 @@ const props = defineProps<{ class?: string }>()
 </script>
 
 <template>
-  <div data-slot="modal-card-footer" :class="cn('flex shrink-0 items-center gap-6 px-4', props.class)">
-    <span v-if="$slots.note" data-slot="modal-card-note" class="min-w-0 flex-1 text-sm text-foreground-secondary">
+  <div data-slot="modal-card-footer" :class="cn('flex shrink-0 items-center gap-4 px-4', props.class)">
+    <span v-if="$slots.note" data-slot="modal-card-note" class="min-w-0 flex-1 text-2xs text-foreground-secondary">
       <slot name="note" />
     </span>
     <div class="ml-auto flex shrink-0 items-center gap-6">

@@ -67,16 +67,17 @@ const withIcon = computed(() => props.type === 'timer' || props.showIcon)
       </ButtonAction>
     </div>
 
-    <!-- Крестик 8×8 прибит в 12 от верха и правого края. У таймера его нет:
+    <!-- Крестик: глиф 16 по центру зоны 32, зона в 4 от верха и правого края (такт 50, решение владельца 2026-10-01;
+         у мастера — 8×8 в 12 от краёв, мелко для цели нажатия). У таймера его нет:
          плашка закрывается сама, и в мастере крестик там не нарисован. -->
     <button
       v-if="props.type !== 'timer'"
       type="button"
-      class="absolute top-3 right-3 text-primary"
+      class="absolute top-1 right-1 flex size-8 items-center justify-center rounded-sm text-primary outline-none hover:text-primary-hover focus-visible:ring-2 focus-visible:ring-ring"
       aria-label="Закрыть"
       @click="emit('close')"
     >
-      <Icon name="close" :size="8" />
+      <Icon name="close" :size="16" />
     </button>
   </div>
 </template>

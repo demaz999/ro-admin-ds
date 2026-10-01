@@ -37,7 +37,7 @@ const props = withDefaults(defineProps<{
  */
 const opticalShift = computed(() => {
   if (props.type !== 'play') return '0px'
-  return props.size === 'sm' ? '1px' : '2px'
+  return props.size === 'sm' || props.size === 'xs' ? '1px' : '2px'
 })
 </script>
 
@@ -49,11 +49,11 @@ const opticalShift = computed(() => {
     :aria-label="props.type === 'play' ? 'Воспроизвести' : 'Пауза'"
     :class="playerButtonVariants({ size: props.size })"
   >
-    <!-- Глиф масштабируется вместе с кругом: 16 / 32 / 48 при 40 / 80 / 128. -->
+    <!-- Глиф масштабируется вместе с кругом: 16 / 32 / 48 при 40 / 80 / 128; у `xs` (такт 50) — 12 при 28. -->
     <slot>
       <Icon
         :name="props.type"
-        :size="props.size === 'sm' ? 16 : props.size === 'md' ? 32 : 48"
+        :size="props.size === 'xs' ? 12 : props.size === 'sm' ? 16 : props.size === 'md' ? 32 : 48"
         :style="{ transform: `translateX(${opticalShift})` }"
       />
     </slot>

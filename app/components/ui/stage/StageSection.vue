@@ -20,11 +20,17 @@ const props = withDefaults(defineProps<{
    * «Новая единица». Пусто — строки нет.
    */
   addLabel?: string
+  /**
+   * Тело — стопка карточек единиц (`RepeatCard`): поля 12 от краёв этапа, 12 между карточками, строка добавления — первой,
+   * по левому краю карточек. Такт 50. Без оси тело прежнее — список шагов или пунктов.
+   */
+  cards?: boolean
   /** Оснастка приёмки: вид наведения без курсора. В продукт не идёт. */
   demoHover?: boolean
   class?: string
 }>(), {
   repeatable: false,
+  cards: false,
   count: '',
   open: true,
   addLabel: '',
@@ -59,8 +65,8 @@ const emit = defineEmits<{ toggle: []; add: [] }>()
       >повторяемый</span>
       <span v-if="props.count" data-slot="stage-count" class="shrink-0 text-2xs text-muted-foreground">{{ props.count }}</span>
     </button>
-    <div v-if="props.open" data-slot="stage-body">
-      <div v-if="props.addLabel" data-slot="stage-add" class="border-b border-border-soft bg-card px-2.5 py-2">
+    <div v-if="props.open" data-slot="stage-body" :class="props.cards ? 'flex flex-col gap-3 p-3' : ''">
+      <div v-if="props.addLabel" data-slot="stage-add" :class="props.cards ? 'flex' : 'border-b border-border-soft bg-card px-2.5 py-2'">
         <Button variant="secondary" size="sm" @click="emit('add')">+ {{ props.addLabel }}</Button>
       </div>
       <slot />

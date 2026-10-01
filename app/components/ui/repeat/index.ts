@@ -39,6 +39,15 @@ export { default as RepeatForm } from './RepeatForm.vue'
  * (слот по умолчанию, `StepRow`) → служебная строка (`hiddenSteps`, «Скрыто проверенных
  * шагов: N»). Порядок держит компонент: страница не может поставить форму под шаги.
  */
+/**
+ * ## Карточка-контейнер — такт 50, решение владельца 2026-10-01
+ *
+ * Три уровня панели читаются вмещением: этап → единица → шаги. Единица — карточка: рамка 1 `--border`, радиус 8,
+ * внутри шапка, сводка формы и шаги. Имя — 15/20 bold `--foreground`, реквизиты — 13/16 приглушённо (`--opacity-on-tone`:
+ * шапка бывает на тоне). Полоса 3 слева идёт по всей высоте карточки: `--primary` у текущей, `--accent-soft` у подсвеченной
+ * связью. Свёрнутая единица — карточка с одной шапкой. Поля 12 от края этапа и 12 между карточками ставит
+ * `StageSection cards`.
+ */
 export const repeatHeaderVariants = cva(
   'flex w-full items-center gap-2 px-3 py-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset',
   {
@@ -48,14 +57,8 @@ export const repeatHeaderVariants = cva(
         current: 'bg-surface-selected',
         suggested: 'bg-warning-surface',
       },
-      /** Полоса 3 слева — текущий (`--primary`) или подсвеченный связью (`--accent-soft`). */
-      rail: {
-        none: '',
-        current: 'shadow-[inset_--spacing(0.75)_0_0_var(--color-primary)]',
-        highlighted: 'shadow-[inset_--spacing(0.75)_0_0_var(--color-accent-soft)]',
-      },
     },
-    defaultVariants: { tone: 'default', rail: 'none' },
+    defaultVariants: { tone: 'default' },
   },
 )
 

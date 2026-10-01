@@ -3,7 +3,7 @@ import type { FeedNoteKind, FeedNoteSelection } from '.'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { cn } from '@/lib/utils'
 import { ButtonAction } from '@/components/ui/button-action'
-import { PlayerAudio } from '@/components/ui/player'
+import { PlayerButton } from '@/components/ui/player'
 import { feedNoteVariants } from '.'
 
 /** Заметка в ленте (§8.4) — разбор и провенанс в `index.ts`. */
@@ -32,6 +32,9 @@ const emit = defineEmits<{
   play: []
   'select-text': [selection: FeedNoteSelection]
 }>()
+
+/** Мета строкой: время · имя файла · длительность; у текстовой заметки — время. */
+const meta = computed(() => [props.time, props.kind === 'voice' ? props.name : '', props.kind === 'voice' ? props.duration : ''].filter(Boolean).join(' · '))
 
 /** Длинная — от 110 знаков, как у прототипа (`clamp = text.length > 110`). */
 const long = computed(() => props.text.length > 110)
@@ -74,22 +77,26 @@ function onMouseup() {
     :data-state="toggleable ? (props.expanded ? 'expanded' : 'clamped') : undefined"
     :class="cn(feedNoteVariants({ kind: props.kind }), props.class)"
   >
+    <!--
+      Строка мета — такт 50, решение владельца 2026-10-01: главное в заметке — текст расшифровки. В одной строке: кнопка
+      воспроизведения 28 (зона 32) у голосовой, тип 13/16 bold в тоне заметки обычным регистром, время · имя файла ·
+      длительность — приглушённо (`--opacity-on-tone`), справа «Копировать».
+    -->
     <div data-slot="feed-note-head" class="flex items-center gap-2">
+      <span v-if="props.kind === 'voice'" data-slot="feed-note-play" class="flex size-8 shrink-0 items-center justify-center">
+        <PlayerButton size="xs" @click="emit('play')" />
+      </span>
       <span
         data-slot="feed-note-type"
-        :class="cn('text-2xs font-bold uppercase', props.kind === 'note' ? 'text-warning-strong' : 'text-primary')"
+        :class="cn('shrink-0 text-xs font-bold', props.kind === 'note' ? 'text-warning-strong' : 'text-primary')"
       >{{ props.kind === 'note' ? 'Текстовая заметка' : 'Голосовой комментарий' }}</span>
-      <span data-slot="feed-note-time" class="text-2xs text-muted-foreground">{{ props.time }}</span>
-      <!-- «Копировать» — правый верхний угол, на строке типа и времени: такт 49, решение владельца 2026-10-01. -->
-      <span data-slot="feed-note-copy" class="ml-auto flex">
+      <span data-slot="feed-note-time" class="min-w-0 truncate text-xs text-foreground/[var(--opacity-on-tone)]">{{ meta }}</span>
+      <span data-slot="feed-note-copy" class="ml-auto flex shrink-0">
         <ButtonAction size="sm" :show-icon="false" @click="emit('copy')">
           Копировать
         </ButtonAction>
       </span>
     </div>
-    <PlayerAudio v-if="props.kind === 'voice'" surface="none" :time="props.duration" @toggle="emit('play')">
-      {{ props.name }}
-    </PlayerAudio>
     <p
       ref="textEl"
       data-slot="feed-note-text"

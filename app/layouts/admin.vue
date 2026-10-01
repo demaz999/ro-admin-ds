@@ -20,6 +20,7 @@ import { computed, reactive, ref } from 'vue'
  * | типовая страница | `definePageMeta({ layout: 'admin' })` — меню развёрнуто, содержимое с полями 32 / 24 |
  * | экран во всё окно (`/free-shoot`) | `<NuxtLayout name="admin" fill menu="compact">` — меню свёрнуто, содержимое без полей на высоту окна |
  * | свои пункты полосы | слот `bar` — встают в правый блок полосы перед языком и профилем |
+ * | меню экрана во всё окно, развёрнутое бургером | ложится поверх содержимого от левого края (такт 50): рабочая зона остаётся на месте и шириной 84 под меню, под правый край окна не уходит |
  *
  * «Мои осмотры» на этот каркас не переведены — у страницы свой рельс, решение такта 8.
  *
@@ -109,7 +110,14 @@ function toggleMenu() {
         variant="kit1": меню по мастеру left_menu кита 1 (такт 9). Свёрнутое — left_menu 33970:14833: пункт 84×48,
         иконка 20, подпись 13/16, группы через линию.
       -->
-      <Menu variant="kit1" :compact="compact" class="shrink-0">
+      <!-- Экран во всё окно: место под меню — всегда 84, развёрнутое меню ложится поверх содержимого (такт 50). -->
+      <div class="relative flex shrink-0" :class="props.fill ? 'w-21' : ''">
+      <Menu
+        variant="kit1"
+        :compact="compact"
+        class="shrink-0"
+        :class="props.fill && !compact ? 'absolute inset-y-0 left-0 z-30 shadow-dropdown' : ''"
+      >
         <MenuSection first>
           <MenuItem :selected="current === '/'">
             <template #icon>
@@ -250,6 +258,7 @@ function toggleMenu() {
           </MenuItem>
         </MenuSection>
       </Menu>
+      </div>
 
       <main
         class="flex min-w-0 flex-1 flex-col"

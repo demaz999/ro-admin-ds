@@ -38,7 +38,11 @@ const glyphSize = computed(() => (props.size === 'sm' ? 12 : 16))
     :disabled="props.disabled"
     :class="buttonNavigationVariants({ size, muted })"
   >
-    <Icon v-if="props.direction === 'left'" name="chevron-left" :size="glyphSize" />
+    <!-- `base` — btn_back: шеврон высотой 16 в контейнере шириной 8. -->
+    <span v-if="props.direction === 'left' && props.size === 'base'" class="flex w-2 shrink-0 justify-center">
+      <Icon name="chevron-left" :size="16" />
+    </span>
+    <Icon v-else-if="props.direction === 'left'" name="chevron-left" :size="glyphSize" />
     <slot />
     <Icon v-if="props.direction === 'right'" name="chevron-right" :size="glyphSize" />
   </button>

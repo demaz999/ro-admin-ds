@@ -1109,13 +1109,19 @@ function onUndo(id: number) {
             № 11 — заголовок страницы: Heading page (h1), такт 47, ворота владельца 2026-10-01. Правило базовой линии:
             в строке «заголовок + текст» элементы стоят на базовой линии заголовка (items-baseline).
           -->
-          <!-- «Назад» над заголовком — такт 48, решение владельца 2026-10-01: ведёт к осмотру; крошек нет. -->
-          <div class="flex flex-col gap-2">
-            <ButtonNavigation size="sm" direction="left" muted>Назад</ButtonNavigation>
-            <div class="flex items-baseline gap-2">
-              <Heading level="page">Свободная съёмка</Heading>
-              <ToolbarText data-sess-meta>{{ sessMeta }}</ToolbarText>
-            </div>
+          <!--
+            «Назад» над заголовком — такт 48, решение владельца 2026-10-01: ведёт к осмотру; крошек нет. Такт 50: вид —
+            btn_back 24442:45220 (ButtonNavigation base), до заголовка 12. Заголовок и сводка — по середине строчных:
+            контраст кеглей page против текста (слот meta у Heading).
+          -->
+          <div class="flex flex-col gap-3">
+            <ButtonNavigation size="base" direction="left">Назад</ButtonNavigation>
+            <Heading level="page">
+              Свободная съёмка
+              <template #meta>
+                <span data-sess-meta>{{ sessMeta }}</span>
+              </template>
+            </Heading>
           </div>
           <!-- Справа: счётчики и «Завершить распределение» (№ 7) — из полосы в подшапку, такт 48. -->
           <div class="ml-auto flex items-center gap-5">
@@ -1258,6 +1264,7 @@ function onUndo(id: number) {
                     :count="st.rep ? String(m.objects.filter((o: any) => o.stageId === st.id).length) : plural(st.steps.length, 'шаг', 'шага', 'шагов')"
                     :open="!closedStages.has(st.id)"
                     :add-label="st.rep ? (st.id === 'bld' ? 'Новое здание' : 'Новая единица') : ''"
+                    :cards="st.rep"
                     @toggle="toggleStage(st.id)"
                     @add="m.openNewForm(st.id, [])"
                   >
@@ -1302,10 +1309,10 @@ function onUndo(id: number) {
                           />
                         </template>
                       </RepeatCard>
-                      <StageNote v-if="!repList(st).list.length">
-                        {{ repList(st).hidden ? 'Все повторы этапа проверены' : m.state.onlyOpen ? 'Все повторы этого этапа проверены и закрыты' : 'Повторов пока нет — выделите кадры и нажмите «Новый объект из выделенного»' }}
+                      <StageNote v-if="!repList(st).list.length" class="p-0">
+                        {{ repList(st).hidden ? 'Все повторы этапа проверены' : m.state.onlyOpen ? 'Все повторы этого этапа проверены и закрыты' : 'Повторов пока нет — выделите кадры и нажмите «Новый объект»' }}
                       </StageNote>
-                      <StageNote v-if="repList(st).hidden && repList(st).list.length">
+                      <StageNote v-if="repList(st).hidden && repList(st).list.length" class="p-0">
                         Принято и скрыто: {{ plural(repList(st).hidden, 'объект', 'объекта', 'объектов') }}
                       </StageNote>
                     </template>
@@ -1384,10 +1391,10 @@ function onUndo(id: number) {
             </SelectContent>
           </PopoverContent>
         </Popover>
-        <!-- № 29: «Новый объект из выделенного» — такт 43: тот же поповер, что № 28; пункт — AssignOption type="stage" -->
+        <!-- № 29: «Новый объект» (до такта 50 — «Новый объект из выделенного») — такт 43: тот же поповер, что № 28; пункт — AssignOption type="stage" -->
         <Popover v-model:open="newObjOpen">
           <PopoverTrigger as-child>
-            <Button variant="secondary">Новый объект из выделенного</Button>
+            <Button variant="secondary">Новый объект</Button>
           </PopoverTrigger>
           <PopoverContent
             as-child
@@ -1464,14 +1471,15 @@ function onUndo(id: number) {
         </FrameStage>
         <template #aside>
           <!--
-            «О кадре» и «Шаги осмотра» — заголовки блоков: Heading section, без подложки и рамки строки, сверху 20, снизу
-            меньше (такт 47, приёмка владельца 2026-10-01; такт 46 ставил StageSection без сворачивания).
+            «О кадре» и «Шаги осмотра» — заголовки блоков: Heading section, без подложки и рамки строки, сверху 20 (такт 47,
+            приёмка владельца 2026-10-01). Под заголовком блока до содержимого — 12, единый отступ (такт 50): у «О кадре»
+            его даёт поле FrameMeta, у «Шаги осмотра» — поле обёртки.
           -->
           <div class="px-4 pt-5">
             <Heading>О кадре</Heading>
           </div>
           <FrameMeta :rows="metaRows" />
-          <div class="px-4 pt-5 pb-2">
+          <div class="px-4 pt-5 pb-3">
             <Heading>Шаги осмотра</Heading>
           </div>
           <!-- список шагов, §11.1–11.2 — такт 33: группа — StageSection, пункт — AssignOption -->

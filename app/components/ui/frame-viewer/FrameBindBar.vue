@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { Button } from '../button'
 import { ButtonAction } from '../button-action'
 import { Kbd } from '../kbd'
 import { stepCounterVariants } from '../step-row'
@@ -86,7 +85,7 @@ const blockedText = computed(() => {
       'flex min-h-12 items-center gap-3 rounded-b-md px-4 py-2 text-sm',
       bound && !props.suggestion
         ? 'bg-success-surface text-success-strong'
-        : 'border-t border-dashed border-border-soft bg-muted text-foreground-secondary',
+        : 'border-t border-dashed border-border-soft bg-muted text-foreground/[var(--opacity-on-tone)]',
       flashing ? 'ring-2 ring-success' : '',
       props.class,
     )"
@@ -115,22 +114,23 @@ const blockedText = computed(() => {
 
     <!-- Действия. Во вспышке выключены (§11.3). -->
     <div data-slot="frame-bind-actions" class="flex shrink-0 flex-wrap items-center justify-end gap-2">
+      <!-- Такт 50, решение владельца 2026-10-01: все кнопки плашки — текстовые без подложки (ButtonAction). -->
       <template v-if="props.suggestion?.kind === 'step'">
-        <Button v-if="!props.suggestion.blocked" variant="secondary" size="sm" :disabled="flashing" @click="emit('accept')">
+        <ButtonAction v-if="!props.suggestion.blocked" size="sm" :show-icon="false" :disabled="flashing" @click="emit('accept')">
           Принять
-          <Kbd surface="card" class="ml-1">Enter</Kbd>
-        </Button>
-        <Button variant="secondary" size="sm" :disabled="flashing" @click="emit('dismiss')">
+          <Kbd surface="card">Enter</Kbd>
+        </ButtonAction>
+        <ButtonAction size="sm" :show-icon="false" :disabled="flashing" @click="emit('dismiss')">
           Не то
-        </Button>
+        </ButtonAction>
       </template>
       <template v-else-if="props.suggestion?.kind === 'create'">
-        <Button variant="secondary" size="sm" :disabled="flashing" @click="emit('create')">
+        <ButtonAction size="sm" :show-icon="false" :disabled="flashing" @click="emit('create')">
           Создать «{{ props.suggestion.stageTitle }}»
-        </Button>
-        <Button variant="secondary" size="sm" :disabled="flashing" @click="emit('dismiss')">
+        </ButtonAction>
+        <ButtonAction size="sm" :show-icon="false" :disabled="flashing" @click="emit('dismiss')">
           Не то
-        </Button>
+        </ButtonAction>
       </template>
       <template v-else-if="bound">
         <!-- Такт 46, приёмка владельца 2026-10-01 (п. 12): текстовые кнопки без подложки — ButtonAction. -->
@@ -142,9 +142,9 @@ const blockedText = computed(() => {
         </ButtonAction>
         <span v-else data-slot="frame-bind-reason" class="max-w-60 text-right">{{ props.reason }} — изменить нельзя</span>
       </template>
-      <Button v-else variant="secondary" size="sm" :disabled="flashing" @click="emit('suggest')">
+      <ButtonAction v-else size="sm" :show-icon="false" :disabled="flashing" @click="emit('suggest')">
         Подобрать шаг
-      </Button>
+      </ButtonAction>
     </div>
   </div>
 </template>

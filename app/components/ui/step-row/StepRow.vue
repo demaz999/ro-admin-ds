@@ -176,7 +176,11 @@ onBeforeUnmount(() => clearTimeout(timer))
       :style="{ transitionDuration: 'var(--duration-hover)' }"
       @click="onRowClick"
     >
-      <!-- Имя и счётчик — на базовой линии имени (правило такта 47); номер клавиши — по центру строки. -->
+      <!--
+        Имя и счётчик — на базовой линии имени (правило такта 47); номер клавиши — по центру строки.
+        Второстепенный текст строки — `--foreground` на ступени `--opacity-on-tone` (такт 50): строка бывает на тоне
+        «Повторить», «переполнен», «проверен», и серый на нём грязнит.
+      -->
       <div class="flex min-h-4 items-baseline gap-2">
         <!-- Номер клавиши; без номера — пустое место той же ширины, строки не пляшут. -->
         <span
@@ -202,7 +206,7 @@ onBeforeUnmount(() => clearTimeout(timer))
       <div
         v-if="!frozen"
         data-slot="step-row-limits"
-        class="mt-1 flex flex-wrap gap-x-1.5 pl-6 text-2xs text-muted-foreground"
+        class="mt-1 flex flex-wrap gap-x-1.5 pl-6 text-2xs text-foreground/[var(--opacity-on-tone)]"
       >
         <span class="font-medium text-foreground">{{ kindText }} · {{ needText }}</span>
         <span v-if="tail" :class="tail.left ? 'font-medium text-warning-strong' : ''">{{ tail.text }}</span>
@@ -212,7 +216,7 @@ onBeforeUnmount(() => clearTimeout(timer))
       <div
         v-if="frozen"
         data-slot="step-row-verdict"
-        class="mt-1 flex items-start gap-1 pl-6 text-2xs font-medium text-muted-foreground"
+        class="mt-1 flex items-start gap-1 pl-6 text-2xs font-medium text-foreground/[var(--opacity-on-tone)]"
       >
         <span>Проверен и закрыт {{ props.verdict?.at }}<span class="font-normal"> · содержимое изменить нельзя</span></span>
       </div>
@@ -227,7 +231,7 @@ onBeforeUnmount(() => clearTimeout(timer))
       <p
         v-if="props.instruction && !frozen"
         data-slot="step-row-instruction"
-        class="mt-1 pl-6 text-2xs text-foreground-secondary"
+        class="mt-1 pl-6 text-2xs text-foreground/[var(--opacity-on-tone)]"
       >
         {{ props.instruction }}
       </p>

@@ -41,6 +41,11 @@ export const buttonNavigationVariants = cva(
     variants: {
       size: {
         sm: 'h-4 gap-1 text-xs',
+        /**
+         * «Назад» над заголовком страницы — `btn_back` `24442:45220` (экземпляр `30980:7977`, VIEWAPP Web Dashboard), такт 50:
+         * шеврон 16 в контейнере шириной 8, зазор 8, подпись 15/20 bold, без подложки.
+         */
+        base: 'h-5 gap-2 text-sm',
         md: 'h-6 gap-1.5 text-xl',
         lg: 'h-7 gap-1.5 text-2xl',
       },

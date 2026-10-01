@@ -36,7 +36,8 @@ export const calloutVariants = cva(
         success: 'bg-success-surface text-success-strong',
         warning: 'bg-warning-surface text-warning-strong',
         destructive: 'bg-destructive-surface text-destructive-strong',
-        neutral: 'bg-muted text-foreground-secondary',
+        // Такт 50: второстепенный текст на тонированной поверхности — `--foreground` на ступени `--opacity-on-tone`.
+        neutral: 'bg-muted text-foreground/[var(--opacity-on-tone)]',
       },
     },
     defaultVariants: { tone: 'neutral' },
