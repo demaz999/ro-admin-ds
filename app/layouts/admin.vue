@@ -70,7 +70,7 @@ function toggleMenu() {
 
 <template>
   <div
-    class="flex min-h-screen flex-col bg-background font-sans text-foreground"
+    class="flex min-h-screen flex-col"
     :class="props.fill ? 'h-screen overflow-hidden' : ''"
   >
     <!-- Верхняя полоса top_menu 33970:14832: левый блок 256 — бургер 24 и логотип 182×32; справа — язык, профиль, выход. -->

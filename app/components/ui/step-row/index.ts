@@ -89,6 +89,13 @@ export const stepCounterVariants = cva(
         warning: 'text-warning-strong',
         success: 'text-success-strong',
         frozen: 'text-foreground-secondary',
+        /**
+         * Такт 53, решение владельца 2026-10-01: пилюли панели — одна роль и один класс. «текущий» — `primary` (заливка
+         * `--primary`, текст `--primary-foreground`; до такта 53 — `Badge` sm), «повторяемый» — `tag` (`--tag`, текст
+         * `--secondary-foreground`; до такта 53 — копия класса в `StageSection`).
+         */
+        primary: 'text-primary-foreground',
+        tag: 'text-secondary-foreground',
       },
       /** `tone` — своя мягкая заливка; `card` — подложка того же тона, пилюля на `--card`. */
       surface: {
@@ -102,12 +109,14 @@ export const stepCounterVariants = cva(
       { surface: 'tone', tone: 'warning', class: 'bg-warning-surface' },
       { surface: 'tone', tone: 'success', class: 'bg-success-surface' },
       { surface: 'tone', tone: 'frozen', class: 'bg-surface-disabled' },
+      { surface: 'tone', tone: 'primary', class: 'bg-primary' },
+      { surface: 'tone', tone: 'tag', class: 'bg-tag' },
     ],
     defaultVariants: { tone: 'neutral', surface: 'tone' },
   },
 )
 
-export type StepCounterTone = 'neutral' | 'error' | 'warning' | 'success' | 'frozen'
+export type StepCounterTone = 'neutral' | 'error' | 'warning' | 'success' | 'frozen' | 'primary' | 'tag'
 
 /**
  * Номер клавиши — прецедент `Tag` (такт 30): 16×16, `--tag` / `--secondary-foreground`,

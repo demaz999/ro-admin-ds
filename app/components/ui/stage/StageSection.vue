@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Button } from '../button'
 import { Icon } from '../icon'
+import { stepCounterVariants } from '../step-row'
 import { cn } from '@/lib/utils'
 
 /**
@@ -61,7 +62,7 @@ const emit = defineEmits<{ toggle: []; add: [] }>()
       <span
         v-if="props.repeatable"
         data-slot="stage-repeatable"
-        class="inline-flex h-4 shrink-0 items-center rounded-full bg-tag px-2 text-2xs font-bold text-secondary-foreground"
+        :class="stepCounterVariants({ tone: 'tag' })"
       >повторяемый</span>
       <span v-if="props.count" data-slot="stage-count" class="shrink-0 text-2xs text-muted-foreground">{{ props.count }}</span>
     </button>

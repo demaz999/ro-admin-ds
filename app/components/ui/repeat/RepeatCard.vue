@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Badge } from '../badge'
 import { Button } from '../button'
 import { StageNote } from '../stage'
 import { stepCounterVariants } from '../step-row'
@@ -94,7 +93,7 @@ const rail = computed(() => (props.highlighted ? 'highlighted' : props.current ?
       <span v-if="props.checkedSteps" :class="cn(stepCounterVariants({ tone: 'frozen' }), 'gap-1')">
         {{ props.checkedSteps }} проверено
       </span>
-      <Badge v-if="props.current" size="sm">текущий</Badge>
+      <span v-if="props.current" data-slot="repeat-current" :class="stepCounterVariants({ tone: 'primary' })">текущий</span>
       <span v-if="props.errors" :class="stepCounterVariants({ tone: 'error' })">{{ props.errors }}</span>
       <span data-slot="repeat-frames" class="shrink-0 text-2xs text-foreground/[var(--opacity-on-tone)] tabular-nums">{{ props.frames }}</span>
     </button>
