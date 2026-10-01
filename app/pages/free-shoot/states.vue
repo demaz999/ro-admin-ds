@@ -201,7 +201,7 @@ const REPEAT_EXAMPLE = `<StageSection
   :title="stage.title" :repeatable="stage.repeatable"
   :count="String(repeats.length)"
   :open="!closed.has(stage.id)" @toggle="toggleStage(stage.id)"
-  add-label="Новая единица" @add="createRepeat(stage.id)"
+  add-label="Новый объект" @add="createRepeat(stage.id)"
 >
   <RepeatCard
     v-for="r in repeats" :key="r.id"
@@ -347,7 +347,7 @@ const BIND_CELLS: BindCell[] = [
   { label: 'подбор выполнен: шаг — «Принять Enter»', spec: '§11.2, §16', props: { state: 'free', suggestion: S_STEP } },
   { label: 'подбор: шаг закрыт — только «Не то»', spec: 'прототип lbSuggest', props: { state: 'free', suggestion: { ...S_STEP, blocked: 'frozen' } } },
   { label: 'подбор: шаг заполнен', spec: 'прототип lbSuggest', props: { state: 'free', suggestion: { ...S_STEP, stepName: 'Фото с представителем собственника', ownerName: 'Завершение осмотра', blocked: 'full' } } },
-  { label: 'подбор: новый объект — «Создать «<этап>»»', spec: '§11.2', props: { state: 'free', suggestion: { kind: 'create', title: 'Линия термообработки', inv: '10902', stageTitle: 'Единица оборудования' } } },
+  { label: 'подбор: новый объект — «Новый объект»', spec: '§11.2', props: { state: 'free', suggestion: { kind: 'create', title: 'Линия термообработки', inv: '10902', stageTitle: 'Единица оборудования' } } },
   { label: 'вспышка «Распределено», кнопки выключены — повторяется', spec: '§11.3', props: { state: 'assigned', stepName: 'Узлы и агрегаты', ownerName: 'Пропиточная линия POLYPRISE' }, flash: true },
 ]
 const bindTick = ref<number | null>(null)

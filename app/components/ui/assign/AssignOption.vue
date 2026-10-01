@@ -13,7 +13,7 @@ import type { AssignBound, AssignOptionType } from '.'
  * Пункт назначения — строка списка «Назначить на шаг» (§10.3) и списка шагов в
  * полноэкранном просмотре (§11.1–11.2). Разбор и таблица «кит | прототип» — в `index.ts`.
  *
- * Три вида пункта (`type`): шаг, новый повтор («Создать «<этап>»», только просмотр) и
+ * Три вида пункта (`type`): шаг, новый повтор («Новый объект», только просмотр; до такта 56 — «Создать «<этап>»») и
  * другой объект («сделать текущим»). Выбор — событие `select`, открепление — `unbind`;
  * что из этого следует, решает страница.
  */
@@ -38,6 +38,8 @@ const props = withDefaults(defineProps<{
   reason?: string
   /** Оснастка приёмки: подсказка причины открыта сразу. В продукт не идёт. */
   reasonOpen?: boolean
+  /** Над пунктом тянут кадр, и шаг его принимает (такт 56): вид цели приёма, как у строки шага. */
+  dropTarget?: boolean
   /** Кадр просмотра уже лежит в этом шаге: `here` — можно открепить, `locked` — нельзя. */
   bound?: AssignBound
   /** Объект: число кадров справа; не передано — счёта нет (так в поповере). */
@@ -59,6 +61,7 @@ const props = withDefaults(defineProps<{
   frozen: false,
   reason: '',
   reasonOpen: undefined,
+  dropTarget: false,
   bound: null,
   frames: null,
   demoHover: false,
@@ -94,7 +97,8 @@ const closed = computed(() => isStep.value && !props.bound && (limit.value || !!
 /** Пункт ничего не делает по выбору: закрыт либо привязан до вас. */
 const inert = computed(() => closed.value || props.bound === 'locked')
 
-const title = computed(() => (props.type === 'create' ? `Создать «${props.name}»` : props.name))
+/** Пункт создания называется «Новый объект» — такт 56, решение владельца 2026-10-01: тип объекта ясен из группы списка. */
+const title = computed(() => (props.type === 'create' ? 'Новый объект' : props.name))
 
 /** Подпись второй строкой — тексты прототипа `itemHTML` и §18. */
 const subtitle = computed(() => {
@@ -144,6 +148,7 @@ function onSelect(event: Event) {
       data-assign-option
       :data-type="props.type"
       :data-bound="props.bound ?? undefined"
+      :data-drop-target="(props.dropTarget && !inert) || undefined"
       :data-flash="flashing || undefined"
       :subtitle="subtitle"
       :selected="!!props.bound"
@@ -162,6 +167,7 @@ function onSelect(event: Event) {
         props.bound ? '' : 'group-focus-within/assign:data-highlighted:bg-list-hover',
         props.bound === 'locked' ? 'cursor-default' : '',
         props.demoHover && !props.bound ? 'bg-list-hover' : '',
+        props.dropTarget && !inert ? 'bg-secondary ring-1 ring-stroke-accent ring-inset' : '',
         flashing ? 'animate-step-flash motion-reduce:animate-none' : '',
         props.class,
       )"

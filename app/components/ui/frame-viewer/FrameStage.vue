@@ -10,10 +10,16 @@ const props = withDefaults(defineProps<{
   alt?: string
   /** Кадр привязан — кольцо успеха вокруг кадра с плашкой (прототип `.lb-stage.on`). */
   assigned?: boolean
+  /**
+   * Кадр перетаскивается на шаг в панели просмотра (такт 56, решение владельца 2026-10-01). События `dragstart` и
+   * `dragend` всплывают от изображения; что делает бросок — страница.
+   */
+  draggable?: boolean
   class?: string
 }>(), {
   alt: '',
   assigned: false,
+  draggable: false,
 })
 </script>
 
@@ -26,7 +32,9 @@ const props = withDefaults(defineProps<{
     <img
       :src="props.src"
       :alt="props.alt"
+      :draggable="props.draggable"
       class="min-h-0 max-w-full rounded-t-md bg-muted object-contain"
+      :class="props.draggable ? 'cursor-grab active:cursor-grabbing' : ''"
     >
     <!-- Плашка: `w-0 min-w-full` — по ширине кадра, свою ширину в расчёт не вносит. -->
     <div class="w-0 min-w-full">

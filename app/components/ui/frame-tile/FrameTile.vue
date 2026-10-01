@@ -230,11 +230,9 @@ function onKeydown(event: KeyboardEvent) {
               {{ plateText }}
             </button>
           </TooltipTrigger>
-          <TooltipContent class="max-w-80 whitespace-normal">
-            Показать в структуре
-            <template v-if="props.locateHint">
-              <br>{{ props.locateHint }}<template v-if="props.lockReason"> · {{ props.lockReason }}</template>
-            </template>
+          <!-- Такт 56, решение владельца 2026-10-01: в подсказке только где кадр — объект · шаг и статус; слов о действии нет. -->
+          <TooltipContent v-if="props.locateHint" class="max-w-80 whitespace-normal">
+            {{ props.locateHint }}<template v-if="props.lockReason"> · {{ props.lockReason }}</template>
           </TooltipContent>
         </Tooltip>
 

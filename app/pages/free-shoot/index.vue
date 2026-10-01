@@ -616,7 +616,7 @@ function onNewObject(stage: string) {
   newObjOpen.value = false
   m.openNewForm(stage)
 }
-/** «Создать «<этап>»» подбора шага — форма нового повтора с кадром просмотра и именем, как прототип `data-act="mk"`. */
+/** «Новый объект» плашки при подборе шага (до такта 56 — «Создать «<этап>»») — форма нового повтора с кадром просмотра и именем, как прототип `data-act="mk"`. */
 function onSuggestCreate() {
   const sg = suggestion.value
   const f = viewerFrame.value
@@ -762,7 +762,7 @@ function onSuggestAccept() {
   const sg = suggestion.value
   if (sg?.kind === 'step' && !sg.blocked) viewerAssign(sg.owner, sg.stepId)
 }
-/** Пункт списка просмотра: шаг — привязка, объект — «сделать текущим», «Создать «<этап>»» — форма нового повтора с кадром. */
+/** Пункт списка просмотра: шаг — привязка, объект — «сделать текущим», «Новый объект» — форма нового повтора с кадром. */
 function onViewerSelect(it: any) {
   const [a, b] = String(it.value).split('|')
   if (it.type === 'object') { m.setCurrent(b!); suggestion.value = null; return }
@@ -833,6 +833,54 @@ const viewerGroups = computed(() => {
   })
   return groups
 })
+/* ------------------------------ перетаскивание в просмотре, такт 56 (решение владельца 2026-10-01) ------------------------------ */
+/**
+ * Кадр просмотра перетаскивается на шаг в правой панели просмотра. Правила — те же, что у нажатия по пункту: тип кадра,
+ * лимит, закрытый шаг дают отказ с причиной; бросок на подходящий шаг — `viewerAssign`: вспышка и переход к следующему
+ * кадру. Подходящий шаг под курсором — цель приёма (`AssignOption dropTarget`), неподходящие приглушены и без переноса.
+ * Прототип кадр из просмотра не перетаскивает — строка раздела 15 для аналитика.
+ */
+const viewerDrag = ref(false)
+const viewerHot = ref('')
+const viewerItem = (value: string) => viewerGroups.value.flatMap(g => g.items).find((it: any) => it.value === value)
+function viewerAccepts(it: any) {
+  if (!it || it.type !== 'step' || it.bound || it.frozen || it.reason) return false
+  const [owner, sid] = String(it.value).split('|')
+  const st = m.ownerStage(owner!)?.steps.find(x => x.id === sid)
+  return !!st && !m.stepFull(owner!, st)
+}
+function onViewerDragStart(e: DragEvent) {
+  if (!viewerFrame.value) return
+  viewerDrag.value = true
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', String(viewerFrame.value.i))
+  }
+}
+function onViewerDragEnd() {
+  viewerDrag.value = false
+  viewerHot.value = ''
+}
+const asideValue = (e: Event) => ((e.target as HTMLElement).closest('[data-assign-option][data-type=step]') as HTMLElement | null)?.dataset.value ?? ''
+function onAsideDragover(e: DragEvent) {
+  if (!viewerDrag.value) return
+  e.preventDefault()
+  const value = asideValue(e)
+  viewerHot.value = value && viewerAccepts(viewerItem(value)) ? value : ''
+}
+/** Бросок на пункт-шаг — как нажатие по нему: отказ с причиной либо привязка. */
+function onAsideDrop(e: DragEvent) {
+  if (!viewerDrag.value) return
+  e.preventDefault()
+  const it = viewerItem(asideValue(e))
+  onViewerDragEnd()
+  if (!it || it.type !== 'step' || it.bound) return
+  const [a, b] = String(it.value).split('|')
+  if (it.frozen) m.notify('Шаг проверен и закрыт — добавить нельзя', 'err')
+  else if (it.reason && viewerAccepts({ ...it, reason: '' })) m.notify(it.reason, 'err')
+  else viewerAssign(a!, b!)
+}
+
 /** Счёт в заголовке группы — число пунктов без «Создать» (прототип `grp`). */
 const groupCount = (g: { items: any[] }) => String(g.items.filter(i => i.type !== 'create').length)
 
@@ -862,11 +910,12 @@ const gridWidth = ref(0)
 const gridColumns = computed(() => (gridWidth.value ? frameTileColumns(gridWidth.value, size.value) : undefined))
 /**
  * Строка полосы ленты — такт 55: по ширине ленты элементы уступают место поиску по порядку. 0 — всё на месте;
- * 1 — без подписи «Размер»; 2 — кнопка «Распределить автоматически» иконкой; 3 — без подписи «Разобранные».
+ * 1 — без подписи «Размер»; 2 — без подписи «Разобранные»; 3 — кнопка «Распределить автоматически» иконкой: главное
+ * действие ленты держит подпись дольше всех (решение чата 2026-10-01, такт 56; в такте 55 кнопка уступала второй).
  * Пороги — ширина ленты, при которой строка с поиском 120 ещё помещается (замер — `free-shoot.md`, раздел 34).
  */
 const feedWidth = ref(0)
-const ROW_STEPS = [957, 905, 683]
+const ROW_STEPS = [953, 901, 812]
 /** Лента не уже строки полосы в самом тесном виде (594, с запасом — 600): панель структуры уступает ей место в своих пределах. */
 const FEED_MIN = 600
 const HANDLE = 10
@@ -1222,7 +1271,7 @@ function onUndo(id: number) {
               тулбар ленты, §7 — кит, такт 42: Toolbar (№ 15–21). Такт 55, решение владельца 2026-10-01 — одна строка:
               «Выделить всё» — поиск — «Распределить автоматически» — «Разобранные» — «Размер». Поиск занимает свободное
               место и сужается вместе с лентой, не уже 120; строка не переносится: когда места мало, уступают по порядку
-              подпись «Размер», текст кнопки (остаётся иконка с подсказкой), подпись «Разобранные» (`rowStep`).
+              подпись «Размер», подпись «Разобранные», текст кнопки — последним, остаётся иконка с подсказкой (`rowStep`).
               Индикатор текущего объекта (№ 19) с экрана снят: текущий отмечен в панели; `curHint` остаётся в модели.
             -->
             <Toolbar data-feed-tools class="flex-nowrap gap-3">
@@ -1234,7 +1283,7 @@ function onUndo(id: number) {
               <div class="min-w-30 flex-1" data-search>
                 <Input v-model="search" placeholder="Поиск по расшифровкам и именам файлов…" />
               </div>
-              <Button v-if="rowStep < 2" variant="secondary" show-icon @click="m.magicWand()">
+              <Button v-if="rowStep < 3" variant="secondary" show-icon @click="m.magicWand()">
                 <template #icon>
                   <Icon name="auto-awesome" :size="20" />
                 </template>
@@ -1250,7 +1299,7 @@ function onUndo(id: number) {
                   <TooltipContent>Распределить автоматически</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              <ToolbarGroup :label="rowStep < 3 ? 'Разобранные' : ''" aria-label="Разобранные">
+              <ToolbarGroup :label="rowStep < 2 ? 'Разобранные' : ''" aria-label="Разобранные">
                 <Tabs v-model="mode">
                   <TabsList variant="segmented">
                     <TabsTrigger value="keep" variant="segmented">оставлять</TabsTrigger>
@@ -1344,7 +1393,7 @@ function onUndo(id: number) {
                     :repeatable="st.rep"
                     :count="st.rep ? String(m.objects.filter((o: any) => o.stageId === st.id).length) : plural(st.steps.length, 'шаг', 'шага', 'шагов')"
                     :open="!closedStages.has(st.id)"
-                    :add-label="st.rep ? (st.id === 'bld' ? 'Новое здание' : 'Новая единица') : ''"
+                    :add-label="st.rep ? 'Новый объект' : ''"
                     :cards="st.rep"
                     @toggle="toggleStage(st.id)"
                     @add="m.openNewForm(st.id, [])"
@@ -1538,7 +1587,7 @@ function onUndo(id: number) {
         <template #actions>
           <FrameTitle :name="viewerFrame?.n ?? ''" :assigned="bindProps.state !== 'free'" />
         </template>
-        <FrameStage :src="img(viewerFrame?.i ?? 1)" :alt="viewerFrame?.n" :assigned="bindProps.state !== 'free'">
+        <FrameStage :src="img(viewerFrame?.i ?? 1)" :alt="viewerFrame?.n" :assigned="bindProps.state !== 'free'" draggable @dragstart="onViewerDragStart" @dragend="onViewerDragEnd">
           <FrameBindBar
             v-bind="bindProps"
             :suggestion="barSuggestion"
@@ -1573,9 +1622,11 @@ function onUndo(id: number) {
             :count="groupCount(g)"
             :open="!closedStages.has(g.id)"
             @toggle="toggleStage(g.id)"
+            @dragover="onAsideDragover"
+            @drop="onAsideDrop"
           >
             <AssignList class="p-1">
-              <AssignOption v-for="it in g.items" :key="it.value" v-bind="it" :data-value="it.value" :flash="viewerFound?.value === it.value ? viewerFound.nonce : null" @select="onViewerSelect(it)" @refuse="onViewerRefuse(it, $event)" @unbind="onViewerUnbind" />
+              <AssignOption v-for="it in g.items" :key="it.value" v-bind="it" :data-value="it.value" :flash="viewerFound?.value === it.value ? viewerFound.nonce : null" :drop-target="viewerHot === it.value" @select="onViewerSelect(it)" @refuse="onViewerRefuse(it, $event)" @unbind="onViewerUnbind" />
             </AssignList>
           </StageSection>
         </template>

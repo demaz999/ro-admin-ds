@@ -1391,7 +1391,7 @@ const textareaVariants = [
       </div>
       <!-- Такт 32: этап и карточка повтора — по представителю каждого вида. -->
       <div class="max-w-110">
-        <StageSection title="Единица оборудования" repeatable count="2" add-label="Новая единица">
+        <StageSection title="Единица оборудования" repeatable count="2" add-label="Новый объект">
           <RepeatCard name="Линия термообработки" details="инв. 10902 · Эксплуатируется" :frames="5" suggested current open :errors="2">
             <template #form>
               <RepeatForm

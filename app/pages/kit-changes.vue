@@ -286,6 +286,15 @@ const mutedClicks = ref(0)
               {{ checkMixed ? 'Отмечен' : 'Неопределённое состояние — клик отмечает' }}
             </Checkbox>
           </template>
+          <template v-else-if="c.id === 'checkbox-gap'">
+            <div data-checkbox-gap class="flex items-center gap-6">
+              <Checkbox>Подпись флажка</Checkbox>
+              <Checkbox :model-value="true">Отмечен</Checkbox>
+            </div>
+            <p class="text-2xs text-muted-foreground">
+              От квадрата до подписи — 8.
+            </p>
+          </template>
           <template v-else-if="c.id === 'checkbox-bare'">
             <div class="flex items-center gap-4">
               <span data-bare-box class="flex size-8 items-center justify-center rounded-sm border border-dashed border-border">

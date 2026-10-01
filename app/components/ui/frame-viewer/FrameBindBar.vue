@@ -60,7 +60,7 @@ const emit = defineEmits<{
   unbind: []
   /** «Принять» (Enter) — предложенный шаг. */
   accept: []
-  /** «Создать «<этап>»» — предложен новый объект. */
+  /** «Новый объект» — предложен новый объект (до такта 56 — «Создать «<этап>»»). */
   create: []
   /** «Не то». */
   dismiss: []
@@ -152,7 +152,7 @@ const blockedText = computed(() => {
       <template v-else-if="props.suggestion?.kind === 'create'">
         <!-- Такт 55: главное действие — цвет бренда, полужирный; второстепенное — приглушённым цветом, обычный вес. -->
         <ButtonAction size="sm" strong :show-icon="false" :disabled="flashing" @click="emit('create')">
-          Создать «{{ props.suggestion.stageTitle }}»
+          Новый объект
         </ButtonAction>
         <ButtonAction size="sm" variant="muted" :show-icon="false" :disabled="flashing" @click="emit('dismiss')">
           Не то
