@@ -71,7 +71,11 @@ const filled = computed(() => model.value || props.indeterminate)
       </CheckboxRoot>
     </span>
 
-    <span class="flex min-w-0 flex-col">
+    <!--
+      Блок подписи есть только при подписи. Пустой блок вместе с зазором строки 12 делал флажок без подписи шире
+      контрола на 12, и в плашке плитки квадрат стоял на 6 левее центра — такт 48, довесок.
+    -->
+    <span v-if="$slots.default || props.subtitle" class="flex min-w-0 flex-col">
       <span data-slot="choice-title" :class="choiceTitleVariants({ checked: filled })">
         <slot />
       </span>

@@ -1329,7 +1329,10 @@ function onUndo(id: number) {
       </NuxtLayout>
 
       <!-- ============================ панель выделения, §10.2 — кит, такт 40 ============================ -->
-      <!-- № 27: ActionBar по центру ленты; закрытая уезжает вниз, как у прототипа. «Новый объект из выделенного» (№ 29) — порция П6. -->
+      <!--
+        № 27: ActionBar по центру ленты; закрытая уезжает вниз, как у прототипа. Кнопки — основной размер кита (40, 15/20):
+        довесок такта 48, решение владельца 2026-10-01.
+      -->
       <ActionBar :open="m.state.sel.size > 0" :count="m.selbar.value.count" :sub="m.selbar.value.sub" :x="selbarLeft">
         <!--
           Поповер «Назначить на шаг», §10.3 — кит, такт 33. Положение — как у прототипа (`#btnToStep`): над
@@ -1337,7 +1340,7 @@ function onUndo(id: number) {
         -->
         <Popover v-model:open="assignOpen">
           <PopoverTrigger as-child>
-            <Button size="sm">Назначить на шаг</Button>
+            <Button>Назначить на шаг</Button>
           </PopoverTrigger>
           <PopoverContent
             as-child
@@ -1360,7 +1363,7 @@ function onUndo(id: number) {
         <!-- № 29: «Новый объект из выделенного» — такт 43: тот же поповер, что № 28; пункт — AssignOption type="stage" -->
         <Popover v-model:open="newObjOpen">
           <PopoverTrigger as-child>
-            <Button variant="secondary" size="sm">Новый объект из выделенного</Button>
+            <Button variant="secondary">Новый объект из выделенного</Button>
           </PopoverTrigger>
           <PopoverContent
             as-child
@@ -1389,16 +1392,16 @@ function onUndo(id: number) {
             </SelectContent>
           </PopoverContent>
         </Popover>
-        <Button variant="secondary" size="sm" @click="m.assignMisc()">В «Прочее»</Button>
-        <Button variant="secondary" size="sm" @click="m.unassignSelection()">Открепить</Button>
+        <Button variant="secondary" @click="m.assignMisc()">В «Прочее»</Button>
+        <Button variant="secondary" @click="m.unassignSelection()">Открепить</Button>
         <ActionBarSeparator />
-        <Button variant="secondary" size="sm" @click="m.clearSel()">Снять</Button>
+        <Button variant="secondary" @click="m.clearSel()">Снять</Button>
       </ActionBar>
 
       <!-- № 26: фрагмент заметки — ActionBar, второе размещение (такт 43): над выделенным текстом, §8.5 -->
       <ActionBar data-fragment :open="!!fragment" count="Новый объект:" :sub="fragment ? `«${fragment.text}»` : ''" :x="fragment?.x" :y="fragment?.y ?? '0px'">
-        <Button size="sm" @click="onFragment('eq')">Оборудование</Button>
-        <Button variant="secondary" size="sm" @click="onFragment('bld')">Здание</Button>
+        <Button @click="onFragment('eq')">Оборудование</Button>
+        <Button variant="secondary" @click="onFragment('bld')">Здание</Button>
       </ActionBar>
 
       <!-- ============================ рамка и метка перетаскивания, §10.1, §9.5 — кит, такт 40 ============================ -->

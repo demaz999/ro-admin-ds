@@ -541,8 +541,8 @@ const NOTES_EXAMPLE = `<!-- заметка ленты: во всю ширину 
 
 <!-- полоса у выделенного текста: нижний край — y, центр — x -->
 <ActionBar :open="!!fragment" count="Новый объект:" :sub="\`«\${fragment.text}»\`" :x="fragment.x" :y="fragment.y">
-  <Button size="sm" @click="create('eq')">Оборудование</Button>
-  <Button variant="secondary" size="sm" @click="create('bld')">Здание</Button>
+  <Button @click="create('eq')">Оборудование</Button>
+  <Button variant="secondary" @click="create('bld')">Здание</Button>
 </ActionBar>
 
 <!-- этап нового повтора в поповере: название и число повторов -->
@@ -551,13 +551,13 @@ const NOTES_EXAMPLE = `<!-- заметка ленты: во всю ширину 
 const ACTION_BAR_EXAMPLE = `<!-- панель выделения, §10.2: по центру ленты (x считает страница), закрытая уезжает вниз -->
 <ActionBar :open="selected.size > 0" :count="plural(n, 'кадр выбран', 'кадра выбрано', 'кадров выбрано')" :sub="sub" :x="feedCenter">
   <Popover v-model:open="assignOpen">
-    <PopoverTrigger as-child><Button size="sm">Назначить на шаг</Button></PopoverTrigger>
+    <PopoverTrigger as-child><Button>Назначить на шаг</Button></PopoverTrigger>
     <PopoverContent as-child side="top" align="start" :width="360"> … </PopoverContent>
   </Popover>
-  <Button variant="secondary" size="sm" @click="assignMisc()">В «Прочее»</Button>
-  <Button variant="secondary" size="sm" @click="unassignSelection()">Открепить</Button>
+  <Button variant="secondary" @click="assignMisc()">В «Прочее»</Button>
+  <Button variant="secondary" @click="unassignSelection()">Открепить</Button>
   <ActionBarSeparator />
-  <Button variant="secondary" size="sm" @click="clearSelection()">Снять</Button>
+  <Button variant="secondary" @click="clearSelection()">Снять</Button>
 </ActionBar>
 
 <!-- рамка выделения, §10.1: только вид — геометрию и выделение под ней считает страница -->
@@ -1702,20 +1702,20 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
         <div class="space-y-1">
           <p class="text-2xs text-muted-foreground">ActionBar — счёт с подписью, действия, разделитель</p>
           <ActionBar count="5 кадров выбрано" sub="1 видео · 2 уже распределено" x="0" class="relative bottom-0 translate-x-0">
-            <Button size="sm">Назначить на шаг</Button>
-            <Button variant="secondary" size="sm">Новый объект из выделенного</Button>
-            <Button variant="secondary" size="sm">В «Прочее»</Button>
-            <Button variant="secondary" size="sm">Открепить</Button>
+            <Button>Назначить на шаг</Button>
+            <Button variant="secondary">Новый объект из выделенного</Button>
+            <Button variant="secondary">В «Прочее»</Button>
+            <Button variant="secondary">Открепить</Button>
             <ActionBarSeparator />
-            <Button variant="secondary" size="sm">Снять</Button>
+            <Button variant="secondary">Снять</Button>
           </ActionBar>
         </div>
         <div class="space-y-1">
           <p class="text-2xs text-muted-foreground">ActionBar — счёт без подписи</p>
           <ActionBar count="1 кадр выбран" x="0" class="relative bottom-0 translate-x-0">
-            <Button size="sm">Назначить на шаг</Button>
+            <Button>Назначить на шаг</Button>
             <ActionBarSeparator />
-            <Button variant="secondary" size="sm">Снять</Button>
+            <Button variant="secondary">Снять</Button>
           </ActionBar>
         </div>
       </div>
@@ -1922,8 +1922,8 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
         <div class="space-y-1">
           <p class="text-2xs text-muted-foreground">ActionBar у выделенного текста — цитата в одну строку до 208 с многоточием</p>
           <ActionBar count="Новый объект:" sub="«Итог по осмотру. Обошёл ткацкий участок цеха шесть, крутильный участок»" x="0" y="0" class="relative translate-x-0 translate-y-0">
-            <Button size="sm">Оборудование</Button>
-            <Button variant="secondary" size="sm">Здание</Button>
+            <Button>Оборудование</Button>
+            <Button variant="secondary">Здание</Button>
           </ActionBar>
         </div>
         <div class="space-y-1">

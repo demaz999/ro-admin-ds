@@ -130,7 +130,8 @@ function onKeydown(event: KeyboardEvent) {
       Картинка и её углы — такт 47, приёмка владельца 2026-10-01 (п. 5). Места закреплены и не сдвигаются: слева вверху —
       флажок, справа вверху — «во весь экран», слева от него — «открепить»; справа внизу картинки — лупа «показать в
       структуре»; слева внизу — маркер видео. Одна геометрия на все углы: зона нажатия 32, видимая плашка 28 `--scrim-dark`
-      с белым глифом 16, отступ плашки 8 от края (зона — 6); центрирование флексом, координаты целые.
+      с белым глифом 16 (у «во весь экран» — 18: целые пиксели штриха, довесок такта 48), отступ плашки 8 от края
+      (зона — 6); центрирование флексом, координаты целые.
     -->
     <div data-slot="frame-tile-media" class="relative">
       <Image ratio="4:3" :src="props.src" :alt="props.alt" :class="imageClass" />
@@ -158,7 +159,7 @@ function onKeydown(event: KeyboardEvent) {
         :class="props.demoHover ? 'opacity-100' : 'opacity-0'"
         @click.stop="emit('open')"
       >
-        <span class="flex size-7 items-center justify-center rounded-sm bg-scrim-dark text-primary-foreground"><Icon name="fullscreen" :size="16" /></span>
+        <span class="flex size-7 items-center justify-center rounded-sm bg-scrim-dark text-primary-foreground"><Icon name="fullscreen" :size="18" /></span>
       </button>
 
       <!-- «Открепить» — слева от «во весь экран», место закреплено (зона 32 вплотную к зоне соседа). -->

@@ -1569,8 +1569,8 @@ const textareaVariants = [
         <FeedNote time="11:40" duration="2:07" name="AUDIO_19.m4a" text="Итог по осмотру. Обошёл ткацкий участок цеха шесть, крутильный участок и компрессорную. В ткацком все станки SMIT на месте, номера с 10940 по 10950." />
         <FeedNote kind="note" time="10:14" text="Компрессор ALUP инв. 10433 — на консервации, наклейка на дверце" />
         <ActionBar count="Новый объект:" sub="«Итог по осмотру»" x="0" y="0" class="relative translate-x-0 translate-y-0">
-          <Button size="sm">Оборудование</Button>
-          <Button variant="secondary" size="sm">Здание</Button>
+          <Button>Оборудование</Button>
+          <Button variant="secondary">Здание</Button>
         </ActionBar>
         <SelectContent :width="360">
           <AssignList>
@@ -1622,10 +1622,10 @@ const textareaVariants = [
       -->
       <div class="grid max-w-5xl grid-cols-2 items-start gap-4">
         <ActionBar count="5 кадров выбрано" sub="1 видео · 2 уже распределено" x="0" class="relative bottom-0 translate-x-0">
-          <Button size="sm">Назначить на шаг</Button>
-          <Button variant="secondary" size="sm">Открепить</Button>
+          <Button>Назначить на шаг</Button>
+          <Button variant="secondary">Открепить</Button>
           <ActionBarSeparator />
-          <Button variant="secondary" size="sm">Снять</Button>
+          <Button variant="secondary">Снять</Button>
         </ActionBar>
         <div class="relative h-24 overflow-hidden rounded-md border border-border-soft bg-background">
           <SelectionMarquee :rect="{ x: 16, y: 16, width: 200, height: 56 }" class="absolute" />
