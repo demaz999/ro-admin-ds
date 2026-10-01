@@ -47,6 +47,7 @@ export { default as TabsTrigger } from './TabsTrigger.vue'
  * `--foreground` над подложкой `TabsIndicator` Reka: `--background`, радиус 8 8 0 0, полоса снизу 2 `--primary`,
  * переезд 0.16 s. Счётчик — проп `count`: 20, поля 0 6, `--accent`, 13/16 bold `--foreground-secondary`, 0 показывается.
  * Слот `end` списка — правый слот 44. Отклонение от мастера `_Tab` (линия 4 по ширине текста) — `figma-fixes.md`.
+ * Ось `stretch` списка (такт 48): линия на всю ширину контейнера, поля списка задаёт потребитель через `class`.
  *
  * ## Сегмент-контрол — ось `segmented`, такт 46
  *
@@ -64,8 +65,16 @@ export const tabsListVariants = cva('inline-flex items-center', {
       /** Сегмент-контрол — дорожка 32 `--muted` с полем 2 (такт 46). */
       segmented: 'h-8 gap-0.5 rounded-md bg-muted p-0.5',
     },
+    /**
+     * Такт 48, решение владельца 2026-10-01: линия вкладок панели идёт на всю ширину панели — поверх VaTabs «линия = ширина
+     * списка». Список во всю ширину, линия 1 `--border` — внутренняя тень `--shadow-tabs-line` по нижнему краю списка вместе с его полями.
+     */
+    stretch: {
+      true: 'flex w-full shadow-tabs-line',
+      false: '',
+    },
   },
-  defaultVariants: { variant: 'line' },
+  defaultVariants: { variant: 'line', stretch: false },
 })
 
 export const tabsTriggerVariants = cva(

@@ -1,15 +1,6 @@
 export { default as Breadcrumb } from './Breadcrumb.vue'
 export { default as BreadcrumbCollapsed } from './BreadcrumbCollapsed.vue'
 
-import type { InjectionKey, Ref } from 'vue'
-
-/**
- * Подача крошек: `light` — мастер; `dark` — на тёмной полосе приложения (`AppBar`), такт 42 — нехватка в ките
- * (шапка экрана VA-9265 и верхняя панель `admin.vue`). Крошка (`ButtonNavigation`) берёт подачу у контейнера.
- */
-export type BreadcrumbSurface = 'light' | 'dark'
-export const BREADCRUMB_SURFACE_KEY: InjectionKey<Ref<BreadcrumbSurface>> = Symbol('breadcrumb-surface')
-
 /**
  * Хлебные крошки — мастер `BreadCrumbs` `3880:31214`, спека `3880:30143`.
  *

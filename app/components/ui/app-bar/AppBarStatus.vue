@@ -21,7 +21,7 @@ const view = computed(() => ({
     data-slot="app-bar-status"
     :data-state="props.state"
     role="status"
-    class="flex items-center gap-2 text-xs whitespace-nowrap text-sidebar-foreground"
+    class="flex items-center gap-2 px-2 text-xs whitespace-nowrap text-sidebar-foreground"
   >
     <Indicator :variant="view.tone" type="dot" size="sm" :class="props.state === 'saving' ? 'motion-safe:animate-pulse' : ''" />
     {{ view.text }}

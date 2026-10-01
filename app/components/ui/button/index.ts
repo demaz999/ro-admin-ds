@@ -96,9 +96,11 @@ export const buttonVariants = cva(
         destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive-hover active:bg-destructive-pressed focus-visible:ring-offset-2 focus-visible:ring-offset-background',
         /**
          * Текстовая кнопка на тёмной полосе приложения — такт 42, нехватка в ките (дыра с такта 8). Прецедент —
-         * `IconButton variant="sidebar"`: фона нет, текст `--sidebar-foreground`, наведение — ступень `--sidebar-accent`.
+         * `IconButton variant="sidebar"`: фона нет, наведение — ступень `--sidebar-accent`.
+         * Такт 48, `top_menu` `33970:14832`: подписи полосы — regular белым (`--sidebar-active-foreground`, `menu/fg/activ`),
+         * иконка перед подписью — слот `icon`; поля 8 — зазор 24 между подписями соседних пунктов.
          */
-        sidebar: 'bg-transparent text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+        sidebar: 'bg-transparent text-sidebar-active-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
       },
       size: {
         lg: 'h-16 gap-1.5 rounded-3xl px-8 text-sm',
@@ -118,7 +120,7 @@ export const buttonVariants = cva(
       { variant: 'default', class: 'disabled:opacity-[var(--opacity-disabled-strong)]' },
       { variant: 'destructive', class: 'disabled:opacity-[var(--opacity-disabled-strong)]' },
       { variant: 'secondary', class: 'disabled:opacity-[var(--opacity-disabled)]' },
-      { variant: 'sidebar', class: 'disabled:opacity-[var(--opacity-disabled)]' },
+      { variant: 'sidebar', class: 'px-2 font-normal disabled:opacity-[var(--opacity-disabled)]' },
     ],
     defaultVariants: {
       variant: 'default',

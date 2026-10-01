@@ -32,6 +32,8 @@ export { default as ButtonNavigation } from './ButtonNavigation.vue'
  * существующий нельзя: три из них стали бы неразличимы.
  *
  * Это не молчаливое урезание матрицы — см. `docs/open-questions.md`, вопрос 30.
+ *
+ * Ось `surface` такта 42 (подача на тёмной полосе) снята тактом 48: крошки из полосы убраны, потребителей нет.
  */
 export const buttonNavigationVariants = cva(
   'inline-flex w-fit items-center bg-transparent font-bold outline-none select-none disabled:pointer-events-none disabled:opacity-[var(--opacity-disabled)]',
@@ -44,28 +46,13 @@ export const buttonNavigationVariants = cva(
       },
       /** Ось `Color` мастера: тёмный против приглушённого. */
       muted: {
-        true: '',
-        false: '',
-      },
-      /**
-       * Подача — такт 42, нехватка в ките: на тёмной полосе (`AppBar`) действуют только роли сайдбара.
-       * Тёмный оттенок мастера — `--sidebar-active-foreground`, приглушённый — `--sidebar-foreground`.
-       */
-      surface: {
-        light: '',
-        dark: '',
+        true: 'text-muted-foreground',
+        false: 'text-foreground',
       },
     },
-    compoundVariants: [
-      { surface: 'light', muted: true, class: 'text-muted-foreground' },
-      { surface: 'light', muted: false, class: 'text-foreground' },
-      { surface: 'dark', muted: true, class: 'text-sidebar-foreground' },
-      { surface: 'dark', muted: false, class: 'text-sidebar-active-foreground' },
-    ],
     defaultVariants: {
       size: 'md',
       muted: false,
-      surface: 'light',
     },
   },
 )

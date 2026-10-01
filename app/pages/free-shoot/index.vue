@@ -1059,30 +1059,23 @@ function onUndo(id: number) {
   <!-- Тема и гарнитура — с корня документа (`:root`, `body`), как у других стендов: узла темы на экране нет. -->
   <div :class="{ 'asis-outline': asisOutline, 'asis-mark': asisMark }">
     <div>
-      <!-- каркас экрана, §7 — такт 42: раскладка классами, полосы — AppBar и Toolbar, рабочая зона — Resizable -->
-      <div class="flex h-screen min-w-320 flex-col overflow-hidden">
-        <!-- ============================ шапка, §7 — кит, такт 42: AppBar (№ 2–7) ============================ -->
-        <AppBar>
-          <template #start>
-            <AppBarBrand>VIEWAPP</AppBarBrand>
-          </template>
-          <Breadcrumb surface="dark">
-            <li>
-              <ButtonNavigation size="sm" muted>Осмотры</ButtonNavigation>
-            </li>
-            <li>
-              <ButtonNavigation size="sm" muted>Демо-осмотр · мониторинг оборудования</ButtonNavigation>
-            </li>
-            <li>
-              <ButtonNavigation size="sm" direction="none">Распределение свободной съёмки</ButtonNavigation>
-            </li>
-          </Breadcrumb>
-          <template #end>
-            <AppBarStatus :state="m.state.saving ? 'saving' : 'saved'" />
-            <Button variant="sidebar" @click="hotkeysOpen = true">Горячие клавиши</Button>
-            <Button @click="m.openWindow('finish')">Завершить распределение</Button>
-          </template>
-        </AppBar>
+      <!--
+        каркас экрана, §7 — такт 48, решение владельца 2026-10-01: общий каркас админки (`layouts/admin.vue`) по Figma —
+        верхняя полоса top_menu 33970:14832 и свёрнутое меню left_menu 33970:14833. Страница кладёт в полосу свои пункты
+        (слот bar): статус сохранения (№ 5) и «Горячие клавиши» с иконкой (№ 6). Крошек в полосе нет.
+      -->
+      <NuxtLayout name="admin" fill menu="compact">
+        <template #bar>
+          <AppBarStatus :state="m.state.saving ? 'saving' : 'saved'" />
+          <Button variant="sidebar" show-icon @click="hotkeysOpen = true">
+            <template #icon>
+              <Icon name="keyboard" :size="20" />
+            </template>
+            Горячие клавиши
+          </Button>
+        </template>
+
+      <div class="flex min-h-0 min-w-320 flex-1 flex-col">
 
         <!-- ============================ подшапка, §7 — кит, такт 42: Toolbar (№ 11–14) ============================ -->
         <Toolbar class="gap-y-3 py-3">
@@ -1101,10 +1094,15 @@ function onUndo(id: number) {
             № 11 — заголовок страницы: Heading page (h1), такт 47, ворота владельца 2026-10-01. Правило базовой линии:
             в строке «заголовок + текст» элементы стоят на базовой линии заголовка (items-baseline).
           -->
-          <div class="flex items-baseline gap-2">
-            <Heading level="page">Свободная съёмка</Heading>
-            <ToolbarText data-sess-meta>{{ sessMeta }}</ToolbarText>
+          <!-- «Назад» над заголовком — такт 48, решение владельца 2026-10-01: ведёт к осмотру; крошек нет. -->
+          <div class="flex flex-col gap-2">
+            <ButtonNavigation size="sm" direction="left" muted>Назад</ButtonNavigation>
+            <div class="flex items-baseline gap-2">
+              <Heading level="page">Свободная съёмка</Heading>
+              <ToolbarText data-sess-meta>{{ sessMeta }}</ToolbarText>
+            </div>
           </div>
+          <!-- Справа: счётчики и «Завершить распределение» (№ 7) — из полосы в подшапку, такт 48. -->
           <div class="ml-auto flex items-center gap-5">
             <ProgressStat
               class="min-w-38 max-w-47.5"
@@ -1121,6 +1119,7 @@ function onUndo(id: number) {
               :sub="S.reqSub"
             />
             <ProgressStat class="min-w-38 max-w-47.5" label="Объекты" :value="S.objText" :sub="S.objSub" />
+            <Button @click="m.openWindow('finish')">Завершить распределение</Button>
           </div>
         </Toolbar>
 
@@ -1203,27 +1202,30 @@ function onUndo(id: number) {
 
           <!-- панель структуры, §9 -->
           <ResizablePanel data-pane-right :default-size="440" :min-size="320" :max-size="820" size-unit="px" class="flex flex-col">
-            <!-- Вкладки панели: 12 сверху (такт 46, п. 6), 20 до содержимого — VaTabs (такт 47). -->
-            <div class="px-3 pt-3 pb-5">
+            <!--
+              Заголовочный блок панели — такт 48, решение владельца 2026-10-01: линия вкладок на всю ширину панели
+              (TabsList stretch), поля блока слева и справа 12, ряд инструментов схемы (№ 32–33) — сразу под вкладками;
+              20 до содержимого — под рядом, в прокручиваемой части. Блок стоит над прокруткой и с ней не уезжает.
+            -->
+            <div class="flex shrink-0 flex-col">
               <Tabs v-model="tab">
-                <TabsList>
+                <TabsList stretch class="px-3 pt-3">
                   <TabsTrigger value="scheme">Схема осмотра</TabsTrigger>
                   <TabsTrigger value="form">Форма осмотра</TabsTrigger>
                 </TabsList>
               </Tabs>
+              <!-- инструменты схемы, §9.1–9.2 — кит, такт 42: Toolbar (№ 32–33) -->
+              <Toolbar v-if="tab === 'scheme'" data-schtools class="px-3">
+                <Button variant="secondary" size="sm" @click="m.toggleAllStages()">{{ m.allClosed.value ? 'Развернуть все' : 'Свернуть все' }}</Button>
+                <Button v-if="nfrz" :variant="m.state.onlyOpen ? 'default' : 'secondary'" size="sm" @click="m.toggleOnlyOpen()">
+                  {{ m.state.onlyOpen ? `Показать все (+${nfrz})` : 'Только открытые' }}
+                </Button>
+                <ToolbarText>этапов: {{ STAGES.length }} · шагов: {{ totalSteps }}{{ nfrz ? ` · заморожено ${nfrz}` : '' }}</ToolbarText>
+              </Toolbar>
             </div>
 
-            <div ref="panelEl" data-panel class="min-h-0 flex-1 overflow-auto pb-30" @dragover="onPanelDragover" @drop="onPanelDrop" @mouseover="onPanelOver" @mouseleave="hoverPanel = null">
+            <div ref="panelEl" data-panel class="min-h-0 flex-1 overflow-auto pt-5 pb-30" @dragover="onPanelDragover" @drop="onPanelDrop" @mouseover="onPanelOver" @mouseleave="hoverPanel = null">
               <template v-if="tab === 'scheme'">
-                <!-- инструменты схемы, §9.1–9.2 — кит, такт 42: Toolbar (№ 32–33), липкий поверх заголовков этапов -->
-                <Toolbar data-schtools class="sticky top-0 z-20 px-3">
-                  <Button variant="secondary" size="sm" @click="m.toggleAllStages()">{{ m.allClosed.value ? 'Развернуть все' : 'Свернуть все' }}</Button>
-                  <Button v-if="nfrz" :variant="m.state.onlyOpen ? 'default' : 'secondary'" size="sm" @click="m.toggleOnlyOpen()">
-                    {{ m.state.onlyOpen ? `Показать все (+${nfrz})` : 'Только открытые' }}
-                  </Button>
-                  <ToolbarText>этапов: {{ STAGES.length }} · шагов: {{ totalSteps }}{{ nfrz ? ` · заморожено ${nfrz}` : '' }}</ToolbarText>
-                </Toolbar>
-
                 <template v-for="st in visibleStages" :key="st.id">
                   <StageSection
                     :data-stage="st.id"
@@ -1300,7 +1302,7 @@ function onUndo(id: number) {
               </template>
 
               <!-- вкладка «Форма осмотра», §7 — кит, такт 42 (№ 42–43): группы — FieldSet, сверка — подсказка Field, примечание — StageNote -->
-              <div v-else data-general class="flex flex-col gap-3 px-3 pt-2 pb-3">
+              <div v-else data-general class="flex flex-col gap-3 px-3 pb-3">
                 <FieldSet v-for="g in P.GENERAL" :key="g.g" :legend="g.g">
                   <template v-for="f in g.fields" :key="f.k">
                     <Field v-if="generalVisible(f)" :label="f.l" :hint="f.k === 'number' ? generalHint : ''">
@@ -1324,6 +1326,7 @@ function onUndo(id: number) {
           </ResizablePanel>
         </ResizablePanelGroup>
       </div>
+      </NuxtLayout>
 
       <!-- ============================ панель выделения, §10.2 — кит, такт 40 ============================ -->
       <!-- № 27: ActionBar по центру ленты; закрытая уезжает вниз, как у прототипа. «Новый объект из выделенного» (№ 29) — порция П6. -->

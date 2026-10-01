@@ -1581,24 +1581,24 @@ const textareaVariants = [
         </SelectContent>
       </div>
       <!--
-        Такт 42: полоса приложения AppBar (крошки на тёмном, статус, кнопка sidebar), светлая полоса Toolbar, панели Resizable.
+        Такт 42: полоса приложения AppBar (с такта 48 — бургер и логотип, статус, кнопка sidebar с иконкой), светлая полоса Toolbar, панели Resizable.
       -->
       <div class="max-w-5xl space-y-3">
         <AppBar>
           <template #start>
+            <IconButton variant="sidebar" size="lg" label="Свернуть меню">
+              <Icon name="menu" :size="24" />
+            </IconButton>
             <AppBarBrand>VIEWAPP</AppBarBrand>
           </template>
-          <Breadcrumb surface="dark">
-            <li>
-              <ButtonNavigation size="sm" muted>Осмотры</ButtonNavigation>
-            </li>
-            <li>
-              <ButtonNavigation size="sm" direction="none">Распределение свободной съёмки</ButtonNavigation>
-            </li>
-          </Breadcrumb>
           <template #end>
             <AppBarStatus state="saving" />
-            <Button variant="sidebar">Горячие клавиши</Button>
+            <Button variant="sidebar" show-icon>
+              <template #icon>
+                <Icon name="keyboard" :size="20" />
+              </template>
+              Горячие клавиши
+            </Button>
           </template>
         </AppBar>
         <Toolbar>

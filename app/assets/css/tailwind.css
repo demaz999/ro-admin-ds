@@ -339,6 +339,8 @@
        BigShadow: выпадающие плашки. Рамки у них при этом НЕТ. */
     --shadow-button: 0 1px 2px 0 #0000000d;
     --shadow-dropdown: 0 8px 32px 0 #0c10181f;
+    /* Линия под списком вкладок во всю ширину контейнера — TabsList stretch, такт 48: 1 --border по нижнему краю, внутрь. */
+    --shadow-tabs-line: inset 0 -1px 0 0 var(--border);
     /* Окно-карточка кита 1 — card 817:34525: DROP_SHADOW 0/4/20, #0e1e33 10%. Такт 35. */
     --shadow-modal: 0 4px 20px 0 #0e1e331a;
 

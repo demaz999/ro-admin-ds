@@ -2,213 +2,259 @@
 import { computed, reactive, ref } from 'vue'
 
 /**
- * Каркас админки: тёмный сайдбар слева, тёмная верхняя панель справа от него,
- * светлая область содержимого под ней.
+ * Каркас админки — одна рамка в ките (такт 48, решение чата по правилу 21, ворота 1 «одна шапка в ките»):
+ * тёмная верхняя полоса во всю ширину с бургером и логотипом, под ней — боковое меню слева и светлая область
+ * содержимого.
  *
- * Заведён тактом 8 под страницу «Типы схем осмотров» без источника. Тактом 9
- * сайдбар пересобран по мастеру **кита 1**: страница `281:62442`, компоненты
- * `left_menu` `643:3053`/`644:6545` и шапка `top_menu` `643:2253`/`643:2255`.
- * Разбор различий с Атомом — `app/components/ui/menu/index.ts`.
+ * Источник — Figma VIEWAPP Web Dashboard (`U829JoK7KMZV8do3KNkWBh`), решение владельца 2026-10-01: верхний бар
+ * `top_menu` `33970:14832` и свёрнутое боковое меню `left_menu` `33970:14833`. Числа полосы — `ui/app-bar/index.ts`,
+ * числа пункта меню — `ui/menu/index.ts` (мастер кита 1 `left_menu` `643:3053` / `644:6545`, такт 9).
  *
- * «Мои осмотры» на этот каркас **не переводятся** — отдельная задача: там
- * шапка идёт во всю ширину поверх рельса, и перевод сдвинет раскладку, на
- * которую наложение уже сходится.
+ * До такта 48 (такты 8–9, 42) сайдбар занимал всю высоту, логотип с бургером жили в нём, полоса начиналась от его
+ * правого края.
  *
- * ## Шапка сайдбара — по мастеру `top_menu`
+ * ## Как страница встаёт на каркас
  *
- * `type=iconed` `643:2253`: высота 56, отступ слева **12**, зазор до логотипа
- * **8**, бургер 24×24. Компактного состояния мастер не рисует вовсе (оба
- * варианта `top_menu` шириной 256) — центрирование бургера в свёрнутом
- * сайдбаре остаётся решением сборки, дыра в `docs/design-debt.md`.
+ * | Что | Как |
+ * |---|---|
+ * | типовая страница | `definePageMeta({ layout: 'admin' })` — меню развёрнуто, содержимое с полями 32 / 24 |
+ * | экран во всё окно (`/free-shoot`) | `<NuxtLayout name="admin" fill menu="compact">` — меню свёрнуто, содержимое без полей на высоту окна |
+ * | свои пункты полосы | слот `bar` — встают в правый блок полосы перед языком и профилем |
  *
- * Логотип в мастере — картинка 85×24, а не текст: у нас логотипа Рососмотра
- * нет (решение от 2026-08-12, логотипы РИР вне скоупа), подпись `VIEWAPP`
- * остаётся местозаполнителем. Геометрия шапки при этом взята точно.
+ * «Мои осмотры» на этот каркас не переведены — у страницы свой рельс, решение такта 8.
  *
- * ## Решения сборки без источника (кит 1 их не покрывает)
+ * ## Состав меню — `left_menu` `33970:14833`
  *
- * | Что | Решение | Почему |
- * |---|---|---|
- * | логотип живёт в сайдбаре, а не в верхней панели | сайдбар занимает всю высоту, панель начинается от его правого края | состав страницы: бургер стоит рядом с логотипом, то есть управляет сайдбаром — кит 1 показывает шапку и список раздельно, без готовой композиции страницы |
- * | верхняя панель тёмная | `bg-sidebar`, содержимое на `sidebar-*` | образец «Мои осмотры»: там шапка тоже тёмная |
- * | язык и профиль — композиция, а не компонент | кнопка с подписью и шевроном | текстовой кнопки на тёмном в ките нет: `Button` весь на светлых ролях. Строка в `docs/design-debt.md` |
- * | шапка сайдбара в компактном режиме | бургер центрируется, логотип пропадает | у мастера `top_menu` компактного состояния нет вовсе |
+ * Пять групп: Главная, Charts, Billing, Построить отчёт | Все доступные осмотры | Все осмотры, Очередь на проверку,
+ * Проекты осмотров, Незавершённые осмотры | Администрирование, Системное | Профиль. Подписи групп развёрнутого меню
+ * («Осмотры», «Инструменты») — с тактов 8–9: узел `33970:14833` показывает только свёрнутое меню.
  *
- * Внутри тёмной полосы действует правило порталов сайдбара: только
- * `sidebar-*`-токены. Бургер и выход поэтому стоят на `IconButton
- * variant="sidebar"`, а не на `service`.
+ * Внутри тёмной полосы и меню действует правило порталов сайдбара: только `sidebar-*`-токены. Бургер и выход —
+ * `IconButton variant="sidebar"`, язык и профиль — `Button variant="sidebar"`.
  */
+const props = withDefaults(defineProps<{
+  /** Меню при загрузке: развёрнутое 256 или свёрнутое 84. */
+  menu?: 'expanded' | 'compact'
+  /** Экран во всё окно: каркас на высоту окна, содержимое без полей, прокрутку ведёт страница. */
+  fill?: boolean
+}>(), { menu: 'expanded', fill: false })
+
 const route = useRoute()
 
 /** Ось `Compact` у `Menu`: бургер сворачивает полосу до иконок. */
-const compact = ref(false)
+const compact = ref(props.menu === 'compact')
+
+/** Пункт подсвечивается по адресу, а не флагом в разметке. */
+const current = computed(() => route.path)
+const inAdmin = computed(() => current.value === '/insure-types' || current.value === '/statuses')
 
 /**
  * Раскрытые разделы с подменю. Состояние живёт здесь, а не в `MenuSub`: у
  * обоих мастеров раскрытие — это ось, а не внутренняя память компонента.
+ * В свёрнутом меню разделы при загрузке закрыты: раскрытие там — флаут поверх содержимого.
  */
 const open = reactive<Record<string, boolean>>({
   projects: false,
-  admin: true,
+  admin: !compact.value,
+  system: false,
 })
 
-/** Пункт подсвечивается по адресу, а не флагом в разметке. */
-const current = computed(() => route.path)
+function toggleMenu() {
+  compact.value = !compact.value
+  if (compact.value) {
+    for (const key of Object.keys(open)) open[key] = false
+  }
+}
 </script>
 
 <template>
-  <div class="flex min-h-screen bg-background font-sans text-foreground">
-    <!--
-      variant="kit1": сайдбар собран по мастеру left_menu кита 1, а не по
-      переносу Атома. Решение владельца, такт 9 — разбор в index.ts.
-    -->
-    <Menu variant="kit1" :compact="compact" class="min-h-screen shrink-0">
-      <!--
-        Шапка top_menu 643:2253: высота 56, pl-3 (12), gap-2 (8), бургер 24.
-        В компактном режиме мастер не покрывает — бургер центрируется решением
-        сборки.
-      -->
-      <div
-        data-slot="app-logo"
-        class="flex h-14 items-center gap-2 pl-3"
-        :class="compact ? 'justify-center pl-0' : ''"
-      >
-        <IconButton variant="sidebar" size="lg" label="Свернуть меню" @click="compact = !compact">
+  <div
+    class="flex min-h-screen flex-col bg-background font-sans text-foreground"
+    :class="props.fill ? 'h-screen overflow-hidden' : ''"
+  >
+    <!-- Верхняя полоса top_menu 33970:14832: левый блок 256 — бургер 24 и логотип 182×32; справа — язык, профиль, выход. -->
+    <AppBar>
+      <template #start>
+        <IconButton variant="sidebar" size="lg" :label="compact ? 'Развернуть меню' : 'Свернуть меню'" @click="toggleMenu">
           <Icon name="menu" :size="24" />
         </IconButton>
-        <span v-if="!compact" class="text-xl font-bold tracking-widest text-sidebar-active-foreground">
-          VIEWAPP
-        </span>
-      </div>
+        <AppBarBrand logo="/brand/rososmotr-logo.svg">Рососмотр</AppBarBrand>
+      </template>
 
-      <MenuSection first>
-        <MenuItem :selected="current === '/'">
-          <template #icon>
-            <Icon name="home" :size="20" />
-          </template>
-          Главная
-        </MenuItem>
-        <MenuItem>
-          <template #icon>
-            <Icon name="payments" :size="20" />
-          </template>
-          Billing
-        </MenuItem>
-        <MenuItem>
-          <template #icon>
-            <Icon name="monitoring" :size="20" />
-          </template>
-          Построить отчёт
-        </MenuItem>
-      </MenuSection>
+      <template #end>
+        <!-- Пункты страницы: статус сохранения, действия экрана. -->
+        <slot name="bar" />
 
-      <MenuSection title="Осмотры">
-        <MenuItem :selected="current === '/my-inspections'">
-          <template #icon>
-            <Icon name="article" :size="20" />
-          </template>
-          Мои осмотры
-        </MenuItem>
-        <MenuItem>
-          <template #icon>
-            <Icon name="draft" :size="20" />
-          </template>
-          Все осмотры
-        </MenuItem>
-        <MenuItem>
-          <template #icon>
-            <Icon name="list" :size="20" />
-          </template>
-          Очередь на проверку
-        </MenuItem>
+        <Button variant="sidebar">
+          RU
+          <Icon name="chevron-down" :size="8" />
+        </Button>
 
-        <!--
-          Подпункты без иконок подтверждено мастером: строки dropdown_menu
-          956:4737 у кита 1 тоже без иконочного слота — такт 8 угадал верно.
-        -->
-        <MenuSub :open="open.projects" :compact="compact" @toggle="open.projects = !open.projects">
+        <Button variant="sidebar" show-icon>
           <template #icon>
-            <Icon name="account-tree" :size="20" />
-          </template>
-          Проекты осмотров
-          <template #items>
-            <!-- Состав подпунктов на скриншотах не раскрыт — демо-контент. -->
-            <MenuItem :show-icon="false">
-              Черновики
-            </MenuItem>
-            <MenuItem :show-icon="false">
-              На согласовании
-            </MenuItem>
-            <MenuItem :show-icon="false">
-              Отклонённые
-            </MenuItem>
-          </template>
-        </MenuSub>
-
-        <MenuItem>
-          <template #icon>
-            <Icon name="hourglass" :size="20" />
-          </template>
-          Незавершённые осмотры
-        </MenuItem>
-      </MenuSection>
-
-      <MenuSection title="Инструменты">
-        <MenuSub :open="open.admin" :compact="compact" @toggle="open.admin = !open.admin">
-          <template #icon>
-            <Icon name="admin" :size="20" />
-          </template>
-          Администрирование
-          <template #items>
-            <MenuItem :show-icon="false">
-              Компании
-            </MenuItem>
-            <MenuItem :show-icon="false">
-              Группы доступа
-            </MenuItem>
-            <MenuItem :show-icon="false">
-              Пользователи системы
-            </MenuItem>
-            <MenuItem :show-icon="false">
-              Привязать пользователя к с…
-            </MenuItem>
-            <MenuItem :show-icon="false" :selected="current === '/insure-types'">
-              Типы схем осмотра
-            </MenuItem>
-            <MenuItem :show-icon="false">
-              Типы объектов съёмки
-            </MenuItem>
-            <MenuItem :show-icon="false" :selected="current === '/statuses'">
-              Статусы
-            </MenuItem>
-          </template>
-        </MenuSub>
-      </MenuSection>
-    </Menu>
-
-    <div class="flex min-w-0 flex-1 flex-col">
-      <!-- Верхняя панель: язык, профиль, выход. Состав тот же, что в «Мои осмотры». -->
-      <!-- Верхняя панель — AppBar кита (такт 42, решение ворот 1): одна шапка в ките. Слева пусто — бренд живёт в сайдбаре. -->
-      <AppBar>
-        <template #end>
-          <button type="button" class="flex items-center gap-2 text-sm outline-none">
-            RU
-            <Icon name="chevron-down" :size="8" />
-          </button>
-
-          <button type="button" class="flex items-center gap-2 text-sm outline-none">
             <Avatar type="letter" letter="Ш" :size="32" />
-            Шипилов Михаил
-            <Icon name="chevron-down" :size="8" />
-          </button>
+          </template>
+          Шипилов Михаил
+          <Icon name="chevron-down" :size="8" />
+        </Button>
 
-          <IconButton variant="sidebar" size="lg" label="Выйти">
-            <Icon name="logout" :size="24" />
-          </IconButton>
-        </template>
-      </AppBar>
+        <IconButton variant="sidebar" size="lg" label="Выйти">
+          <Icon name="logout" :size="24" />
+        </IconButton>
+      </template>
+    </AppBar>
 
-      <main class="flex min-w-0 flex-1 flex-col gap-6 px-8 py-6">
+    <div class="flex min-h-0 flex-1">
+      <!--
+        variant="kit1": меню по мастеру left_menu кита 1 (такт 9). Свёрнутое — left_menu 33970:14833: пункт 84×48,
+        иконка 20, подпись 13/16, группы через линию.
+      -->
+      <Menu variant="kit1" :compact="compact" class="shrink-0">
+        <MenuSection first>
+          <MenuItem :selected="current === '/'">
+            <template #icon>
+              <Icon name="home" :size="20" />
+            </template>
+            Главная
+          </MenuItem>
+          <MenuItem>
+            <template #icon>
+              <Icon name="bar-chart" :size="20" />
+            </template>
+            Charts
+          </MenuItem>
+          <MenuItem>
+            <template #icon>
+              <Icon name="payments" :size="20" />
+            </template>
+            Billing
+          </MenuItem>
+          <MenuItem>
+            <template #icon>
+              <Icon name="monitoring" :size="20" />
+            </template>
+            Построить отчёт
+          </MenuItem>
+        </MenuSection>
+
+        <MenuSection>
+          <MenuItem :selected="current === '/my-inspections'">
+            <template #icon>
+              <Icon name="article" :size="20" />
+            </template>
+            Все доступные осмотры
+          </MenuItem>
+        </MenuSection>
+
+        <MenuSection title="Осмотры">
+          <!-- Экран распределения открыт из осмотра: активен «Все осмотры», как в макете 33970:14833. -->
+          <MenuItem :selected="current.startsWith('/free-shoot')">
+            <template #icon>
+              <Icon name="draft" :size="20" />
+            </template>
+            Все осмотры
+          </MenuItem>
+          <MenuItem>
+            <template #icon>
+              <Icon name="list" :size="20" />
+            </template>
+            Очередь на проверку
+          </MenuItem>
+
+          <!--
+            Подпункты без иконок подтверждено мастером: строки dropdown_menu
+            956:4737 у кита 1 тоже без иконочного слота — такт 8 угадал верно.
+          -->
+          <MenuSub :open="open.projects" :compact="compact" @toggle="open.projects = !open.projects">
+            <template #icon>
+              <Icon name="account-tree" :size="20" />
+            </template>
+            Проекты осмотров
+            <template #items>
+              <!-- Состав подпунктов на скриншотах не раскрыт — демо-контент. -->
+              <MenuItem :show-icon="false">
+                Черновики
+              </MenuItem>
+              <MenuItem :show-icon="false">
+                На согласовании
+              </MenuItem>
+              <MenuItem :show-icon="false">
+                Отклонённые
+              </MenuItem>
+            </template>
+          </MenuSub>
+
+          <MenuItem>
+            <template #icon>
+              <Icon name="hourglass" :size="20" />
+            </template>
+            Незавершённые осмотры
+          </MenuItem>
+        </MenuSection>
+
+        <MenuSection title="Инструменты">
+          <!-- В свёрнутом меню раздел с открытой страницей подсвечен сам: его подпункты спрятаны во флаут. -->
+          <MenuSub :open="open.admin" :compact="compact" :selected="compact && inAdmin" @toggle="open.admin = !open.admin">
+            <template #icon>
+              <Icon name="admin" :size="20" />
+            </template>
+            Администрирование
+            <template #items>
+              <MenuItem :show-icon="false">
+                Компании
+              </MenuItem>
+              <MenuItem :show-icon="false">
+                Группы доступа
+              </MenuItem>
+              <MenuItem :show-icon="false">
+                Пользователи системы
+              </MenuItem>
+              <MenuItem :show-icon="false">
+                Привязать пользователя к с…
+              </MenuItem>
+              <MenuItem :show-icon="false" :selected="current === '/insure-types'">
+                Типы схем осмотра
+              </MenuItem>
+              <MenuItem :show-icon="false">
+                Типы объектов съёмки
+              </MenuItem>
+              <MenuItem :show-icon="false" :selected="current === '/statuses'">
+                Статусы
+              </MenuItem>
+            </template>
+          </MenuSub>
+
+          <MenuSub :open="open.system" :compact="compact" @toggle="open.system = !open.system">
+            <template #icon>
+              <Icon name="settings" :size="20" />
+            </template>
+            Системное
+            <template #items>
+              <!-- Состав подпунктов макет не раскрывает — демо-контент. -->
+              <MenuItem :show-icon="false">
+                Журнал событий
+              </MenuItem>
+              <MenuItem :show-icon="false">
+                Настройки
+              </MenuItem>
+            </template>
+          </MenuSub>
+        </MenuSection>
+
+        <MenuSection>
+          <MenuItem>
+            <template #icon>
+              <Icon name="person" :size="20" />
+            </template>
+            Профиль
+          </MenuItem>
+        </MenuSection>
+      </Menu>
+
+      <main
+        class="flex min-w-0 flex-1 flex-col"
+        :class="props.fill ? 'min-h-0' : 'gap-6 px-8 py-6'"
+      >
         <slot />
       </main>
     </div>

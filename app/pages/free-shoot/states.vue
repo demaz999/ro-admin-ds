@@ -483,19 +483,28 @@ const RADIO_CARD_EXAMPLE = `<!-- карточка выбора: variant="card", 
 /* ------------------------------ такт 40: ActionBar, SelectionMarquee, «Отменить» ------------------------------ */
 /* ------------------------------ такт 42: AppBar, Toolbar, Resizable, оси ------------------------------ */
 const saveDemo = ref<'saving' | 'saved' | 'error'>('saved')
-const FRAME_EXAMPLE = `<!-- полоса приложения: бренд, навигация, статус и действия справа; внутри — только sidebar-типы -->
+const FRAME_EXAMPLE = `<!-- полоса приложения top_menu 33970:14832: слева бургер и логотип, справа статус и действия; внутри — только sidebar-типы -->
 <AppBar>
-  <template #start><AppBarBrand>VIEWAPP</AppBarBrand></template>
-  <Breadcrumb surface="dark">
-    <li><ButtonNavigation size="sm" muted>Осмотры</ButtonNavigation></li>
-    <li><ButtonNavigation size="sm" direction="none">Распределение свободной съёмки</ButtonNavigation></li>
-  </Breadcrumb>
+  <template #start>
+    <IconButton variant="sidebar" size="lg" label="Свернуть меню"><Icon name="menu" :size="24" /></IconButton>
+    <AppBarBrand logo="/brand/rososmotr-logo.svg">Рососмотр</AppBarBrand>
+  </template>
   <template #end>
     <AppBarStatus :state="saving ? 'saving' : 'saved'" />   <!-- тексты §17.2 выводит сам -->
-    <Button variant="sidebar">Горячие клавиши</Button>
-    <Button>Завершить распределение</Button>
+    <Button variant="sidebar" show-icon>
+      <template #icon><Icon name="keyboard" :size="20" /></template>
+      Горячие клавиши
+    </Button>
+    <Button variant="sidebar">RU <Icon name="chevron-down" :size="8" /></Button>
+    <IconButton variant="sidebar" size="lg" label="Выйти"><Icon name="logout" :size="24" /></IconButton>
   </template>
 </AppBar>
+
+<!-- экран во всё окно на общем каркасе: меню свёрнуто, свои пункты — в слот bar -->
+<NuxtLayout name="admin" fill menu="compact">
+  <template #bar> … </template>
+  …
+</NuxtLayout>
 
 <!-- светлая полоса: строка с переносом, зазор 8; Tab проходит каждый контрол -->
 <Toolbar>
@@ -1748,11 +1757,12 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
     <section id="frame" data-section="frame" class="space-y-6">
       <div class="space-y-1">
         <h2 class="text-lg font-bold">
-          AppBar · Toolbar · Resizable · Breadcrumb surface="dark" · Button variant="sidebar" — каркас экрана
+          AppBar · Toolbar · Resizable · Button variant="sidebar" — каркас экрана
         </h2>
         <p class="max-w-240 text-sm text-foreground-secondary">
-          Такт 42, карточки 1–3 такта 37 (ворота 2026-09-30). <code>AppBar</code> — полоса приложения 56 на ролях сайдбара, геометрия
-          верхней панели <code>admin.vue</code> (<code>top_menu</code> кита 1); <code>admin.vue</code> переведена на неё.
+          Такт 42, карточки 1–3 такта 37 (ворота 2026-09-30). <code>AppBar</code> — полоса приложения 56 на ролях сайдбара; с такта 48
+          геометрия — <code>top_menu</code> <code>33970:14832</code> (левый блок 256 с бургером и логотипом, правый блок у края), каркас
+          <code>admin.vue</code> — на ней.
           <code>Toolbar</code> — светлая полоса на <code>--card</code> с нижней линией <code>--border-soft</code>, без примитива Reka.
           <code>Resizable</code> — <code>Splitter</code> Reka, панель в пикселях, пределы 320–820. Разбор — <code>docs/free-shoot.md</code>, раздел 21.
         </p>
@@ -1764,26 +1774,34 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
       </div>
 
       <div data-subsection="app-bar" class="space-y-2">
-        <p class="text-2xs text-muted-foreground">AppBar — бренд, крошки на тёмном, статус, кнопки sidebar и главная</p>
+        <p class="text-2xs text-muted-foreground">AppBar — бургер и логотип, статус, кнопки sidebar с иконкой и без, выход</p>
+        <AppBar>
+          <template #start>
+            <IconButton variant="sidebar" size="lg" label="Свернуть меню">
+              <Icon name="menu" :size="24" />
+            </IconButton>
+            <AppBarBrand logo="/brand/rososmotr-logo.svg">Рососмотр</AppBarBrand>
+          </template>
+          <template #end>
+            <AppBarStatus :state="saveDemo" />
+            <Button variant="sidebar" show-icon>
+              <template #icon>
+                <Icon name="keyboard" :size="20" />
+              </template>
+              Горячие клавиши
+            </Button>
+            <Button variant="sidebar">
+              RU
+              <Icon name="chevron-down" :size="8" />
+            </Button>
+            <IconButton variant="sidebar" size="lg" label="Выйти">
+              <Icon name="logout" :size="24" />
+            </IconButton>
+          </template>
+        </AppBar>
         <AppBar>
           <template #start>
             <AppBarBrand>VIEWAPP</AppBarBrand>
-          </template>
-          <Breadcrumb surface="dark">
-            <li>
-              <ButtonNavigation size="sm" muted>Осмотры</ButtonNavigation>
-            </li>
-            <li>
-              <ButtonNavigation size="sm" muted>Демо-осмотр · мониторинг оборудования</ButtonNavigation>
-            </li>
-            <li>
-              <ButtonNavigation size="sm" direction="none">Распределение свободной съёмки</ButtonNavigation>
-            </li>
-          </Breadcrumb>
-          <template #end>
-            <AppBarStatus :state="saveDemo" />
-            <Button variant="sidebar">Горячие клавиши</Button>
-            <Button>Завершить распределение</Button>
           </template>
         </AppBar>
         <div class="flex flex-wrap items-center gap-6 bg-sidebar px-4 py-3">

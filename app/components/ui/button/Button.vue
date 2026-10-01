@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { cn } from '@/lib/utils'
 import { Icon } from '../icon'
 import { buttonVariants, type ButtonVariants } from '.'
 
@@ -35,7 +36,7 @@ const props = withDefaults(defineProps<{
     data-slot="button"
     :type="props.type"
     :disabled="props.disabled"
-    :class="buttonVariants({ variant, size, wide })"
+    :class="cn(buttonVariants({ variant, size, wide }))"
     :style="{ transitionProperty: 'background-color', transitionDuration: 'var(--duration-hover)' }"
   >
     <!-- Слот иконки есть только у среднего и большого: у малой его нет в мастере. -->
