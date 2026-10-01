@@ -9,7 +9,6 @@ import {
   stepCounterTone,
   stepCounterVariants,
   stepFill,
-  stepKeyClass,
   stepKindText,
   stepNeedText,
   stepRowVariants,
@@ -33,8 +32,6 @@ const props = withDefaults(defineProps<{
   /** Сколько из `count` защищено — «· N из них было до вас». */
   wasCount?: number
   instruction?: string
-  /** Номер клавиши 1–8; страница передаёт только у текущего объекта (§16.3). */
-  hotkey?: number | null
   verdict?: StepVerdict | null
   thumbs?: StepThumbItem[]
   /** Миниатюра, найденная переходом, — обводка (§15.3). */
@@ -43,6 +40,11 @@ const props = withDefaults(defineProps<{
   highlighted?: boolean
   /** Над строкой тянут выделение (§9.5). У заполненного и замороженного не действует. */
   dropTarget?: boolean
+  /**
+   * Шаг не принимает то, что сейчас переносят, — например видео в шаг «только фото» (такт 55, решение владельца
+   * 2026-10-01): строка на ступени выключенного, как заполненная, приёма нет. Причину знает страница.
+   */
+  muted?: boolean
   /** Смена значения запускает вспышку 1.5 с (§15.3, решение владельца 7). */
   flash?: number | null
   /**
@@ -58,12 +60,12 @@ const props = withDefaults(defineProps<{
   max: null,
   wasCount: 0,
   instruction: '',
-  hotkey: null,
   verdict: null,
   thumbs: () => [],
   locatedThumb: null,
   highlighted: false,
   dropTarget: false,
+  muted: false,
   flash: null,
   demoHover: false,
 })
@@ -95,7 +97,7 @@ const redo = computed(() => props.verdict?.kind === 'redo')
 const fill = computed(() => stepFill(props.count, props.min, props.max, props.required))
 /** «Заполнен по лимиту»: приём выключен. Переполнение его перебивает (решение 5). */
 const full = computed(() => fill.value === 'full' && !frozen.value)
-const acceptsDrop = computed(() => !frozen.value && fill.value !== 'full' && fill.value !== 'over')
+const acceptsDrop = computed(() => !props.muted && !frozen.value && fill.value !== 'full' && fill.value !== 'over')
 
 const tone = computed(() => {
   if (props.dropTarget && acceptsDrop.value) return 'drop'
@@ -140,7 +142,6 @@ const showWas = computed(() => props.wasCount > 0 && props.wasCount < props.coun
 const slots = computed(() => Math.min(missing.value, STEP_THUMBS_MAX))
 const visibleThumbs = computed(() => props.thumbs.slice(0, STEP_THUMBS_MAX))
 const hiddenThumbs = computed(() => Math.max(0, props.thumbs.length - STEP_THUMBS_MAX))
-const showKey = computed(() => props.hotkey != null && !frozen.value)
 
 /**
  * Вспышка. Компонент сам держит 1.5 с и сам её снимает: страница только выдаёт
@@ -165,10 +166,11 @@ onBeforeUnmount(() => clearTimeout(timer))
       :data-fill="fill"
       :data-verdict="props.verdict?.kind ?? 'none'"
       :data-accepts-drop="acceptsDrop"
+      :data-muted="props.muted || undefined"
       :data-highlighted="props.highlighted || undefined"
       :data-flash="flashing || undefined"
       :class="cn(
-        stepRowVariants({ tone, dimmed: full }),
+        stepRowVariants({ tone, dimmed: full || props.muted }),
         props.demoHover && tone === 'default' ? 'bg-accent' : '',
         flashing ? 'animate-step-flash motion-reduce:animate-none motion-reduce:bg-secondary-hover' : '',
         props.class,
@@ -177,19 +179,12 @@ onBeforeUnmount(() => clearTimeout(timer))
       @click="onRowClick"
     >
       <!--
-        Имя и счётчик — на базовой линии имени (правило такта 47); номер клавиши — по центру строки.
+        Имя и счётчик — на базовой линии имени (правило такта 47). Номера клавиши и отступа под него нет: распределение
+        цифрами снято тактом 55 (решение владельца 2026-10-01) — строки начинаются от левого поля.
         Второстепенный текст строки — `--foreground` на ступени `--opacity-on-tone` (такт 50): строка бывает на тоне
         «Повторить», «переполнен», «проверен», и серый на нём грязнит.
       -->
       <div class="flex min-h-4 items-baseline gap-2">
-        <!-- Номер клавиши; без номера — пустое место той же ширины, строки не пляшут. -->
-        <span
-          v-if="showKey"
-          data-slot="step-row-key"
-          :class="[stepKeyClass, 'self-center']"
-        >{{ props.hotkey }}</span>
-        <span v-else class="size-4 shrink-0 self-center" aria-hidden="true" />
-
         <span
           data-slot="step-row-name"
           class="min-w-0 flex-1 text-xs font-bold text-foreground"
@@ -206,7 +201,7 @@ onBeforeUnmount(() => clearTimeout(timer))
       <div
         v-if="!frozen"
         data-slot="step-row-limits"
-        class="mt-1 flex flex-wrap gap-x-1.5 pl-6 text-2xs text-foreground/[var(--opacity-on-tone)]"
+        class="mt-1 flex flex-wrap gap-x-1.5 text-2xs text-foreground/[var(--opacity-on-tone)]"
       >
         <span class="font-medium text-foreground">{{ kindText }} · {{ needText }}</span>
         <span v-if="tail" :class="tail.left ? 'font-medium text-warning-strong' : ''">{{ tail.text }}</span>
@@ -216,14 +211,14 @@ onBeforeUnmount(() => clearTimeout(timer))
       <div
         v-if="frozen"
         data-slot="step-row-verdict"
-        class="mt-1 flex items-start gap-1 pl-6 text-2xs font-medium text-foreground/[var(--opacity-on-tone)]"
+        class="mt-1 flex items-start gap-1 text-2xs font-medium text-foreground/[var(--opacity-on-tone)]"
       >
         <span>Проверен и закрыт {{ props.verdict?.at }}<span class="font-normal"> · содержимое изменить нельзя</span></span>
       </div>
       <div
         v-else-if="redo"
         data-slot="step-row-verdict"
-        class="mt-1 flex items-start gap-1 pl-6 text-2xs font-medium text-warning-strong"
+        class="mt-1 flex items-start gap-1 text-2xs font-medium text-warning-strong"
       >
         <span>«Повторить» от {{ props.verdict?.at }}<span class="font-normal"> · {{ props.verdict?.note || 'нужно переснять' }}</span></span>
       </div>
@@ -231,7 +226,7 @@ onBeforeUnmount(() => clearTimeout(timer))
       <p
         v-if="props.instruction && !frozen"
         data-slot="step-row-instruction"
-        class="mt-1 pl-6 text-2xs text-foreground/[var(--opacity-on-tone)]"
+        class="mt-1 text-2xs text-foreground/[var(--opacity-on-tone)]"
       >
         {{ props.instruction }}
       </p>
@@ -241,7 +236,7 @@ onBeforeUnmount(() => clearTimeout(timer))
       <TooltipProvider v-if="visibleThumbs.length">
       <div
         data-slot="step-row-thumbs"
-        class="mt-1.5 flex flex-wrap items-center gap-1 pl-6"
+        class="mt-1.5 flex flex-wrap items-center gap-1"
       >
         <StepThumb
           v-for="thumb in visibleThumbs"
@@ -268,7 +263,7 @@ onBeforeUnmount(() => clearTimeout(timer))
       <div
         v-if="slots"
         data-slot="step-row-slots"
-        class="mt-1.5 flex flex-wrap gap-1 pl-6"
+        class="mt-1.5 flex flex-wrap gap-1"
         aria-hidden="true"
       >
         <span

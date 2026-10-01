@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ListboxContent, ListboxRoot } from 'reka-ui'
+import { TooltipProvider } from '../tooltip'
 import { cn } from '@/lib/utils'
 
 /**
@@ -9,6 +10,9 @@ import { cn } from '@/lib/utils'
  * тело `StageSection`. Разбор — в `index.ts`.
  *
  * Значение списка не хранится: пункт сообщает выбор событием, привязку делает страница.
+ *
+ * Провайдер подсказок — внутри корня списка (ловушка безрендерного корня): причину выключенного пункта
+ * `AssignOption` показывает подсказкой (такт 55).
  */
 const props = defineProps<{ class?: string }>()
 </script>
@@ -16,7 +20,9 @@ const props = defineProps<{ class?: string }>()
 <template>
   <ListboxRoot highlight-on-hover class="outline-none">
     <ListboxContent data-slot="assign-list" :class="cn('group/assign flex flex-col outline-none', props.class)">
-      <slot />
+      <TooltipProvider>
+        <slot />
+      </TooltipProvider>
     </ListboxContent>
   </ListboxRoot>
 </template>

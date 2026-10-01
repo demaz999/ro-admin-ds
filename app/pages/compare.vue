@@ -1366,7 +1366,6 @@ const textareaVariants = [
           :count="1"
           :was-count="0"
           instruction="Не менее 3 кадров с разных сторон"
-          :hotkey="3"
           :verdict="{ kind: 'redo', at: '20 июня', note: 'Станок снят в тени — переснять' }"
           :thumbs="[
             { id: 1, src: '/free-shoot/demo-22.jpg', state: 'rejected' },
@@ -1382,7 +1381,7 @@ const textareaVariants = [
           :verdict="{ kind: 'ok', at: '20 июня' }"
           :thumbs="[{ id: 1, src: '/free-shoot/demo-01.jpg', state: 'locked' }]"
         />
-        <StepRow name="Контрольное видео" required kind="video" :min="1" :max="1" :count="1" :hotkey="8" :thumbs="[{ id: 1, src: '/free-shoot/demo-07.jpg' }]" />
+        <StepRow name="Контрольное видео" required kind="video" :min="1" :max="1" :count="1" :thumbs="[{ id: 1, src: '/free-shoot/demo-07.jpg' }]" />
         <StepRow name="Фото с представителем" :min="0" :max="1" :count="2" :thumbs="[{ id: 1, src: '/free-shoot/demo-12.jpg' }, { id: 2, src: '/free-shoot/demo-13.jpg' }]" />
       </div>
       <div class="flex flex-wrap gap-8">
@@ -1413,9 +1412,9 @@ const textareaVariants = [
         <SelectContent :width="360" :max-height="480">
           <AssignList>
             <SelectGroup header="Текущий · Пропиточная линия POLYPRISE">
-              <AssignOption value="c1" name="Шильдик, заводская табличка" :min="1" :count="1" frozen :hotkey="1" />
-              <AssignOption value="c3" name="Общий вид оборудования" :min="3" :count="1" :hotkey="3" />
-              <AssignOption value="c8" name="Контрольное видео" kind="video" :min="1" :max="1" :count="1" :hotkey="8" />
+              <AssignOption value="c1" name="Шильдик, заводская табличка" :min="1" :count="1" frozen />
+              <AssignOption value="c3" name="Общий вид оборудования" :min="3" :count="1" />
+              <AssignOption value="c8" name="Контрольное видео" kind="video" :min="1" :max="1" :count="1" />
             </SelectGroup>
             <SelectGroup header="Другие объекты">
               <AssignOption value="co" type="object" name="ЦЕХ-6" />
@@ -1439,7 +1438,7 @@ const textareaVariants = [
       </div>
       <!-- Такт 34: полноэкранный просмотр — плашка в каждом виде, метаданные, метка, кадр. -->
       <div class="grid max-w-5xl grid-cols-2 items-start gap-4">
-        <FrameBindBar state="free" :keys="8" class="rounded-md" />
+        <FrameBindBar state="free" class="rounded-md" />
         <FrameBindBar state="assigned" step-name="Узлы и агрегаты" owner-name="Пропиточная линия POLYPRISE" class="rounded-md" />
         <FrameBindBar state="locked" rejected step-name="Общий вид оборудования" owner-name="Пропиточная линия POLYPRISE" reason="Кадр отклонён проверяющим" class="rounded-md" />
         <FrameBindBar :suggestion="{ kind: 'step', stepName: 'Общий вид территории', ownerName: 'Общие данные осмотра' }" class="rounded-md" />
@@ -1469,7 +1468,7 @@ const textareaVariants = [
             <ModalCardContent inline>
               <ModalCardHeader title="Горячие клавиши" subtitle="Разбор ленты с клавиатуры" />
               <ModalCardBody>
-                <ShortcutList :items="[{ keys: '[Shift] + клик', action: 'выделить подряд идущие кадры' }, { keys: '[1]–[8]', action: 'назначить на шаг текущего объекта' }, { keys: '[Esc]', action: 'снять выделение' }]" />
+                <ShortcutList :items="[{ keys: '[Shift] + клик', action: 'выделить подряд идущие кадры' }, { keys: '[Del]', action: 'открепить' }, { keys: '[Esc]', action: 'снять выделение' }]" />
               </ModalCardBody>
               <ModalCardFooter>
                 <Button>Понятно</Button>

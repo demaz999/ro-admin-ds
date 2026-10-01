@@ -12,7 +12,11 @@ import type { FrameBindState, FrameSuggestion } from '.'
  * таблица «кит | прототип» — в `index.ts`.
  *
  * Плашка показывает состояние кадра пропами и сообщает намерения событиями. Переход к
- * следующему кадру через 820 мс, клавиши 1–N, Enter, Del — логика страницы (§11.3, §16).
+ * следующему кадру через 820 мс, Enter, Del — логика страницы (§11.3, §16).
+ *
+ * Такт 55, решения владельца 2026-10-01: действия — всегда у правого края; пояснение защищённого кадра — в левом
+ * блоке, под названием шага; в паре действий главное — `ButtonAction strong`, второстепенное — `variant="muted"`;
+ * подсказки «или нажмите 1–N» нет — распределение цифрами снято.
  */
 const props = withDefaults(defineProps<{
   state?: FrameBindState
@@ -20,8 +24,6 @@ const props = withDefaults(defineProps<{
   stepName?: string
   /** Объект или этап этого шага. */
   ownerName?: string
-  /** N для «или нажмите 1–N»; `null` — текущего объекта нет, подсказки нет (решение 3, такт 34). */
-  keys?: number | null
   /** Кадр отклонён проверяющим — «Отклонён проверяющим · …» у `locked`. */
   rejected?: boolean
   /** Причина защиты — тексты `frame.*` спеки §18 без хвоста: «Кадр в проверенном шаге». */
@@ -42,7 +44,6 @@ const props = withDefaults(defineProps<{
   state: 'free',
   stepName: '',
   ownerName: '',
-  keys: null,
   rejected: false,
   reason: '',
   suggestion: null,
@@ -107,7 +108,8 @@ const blockedText = computed(() => {
     >Распределено</span>
 
     <!-- Текст состояния. -->
-    <span data-slot="frame-bind-text" class="min-w-0 flex-1">
+    <span data-slot="frame-bind-text" class="flex min-w-0 flex-1 flex-col">
+      <span>
       <template v-if="props.suggestion?.kind === 'step'">
         <!-- Такт 51, решение владельца 2026-10-01: название предложенного шага — кнопка-ссылка, клик привязывает кадр, как Enter. -->
         Предложение: <button
@@ -128,35 +130,42 @@ const blockedText = computed(() => {
         <template v-if="props.rejected">Отклонён проверяющим · </template><b class="font-bold">{{ props.stepName }}</b> · {{ props.ownerName }}
       </template>
       <template v-else>
-        Кадр не распределён — выберите шаг справа<template v-if="props.keys"> или нажмите 1–{{ props.keys }}</template>
+        Кадр не распределён — выберите шаг справа
       </template>
+      </span>
+      <!-- Пояснение защищённого кадра — под названием шага, второстепенным текстом на тоне (такт 55). -->
+      <span
+        v-if="bound && !props.suggestion && props.state === 'locked'"
+        data-slot="frame-bind-reason"
+        class="text-2xs text-foreground/[var(--opacity-on-tone)]"
+      >{{ props.reason }} — изменить нельзя</span>
     </span>
 
     <!-- Действия. Во вспышке выключены (§11.3). -->
-    <div data-slot="frame-bind-actions" class="flex shrink-0 flex-wrap items-center justify-end gap-2">
+    <div data-slot="frame-bind-actions" class="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-4">
       <!-- Такт 50, решение владельца 2026-10-01: все кнопки плашки — текстовые без подложки (ButtonAction). -->
       <template v-if="props.suggestion?.kind === 'step'">
-        <ButtonAction size="sm" :show-icon="false" :disabled="flashing" @click="emit('dismiss')">
+        <ButtonAction size="sm" variant="muted" :show-icon="false" :disabled="flashing" @click="emit('dismiss')">
           Не то
         </ButtonAction>
       </template>
       <template v-else-if="props.suggestion?.kind === 'create'">
-        <ButtonAction size="sm" :show-icon="false" :disabled="flashing" @click="emit('create')">
+        <!-- Такт 55: главное действие — цвет бренда, полужирный; второстепенное — приглушённым цветом, обычный вес. -->
+        <ButtonAction size="sm" strong :show-icon="false" :disabled="flashing" @click="emit('create')">
           Создать «{{ props.suggestion.stageTitle }}»
         </ButtonAction>
-        <ButtonAction size="sm" :show-icon="false" :disabled="flashing" @click="emit('dismiss')">
+        <ButtonAction size="sm" variant="muted" :show-icon="false" :disabled="flashing" @click="emit('dismiss')">
           Не то
         </ButtonAction>
       </template>
       <template v-else-if="bound">
         <!-- Такт 46, приёмка владельца 2026-10-01 (п. 12): текстовые кнопки без подложки — ButtonAction. -->
-        <ButtonAction size="sm" :show-icon="false" :disabled="flashing" @click="emit('locate')">
+        <ButtonAction size="sm" strong :show-icon="false" :disabled="flashing" @click="emit('locate')">
           Показать в структуре
         </ButtonAction>
-        <ButtonAction v-if="props.state === 'assigned'" size="sm" :show-icon="false" :disabled="flashing" @click="emit('unbind')">
+        <ButtonAction v-if="props.state === 'assigned'" size="sm" variant="muted" :show-icon="false" :disabled="flashing" @click="emit('unbind')">
           Открепить
         </ButtonAction>
-        <span v-else data-slot="frame-bind-reason" class="max-w-60 text-right">{{ props.reason }} — изменить нельзя</span>
       </template>
       <!--
         Подобрать нельзя — кнопка выключена, причина — в подсказке (такт 52). Выключенная кнопка событий не получает,

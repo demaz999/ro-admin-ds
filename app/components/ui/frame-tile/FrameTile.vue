@@ -182,7 +182,7 @@ function onKeydown(event: KeyboardEvent) {
         v-if="placed"
         type="button"
         data-slot="frame-tile-locate"
-        aria-label="Показать в структуре справа"
+        aria-label="Показать в структуре"
         class="absolute right-1.5 bottom-1.5 z-20 flex size-8 items-center justify-center outline-none"
         @click.stop="emit('locate')"
       >
@@ -231,7 +231,7 @@ function onKeydown(event: KeyboardEvent) {
             </button>
           </TooltipTrigger>
           <TooltipContent class="max-w-80 whitespace-normal">
-            Показать в структуре справа
+            Показать в структуре
             <template v-if="props.locateHint">
               <br>{{ props.locateHint }}<template v-if="props.lockReason"> · {{ props.lockReason }}</template>
             </template>

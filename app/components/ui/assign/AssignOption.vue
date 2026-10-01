@@ -4,7 +4,8 @@ import { ListboxItem } from 'reka-ui'
 import { ButtonAction } from '../button-action'
 import { Icon } from '../icon'
 import { SelectItem } from '../select'
-import { stepCounterText, stepFill, stepKeyClass, stepKindText, stepNeedText } from '../step-row'
+import { stepCounterText, stepFill, stepKindText, stepNeedText } from '../step-row'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../tooltip'
 import { cn } from '@/lib/utils'
 import type { AssignBound, AssignOptionType } from '.'
 
@@ -31,10 +32,12 @@ const props = withDefaults(defineProps<{
   /** Шаг проверен и закрыт (§5.2). */
   frozen?: boolean
   /**
-   * Номер клавиши 1–8 — только у шагов текущего объекта (§16.3). Передан — держатель
-   * слева есть; у замороженного номер снят, держатель остаётся.
+   * Шаг не принимает кадр или выделение — причина, например «Шаг принимает только фото» (такт 55, решение владельца
+   * 2026-10-01). Пункт — в виде выключенного (`SelectItem muted`), причина — в подсказке; нажатие — `refuse('kind')`.
    */
-  hotkey?: number | null
+  reason?: string
+  /** Оснастка приёмки: подсказка причины открыта сразу. В продукт не идёт. */
+  reasonOpen?: boolean
   /** Кадр просмотра уже лежит в этом шаге: `here` — можно открепить, `locked` — нельзя. */
   bound?: AssignBound
   /** Объект: число кадров справа; не передано — счёта нет (так в поповере). */
@@ -54,7 +57,8 @@ const props = withDefaults(defineProps<{
   max: null,
   count: 0,
   frozen: false,
-  hotkey: null,
+  reason: '',
+  reasonOpen: undefined,
   bound: null,
   frames: null,
   demoHover: false,
@@ -62,11 +66,12 @@ const props = withDefaults(defineProps<{
 })
 
 /**
- * `refuse` — нажат пункт, закрытый для приёма: заморожен (`frozen`), заполнен (`full`) или кадр привязан до вас (`locked`).
+ * `refuse` — нажат пункт, закрытый для приёма: заморожен (`frozen`), заполнен (`full`), кадр привязан до вас (`locked`)
+ * или шаг не принимает такой тип кадра (`kind`, такт 55).
  * Вид пункта — выключенный, отказ с причиной даёт страница текстом §18: прототип `#popList` и `#lbList`, решение чата
  * 2026-09-30, такт 41 (до него пункт был выключен и нажатие не доходило).
  */
-const emit = defineEmits<{ select: []; unbind: []; refuse: [reason: 'frozen' | 'full' | 'locked'] }>()
+const emit = defineEmits<{ select: []; unbind: []; refuse: [reason: 'frozen' | 'full' | 'locked' | 'kind'] }>()
 
 const flashing = ref(false)
 let flashTimer: ReturnType<typeof setTimeout> | undefined
@@ -83,9 +88,9 @@ onBeforeUnmount(() => clearTimeout(flashTimer))
 
 const fill = computed(() => stepFill(props.count, props.min, props.max, false))
 const isStep = computed(() => props.type === 'step')
-/** Приём выключен: заморожен, заполнен или переполнен (§10.3; переполнение — решение 5). */
-const closed = computed(() => isStep.value && !props.bound
-  && (props.frozen || fill.value === 'full' || fill.value === 'over'))
+/** Приём выключен: заморожен, заполнен или переполнен (§10.3; переполнение — решение 5) либо не тот тип кадра. */
+const limit = computed(() => props.frozen || fill.value === 'full' || fill.value === 'over')
+const closed = computed(() => isStep.value && !props.bound && (limit.value || !!props.reason))
 /** Пункт ничего не делает по выбору: закрыт либо привязан до вас. */
 const inert = computed(() => closed.value || props.bound === 'locked')
 
@@ -103,11 +108,10 @@ const subtitle = computed(() => {
   return `${stepKindText(props.kind)} · ${stepNeedText(props.min, props.max)}${full}`
 })
 
-/** Держатель слева: галочка у привязанного, «+» у нового повтора, номер у шагов текущего. */
+/** Держатель слева: галочка у привязанного, «+» у нового повтора. Номера клавиши нет — цифры сняты тактом 55. */
 const lead = computed(() => {
   if (props.bound) return 'check'
   if (props.type === 'create') return 'add'
-  if (isStep.value && props.hotkey != null) return props.frozen ? 'blank' : 'key'
   return null
 })
 
@@ -116,7 +120,7 @@ const counter = computed(() => stepCounterText(props.count, props.min, props.max
 /** Нажатие мимо выбора Reka: выключенный пункт `ListboxItem` события `select` не даёт — отказ ловится кликом. */
 function onClick() {
   if (props.bound === 'locked') emit('refuse', 'locked')
-  else if (closed.value) emit('refuse', props.frozen ? 'frozen' : 'full')
+  else if (closed.value) emit('refuse', props.frozen ? 'frozen' : limit.value ? 'full' : 'kind')
 }
 
 function onSelect(event: Event) {
@@ -130,6 +134,11 @@ function onSelect(event: Event) {
 </script>
 
 <template>
+  <!--
+    `:disabled="false"` у строки — обязателен (такт 55): `ListboxItem as-child` отдаёт ребёнку атрибут `disabled`, строка
+    принимала его своим пропом и гасила события (`pointer-events: none`) — нажатие по закрытому пункту не доходило,
+    отказа с причиной не было. Выключенность для списка держит `ListboxItem`, вид — ось `muted`.
+  -->
   <ListboxItem :value="props.value" :disabled="inert" as-child @select="onSelect">
     <SelectItem
       data-assign-option
@@ -140,10 +149,11 @@ function onSelect(event: Event) {
       :selected="!!props.bound"
       :tone="props.bound ? 'success' : 'default'"
       :muted="closed"
+      :disabled="false"
       :show-icon="!!lead"
       @click="onClick"
       :class="cn(
-        'cursor-pointer outline-none',
+        'relative cursor-pointer outline-none',
         /*
          * Подсветка с клавиатуры — та же заливка, что у наведения; у выбранного своя. Только при
          * фокусе в списке: Reka помечает первый пункт `data-highlighted` уже при монтировании, и
@@ -162,10 +172,19 @@ function onSelect(event: Event) {
           <Icon name="check" :size="12" />
         </span>
         <Icon v-else-if="lead === 'add'" name="add" :size="16" />
-        <span v-else-if="lead === 'key'" data-slot="assign-option-key" :class="stepKeyClass">{{ props.hotkey }}</span>
-        <span v-else class="size-4" aria-hidden="true" />
       </template>
       {{ title }}
+      <!--
+        Причина выключенного пункта — подсказкой (такт 55). Зона подсказки — слой во всю строку: строка списка остаётся
+        корнем пункта, атрибуты и обработчики страницы идут на неё; нажатие по слою всплывает к строке и даёт `refuse`.
+        Провайдер подсказок держит `AssignList`.
+      -->
+      <Tooltip v-if="props.reason && !props.bound" :open="props.reasonOpen">
+        <TooltipTrigger as-child>
+          <span data-slot="assign-option-reason" class="absolute inset-0" />
+        </TooltipTrigger>
+        <TooltipContent side="left" class="max-w-80 whitespace-normal">{{ props.reason }}</TooltipContent>
+      </Tooltip>
       <template v-if="props.bound === 'here' || props.bound === 'locked' || isStep || props.frames != null" #trailing>
         <ButtonAction
           v-if="props.bound === 'here'"

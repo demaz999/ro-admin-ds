@@ -12,12 +12,13 @@
 Черновик: экран «Свободная съёмка» открыт, идёт круг правок владельца. Имя метки `handover-ГГГГ-ММ-ДД` и дату впишет такт
 закрытия круга; до метки запись пополняется. Относительно передачи 2026-09-30 (простые компоненты экрана свободной съёмки,
 задача VA-9265). Живые примеры каждой строки —
-стенд `/kit-changes` (кадр — `docs/kit-changes-draft.png`). Изменения кирпичиков: добавлено — 7,
+стенд `/kit-changes` (кадр — `docs/kit-changes-draft.png`). Изменения кирпичиков: добавлено — 8,
 исправлено — 4, меняет существующее — 7.
 
 ### Добавлено
 
 - **Button.** Вариант `variant="sidebar"` — текстовая кнопка на тёмной поверхности: без фона, подпись regular цветом `--sidebar-active-foreground`, поля 8, наведение `--sidebar-accent`. Иконка перед подписью — слот `icon` с `show-icon`.
+- **ButtonAction.** Проп `strong` — главное действие пары: полужирный, цвет варианта. Вариант `variant="muted"` — второстепенное действие пары: обычный вес, `--foreground` на ступени `--opacity-on-tone` (64 %), наведение и нажатие — `--foreground`. Без осей кнопка прежняя.
 - **Tabs.** Вид `variant="segmented"` у `TabsList` и `TabsTrigger` — сегмент-контрол: дорожка 32 `--muted` с полем 2, сегмент 28, выбранный — `--background` с тенью, 13/16 medium.
 - **Tabs.** У вида `line`: проп `count` у `TabsTrigger` — счётчик вкладки (0 показывается); слот `end` у `TabsList` — правый слот высотой 44.
 - **Tabs.** Проп `stretch` у `TabsList` вида `line` — список во всю ширину контейнера, линия 1 `--border` идёт под всем списком вместе с его полями. `TabsList` принимает `class`.
@@ -31,8 +32,8 @@
   `ProgressCounter`, `StageSection` и `StageNote`, `RepeatCard` и `RepeatForm`, `AssignOption` и `AssignList`, части
   просмотра `FrameStage`, `FrameBindBar`, `FrameMeta`, `FrameStatus`, `FrameTitle`, слот `aside` у `Lightbox`, `ModalCard`,
   `Kbd` и `ShortcutList`, `FieldSet`, `Callout`, `RadioGroupItem variant="card"`, `ActionBar`, `SelectionMarquee`, `AppBar`,
-  `Toolbar`, `Resizable`, `FeedNote`, `Heading`, `PlayerButton size="xs"`, `Toast` и `Alert`, каркас `layouts/admin.vue` с
-  `Menu variant="kit1"`. Роли, оси и события — `docs/free-shoot.md`, раздел 32.1; матрицы состояний — стенд
+  `Toolbar`, `Resizable`, `FeedNote`, `Heading`, `PlayerButton size="xs"`, `Toast` и `Alert` (у `Toaster` — угол `side`
+  и отступы `x`, `bottom`), каркас `layouts/admin.vue` с `Menu variant="kit1"`. Роли, оси и события — `docs/free-shoot.md`, раздел 32.1; матрицы состояний — стенд
   `/free-shoot/states`.
 
 ### Исправлено
@@ -53,4 +54,4 @@
 - **Checkbox.** Без подписи (нет слота и `subtitle`) выводится только контрол: компонент занимает 16 вместо 28 по ширине и встаёт по центру отведённого места. С подписью — прежний.
 
 Без итогового изменения: глиф `fullscreen` у `Icon` — правка такта 51 (оптический размер 20) отменена тактом 52, контур тот же,
-что в передаче 2026-09-30. `ButtonAction`, `ButtonArrow`, `Badge`, `Tooltip`, `Image`, `Popover` после передачи не менялись.
+что в передаче 2026-09-30. `ButtonArrow`, `Badge`, `Tooltip`, `Image`, `Popover` после передачи не менялись.

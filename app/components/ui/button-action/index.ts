@@ -54,6 +54,27 @@ export { default as ButtonAction } from './ButtonAction.vue'
  *
  * Состояния — та же лестница, что у `Button`, но ходит **цвет текста**, а не
  * заливки: покой брендовый, наведение светлее, нажатие темнее.
+ *
+ * ## Главное и второстепенное в паре — такт 55, решение владельца 2026-10-01
+ *
+ * Наше расширение матрицы: у мастеров пары «главное / второстепенное» нет. Источник — экран VA-9265, плашка просмотра:
+ * «Создать «…»» и «Не то», «Показать в структуре» и «Открепить».
+ *
+ * | ось | вид | роль |
+ * |---|---|---|
+ * | `strong` | полужирный (700), цвет варианта | главное действие пары |
+ * | `variant="muted"` | обычный вес (400), `--foreground` на ступени `--opacity-on-tone`; наведение и нажатие — `--foreground` | второстепенное действие пары |
+ *
+ * Приглушённый цвет — ступень второстепенного текста на тоне (правило такта 50): серый `--muted-foreground` на
+ * тонированной плашке не ставится. Без осей кнопка прежняя.
+ *
+ * ## Изменения после передачи
+ *
+ * Передача 2026-09-30 → следующая версия (черновик), правило 23 `docs/chat-protocol.md`.
+ *
+ * | Версия | Класс | Что |
+ * |---|---|---|
+ * | следующая (черновик) | Добавлено | проп `strong` — полужирное главное действие; `variant="muted"` — приглушённое второстепенное действие обычного веса (такт 55) |
  */
 /*
  * Кольцо фокуса с клавиатуры — такт 35, решение владельца 2026-09-23 (решение 3): то же, что у
@@ -71,11 +92,17 @@ export const buttonActionVariants = cva(
       variant: {
         default: 'text-primary hover:text-primary-hover active:text-primary-pressed',
         destructive: 'text-destructive hover:text-destructive-hover active:text-destructive-pressed',
+        muted: 'font-normal text-foreground/[var(--opacity-on-tone)] hover:text-foreground active:text-foreground',
+      },
+      strong: {
+        true: 'font-bold',
+        false: '',
       },
     },
     defaultVariants: {
       size: 'md',
       variant: 'default',
+      strong: false,
     },
   },
 )

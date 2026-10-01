@@ -136,7 +136,7 @@ function cell(row: FillRow, avail: typeof AVAIL[number]['key']) {
   const thumbState = avail === 'frozen' ? 'locked' : 'free'
   const thumbs = row.thumbs.map(i => THUMB(i, thumbState))
   if (avail === 'redo') thumbs.unshift(THUMB(101, 'rejected'), THUMB(92, 'rejected'))
-  return { props: { ...row.base, verdict, thumbs, hotkey: avail === 'frozen' ? null : 3 } }
+  return { props: { ...row.base, verdict, thumbs } }
 }
 
 const flashNonce = ref<number | null>(null)
@@ -151,7 +151,6 @@ const STEP_ROW_EXAMPLE = `<StepRow
   :count="framesIn(step).filter(f => !f.rejected).length"   // отклонённые не считаются, §4.2
   :was-count="protectedIn(step).length"
   :instruction="step.hint"
-  :hotkey="isCurrent(object) ? index + 1 : null"            // §16.3
   :verdict="review[step.id]"          // { kind: 'ok' | 'redo', at, note }
   :thumbs="framesIn(step).map(f => ({ id: f.id, src: f.preview, state: thumbState(f) }))"
   :located-thumb="locatedFrameId"
@@ -220,7 +219,7 @@ const REPEAT_EXAMPLE = `<StageSection
       <RepeatForm
         :fields="formFields(r)"          // { key, label, value, required, source, group }
         :expanded="formOpen.has(r.id)" :deletable="!frozenSteps(r) && !r.draft"
-        @toggle="toggleForm(r.id)" @edit="group => openEditor(r.id, group)" @delete="removeRepeat(r.id)"
+        @toggle="toggleForm(r.id)" @edit="openEditor(r.id)" @delete="removeRepeat(r.id)"
       />
     </template>
     <StepRow v-for="step in steps(r)" :key="step.id" v-bind="stepProps(r, step)" />
@@ -239,7 +238,8 @@ interface Opt {
   max?: number | null
   count?: number
   frozen?: boolean
-  hotkey?: number | null
+  reason?: string
+  reasonOpen?: boolean
   bound?: AssignBound
   frames?: number | null
 }
@@ -261,22 +261,22 @@ const FIN: Opt[] = [
   { value: 'f2', name: 'Документы и подтверждения', min: 0, count: 0 },
   { value: 'f3', name: 'Фото с представителем собственника', min: 0, max: 1, count: 1 },
 ]
-const withKeys = (list: Opt[], prefix: string) => list.map((o, k) => ({ ...o, value: `${prefix}|${o.value}`, hotkey: k + 1 }))
+const withKeys = (list: Opt[], prefix: string) => list.map(o => ({ ...o, value: `${prefix}|${o.value}` }))
 const noKeys = (list: Opt[], prefix: string) => list.map(o => ({ ...o, value: `${prefix}|${o.value}` }))
 
 /** Все виды пункта — подпись, спека, пропы. */
 const OPTION_STATES: { label: string, spec: string, props: Opt, demoHover?: boolean }[] = [
   { label: 'доступен', spec: '§10.3', props: { value: 's1', name: 'Поэтажные планы и планы эвакуации', min: 0, count: 0 } },
-  { label: 'текущий объект — номер клавиши', spec: '§16.3', props: { value: 's2', name: 'Общий вид оборудования', min: 3, count: 1, hotkey: 3 } },
-  { label: 'наведение и фокус с клавиатуры', spec: '—', props: { value: 's3', name: 'Узлы и агрегаты', min: 0, count: 0, hotkey: 4 }, demoHover: true },
+  { label: 'наведение и фокус с клавиатуры', spec: '—', props: { value: 's3', name: 'Узлы и агрегаты', min: 0, count: 0, }, demoHover: true },
   { label: 'заполнен — не выбирается', spec: '§10.3', props: { value: 's4', name: 'Фото с представителем собственника', min: 0, max: 1, count: 1 } },
   { label: 'переполнен — не выбирается, без «· заполнен»', spec: '§10.3, решение 5', props: { value: 's5', name: 'Фото с представителем собственника', min: 0, max: 1, count: 2 } },
-  { label: 'заморожен — замок, номер снят', spec: '§5.2, §16.3', props: { value: 's6', name: 'Шильдик, заводская табличка', min: 1, count: 1, frozen: true, hotkey: 1 } },
+  { label: 'заморожен', spec: '§5.2', props: { value: 's6', name: 'Шильдик, заводская табличка', min: 1, count: 1, frozen: true, } },
   { label: 'кадр привязан сюда — «Открепить»', spec: '§11.4', props: { value: 's7', name: 'Узлы и агрегаты', min: 0, count: 1, bound: 'here' } },
   { label: 'привязано до вас — изменить нельзя', spec: '§6.1', props: { value: 's8', name: 'Шильдик, заводская табличка', min: 1, count: 1, bound: 'locked' } },
   { label: 'новый повтор — только в просмотре', spec: '§11.2', props: { value: 's9', type: 'create', name: 'Единица оборудования' } },
   { label: 'другой объект — сделать текущим', spec: '§10.3', props: { value: 's10', type: 'object', name: 'ЦЕХ-6', frames: 6 } },
-  { label: 'видео-шаг', spec: '§10.5', props: { value: 's11', name: 'Контрольное видео', kind: 'video', min: 1, max: 1, count: 0, hotkey: 8 } },
+  { label: 'видео-шаг', spec: '§10.5', props: { value: 's11', name: 'Контрольное видео', kind: 'video', min: 1, max: 1, count: 0 } },
+  { label: 'не тот тип кадра — выключен, причина в подсказке', spec: 'такт 55', props: { value: 's12', name: 'Общий вид оборудования', min: 3, count: 1, reason: 'Шаг принимает только фото', reasonOpen: true } },
 ]
 
 /** Матрица: наполненность и доступность шага × контекст пункта. */
@@ -288,14 +288,12 @@ const MATRIX_ROWS = [
 ]
 const MATRIX_COLS = [
   { key: 'plain', label: 'не текущий объект' },
-  { key: 'key', label: 'текущий объект — клавиша' },
   { key: 'here', label: 'просмотр: кадр здесь' },
   { key: 'locked', label: 'просмотр: кадр здесь до вас' },
 ] as const
 function matrixCell(row: typeof MATRIX_ROWS[number], col: typeof MATRIX_COLS[number]['key']): { props?: Opt, none?: string } {
   if (row.key === 'frozen' && col === 'here') return { none: 'невозможно: кадр в проверенном шаге защищён — это «до вас»' }
   const props: Opt = { ...row.base, value: `${row.key}-${col}` }
-  if (col === 'key') props.hotkey = 2
   if (col === 'here') props.bound = 'here'
   if (col === 'locked') props.bound = 'locked'
   return { props }
@@ -315,7 +313,6 @@ const ASSIGN_EXAMPLE = `<!-- поповер «Назначить на шаг», 
             :name="step.name" :kind="step.kind" :min="step.min" :max="step.max"
             :count="countIn(current, step)"      // без отклонённых, §4.2
             :frozen="isFrozen(current, step)"   // §5.2
-            :hotkey="i + 1"                      // только у текущего объекта, §16.3
             @select="assign(selection, current, step)"
           />
         </SelectGroup>
@@ -343,8 +340,7 @@ const ASSIGN_EXAMPLE = `<!-- поповер «Назначить на шаг», 
 interface BindCell { label: string, spec: string, props: Record<string, unknown>, flash?: boolean }
 const S_STEP: FrameSuggestion = { kind: 'step', stepName: 'Общий вид территории', ownerName: 'Общие данные осмотра' }
 const BIND_CELLS: BindCell[] = [
-  { label: 'не распределён, текущий объект выбран — «1–N»', spec: '§11.2, решение 3', props: { state: 'free', keys: 8 } },
-  { label: 'не распределён, текущего нет — без «1–N»', spec: '§11.2, §16.2', props: { state: 'free' } },
+  { label: 'не распределён', spec: '§11.2', props: { state: 'free' } },
   { label: 'распределён', spec: '§11.2', props: { state: 'assigned', stepName: 'Узлы и агрегаты', ownerName: 'Пропиточная линия POLYPRISE' } },
   { label: 'защищён', spec: '§11.2', props: { state: 'locked', stepName: 'Шильдик, заводская табличка', ownerName: 'Пропиточная линия POLYPRISE', reason: 'Кадр в проверенном шаге' } },
   { label: 'отклонён', spec: '§11.2, §4.2', props: { state: 'locked', rejected: true, stepName: 'Общий вид оборудования', ownerName: 'Пропиточная линия POLYPRISE', reason: 'Кадр отклонён проверяющим' } },
@@ -373,7 +369,6 @@ const MC_HOTKEYS = [
   { keys: '[клик]', action: 'выбрать или снять выбор кадра' },
   { keys: '[Shift] + клик', action: 'выделить подряд идущие кадры' },
   { keys: 'протянуть мышью', action: 'выделить рамкой (с пустого места или с [Alt])' },
-  { keys: '[1]–[8]', action: 'назначить на шаг текущего объекта' },
   { keys: '[←] [→]', action: 'листать в просмотре' },
   { keys: '[Del]', action: 'открепить' },
   { keys: '[Enter]', action: 'принять подобранный шаг в просмотре' },
@@ -583,7 +578,6 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
     <FrameBindBar
       :state="frame.stepId ? (frame.locked ? 'locked' : 'assigned') : 'free'"
       :step-name="step?.name" :owner-name="owner?.name"
-      :keys="current ? current.steps.length : null"   // «или нажмите 1–N» — только при текущем, §16.2
       :rejected="frame.rejected" :reason="lockReason(frame)"   // тексты frame.* §18 без хвоста
       :suggestion="suggestion"            // { kind: 'step', … } | { kind: 'create', … } | null
       :flash="flashKey"                   // новое число — вспышка 820 мс, кнопки выключены
@@ -601,7 +595,7 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
     </StageSection>
   </template>
 </Lightbox>
-<!-- переход через 820 мс, 1–N, ←/→, Enter, Del, «Перенести кадр?» (№ 47) — логика страницы, §11.3–11.4, §16 -->`
+<!-- переход через 820 мс, ←/→, Enter, Del, «Перенести кадр?» (№ 47) — логика страницы, §11.3–11.4, §16 -->`
 </script>
 
 <template>
@@ -732,19 +726,25 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
           <p class="text-2xs text-muted-foreground">
             цель приёма — §9.5
           </p>
-          <StepRow name="Узлы и агрегаты" :min="0" :count="0" instruction="Приводы, валы, редукторы" :hotkey="4" drop-target />
+          <StepRow name="Узлы и агрегаты" :min="0" :count="0" instruction="Приводы, валы, редукторы" drop-target />
         </div>
         <div class="space-y-1">
           <p class="text-2xs text-muted-foreground">
             цель приёма у заполненного не действует — §9.5
           </p>
-          <StepRow name="Контрольное видео" required kind="video" :min="1" :max="1" :count="1" instruction="От шильдика, затем обход" :hotkey="8" :thumbs="[THUMB(22)]" drop-target />
+          <StepRow name="Контрольное видео" required kind="video" :min="1" :max="1" :count="1" instruction="От шильдика, затем обход" :thumbs="[THUMB(22)]" drop-target />
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">
+            переносят не тот тип кадра — приглушён, приёма нет (muted, такт 55)
+          </p>
+          <StepRow name="Узлы и агрегаты" :min="0" :count="0" instruction="Приводы, валы, редукторы" muted drop-target />
         </div>
         <div class="space-y-1">
           <p class="text-2xs text-muted-foreground">
             подсвечен связью с кадром ленты — §15.1
           </p>
-          <StepRow name="Инвентарный или учётный номер" required :min="1" :count="1" instruction="Номер краской, бирка, наклейка" :hotkey="2" :thumbs="[THUMB(12)]" highlighted />
+          <StepRow name="Инвентарный или учётный номер" required :min="1" :count="1" instruction="Номер краской, бирка, наклейка" :thumbs="[THUMB(12)]" highlighted />
         </div>
         <div class="space-y-1">
           <p class="flex items-center gap-2 text-2xs text-muted-foreground">
@@ -753,13 +753,13 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
               Повторить
             </Button>
           </p>
-          <StepRow name="Общий вид оборудования" required :min="3" :count="1" instruction="Не менее 3 кадров с разных сторон" :hotkey="3" :thumbs="[THUMB(26)]" :located-thumb="26" :flash="flashNonce" />
+          <StepRow name="Общий вид оборудования" required :min="3" :count="1" instruction="Не менее 3 кадров с разных сторон" :thumbs="[THUMB(26)]" :located-thumb="26" :flash="flashNonce" />
         </div>
         <div class="space-y-1">
           <p class="text-2xs text-muted-foreground">
             наведение
           </p>
-          <StepRow name="Органы управления и показания" :min="0" :count="1" instruction="Пульты, шкафы управления" :hotkey="5" :thumbs="[THUMB(31)]" demo-hover />
+          <StepRow name="Органы управления и показания" :min="0" :count="1" instruction="Пульты, шкафы управления" :thumbs="[THUMB(31)]" demo-hover />
         </div>
         <div class="space-y-1">
           <p class="text-2xs text-muted-foreground">
@@ -771,13 +771,13 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
           <p class="text-2xs text-muted-foreground">
             «было до вас» — §18 step.was
           </p>
-          <StepRow name="Органы управления и показания" :min="0" :count="2" :was-count="1" instruction="Пульты, шкафы управления" :hotkey="5" :thumbs="[THUMB(31), THUMB(1, 'locked')]" />
+          <StepRow name="Органы управления и показания" :min="0" :count="2" :was-count="1" instruction="Пульты, шкафы управления" :thumbs="[THUMB(31), THUMB(1, 'locked')]" />
         </div>
         <div class="space-y-1">
           <p class="text-2xs text-muted-foreground">
             больше восьми миниатюр — хвост «+N», решение 8
           </p>
-          <StepRow name="Общий вид территории" :min="2" :count="12" instruction="Не менее 2 кадров" :hotkey="1" :thumbs="MANY" />
+          <StepRow name="Общий вид территории" :min="2" :count="12" instruction="Не менее 2 кадров" :thumbs="MANY" />
         </div>
         <div class="space-y-1">
           <p class="text-2xs text-muted-foreground">
@@ -955,8 +955,8 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
             <template #form>
               <RepeatForm :fields="FORM_AUTO" />
             </template>
-            <StepRow name="Шильдик, заводская табличка" required :min="1" :count="0" instruction="Марка, модель, заводской номер, год" :hotkey="1" />
-            <StepRow name="Инвентарный или учётный номер" required :min="1" :count="1" instruction="Номер краской, бирка, наклейка" :hotkey="2" :thumbs="[THUMB(12, 'suggested')]" />
+            <StepRow name="Шильдик, заводская табличка" required :min="1" :count="0" instruction="Марка, модель, заводской номер, год" />
+            <StepRow name="Инвентарный или учётный номер" required :min="1" :count="1" instruction="Номер краской, бирка, наклейка" :thumbs="[THUMB(12, 'suggested')]" />
           </RepeatCard>
         </div>
         <div class="space-y-1">
@@ -1820,7 +1820,7 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
           <Toolbar>
             <Button variant="secondary">Распределить автоматически</Button>
             <Button variant="secondary">Выделить всё</Button>
-            <ToolbarText truncate grow align="end">Текущий: Пропиточная линия POLYPRISE · клавиши 1–8</ToolbarText>
+            <ToolbarText truncate grow align="end">Текущий: Пропиточная линия POLYPRISE</ToolbarText>
             <ToolbarGroup label="Размер">
               <Tabs model-value="md">
                 <TabsList variant="pill">

@@ -43,6 +43,8 @@ export const COVERAGE_STATES = [
   'open=move',
   /* Такт 43: форма нового повтора из выделенного, поповер нового объекта, «Удалить объект?», полоса фрагмента заметки. */
   'open=new', 'open=newobj', 'open=delete', 'open=fragment',
+  /* Такт 55: два сценария страницы — без параметров обычный (осмотр до распределения), `data=reviewed` — частично проверенный. */
+  'data=reviewed',
 ] as const
 
 const transparent = (c: string) => !c || c === 'transparent' || /rgba\([^)]*,\s*0\)$/.test(c)

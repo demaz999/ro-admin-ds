@@ -102,10 +102,13 @@ const rail = computed(() => (props.highlighted ? 'highlighted' : props.current ?
       <div
         v-if="props.suggested"
         data-slot="repeat-review"
-        class="flex flex-wrap items-center gap-4 border-b border-border-soft px-0.5 pb-2"
+        class="flex flex-col gap-1 border-b border-border-soft px-0.5 pb-2"
       >
-        <Button size="sm" @click="emit('accept')">Принять объект</Button>
-        <Button variant="secondary" size="sm" @click="emit('reject')">Отклонить</Button>
+        <!-- Такт 55, решение владельца 2026-10-01: между маленькими кнопками приёмки — 8, пояснение — вплотную под ними. -->
+        <div class="flex items-center gap-2">
+          <Button size="sm" @click="emit('accept')">Принять объект</Button>
+          <Button variant="secondary" size="sm" @click="emit('reject')">Отклонить</Button>
+        </div>
         <span class="text-2xs text-muted-foreground">кадры примутся вместе с объектом</span>
       </div>
       <slot name="form" />

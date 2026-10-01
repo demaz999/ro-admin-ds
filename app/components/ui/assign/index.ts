@@ -20,7 +20,8 @@ export { default as AssignOption } from './AssignOption.vue'
  * | строка | `SelectItem`: паддинг 8/16, радиус 8, наведение `--list-hover` | `.it` 7/9, радиус 4, `#EDF3FA` |
  * | название | 15/20 medium `--field-foreground` | 13.5/19.6 400 `#20303F` |
  * | подпись | 13/16 medium `--field-placeholder` | `.n small` 11/16 `#8A9AAB` |
- * | номер клавиши | `stepKeyClass` (как в `StepRow`) в держателе 16×20 | `.key` 17×17 `#EDF1F6` / `#55677A` |
+ * | номер клавиши | нет — распределение цифрами снято тактом 55 (решение владельца 2026-10-01); до него — держатель 16×20 | `.key` 17×17 `#EDF1F6` / `#55677A` |
+ * | не тот тип кадра | вид выключенного (`SelectItem muted`), причина — в подсказке (`reason`), нажатие — `refuse('kind')`; такт 55 | у прототипа пункт включён, отказ — уведомлением после нажатия |
  * | счёт справа | 12/16 `--muted-foreground`, цифры табличные | `.c` 11.5 `#8A9AAB` — текст, **не пилюля** |
  * | заполнен, заморожен | выключено `SelectItem`: 0.48, наведения нет | `.it.full` 0.42, `.it.lock` 0.45 |
  * | кадр привязан сюда | выбранное `SelectItem` тона `success` (такт 34): `--success-surface`, рамка 1px `--success`, текст `--success-strong`, галочка белым на `--success-strong`; «Открепить» — `ButtonAction` sm | `.it.bound` `#E9F6EE`, рамка `#BFE3CD`, `#1D7444`, `.key.ok`, `.unb` |

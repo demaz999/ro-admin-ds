@@ -298,6 +298,26 @@ const mutedClicks = ref(0)
             </p>
           </template>
 
+          <!-- ---------------- ButtonAction ---------------- -->
+          <template v-else-if="c.id === 'button-action-pair'">
+            <div class="flex flex-col gap-3">
+              <div class="flex items-center gap-4 rounded-md bg-muted px-4 py-3">
+                <ButtonAction size="sm" strong :show-icon="false">
+                  Главное действие
+                </ButtonAction>
+                <ButtonAction size="sm" variant="muted" :show-icon="false">
+                  Второстепенное
+                </ButtonAction>
+                <ButtonAction size="sm" :show-icon="false">
+                  Без осей
+                </ButtonAction>
+              </div>
+              <p class="text-2xs text-muted-foreground">
+                <code>strong</code> и <code>variant="muted"</code> на тонированной плашке; справа — кнопка без осей, прежняя.
+              </p>
+            </div>
+          </template>
+
           <!-- ---------------- Icon ---------------- -->
           <template v-else-if="c.id === 'icon-glyphs'">
             <div class="flex items-center gap-6">

@@ -67,7 +67,10 @@ import proto from '~/stands/free-shoot/prototype-data.json'
  * | `?open=finish` | сводка завершения распределения (§17.4) |
  * | `?view=review` | режим приёмки: полоса приёмки, предложенные объекты и кадры (§13) — с такта 39 модель применяет полное автораспределение к набору (результат совпадает со снимком прототипа) |
  * | `?expand=eq` | раскрыт повтор оборудования (в режиме приёмки — первый предложенный); без параметра все свёрнуты, как у прототипа — такт 39. Нужен состояниям `state=link`, `state=flash`, `state=drop` |
- * | `?data=empty` | набор «Пустой осмотр» — прототип `applyScenario('empty')`: повторов и вердиктов нет, режим «Только кадры» недоступен (С-27), такт 39 |
+ * | без `?data` | обычный сценарий (такт 55, решение владельца 2026-10-01): ничего не распределено, проверенных шагов нет, «до вас» ничего не привязано — прототип `applyScenario('empty')` |
+ * | `?data=reviewed` | осмотр, частично проверенный до распределения, — прототип `applyScenario('review')`: замороженные шаги, «Повторить», кадры, снятые прямо в шагах (такт 55) |
+ * | `?data=empty` | набор «Пустой осмотр» — прототип `applyScenario('empty')`: повторов и вердиктов нет, режим «Только кадры» недоступен (С-27), такт 39; те же данные, что у обычного сценария |
+ * | оснастка без `?data` | параметры `state`, `open`, `view`, `expand`, `selected` без `?data` берут набор «Частично проверен» — их состояния сняты с него |
  * | `?tab=form` | вкладка «Форма осмотра» (§7) |
  * | `?open=new` | окно «Новый повтор · Оборудование» из пяти выделенных кадров: подпись, начальные значения, подсказки распознанного (§10, §14.5) — такт 43 |
  * | `?open=newobj` | панель выделения и поповер «Новый объект из выделенного» (№ 29) — такт 43 |
@@ -91,8 +94,17 @@ const asisOutline = q('asis') !== 'off'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const P = proto as any
-/** Набор: «Частично проверен» (`A`) или «Пустой осмотр» (`?data=empty`). Режим приёмки модель строит сама — `P.B` не читается. */
-const D = q('data') === 'empty' ? emptyDataset(P.A) : P.A
+/**
+ * Набор — такт 55, решение владельца 2026-10-01: два сценария страницы. Обычный (без `?data`) — осмотр до распределения:
+ * ничего не привязано, проверенных шагов и повторов нет; `?data=reviewed` — «Частично проверен» (`A`). `?data=empty` —
+ * набор «Пустой осмотр», данные обычного сценария. Оснастка состояний без `?data` берёт `A`: её состояния сняты с него.
+ * Режим приёмки модель строит сама — `P.B` не читается.
+ */
+const RIG = ['state', 'open', 'view', 'expand', 'selected']
+const scenario: 'review' | 'empty' = q('data') === 'reviewed' ? 'review'
+  : q('data') === 'empty' ? 'empty'
+    : RIG.some(k => route.query[k] != null) ? 'review' : 'empty'
+const D = scenario === 'review' ? P.A : emptyDataset(P.A)
 const H = P.html
 
 /** Демо-кадр по индексу кадра прототипа: 24 снимка по кругу. */
@@ -129,9 +141,9 @@ const m = createModel({
   stages: P.stages,
   general: P.general,
   blocks: DEMO_BLOCKS,
-  scenario: q('data') === 'empty' ? 'empty' : 'review',
+  scenario,
   initial: {
-    cur: openWin === 'assign' ? P.selectCur : D.cur,
+    cur: openWin === 'assign' && scenario === 'review' ? P.selectCur : D.cur,
     sel: state === 'drop' || ['assign', 'new', 'newobj'].includes(openWin) || q('selected') === 'demo' ? P.selected : [],
     rtab: q('tab') === 'form' ? 'form' : 'scheme',
     win: (WINDOWS as readonly string[]).includes(openWin) ? openWin as ScreenWindow : null,
@@ -155,7 +167,7 @@ const { feed, stats: S, sessMeta, eqCount, reviewBar, wandWindow, progressWindow
 /**
  * «Выделить всё» — флажок в трёх состояниях (такт 49, решение владельца 2026-10-01): ничего не выделено — пусто,
  * выделена часть — неопределённое, выделены все видимые кадры — отмечен. Клик из пустого или неопределённого выделяет
- * все (`selectAll` модели), из отмеченного — снимает выделение, как «Снять».
+ * все (`selectAll` модели), из отмеченного — снимает выделение, как «Отменить» панели выделения.
  */
 const selectAllState = computed<'none' | 'some' | 'all'>(() => {
   if (!m.state.sel.size) return 'none'
@@ -295,7 +307,7 @@ function thumbState(f: any): StepThumbItem['state'] {
   if (f.auto) return 'suggested'
   return 'free'
 }
-function stepProps(owner: string, st: any, index: number) {
+function stepProps(owner: string, st: any) {
   const inStep = framesIn(owner, st.id)
   const counted = inStep.filter((f: any) => !f.rej)
   const v = verdictOf(owner, st.id)
@@ -310,11 +322,12 @@ function stepProps(owner: string, st: any, index: number) {
     count: counted.length,
     wasCount: counted.filter((f: any) => f.lock).length,
     instruction: st.hint ?? '',
-    hotkey: cur.value === owner ? index + 1 : null,
     verdict,
     thumbs: inStep.map((f: any) => ({ id: f.i, src: img(f.i), state: thumbState(f) })),
     highlighted: (state === 'link' && isLink) || hoverFeed.value?.key === `${owner}|${st.id}`,
     dropTarget: (state === 'drop' && owner === eqId && st.id === 'e4') || hotStep.value === `${owner}|${st.id}`,
+    /* Перетаскивание: шаг, который не принимает такой тип кадра, приглушён (такт 55). */
+    muted: dragIds.value.length > 0 && !!m.kindRefusal(owner, st.id, dragIds.value),
     flash: isLink && flashNonce.value ? flashNonce.value : found.value?.key === `${owner}|${st.id}` ? found.value.nonce : null,
     locatedThumb: state === 'flash' && isLink ? inStep[0]?.i ?? null : found.value?.key === `${owner}|${st.id}` && found.value.thumb ? found.value.i : null,
   }
@@ -363,11 +376,21 @@ function repList(st: any) {
 }
 
 /* ------------------------------ приёмка, такт 39 (§13) ------------------------------ */
-/** Панель прокручивается к объекту, который модель сделала текущим, — прототип `revealObj`. */
+/**
+ * Панель прокручивается к объекту, который модель сделала текущим, — прототип `revealObj`: верх объекта встаёт на одно и
+ * то же место под рядом инструментов, поэтому «Принять объект» следующего объекта оказывается там же, где была у
+ * принятого (такт 55, замер — `free-shoot.md`, раздел 34). Прокручивается только панель: `scrollIntoView` двигал бы и
+ * предков. Отступ сверху — 8 (у прототипа 6).
+ */
 async function reveal(id: string | null) {
   if (!id) return
   await nextTick()
-  document.querySelector(`[data-obj="${id}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+  const p = panelEl.value
+  const el = p?.querySelector(`[data-obj="${id}"]`)
+  if (!p || !el) return
+  /* Заголовок этапа прилипает к верху панели и накрыл бы шапку объекта — объект встаёт под ним. */
+  const head = el.closest('[data-slot=stage-section]')?.querySelector<HTMLElement>('[data-slot=stage-header]')?.offsetHeight ?? 0
+  p.scrollTo({ top: p.scrollTop + el.getBoundingClientRect().top - p.getBoundingClientRect().top - head - 8, behavior: 'smooth' })
 }
 /** Кнопки карточки повтора (№ 37) — обработчик панели прототипа: операция и подтверждение. */
 function acceptRepeat(id: string) {
@@ -473,14 +496,13 @@ const HOTKEYS = [
   { keys: 'значок в углу', action: 'открыть кадр во весь экран' },
   { keys: 'протянуть мышью', action: 'выделить рамкой (с пустого места или с [Alt])' },
   { keys: '[двойной клик]', action: 'то же самое' },
-  { keys: '[1]–[8]', action: 'назначить на шаг текущего объекта' },
   { keys: '[←] [→]', action: 'листать в просмотре' },
   { keys: '[Del]', action: 'открепить' },
   { keys: '[Enter]', action: 'принять подобранный шаг в просмотре' },
   { keys: '[⌘]/[Ctrl]+[Z]', action: 'отменить' },
   { keys: '[Esc]', action: 'снять выделение' },
 ]
-const HOTKEYS_NOTE = 'Порядок работы: сначала оформите здание, потом единицы оборудования внутри него — поле «Здание / цех» подставится автоматически. Перетаскивание работает так же, как клавиши.'
+const HOTKEYS_NOTE = 'Порядок работы: сначала оформите здание, потом единицы оборудования внутри него — поле «Здание / цех» подставится автоматически.'
 const hotkeysOpen = windowModel('hotkeys')
 
 /* ------------------------- окно формы повтора, такт 36 (§14.3–14.6) ------------------------- */
@@ -604,7 +626,8 @@ function onSuggestCreate() {
 const deleteOpen = windowModel('delete')
 
 /* ---------------------- пункт назначения, такт 33 (§10.3, §11.1–11.2) ---------------------- */
-function stepOption(owner: string, st: any, hotkey: number | null, bound: AssignBound = null) {
+/** `ids` — кадры, которые собираются привязать: шаг, не принимающий их тип, выключен с причиной в подсказке (такт 55). */
+function stepOption(owner: string, st: any, ids: number[], bound: AssignBound = null) {
   return {
     type: 'step' as const,
     value: `${owner}|${st.id}`,
@@ -614,7 +637,7 @@ function stepOption(owner: string, st: any, hotkey: number | null, bound: Assign
     max: st.max,
     count: cnt(owner, st.id),
     frozen: isFrozen(owner, st.id),
-    hotkey,
+    reason: bound ? '' : m.kindRefusal(owner, st.id, ids),
     bound,
   }
 }
@@ -623,11 +646,12 @@ const objectOption = (o: any, frames: number | null) => ({ type: 'object' as con
 /** Поповер «Назначить на шаг» — группы прототипа `#btnToStep`: текущий → неповторяемые этапы → другие объекты. */
 const assignGroups = computed(() => {
   const groups: { key: string, header: string, items: any[] }[] = []
+  const ids = [...m.state.sel]
   if (cur.value) {
     const o = O(cur.value)!
-    groups.push({ key: 'cur', header: `Текущий · ${objName(o)}`, items: stageById[o.stageId].steps.map((x: any, k: number) => stepOption(o.id, x, k + 1)) })
+    groups.push({ key: 'cur', header: `Текущий · ${objName(o)}`, items: stageById[o.stageId].steps.map((x: any) => stepOption(o.id, x, ids)) })
   }
-  STAGES.filter(s => !s.rep).forEach(s => groups.push({ key: s.id, header: s.title, items: s.steps.map((x: any) => stepOption(s.id, x, null)) }))
+  STAGES.filter(s => !s.rep).forEach(s => groups.push({ key: s.id, header: s.title, items: s.steps.map((x: any) => stepOption(s.id, x, ids)) }))
   const others = m.objects.filter((o: any) => o.id !== cur.value)
   if (others.length) groups.push({ key: 'others', header: 'Другие объекты', items: others.map((o: any) => objectOption(o, null)) })
   return groups
@@ -677,8 +701,6 @@ const bindProps = computed(() => {
     state: (st ? (f.lock || f.rej ? 'locked' : 'assigned') : 'free') as 'free' | 'assigned' | 'locked',
     stepName: st?.n ?? '',
     ownerName: f?.objId ? (O(f.objId) ? objName(O(f.objId)!) : ownerStage(f.objId).title) : '',
-    /* «или нажмите 1–N» — только при текущем объекте: решение владельца 3, такт 34 (§16.2). */
-    keys: cur.value ? stageById[O(cur.value)!.stageId].steps.length : null,
     rejected: !!f?.rej,
     reason: f ? frameWhy(f) : '',
     /* Подбор недоступен — причина заранее, при показе кадра: кнопка выключена, причина в подсказке (такт 52). */
@@ -748,11 +770,12 @@ function onViewerSelect(it: any) {
   if (it.type === 'step') viewerAssign(a!, b!)
 }
 /** Нажат закрытый пункт списка просмотра — прототип `#lbList`: заморожен — отказ; заполнен — `lbAssign`; привязан до вас — отказ. */
-function onViewerRefuse(it: any, reason: 'frozen' | 'full' | 'locked') {
+function onViewerRefuse(it: any, reason: 'frozen' | 'full' | 'locked' | 'kind') {
   const f = viewerFrame.value
   if (!f) return
   const [a, b] = String(it.value).split('|')
-  if (reason === 'locked') m.notify(`${frameWhy(f)} — открепить нельзя`, 'err')
+  if (reason === 'kind') m.notify(it.reason, 'err')
+  else if (reason === 'locked') m.notify(`${frameWhy(f)} — открепить нельзя`, 'err')
   else if (reason === 'frozen') m.notify('Шаг проверен и закрыт — добавить нельзя', 'err')
   else viewerAssign(a!, b!)
 }
@@ -787,18 +810,18 @@ const viewerGroups = computed(() => {
   const locked = f.lock || f.rej
   const bound = (owner: string, sid: string): AssignBound => (f.objId === owner && f.stepId === sid ? (locked ? 'locked' : 'here') : null)
   const groups: { id: string, title: string, repeatable?: boolean, items: any[] }[] = []
+  /* Шаг, который не принимает тип кадра просмотра (видео в «только фото» и наоборот), выключен с причиной — такт 55. */
+  const ids = [f.i]
   if (cur.value) {
     const o = O(cur.value)!
     const s = stageById[o.stageId]
-    groups.push({ id: s.id, title: `Текущий · ${objName(o)}`, items: s.steps.map((x: any, k: number) => stepOption(o.id, x, k + 1, bound(o.id, x.id))) })
+    groups.push({ id: s.id, title: `Текущий · ${objName(o)}`, items: s.steps.map((x: any) => stepOption(o.id, x, ids, bound(o.id, x.id))) })
   }
-  /* Номера клавиш — только у текущего объекта (§16.3). Прототип выводит их и в группе
-     «Привязан к», но клавиши 1–9 привязывают только к текущему объекту. */
   if (f.objId && O(f.objId) && f.objId !== cur.value) {
     const o = O(f.objId)!
-    groups.push({ id: `bnd_${o.id}`, title: `Привязан к · ${objName(o)}`, items: stageById[o.stageId].steps.map((x: any) => stepOption(o.id, x, null, bound(o.id, x.id))) })
+    groups.push({ id: `bnd_${o.id}`, title: `Привязан к · ${objName(o)}`, items: stageById[o.stageId].steps.map((x: any) => stepOption(o.id, x, ids, bound(o.id, x.id))) })
   }
-  STAGES.filter(s => !s.rep).forEach(s => groups.push({ id: s.id, title: s.title, items: s.steps.map((x: any) => stepOption(s.id, x, null, bound(s.id, x.id))) }))
+  STAGES.filter(s => !s.rep).forEach(s => groups.push({ id: s.id, title: s.title, items: s.steps.map((x: any) => stepOption(s.id, x, ids, bound(s.id, x.id))) }))
   STAGES.filter(s => s.rep).forEach((s) => {
     const list = m.objects.filter((o: any) => o.stageId === s.id && o.id !== cur.value)
     groups.push({
@@ -815,8 +838,8 @@ const groupCount = (g: { items: any[] }) => String(g.items.filter(i => i.type !=
 
 const assignOpen = ref(false)
 /** Нажат закрытый пункт поповера — прототип `#popList`: отказ с причиной, плашка остаётся открытой (решение чата, такт 41). */
-function onAssignRefuse(reason: 'frozen' | 'full' | 'locked') {
-  m.notify(reason === 'full' ? 'Шаг уже заполнен' : 'Шаг проверен и закрыт — добавить нельзя', 'err')
+function onAssignRefuse(reason: 'frozen' | 'full' | 'locked' | 'kind', it: any) {
+  m.notify(reason === 'kind' ? it.reason : reason === 'full' ? 'Шаг уже заполнен' : 'Шаг проверен и закрыт — добавить нельзя', 'err')
 }
 /**
  * Пункт поповера (§10.3) — прототип `#popList`: шаг — привязка выделения с проверкой шага, другой объект —
@@ -837,8 +860,40 @@ const feedEl = ref<HTMLElement | null>(null)
 const gridEl = ref<HTMLElement | null>(null)
 const gridWidth = ref(0)
 const gridColumns = computed(() => (gridWidth.value ? frameTileColumns(gridWidth.value, size.value) : undefined))
+/**
+ * Строка полосы ленты — такт 55: по ширине ленты элементы уступают место поиску по порядку. 0 — всё на месте;
+ * 1 — без подписи «Размер»; 2 — кнопка «Распределить автоматически» иконкой; 3 — без подписи «Разобранные».
+ * Пороги — ширина ленты, при которой строка с поиском 120 ещё помещается (замер — `free-shoot.md`, раздел 34).
+ */
+const feedWidth = ref(0)
+const ROW_STEPS = [957, 905, 683]
+/** Лента не уже строки полосы в самом тесном виде (594, с запасом — 600): панель структуры уступает ей место в своих пределах. */
+const FEED_MIN = 600
+const HANDLE = 10
+const zoneWidth = ref(0)
+const panelMax = computed(() => (zoneWidth.value ? Math.max(320, Math.min(820, zoneWidth.value - HANDLE - FEED_MIN)) : 820))
+const rowStep = computed(() => (!feedWidth.value ? 0 : ROW_STEPS.filter(w => feedWidth.value < w).length))
 let gridObserver: ResizeObserver | undefined
 const selbarLeft = ref('50%')
+/**
+ * Стопка уведомлений — такт 55, решение владельца 2026-10-01: левый нижний угол ленты (справа стопка перекрывала панель
+ * структуры); при видимой панели выделения — над ней. В просмотре — над плашкой привязки, у левого края кадра.
+ */
+const toastX = ref<string | undefined>(undefined)
+const toastBottom = ref<string | undefined>(undefined)
+function placeToasts() {
+  const gap = 12
+  const bar = document.querySelector('[data-slot=frame-bind-bar]')
+  const sel = m.state.sel.size > 0 ? document.querySelector('[data-slot=action-bar]:not([data-fragment])') : null
+  const over = m.state.lb >= 0 && bar ? bar : sel
+  const feed = feedEl.value?.getBoundingClientRect()
+  const left = m.state.lb >= 0 && bar ? bar.getBoundingClientRect().left : feed?.left
+  toastX.value = left != null ? `${Math.round(left) + 16}px` : undefined
+  /* Панель выделения выезжает снизу: её место берётся по раскладке — низ окна минус отступ 20: кадр анимации даёт промежуточное положение. */
+  toastBottom.value = !over ? undefined
+    : over === bar ? `${Math.round(window.innerHeight - bar.getBoundingClientRect().top) + gap}px`
+      : `${(over as HTMLElement).offsetHeight + 20 + gap}px`
+}
 onMounted(async () => {
   /* Оснастка прогона сценариев (`scripts/free-shoot-scenarios.mjs`): модель — слепку привязок и состояния. Не продукт. */
   if (import.meta.dev) (window as any).__freeShoot = m
@@ -855,8 +910,8 @@ onMounted(async () => {
     setInterval(() => { flashNonce.value = Date.now() }, 2000)
   }
   /* Окно формы повтора — оснастка такта 36: повтор оборудования, как `openObjForm('eq', 'o2')` разбора. */
-  if (openWin === 'form' || openWin === 'form-errors') openForm(eqId)
-  if (openWin === 'form-group') openForm(eqId, 'Состояние и эксплуатация')
+  if ((openWin === 'form' || openWin === 'form-errors') && eqId) openForm(eqId)
+  if (openWin === 'form-group' && eqId) openForm(eqId, 'Состояние и эксплуатация')
   if (openWin === 'form-errors') {
     editDraft.value = { ...editDraft.value, mark: '' }
     saveForm()
@@ -866,14 +921,15 @@ onMounted(async () => {
   const target = state === 'drop' ? `${eqId}|e4` : ['link', 'flash'].includes(state) ? `${LINK.owner}|${LINK.step}` : ''
   if (target) document.querySelector(`[data-step-key="${target}"]`)?.scrollIntoView({ block: 'center' })
   if (feedEl.value) {
-    const measure = () => { const el = feedEl.value; if (!el) return; const cs = getComputedStyle(el); gridWidth.value = el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) }
+    const measure = () => { const el = feedEl.value; if (!el) return; const cs = getComputedStyle(el); gridWidth.value = el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight); feedWidth.value = el.offsetWidth;zoneWidth.value = el.closest('[data-slot=resizable-panel-group]')?.clientWidth ?? 0 }
     measure()
-    gridObserver = new ResizeObserver(() => { measure(); placeSelbar() })
+    gridObserver = new ResizeObserver(() => { measure(); placeSelbar(); placeToasts() })
     gridObserver.observe(feedEl.value)
   }
-  /* Окно входа (№ 59): при загрузке без параметров адреса — как прототип `showEntry` (решение чата 3, такт 42). */
-  if (!Object.keys(route.query).length) m.openWindow('entry')
+  /* Окно входа (№ 59): при загрузке без параметров оснастки — как прототип `showEntry` (решение чата 3, такт 42); `?data` — выбор сценария, окно открывается (такт 55). */
+  if (!Object.keys(route.query).some(k => k !== 'data')) m.openWindow('entry')
   placeSelbar()
+  placeToasts()
   /* Оснастка такта 40: рамка над первыми тремя плитками — как протяжка с поля ленты до третьего кадра. */
   if (state === 'marquee' && feedEl.value) {
     const tiles = [...feedEl.value.querySelectorAll<HTMLElement>('[data-slot=frame-tile][data-frame]')].slice(0, 3)
@@ -1023,7 +1079,7 @@ function onPanelDragover(e: DragEvent) {
   const key = stepKeyOf(e)
   const [owner, sid] = key.split('|')
   const st = key ? m.ownerStage(owner!)?.steps.find(x => x.id === sid) : null
-  const closed = !st || m.isFrozen(owner!, sid!) || m.stepFull(owner!, st)
+  const closed = !st || m.isFrozen(owner!, sid!) || m.stepFull(owner!, st) || !!m.kindRefusal(owner!, sid!, dragIds.value)
   hotStep.value = closed ? '' : key
   if (e.dataTransfer) e.dataTransfer.dropEffect = key && closed ? 'none' : 'move'
 }
@@ -1043,8 +1099,9 @@ function onStepSelect(owner: string, stepId: string) {
 
 /* ------------------------------ клавиатура, такт 40 (§16) ------------------------------ */
 /**
- * Один обработчик по таблице прототипа (`keydown` документа). П3: Esc, Ctrl+Z, Ctrl+A, 1–8, Del / Backspace;
- * в просмотре — Del / Backspace. П4 (такт 41): в просмотре ← →, Enter (принять предложенный шаг) и 1–N.
+ * Один обработчик по таблице прототипа (`keydown` документа). П3: Esc, Ctrl+Z, Ctrl+A, Del / Backspace;
+ * в просмотре — Del / Backspace. П4 (такт 41): в просмотре ← →, Enter (принять предложенный шаг).
+ * Клавиш 1–N нет — такт 55, решение владельца 2026-10-01: распределение цифрами снято в ленте и в просмотре.
  *
  * Esc по приоритету «просмотр → окно → выделение»: просмотр и окна закрывает Reka сама, поэтому обработчик
  * стоит в фазе перехвата и снимает выделение, только если ни просмотра, ни окна нет.
@@ -1070,21 +1127,11 @@ function onKeydown(e: KeyboardEvent) {
       return
     }
   }
-  if (/^[1-9]$/.test(e.key)) {
-    const n = Number(e.key)
-    /* В просмотре — привязка показанного кадра к шагу текущего объекта (§11.3, §16.2). */
-    if (lbOpen && m.state.cur) {
-      const st = stageById[m.O(m.state.cur)!.stageId]!.steps[n - 1]
-      if (st) viewerAssign(m.state.cur, st.id)
-      return
-    }
-    m.pressDigit(n)
-    return
-  }
   if ((e.key === 'Backspace' || e.key === 'Delete') && m.state.sel.size) m.unassignSelection()
 }
 
 /* ------------------------------ уведомления, такт 40 (§10.6) ------------------------------ */
+watch(() => [m.state.sel.size > 0, m.state.lb, m.notices.length], () => nextTick(placeToasts), { flush: 'post' })
 /** «Отменить» — прототип: действие `undoLast`, плашка снимается. */
 function onUndo(id: number) {
   m.undoLast()
@@ -1113,7 +1160,8 @@ function onUndo(id: number) {
           </Button>
         </template>
 
-      <div class="flex min-h-0 min-w-320 flex-1 flex-col">
+      <!-- Минимальной ширины рабочей зоны нет (такт 55): развёрнутое меню двигает содержимое, лента и панель подстраиваются. -->
+      <div class="flex min-h-0 min-w-0 flex-1 flex-col">
 
         <!-- ============================ подшапка, §7 — кит, такт 42: Toolbar (№ 11–14) ============================ -->
         <Toolbar class="gap-y-3 py-3">
@@ -1124,7 +1172,8 @@ function onUndo(id: number) {
               <Checkbox v-if="reviewBar.only !== null" :model-value="reviewBar.only" @update:model-value="m.setReviewOnly(!!$event)">
                 только непроверенные
               </Checkbox>
-              <Button variant="secondary" size="sm" @click="m.rejectAll()">Отменить автораспределение</Button>
+              <!-- Такт 55, решение владельца 2026-10-01: текстовая кнопка без подложки. -->
+              <ButtonAction size="sm" :show-icon="false" @click="m.rejectAll()">Отменить автораспределение</ButtonAction>
               <Button size="sm" @click="m.acceptAll()">Принять все объекты</Button>
             </template>
           </Callout>
@@ -1146,7 +1195,7 @@ function onUndo(id: number) {
               </template>
             </Heading>
           </div>
-          <!-- Справа: счётчики и «Завершить распределение» (№ 7) — из полосы в подшапку, такт 48. -->
+          <!-- Справа: счётчики и «Завершить распределение» (№ 7) — из полосы в подшапку, такт 48. Блока «Объекты» нет — такт 55, решение владельца 2026-10-01. -->
           <div class="ml-auto flex shrink-0 items-center gap-3">
             <ProgressStat
               class="min-w-32 max-w-47.5"
@@ -1162,7 +1211,6 @@ function onUndo(id: number) {
               :progress="{ value: S.ok, max: S.req, locked: S.frz }"
               :sub="S.reqSub"
             />
-            <ProgressStat class="min-w-32 max-w-47.5" label="Объекты" :value="S.objText" :sub="S.objSub" />
             <Button @click="m.openWindow('finish')">Завершить распределение</Button>
           </div>
         </Toolbar>
@@ -1171,44 +1219,53 @@ function onUndo(id: number) {
         <ResizablePanelGroup direction="horizontal" class="min-h-0 flex-1">
           <ResizablePanel class="flex flex-col">
             <!--
-              тулбар ленты, §7 — кит, такт 42: Toolbar (№ 15–21). Такт 49, решение владельца 2026-10-01 — полоса по ролям.
-              Строка 1 «найти и разложить»: поиск на всё свободное место, справа «Распределить автоматически» с иконкой.
-              Строка 2 «что показывать»: слева флажок «Выделить всё» в трёх состояниях, справа сегменты вида ленты.
+              тулбар ленты, §7 — кит, такт 42: Toolbar (№ 15–21). Такт 55, решение владельца 2026-10-01 — одна строка:
+              «Выделить всё» — поиск — «Распределить автоматически» — «Разобранные» — «Размер». Поиск занимает свободное
+              место и сужается вместе с лентой, не уже 120; строка не переносится: когда места мало, уступают по порядку
+              подпись «Размер», текст кнопки (остаётся иконка с подсказкой), подпись «Разобранные» (`rowStep`).
               Индикатор текущего объекта (№ 19) с экрана снят: текущий отмечен в панели; `curHint` остаётся в модели.
             -->
-            <Toolbar>
-              <div class="min-w-80 flex-1" data-search>
+            <Toolbar data-feed-tools class="flex-nowrap gap-3">
+              <div data-select-all class="flex shrink-0">
+                <Checkbox :model-value="selectAllState === 'all'" :indeterminate="selectAllState === 'some'" @update:model-value="onSelectAll">
+                  Выделить всё
+                </Checkbox>
+              </div>
+              <div class="min-w-30 flex-1" data-search>
                 <Input v-model="search" placeholder="Поиск по расшифровкам и именам файлов…" />
               </div>
-              <Button variant="secondary" show-icon @click="m.magicWand()">
+              <Button v-if="rowStep < 2" variant="secondary" show-icon @click="m.magicWand()">
                 <template #icon>
                   <Icon name="auto-awesome" :size="20" />
                 </template>
                 Распределить автоматически
               </Button>
-              <div class="flex basis-full items-center gap-4">
-                <div data-select-all class="mr-auto flex">
-                  <Checkbox :model-value="selectAllState === 'all'" :indeterminate="selectAllState === 'some'" @update:model-value="onSelectAll">
-                    Выделить всё
-                  </Checkbox>
-                </div>
-                <ToolbarGroup label="Разобранные">
-                  <Tabs v-model="mode">
-                    <TabsList variant="segmented">
-                      <TabsTrigger value="keep" variant="segmented">оставлять</TabsTrigger>
-                      <TabsTrigger value="hide" variant="segmented">убирать</TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                </ToolbarGroup>
-                <ToolbarGroup label="Размер">
-                  <Tabs v-model="size">
-                    <TabsList variant="segmented">
-                      <TabsTrigger value="md" variant="segmented">M</TabsTrigger>
-                      <TabsTrigger value="lg" variant="segmented">L</TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                </ToolbarGroup>
-              </div>
+              <TooltipProvider v-else>
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <IconButton variant="secondary" size="lg" label="Распределить автоматически" @click="m.magicWand()">
+                      <Icon name="auto-awesome" :size="20" />
+                    </IconButton>
+                  </TooltipTrigger>
+                  <TooltipContent>Распределить автоматически</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <ToolbarGroup :label="rowStep < 3 ? 'Разобранные' : ''" aria-label="Разобранные">
+                <Tabs v-model="mode">
+                  <TabsList variant="segmented">
+                    <TabsTrigger value="keep" variant="segmented">оставлять</TabsTrigger>
+                    <TabsTrigger value="hide" variant="segmented">убирать</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </ToolbarGroup>
+              <ToolbarGroup :label="rowStep < 1 ? 'Размер' : ''" aria-label="Размер">
+                <Tabs v-model="size">
+                  <TabsList variant="segmented">
+                    <TabsTrigger value="md" variant="segmented">M</TabsTrigger>
+                    <TabsTrigger value="lg" variant="segmented">L</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </ToolbarGroup>
             </Toolbar>
 
             <!-- лента материалов, §8 -->
@@ -1254,7 +1311,7 @@ function onUndo(id: number) {
           <ResizableHandle with-handle />
 
           <!-- панель структуры, §9 -->
-          <ResizablePanel data-pane-right :default-size="440" :min-size="320" :max-size="820" size-unit="px" class="flex flex-col">
+          <ResizablePanel data-pane-right :default-size="440" :min-size="320" :max-size="panelMax" size-unit="px" class="flex flex-col">
             <!--
               Заголовочный блок панели — такт 48, решение владельца 2026-10-01: линия вкладок на всю ширину панели
               (TabsList stretch), поля блока слева и справа 12, ряд инструментов схемы (№ 32–33) — сразу под вкладками.
@@ -1318,14 +1375,14 @@ function onUndo(id: number) {
                             :expanded="formOpen.has(o.id)"
                             :deletable="!formPreview(o).locked && !o.auto"
                             @toggle="toggleForm(o.id)"
-                            @edit="openForm(o.id, $event)"
+                            @edit="openForm(o.id)"
                             @delete="m.askDelete(o.id)"
                           />
                         </template>
-                        <template v-for="(x, k) in stageById[o.stageId].steps" :key="x.id">
+                        <template v-for="x in stageById[o.stageId].steps" :key="x.id">
                           <StepRow
                             v-if="!m.state.onlyOpen || !isFrozen(o.id, x.id)"
-                            v-bind="stepProps(o.id, x, k)"
+                            v-bind="stepProps(o.id, x)"
                             :data-step-key="`${o.id}|${x.id}`"
                             @select="onStepSelect(o.id, x.id)"
                             @thumb-open="openViewer(Number($event))"
@@ -1341,10 +1398,10 @@ function onUndo(id: number) {
                       </StageNote>
                     </template>
                     <div v-else class="flex flex-col gap-0.5 px-1.5 pt-1 pb-2">
-                      <template v-for="(x, k) in st.steps" :key="x.id">
+                      <template v-for="x in st.steps" :key="x.id">
                         <StepRow
                           v-if="!m.state.onlyOpen || !isFrozen(st.id, x.id)"
-                          v-bind="stepProps(st.id, x, k)"
+                          v-bind="stepProps(st.id, x)"
                           :data-step-key="`${st.id}|${x.id}`"
                           @select="onStepSelect(st.id, x.id)"
                           @thumb-open="openViewer(Number($event))"
@@ -1409,7 +1466,7 @@ function onUndo(id: number) {
             <SelectContent :width="360" max-height="62vh">
               <AssignList>
                 <SelectGroup v-for="g in assignGroups" :key="g.key" :header="g.header">
-                  <AssignOption v-for="it in g.items" :key="it.value" v-bind="it" :data-value="it.value" @select="onAssignSelect(it.value)" @refuse="onAssignRefuse" />
+                  <AssignOption v-for="it in g.items" :key="it.value" v-bind="it" :data-value="it.value" @select="onAssignSelect(it.value)" @refuse="onAssignRefuse($event, it)" />
                 </SelectGroup>
               </AssignList>
             </SelectContent>
@@ -1450,7 +1507,8 @@ function onUndo(id: number) {
         <Button variant="secondary" @click="m.assignMisc()">В «Прочее»</Button>
         <Button variant="secondary" @click="m.unassignSelection()">Открепить</Button>
         <ActionBarSeparator />
-        <Button variant="secondary" @click="m.clearSel()">Снять</Button>
+        <!-- Такт 55, решение владельца 2026-10-01: «Отменить» (было «Снять»; спека §18 — строка аналитику). -->
+        <Button variant="secondary" @click="m.clearSel()">Отменить</Button>
       </ActionBar>
 
       <!-- № 26: фрагмент заметки — ActionBar, второе размещение (такт 43): над выделенным текстом, §8.5 -->
@@ -1760,8 +1818,8 @@ function onUndo(id: number) {
       </ModalCardContent>
     </ModalCard>
 
-    <!-- Уведомления экрана: отказ «Заполните: …» (§18 form.required). Угол и тон — долг Toast. -->
-    <Toaster>
+    <!-- Уведомления экрана: отказ «Заполните: …» (§18 form.required). Тон — долг Toast; угол — левый нижний, над панелью выделения (такт 55). -->
+    <Toaster side="left" :x="toastX" :bottom="toastBottom">
       <Toast
         v-for="t in toasts"
         :key="t.id"

@@ -10,6 +10,8 @@ const props = withDefaults(defineProps<{
   size?: NonNullable<ButtonActionVariants['size']>
   /** Цветовая ось мастера схлопнута; удаление берётся из колонки `fargo`, как у `Button`. */
   variant?: NonNullable<ButtonActionVariants['variant']>
+  /** Главное действие пары — полужирный (такт 55); второстепенное — `variant="muted"`. */
+  strong?: boolean
   /** Булев проп мастера `Show icon`. */
   showIcon?: boolean
   disabled?: boolean
@@ -17,6 +19,7 @@ const props = withDefaults(defineProps<{
 }>(), {
   size: 'md',
   variant: 'default',
+  strong: false,
   showIcon: true,
   disabled: false,
   type: 'button',
@@ -28,7 +31,7 @@ const props = withDefaults(defineProps<{
     data-slot="button"
     :type="props.type"
     :disabled="props.disabled"
-    :class="buttonActionVariants({ size, variant })"
+    :class="buttonActionVariants({ size, variant, strong })"
     :style="{ transitionProperty: 'color', transitionDuration: 'var(--duration-hover)' }"
   >
     <slot v-if="props.showIcon" name="icon">

@@ -67,7 +67,7 @@ export interface RepeatFormField {
   label: string
   value?: string
   required?: boolean
-  /** Источник автозаполнения (§3.1, §14.2): с кадра или значение по умолчанию. */
+  /** Источник автозаполнения (§3.1, §14.2): с кадра или значение по умолчанию. Метку несёт только `recognized` (такт 55). */
   source?: 'recognized' | 'default'
   /** Группа полей — заголовок в развёрнутой форме (§14.3). */
   group?: string

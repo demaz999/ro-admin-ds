@@ -143,7 +143,10 @@ export interface ModelOptions {
   general: Record<string, string>
   /** Блоки съёмки для автораспределения — `window.VA_BLOCKS` прототипа. */
   blocks?: Block[]
-  /** Сценарий исходного состояния — прототип `scen`: окно входа говорит о нём (`review` — «Частично проверен», `empty`). */
+  /**
+   * Сценарий исходного состояния — прототип `scen`: окно входа говорит о нём. `review` — «Частично проверен»; `empty` —
+   * осмотр до распределения: ничего не привязано, проверенных шагов и повторов нет (такт 55: он же обычный сценарий экрана).
+   */
   scenario?: 'review' | 'empty'
   /** Начальное состояние интерфейса — оснастка адреса и выбор стенда. */
   initial?: Partial<Omit<UiState, 'sel' | 'open' | 'closed' | 'formOpen' | 'undo' | 'move' | 'del'>> & { sel?: number[], open?: string[] }
@@ -271,7 +274,7 @@ export function createModel(opts: ModelOptions) {
   })
   const curHint = computed(() => {
     const o = state.cur ? O(state.cur) : null
-    return o ? `Текущий: ${objName(o)} · клавиши 1–${stageById[o.stageId].steps.length}` : 'Текущий объект не выбран'
+    return o ? `Текущий: ${objName(o)}` : 'Текущий объект не выбран'
   })
   /** Сверка общей формы (вкладка «Форма осмотра», поле «Общее количество объектов по документам»). */
   const eqCount = computed(() => objects.filter(o => o.stageId === 'eq').length)
@@ -838,6 +841,21 @@ export function createModel(opts: ModelOptions) {
   const stepFull = (owner: string, st: Step) => !!(st.max && cnt(owner, st.id) >= st.max)
   const ownerLabel = (owner: string) => { const o = O(owner); return o ? objName(o) : ownerStage(owner)?.title ?? '' }
   /**
+   * Тип кадра и шаг — такт 55, решение владельца 2026-10-01: шаг «только фото» видео не принимает, шаг «только видео» —
+   * фото. Причина известна заранее, до нажатия: пункт назначения выключен, причина — в его подсказке; при перетаскивании
+   * неподходящий шаг приглушён. Пусто — шаг принимает все кадры `ids`. Тексты отказа — §18 (`assign`).
+   */
+  function kindRefusal(owner: string, stepId: string, ids: number[]) {
+    const st = stepOf(owner, stepId)
+    if (!st || !ids.length) return ''
+    const video = st.kind === 'Видео'
+    const fs = ids.map(i => frameByI[i]).filter((f): f is Frame => !!f)
+    const wrong = fs.filter(f => video !== (f.type === 'video')).length
+    if (!wrong) return ''
+    const only = video ? 'Шаг принимает только видео' : 'Шаг принимает только фото'
+    return wrong === fs.length ? only : `${only} — в выделении есть ${video ? 'фото' : 'видео'}`
+  }
+  /**
    * Прототип `assign`: отказы с причиной (§6.1, тексты §18) — заморожен, не тот тип, сверх предела; иначе
    * прежние привязки — в стек отмены, кадры — в шаг, «N кадров → «шаг» · объект» с «Отменить».
    */
@@ -913,14 +931,6 @@ export function createModel(opts: ModelOptions) {
     state.cur = id
     state.open.add(id)
     notify(`Текущий: ${objName(O(id)!)}`)
-  }
-  /** Клавиши 1–8 (§16.2): без текущего объекта — отказ; с выделением — привязка к шагу текущего. */
-  function pressDigit(n: number) {
-    if (!state.cur) { notify('Сначала выберите текущий объект', 'err'); return }
-    const o = O(state.cur)!
-    const st = stageById[o.stageId]!.steps[n - 1]
-    if (!st) return
-    if (state.sel.size && assign([...state.sel], o.id, st.id)) state.sel.clear()
   }
   /** Начало перетаскивания (§9.5) — прототип `dragstart`: тянется выделение, если кадр в нём, иначе только кадр. */
   function dragStart(i: number) {
@@ -1175,6 +1185,7 @@ export function createModel(opts: ModelOptions) {
     setSelection,
     selbar,
     stepFull,
+    kindRefusal,
     assign,
     unassign,
     undoLast,
@@ -1184,7 +1195,6 @@ export function createModel(opts: ModelOptions) {
     unassignFrame,
     unassignViewed,
     setCurrent,
-    pressDigit,
     dragStart,
     dragLabel,
     /* П4 */
