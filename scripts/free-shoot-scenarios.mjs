@@ -1,35 +1,34 @@
 #!/usr/bin/env node
 /**
- * Прогон сценариев экрана «Распределение свободной съёмки» (VA-9265) — такт 38, порция П1; такт 39, порция П2 —
- * автораспределение и приёмка (С-15, 27–30). План — `docs/free-shoot.md`, 16.4; итоги — разделы 17 и 18.
- * Оснастка приёмки, не продукт. `DEBUG_CLICK=1` печатает координаты и цель каждого клика.
+ * Прогон сценариев экрана «Распределение свободной съёмки» (VA-9265). Оснастка приёмки, не продукт.
  *
- * Одни и те же действия выполняются в прототипе v17 (`docs/sources/va-9265/va-9265-v17.html`) и на
- * стенде `/free-shoot`; после каждого шага с обоих снимается слепок (лента, выделение, режимы,
- * текущий и раскрытые повторы, счётчики подшапки, окно, вкладка «Форма осмотра»), слепки
- * сравниваются построчно. Расхождение — провал с именем сценария и шага.
+ * **Эталон — сам кит** (решение владельца 2026-10-02, такт 59). Сценарий выполняется на стенде `/free-shoot`; после
+ * каждого шага снимается слепок (лента, выделение, режимы, текущий и раскрытые повторы, счётчики подшапки, окно,
+ * уведомления, привязки модели…) и сравнивается с замороженным эталоном `scripts/free-shoot-baseline/<сценарий>.json`.
+ * Расхождение — провал с именем сценария, шага и поля. До такта 59 прогон сравнивал кит с прототипом v17
+ * (`docs/sources/va-9265/va-9265-v17.html`); адаптер прототипа и пары снимков — в истории git (метка `handover-2026-10-01`).
  *
  * Запуск (dev-сервер на 3000 уже поднят):
- *   node scripts/free-shoot-scenarios.mjs            — все сценарии
- *   node scripts/free-shoot-scenarios.mjs С-16 С-38  — выбранные
- * Такт 53 — сдача экрана, решение чата (правило 21). Кит местами сознательно расходится с прототипом v17 (раздел 15):
- * — демо-данные одинаковы у обеих сторон: правки данных стенда прогон подкладывает прототипу при загрузке (`PROTO_DATA`);
- * — ширина окна прототипа — ширина рабочей зоны кита: каркас кита держит слева меню 84 (строка 81), прототип меню не знает;
- * — шаг, где кит отличается по строке раздела 15, сверяется с ожиданием этой строки: опции шага `expect` (значение поля у
- *   кита), `keep` (поле у кита прежнее) и `skip` (поле не сравнивается) с номером строки `row`;
- * — тихих исключений нет: каждое заменённое ожидание и снятое поле печатается списком в конце прогона.
+ *   node scripts/free-shoot-scenarios.mjs                    — все сценарии против эталона
+ *   node scripts/free-shoot-scenarios.mjs С-16 С-38          — выбранные
+ *   node scripts/free-shoot-scenarios.mjs --update-baseline  — переписать эталон; печатает список изменённых слепков
+ *     (сценарий, шаг, поле). Намеренная правка экрана обновляет эталон только так, список идёт в отчёт такта.
+ *
+ * Защита от пустой зелени (такт 57): клик, не попавший в цель, — провал шага (намеренный клик по выключенному — опция
+ * шага `blind`); уведомления пишет наблюдатель в странице в момент появления. `NOTICES=1` печатает тексты уведомлений.
+ * `DEBUG_CLICK=1` печатает координаты и цель каждого клика.
  *
  * Chrome ищется на CDP-порту `CDP_PORT` (по умолчанию 9333); если его нет — запускается headless.
  * Адрес стенда — `KIT_URL` (по умолчанию http://localhost:3000/free-shoot/).
  */
 import { spawn } from 'node:child_process'
-import { existsSync, mkdtempSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
-import { fileURLToPath, pathToFileURL } from 'node:url'
+import { fileURLToPath } from 'node:url'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const PROTO_URL = pathToFileURL(join(ROOT, 'docs/sources/va-9265/va-9265-v17.html')).href
+const BASELINE = join(ROOT, 'scripts/free-shoot-baseline')
 const KIT_URL = process.env.KIT_URL ?? 'http://localhost:3000/free-shoot/'
 const PORT = Number(process.env.CDP_PORT ?? 9333)
 const sleep = ms => new Promise(r => setTimeout(r, ms))
@@ -61,7 +60,6 @@ async function ensureChrome() {
 /** Ширина окна кита и прототипа: рабочая зона кита уже окна на меню 84 (каркас, строка 81 раздела 15). */
 const KIT_W = 1440
 const MENU_W = 84
-const PROTO_W = KIT_W - MENU_W
 async function openPage(width = KIT_W) {
   const t = await (await fetch(`http://127.0.0.1:${PORT}/json/new?about:blank`, { method: 'PUT' })).json()
   const ws = new WebSocket(t.webSocketDebuggerUrl)
@@ -353,220 +351,6 @@ async function selectText(page, el, n) {
   await sleep(300)
 }
 
-/**
- * Правки демо-данных стенда, подложенные прототипу (решение чата, такт 53): кадр 6 отнесён к блоку «Пропиточная линия
- * POLYPRISE» — строка 118 раздела 15 (`DEMO_BLOCKS` страницы стенда). Блоки читаются из `window.VA_BLOCKS` при вызове.
- */
-const PROTO_DATA = `(() => { window.VA_BLOCKS = window.VA_BLOCKS.filter(b => !(b.a === 6 && b.b === 6)).map(b => (b.a === 1 && b.b === 5 ? { ...b, b: 6 } : b)); return 1 })()`
-
-const prototype = page => ({
-  name: 'прототип',
-  async start(dataset, keepEntry) {
-    await page.goto(PROTO_URL, 1500)
-    await page.evaluate(PROTO_DATA)
-    await page.evaluate(NOTICE_LOG(`document.getElementById('toasts')`, '.toast', 'span'))
-    /* Обычный сценарий стенда (строка 124) — данные «Пустой осмотр» прототипа: переключатель сценариев окна входа, окно показано заново. */
-    if (dataset === 'plain') { await page.click(`document.querySelector('#mBody [data-scen="empty"]')`); await sleep(500) }
-    if (keepEntry) return
-    /* Окно входа (`showEntry`) открывается при загрузке — закрыть «Разложу вручную». Окно входа на ките — П5. */
-    await page.click(`[...document.querySelectorAll('#mFoot button')].find(b => b.textContent.trim() === 'Разложу вручную')`)
-    /* «Пустой осмотр» — функция самого прототипа, как кнопка переключателя сценариев окна входа. */
-    if (dataset === 'empty') await page.evaluate(`(() => { applyScenario('empty'); return 1 })()`)
-  },
-  wand: () => page.click(`document.querySelector('#btnWand')`),
-  wandMode: v => page.click(`document.querySelector('#mBody input[name="wm"][value="${v}"]')`),
-  stop: () => page.click(`document.querySelector('#wStop')`),
-  waitWand: () => until(page, `document.querySelector('#modal.show #mTitle')?.textContent === 'Автораспределение завершено'`),
-  reviewOnly: () => page.click(`document.querySelector('#review [data-rev="only"]')`),
-  reviewAll: v => page.click(`document.querySelector('#review [data-rev="${v}"]')`),
-  repeatAct: (id, v) => page.click(`document.querySelector('.obj[data-obj="${id}"] [data-act="${v === 'accept' ? 'acc' : 'rej'}"]')`),
-  dump: () => page.evaluate(`(${DUMP})({ frames, objects, review: REVIEW, state })`),
-  /* П3 */
-  tileMod: (i, modifiers) => page.click(`document.querySelector('#feed .card[data-i="${i}"] img')`, modifiers),
-  selectAllButton: () => page.click(`document.querySelector('#btnSelAll')`),
-  selbar: b => page.click(`document.querySelector('#${{ toStep: 'btnToStep', misc: 'btnMisc', unassign: 'btnUnassign', clear: 'btnSelClear' }[b]}')`),
-  popOption: v => page.click(v.startsWith('obj|') ? `document.querySelector('#popList [data-setcur="${v.slice(4)}"]')` : `document.querySelector('#popList .it[data-owner="${v.split('|')[0]}"][data-step="${v.split('|')[1]}"]')`),
-  step: k => page.click(`document.querySelector('.step[data-owner="${k.split('|')[0]}"][data-step="${k.split('|')[1]}"] .nm')`),
-  async thumbRemove(k, n) { const th = `document.querySelectorAll('.step[data-owner="${k.split('|')[0]}"][data-step="${k.split('|')[1]}"] .th')[${n}]`; await page.hover(th); await page.click(`${th}.querySelector('.rm')`) },
-  async tileUnassign(i) { await page.hover(`document.querySelector('#feed .card[data-i="${i}"] img')`); await page.click(`document.querySelector('#feed .card[data-i="${i}"] .mark .x')`) },
-  async viewer(i) { await page.hover(`document.querySelector('#feed .card[data-i="${i}"] img')`); await page.click(`document.querySelector('#feed .card[data-i="${i}"] .zoom')`) },
-  bindUnbind: () => page.click(`document.querySelector('#lbBind [data-act="unbind-bar"]')`),
-  toastUndo: () => page.click(`[...document.querySelectorAll('#toasts .toast button')].pop()`),
-  marquee: (a, b, o) => sweepRow(page, i => `document.querySelector('#feed .card[data-i="${i}"]')`, `document.getElementById('feed')`, a, b, o),
-  marqueeEdge: (a, n) => sweepEdge(page, i => `document.querySelector('#feed .card[data-i="${i}"]')`, `document.getElementById('feed')`, a, n),
-  dragTo: (i, k) => page.drag(`document.querySelector('#feed .card[data-i="${i}"] img')`, `document.querySelector('.step[data-owner="${k.split('|')[0]}"][data-step="${k.split('|')[1]}"] .nm')`),
-  savingNow: () => page.evaluate(`document.getElementById('saveState').lastElementChild.textContent.trim()`),
-  /* П4 */
-  toggleAll: async () => { await page.evaluate(`(document.getElementById('rbody').scrollTop = 0, 1)`); await page.click(`document.querySelector('.schtools [data-coll]')`) },
-  onlyOpen: async () => { await page.evaluate(`(document.getElementById('rbody').scrollTop = 0, 1)`); await page.click(`document.querySelector('.schtools [data-onlyopen]')`) },
-  clickAway: () => page.clickAt(700, 10),
-  foundWatch: () => page.watch({ step: `!!document.querySelector('.step.found')`, thumb: `[...document.querySelectorAll('.th')].some(t => t.style.outline)` }),
-  bindWatch: () => page.watch({ flash: `document.getElementById('lbBind').classList.contains('flash')`, index: `state.lb` }),
-  watched: () => page.watched(),
-  hoverTile: i => page.hover(`document.querySelector('#feed .card[data-i="${i}"] img')`),
-  hoverStep: k => page.hover(`document.querySelector('.step[data-owner="${k.split('|')[0]}"][data-step="${k.split('|')[1]}"] .nm')`),
-  hoverRepeat: id => page.hover(`document.querySelector('.obj[data-obj="${id}"] .obj-h')`),
-  away: () => page.away(),
-  async locate(i) { await page.hover(`document.querySelector('#feed .card[data-i="${i}"] img')`); await page.click(`document.querySelector('#feed .card[data-i="${i}"] .mark .find')`) },
-  found: () => page.evaluate(`JSON.stringify({ step: [...document.querySelectorAll('.step.found')].map(x => x.dataset.owner + '|' + x.dataset.step), thumb: [...document.querySelectorAll('.th')].filter(t => t.style.outline).map(t => +t.dataset.i) })`),
-  dblTile: i => page.dblclick(`document.querySelector('#feed .card[data-i="${i}"] img')`),
-  thumbOpen: (k, n) => page.click(`document.querySelectorAll('.step[data-owner="${k.split('|')[0]}"][data-step="${k.split('|')[1]}"] .th')[${n}]`),
-  lbItem: v => page.click(v.startsWith('obj|') ? `document.querySelector('#lbList [data-setcur="${v.slice(4)}"]')` : `document.querySelector('#lbList .it[data-owner="${v.split('|')[0]}"][data-step="${v.split('|')[1]}"]')`),
-  /* Перенос кадра просмотра на пункт: у прототипа его нет — то же нажатие по пункту (строка 139). */
-  lbDrag: v => page.click(v.startsWith('new|') ? `document.querySelector('#lbList [data-newobj="${v.slice(4)}"]')` : `document.querySelector('#lbList .it[data-owner="${v.split('|')[0]}"][data-step="${v.split('|')[1]}"]')`),
-  acceptTop: () => page.evaluate(`(() => { const b = document.querySelector('.obj.cur [data-act="acc"]'); return b ? Math.round(b.getBoundingClientRect().top * 10) / 10 : null })()`),
-  suggest: () => page.click(`document.querySelector('#lbBind [data-act="suggest"]')`),
-  suggestNo: () => page.click(`document.querySelector('#lbBind [data-act="no"]')`),
-  /* «Принять» предложенный шаг: у прототипа кнопка, у кита — ссылка на шаг (строка 114). */
-  suggestAccept: () => page.click(`document.querySelector('#lbBind [data-act="ok"]')`),
-  burger: async () => {},
-  bindLocate: () => page.click(`document.querySelector('#lbBind [data-act="locate"]')`),
-  bindFlashing: () => page.evaluate(`document.getElementById('lbBind').classList.contains('flash')`),
-  lbIndex: () => page.evaluate(`document.getElementById('lb').classList.contains('show') ? state.lb : -1`),
-  /* П5 */
-  async search(q) { await page.click(`document.getElementById('feedSearch')`); await page.evaluate(`document.getElementById('feedSearch').select()`); await page.key('Delete', 'Delete', DEL); if (q) await page.type(q) },
-  finishOpen: () => page.click(`document.getElementById('btnDone')`),
-  splitterTo: x => splitterDrag(page, `document.getElementById('splitter')`, x),
-  paneWidth: () => page.evaluate(`Math.round(document.querySelector('.pane.right').getBoundingClientRect().width * 10) / 10`),
-  tile: i => page.click(`document.querySelector('#feed .card[data-i="${i}"] img')`),
-  mode: v => page.click(`document.querySelector('#mode button[data-m="${v}"]')`),
-  size: v => page.click(`document.querySelector('#sizer button[data-s="${v === 'lg' ? 272 : 176}"]')`),
-  repeat: id => page.click(`document.querySelector('.obj[data-obj="${id}"] .obj-h')`),
-  tab: v => page.click(`document.querySelector('.rtab[data-r="${v}"]')`),
-  hotkeys: () => page.click(`document.querySelector('#btnHelp')`),
-  windowButton: text => page.click(`[...document.querySelectorAll('#mFoot button')].find(b => b.textContent.trim() === ${JSON.stringify(text)})`),
-  /* П6 */
-  flyWatch: () => flyWatch(page, 'img.flyer'),
-  flyRead: () => flyRead(page, 'img.flyer'),
-  flyLeft: () => flyLeft(page, 'img.flyer'),
-  noteToggle: i => page.click(`document.querySelector('#feed .card[data-i="${i}"] [data-act="exp"]')`),
-  noteCopy: i => page.click(`document.querySelector('#feed .card[data-i="${i}"] [data-act="copy"]')`),
-  notePlay: i => page.click(`document.querySelector('#feed .card[data-i="${i}"] [data-act="play"]')`),
-  noteSelect: (i, n) => selectText(page, `document.querySelector('#feed .card[data-i="${i}"] .vx')`, n),
-  fragment: st => page.click(`document.querySelector('#selact [data-st="${st}"]')`),
-  newObj: () => page.click(`document.querySelector('#btnNewObj')`),
-  newObjStage: st => page.click(`document.querySelector('#popList [data-newstage="${st}"]')`),
-  addRepeat: st => page.click(`document.querySelector('[data-add="${st}"]')`),
-  repeatEdit: id => page.click(`document.querySelector('.obj[data-obj="${id}"] .fp-foot [data-act="edit"]')`),
-  repeatDelete: id => page.click(`document.querySelector('.obj[data-obj="${id}"] [data-act="del"]')`),
-  lbCreate: st => page.click(`document.querySelector('#lbList [data-newobj="${st}"]')`),
-  suggestCreate: () => page.click(`document.querySelector('#lbBind [data-act="mk"]')`),
-  ocrHint: n => page.click(`document.querySelectorAll('#mBody [data-ocr]')[${n}]`),
-  async formField(k, value) {
-    const el = `document.querySelector('#mBody [data-k="${k}"]')`
-    if (await page.evaluate(`${el}.tagName === 'SELECT'`)) {
-      /* Нативный список прототипа кликом не раскрыть — значение выставляется, событие `change` — как у выбора. */
-      await page.evaluate(`(() => { const el = ${el}; el.value = ${JSON.stringify(value || '—')}; el.dispatchEvent(new Event('change', { bubbles: true })); return 1 })()`)
-      await sleep(250)
-    }
-    else {
-      await page.click(el)
-      await page.evaluate(`${el}.select()`)
-      await page.key('Delete', 'Delete', DEL)
-      if (value) await page.type(value)
-    }
-  },
-  key: (name, code, extra) => page.key(name, code, extra),
-  async general(k, value) {
-    const isSelect = await page.evaluate(`document.querySelector('#rbody [data-g="${k}"]').tagName === 'SELECT'`)
-    if (isSelect) {
-      /* Нативный список прототипа кликом не раскрыть — значение выставляется, событие `change` — как у выбора. */
-      await page.evaluate(`(() => { const el = document.querySelector('#rbody [data-g="${k}"]'); el.value = ${JSON.stringify(value)}; el.dispatchEvent(new Event('change', { bubbles: true })); return 1 })()`)
-      await sleep(250)
-    }
-    else {
-      await page.click(`document.querySelector('#rbody [data-g="${k}"]')`)
-      await page.evaluate(`document.querySelector('#rbody [data-g="${k}"]').select()`)
-      await page.type(value)
-    }
-  },
-  snapshot: () => page.evaluate(`(() => {
-    const t = s => (s ?? '').replace(/\\s+/g, ' ').trim()
-    const cards = [...document.querySelectorAll('#feed .card')]
-    const tileState = c => { if (!c.classList.contains('placed')) return 'free'; const m = c.querySelector('.mark'); if (m?.classList.contains('rej')) return 'rejected'; if (m?.classList.contains('lk')) return 'locked'; if (c.classList.contains('auto')) return 'suggested'; return 'assigned' }
-    const modal = document.querySelector('#modal.show')
-    const wov = document.getElementById('wandov')
-    const TONE = { ok: 'success', warn: 'warning', err: 'destructive' }
-    const sum = s => { const b = s.querySelector('b'); return [TONE[[...s.classList].find(c => TONE[c])], t(b?.textContent), t(s.textContent.replace(b?.textContent ?? '', ''))].join(' | ') }
-    const win = modal ? {
-      head: t(modal.querySelector('#mTitle').textContent) + ' / ' + t(modal.querySelector('#mSub').textContent),
-      /* Фраза о клавишах в примечании окна клавиш у кита снята вместе с цифрами (строка 133). */
-      text: [...modal.querySelectorAll('#mBody .wsrc, #mBody > p'), ...[...modal.querySelectorAll('#mBody .ocrhint')].map(h => h.previousElementSibling)].map(e => t(e.textContent).replace(' Перетаскивание работает так же, как клавиши.', '')),
-      modes: [...modal.querySelectorAll('#mBody .wmode')].map(w => [t(w.querySelector('.wt').textContent), t(w.querySelector('.wd').textContent), t(w.querySelector('.wn').textContent), w.classList.contains('dis') ? 'выключен' : '', w.querySelector('input').checked ? 'выбран' : ''].join(' | ')),
-      blocks: [...modal.querySelectorAll('#mBody .sum')].map(sum),
-      buttons: [...modal.querySelectorAll('#mFoot button')].map(b => t(b.textContent)),
-      rows: [],
-      fields: [...modal.querySelectorAll('#mBody [data-k]')].filter(el => getComputedStyle(el.closest('.f-row')).display !== 'none').map(el => el.dataset.k + '=' + (el.value === '—' ? '' : t(el.value))),
-      hints: [...modal.querySelectorAll('#mBody [data-ocr]')].map(b => t(b.textContent)),
-    } : wov ? {
-      head: t(wov.querySelector('.wh').firstChild.textContent) + ' / ' + t(wov.querySelector('.wh small').textContent),
-      text: [], modes: [], blocks: [],
-      buttons: [...wov.querySelectorAll('button')].map(b => t(b.textContent)),
-      rows: [...wov.querySelectorAll('.wrow span')].map(s => t(s.textContent)),
-      fields: [], hints: [],
-    } : null
-    const rv = document.querySelector('#review.show')
-    const tab = document.querySelector('.rtab.on')?.dataset.r
-    const form = tab === 'form' ? {
-      rows: [...document.querySelectorAll('#rbody .grow')].filter(r => getComputedStyle(r).display !== 'none').map(r => {
-        const c = r.querySelector('[data-g]'); const v = c.value === '—' ? '' : c.value
-        return t(r.querySelector('label').textContent) + ' = ' + t(v) }),
-      check: t(document.querySelector('#rbody .cmp')?.textContent),
-    } : null
-    return {
-      feed: cards.map(c => +c.dataset.i),
-      cols: (() => { const c = cards.filter(x => !x.classList.contains('voice')); if (!c.length) return 0; const top = c[0].getBoundingClientRect().top; return c.filter(x => Math.abs(x.getBoundingClientRect().top - top) < 2).length })(),
-      empty: t(document.querySelector('#feed .empty')?.textContent) || null,
-      tiles: cards.filter(c => !c.classList.contains('voice')).map(c => c.dataset.i + ':' + tileState(c)),
-      /* Выделение — из состояния: после привязки прототип чистит state.sel, но ленту не перерисовывает, и класс .sel
-         висит на плитках до следующей отрисовки (такт 40, строка реестра расхождений). */
-      sel: cards.filter(c => state.sel.has(+c.dataset.i)).map(c => +c.dataset.i),
-      mode: document.querySelector('#mode button.on')?.dataset.m,
-      size: document.querySelector('#sizer button.on')?.dataset.s === '272' ? 'lg' : 'md',
-      tab,
-      cur: document.querySelector('.obj.cur')?.dataset.obj ?? null,
-      open: [...document.querySelectorAll('.obj.open')].map(o => o.dataset.obj).sort(),
-      /* Распределения цифрами у кита нет (строка 132): хвост «· клавиши 1–N» индикатора снимается. */
-      curHint: t(document.querySelector('#curHint')?.textContent).replace(/ · клавиши 1–\\d+$/, ''),
-      sessMeta: t(document.querySelector('#sessMeta')?.textContent),
-      stats: ['stFrames', 'stFramesSub', 'stReq', 'stReqSub', 'stObj', 'stObjSub'].map(id => t(document.getElementById(id)?.textContent)),
-      window: win,
-      form,
-      review: rv ? {
-        title: t(rv.querySelector('.t').firstChild.textContent),
-        text: t(rv.querySelector('.t small').textContent),
-        only: rv.querySelector('[data-rev="only"]') ? rv.querySelector('[data-rev="only"]').checked : null,
-      } : null,
-      repeats: [...document.querySelectorAll('.obj[data-obj]')].filter(o => o.getClientRects().length).map(o => o.dataset.obj + (o.classList.contains('auto') ? '*' : '')),
-      /* Кнопка у кита названа «Новый объект» (строка 103) — имя в подсказке пустого этапа приводится к нему. */
-      hints: [...document.querySelectorAll('#rbody .hintbox')].filter(h => h.getClientRects().length).map(h => t(h.textContent).replace('«Новый объект из выделенного»', '«Новый объект»')),
-      bind: frames.filter(f => f.objId).map(f => f.i + '>' + f.objId + '|' + f.stepId + (f.auto ? '*' : '')),
-      notices: (window.__notices ?? []).splice(0),
-      selbar: document.querySelector('#selbar.show') ? { count: t(document.getElementById('selN').textContent), sub: t(document.getElementById('selSub').textContent) } : null,
-      pop: !!document.querySelector('#pop.show'),
-      viewer: document.getElementById('lb').classList.contains('show') ? lbList()[state.lb]?.n ?? null : null,
-      bind: (() => { const lb = document.getElementById('lb'); if (!lb.classList.contains('show')) return null; const b = document.getElementById('lbBind')
-        const name = [...b.querySelectorAll('b')].map(x => t(x.textContent)).filter(x => x !== 'Отклонён проверяющим').pop() ?? ''
-        const blocked = /— шаг (проверен и закрыт|уже заполнен)/.exec(b.textContent)?.[1] ?? ''
-        if (b.querySelector('[data-act="mk"]')) return 'создать: ' + name
-        if (b.querySelector('[data-act="ok"]') || /Предложение:/.test(b.textContent)) return 'предложение: ' + name + (blocked ? ' — ' + blocked : '')
-        return b.classList.contains('on') ? 'распределён: ' + name : 'свободен' })(),
-      linked: [...document.querySelectorAll('#feed .card.linked')].map(c => +c.dataset.i),
-      dim: document.getElementById('feed').classList.contains('linking'),
-      hl: [...document.querySelectorAll('.step.hl')].map(x => x.dataset.owner + '|' + x.dataset.step),
-      hlObj: [...document.querySelectorAll('.obj.hl')].map(x => x.dataset.obj),
-      closed: [...document.querySelectorAll('.stage.closed')].map(x => x.dataset.st),
-      steps: [...document.querySelectorAll('#rbody .step')].filter(x => x.getClientRects().length).map(x => x.dataset.owner + '|' + x.dataset.step),
-      tools: [...document.querySelectorAll('.schtools button')].map(b => t(b.textContent)),
-      notes: [...document.querySelectorAll('#feed .card.voice')].map(c => c.dataset.i + ':' + (c.querySelector('[data-act="exp"]') ? (c.classList.contains('exp') ? 'exp' : 'clamp') : '-')),
-      frag: document.querySelector('#selact.show') ? t(document.getElementById('selactTxt').textContent) : null,
-      newStages: [...document.querySelectorAll('#pop.show [data-newstage]')].map(x => t(x.querySelector('.n').textContent) + ' ' + t(x.querySelector('.c').textContent)),
-      del: [...document.querySelectorAll('.obj [data-act="del"]')].filter(b => b.getClientRects().length).map(b => b.dataset.obj),
-      kitOnly: {},
-    }
-  })()`),
-})
-
 const kit = page => ({
   name: 'кит',
   async start(dataset, keepEntry) {
@@ -578,7 +362,7 @@ const kit = page => ({
     if (!keepEntry) await page.click(`[...document.querySelectorAll('[data-slot=modal-card] button')].find(b => b.textContent.trim() === 'Разложу вручную')`)
   },
   /* При узкой ленте кнопка — иконка с тем же `aria-label` (строка 123). */
-  wand: () => page.click(`[...document.querySelectorAll('[data-feed-tools] button')].find(b => b.textContent.trim() === 'Распределить автоматически' || b.getAttribute('aria-label') === 'Распределить автоматически')`),
+  wand: () => page.click(`[...document.querySelectorAll('[data-feed-tools] button')].find(b => b.textContent.trim() === 'Автораспределение' || b.getAttribute('aria-label') === 'Автораспределение')`),
   wandMode: v => page.click(`[...document.querySelectorAll('[data-slot=choice][data-variant=card]')].find(c => c.querySelector('[data-slot=choice-title]').textContent.trim() === ${JSON.stringify(MODE_TITLES[v])})?.querySelector('[data-slot=choice-control]')`),
   stop: () => page.click(`[...document.querySelectorAll('[data-slot=modal-card] button')].find(b => b.textContent.trim() === 'Прервать')`),
   waitWand: () => until(page, `document.querySelector('[data-slot=modal-card] [data-slot=modal-card-title]')?.textContent.trim() === 'Автораспределение завершено'`),
@@ -648,7 +432,14 @@ const kit = page => ({
   flyLeft: () => flyLeft(page, 'img[data-flyer]'),
   noteToggle: i => page.click(`[...document.querySelectorAll('[data-slot=feed-note][data-frame="${i}"] button')].find(b => ['Показать полностью', 'Свернуть'].includes(b.textContent.trim()))`),
   noteCopy: i => page.click(`[...document.querySelectorAll('[data-slot=feed-note][data-frame="${i}"] button')].find(b => b.textContent.trim() === 'Копировать')`),
-  notePlay: i => page.click(`document.querySelector('[data-slot=feed-note][data-frame="${i}"] [data-slot=player-button], [data-slot=feed-note][data-frame="${i}"] button[aria-label="Текстовая заметка"]')`),
+  /* Голосовая — кнопка плеера с волной (такт 58); у текстовой заметки кнопки нет. */
+  notePlay: i => page.click(`document.querySelector('[data-slot=feed-note][data-frame="${i}"] [data-slot=player-audio] button')`),
+  /* Перемотка: клик по волновой дорожке на долю `frac` её ширины. */
+  async noteSeek(i, frac) {
+    const r = await page.evaluate(`(() => { const w = document.querySelector('[data-slot=feed-note][data-frame="${i}"] [data-slot=player-audio-wave]'); w.scrollIntoView({ block: 'center', behavior: 'instant' }); const b = w.getBoundingClientRect(); return { x: b.x + b.width * ${frac}, y: b.y + b.height / 2 } })()`)
+    await page.clickAt(r.x, r.y)
+    return page.evaluate(`document.querySelector('[data-slot=feed-note][data-frame="${i}"] [data-slot=player-audio-time]').textContent.trim()`)
+  },
   noteSelect: (i, n) => selectText(page, `document.querySelector('[data-slot=feed-note][data-frame="${i}"] [data-slot=feed-note-text]')`, n),
   fragment: st => page.click(`[...document.querySelectorAll('[data-fragment] button')].find(b => b.textContent.trim() === ${JSON.stringify({ eq: 'Оборудование', bld: 'Здание' }[st])})`),
   newObj: () => page.click(`[...document.querySelectorAll('[data-slot=action-bar] button')].find(b => b.textContent.trim() === 'Новый объект')`),
@@ -773,6 +564,10 @@ const kit = page => ({
         asideFlash: [...document.querySelectorAll('[data-slot=lightbox-aside] [data-flash]')].map(x => x.dataset.value),
         suggestOff: document.querySelector('[data-slot=frame-bind-suggest]')?.getAttribute('aria-label') ?? null,
         menu: Math.round(document.querySelector('[data-slot=menu]')?.getBoundingClientRect().width ?? 0),
+        /* Такт 58: пункт «кадр привязан сюда» в панели просмотра; голосовые с начатым воспроизведением — состояние (время после перемотки — замером шага: при воспроизведении оно зависит от часов). */
+        asideBound: [...document.querySelectorAll('[data-slot=lightbox-aside] [data-bound]')].map(x => x.dataset.value + ':' + x.dataset.bound),
+        voice: [...document.querySelectorAll('[data-slot=feed-note][data-kind=voice]')].map(n => { const p = n.querySelector('[data-slot=player-audio]'); const played = p.querySelectorAll('[data-played]').length; return p.dataset.state === 'playing' ? n.dataset.frame + ':playing' : played ? n.dataset.frame + ':paused' : null }).filter(Boolean),
+        wandButton: (() => { const b = [...document.querySelectorAll('[data-feed-tools] button')].find(x => x.textContent.trim() === 'Автораспределение' || x.getAttribute('aria-label') === 'Автораспределение'); return b ? (b.textContent.trim() ? 'текст' : 'иконка') : null })(),
         feedLeft: Math.round(document.querySelector('[data-feed]')?.getBoundingClientRect().left ?? 0),
       },
     }
@@ -896,7 +691,7 @@ const SCENARIOS = {
     ['конец обработки', a => a.waitWand()],
     ['«К проверке»', a => a.windowButton('К проверке')],
     /* Строка 138: «Принять объект» следующего объекта встаёт на место кнопки принятого — у каждой стороны на своём. */
-    ['принять o3', a => acceptProbe(a, 'o3'), { note: 'замер: кнопка следующего объекта на месте принятой — у каждой стороны своё число', row: 138 }],
+    ['принять o3', a => acceptProbe(a, 'o3')],
     ['отклонить o4', a => a.repeatAct('o4', 'reject')],
     ['«только непроверенные» — снять', a => a.reviewOnly()],
     ['«только непроверенные» — вернуть', a => a.reviewOnly()],
@@ -910,8 +705,8 @@ const SCENARIOS = {
     ['«Снять»', a => a.selbar('clear')],
     ['Ctrl+A', a => a.key('a', 'KeyA', { modifiers: 2 })],
     ['Ctrl+A — снять видимое', a => a.key('a', 'KeyA', { modifiers: 2 })],
-    ['«Выделить всё»', a => a.selectAllButton(), { expect: { selectAll: 'all' }, row: 96 }],
-    ['«Снять» после «Выделить всё»', a => a.selbar('clear'), { expect: { selectAll: 'none' }, row: 96 }],
+    ['«Выделить всё»', a => a.selectAllButton()],
+    ['«Снять» после «Выделить всё»', a => a.selbar('clear')],
     ['рамка с поля ленты до кадра 3', a => a.marquee(1, 3)],
     ['Shift + Alt: рамка с кадра 4 — к выделению', a => a.marquee(4, 4, { alt: true, shift: true })],
     ['Alt: рамка с кадра 2 до 3 — заново', a => a.marquee(2, 3, { alt: true })],
@@ -937,8 +732,8 @@ const SCENARIOS = {
     ['«сделать текущим» o2', a => a.popOption('obj|o2')],
     ['«Назначить на шаг» — с текущим', a => a.selbar('toStep')],
     /* Строка 131: у кита пункт не того типа выключен заранее — нажатие даёт тот же отказ, плашка остаётся открытой. */
-    ['«Контрольное видео» — не тот тип', a => a.popOption('o2|e8'), { expect: { pop: true }, row: 131 }],
-    ['Shift + кадр 24', async (a) => { if (a.name === 'кит') await a.clickAway(); await a.tileMod(24, 8) }],
+    ['«Контрольное видео» — не тот тип', a => a.popOption('o2|e8')],
+    ['Shift + кадр 24', async (a) => { await a.clickAway(); await a.tileMod(24, 8) }],
     ['«Назначить на шаг» — два кадра', a => a.selbar('toStep')],
     ['«Фото с представителем» — сверх предела', a => a.popOption('fin|f3')],
     ['«В «Прочее»»', a => a.selbar('misc')],
@@ -962,14 +757,14 @@ const SCENARIOS = {
   /* Строка 132 (такт 55): распределения цифрами у кита нет — после цифры слепок кита прежний целиком; прототип привязывает. */
   'С-10': ['клавиши 1–8: у кита цифры ничего не делают (строка 132; у прототипа — §16.2)', [
     ['кадр 21', a => a.tile(21)],
-    ['1 без текущего', a => a.key('1', 'Digit1'), { still: true, row: 132 }],
+    ['1 без текущего', a => a.key('1', 'Digit1')],
     ['заголовок o2 — текущий', a => a.repeat('o2')],
-    ['4 — «Узлы и агрегаты»', a => a.key('4', 'Digit4'), { still: true, row: 132 }],
+    ['4 — «Узлы и агрегаты»', a => a.key('4', 'Digit4')],
   ]],
   'С-10/просмотр': ['цифра в просмотре: у кита ничего не делает (строка 132; у прототипа — привязка, §11.3)', [
     ['заголовок o2 — текущий', a => a.repeat('o2')],
     ['просмотр кадра 20', a => a.viewer(20)],
-    ['4 в просмотре', a => a.key('4', 'Digit4'), { still: true, row: 132 }],
+    ['4 в просмотре', a => a.key('4', 'Digit4')],
   ]],
   'С-11': ['открепление: крестик миниатюры, Del, крестик плашки, «Открепить» в просмотре (§6, §9.6, §11.2)', [
     ['заголовок o2 — текущий', a => a.repeat('o2')],
@@ -993,7 +788,7 @@ const SCENARIOS = {
   'С-12': ['отказы с причиной (§6.1, тексты §18), привязки не меняются', [
     ['кадр 21', a => a.tile(21)],
     /* Строка 132: у прототипа цифра без текущего объекта даёт «Сначала выберите текущий объект», у кита цифры ничего не делают. */
-    ['1 без текущего', a => a.key('1', 'Digit1'), { remember: 'до отказов', still: true, row: 132 }],
+    ['1 без текущего', a => a.key('1', 'Digit1'), { remember: 'до отказов' }],
     ['заголовок o2 — текущий', a => a.repeat('o2')],
     ['шаг e1 — проверен и закрыт', a => a.step('o2|e1')],
     ['шаг e8 — фото в шаг видео', a => a.step('o2|e8')],
@@ -1092,7 +887,7 @@ const SCENARIOS = {
     ['Esc', a => a.key('Escape')],
     /* Прототип двойным кликом просмотр не открывает: первый клик перерисовывает ленту, узел плитки подменён, dblclick не приходит.
        Кит открывает, как хочет код прототипа и спека (§11.1), — строка реестра расхождений; шаг кадр просмотра не сравнивает. */
-    ['двойной клик по кадру 23', a => a.dblTile(23), { skip: ['viewer', 'bind'], row: 3 }],
+    ['двойной клик по кадру 23', a => a.dblTile(23)],
     ['Esc — после двойного клика', a => a.key('Escape')],
     ['заголовок o2 — раскрыть', a => a.repeat('o2')],
     ['миниатюра кадра 1 в «Шильдике»', a => a.thumbOpen('o2|e1', 0)],
@@ -1124,30 +919,29 @@ const SCENARIOS = {
     ['пункт «Органы управления» — перенести нельзя', a => a.lbItem('o2|e5')],
     /* Строка 117: кит просмотр не закрывает — шаг вспыхивает в панели просмотра, основная панель прежняя; прототип
        закрывает просмотр и находит шаг в основной панели. */
-    ['«Показать в структуре» на плашке', a => a.bindLocate().then(() => sleep(400)),
-      { expect: { asideFlash: ['o2|e1'] }, keep: ['viewer', 'bind', 'cur', 'open', 'closed', 'steps', 'hints', 'tools', 'del', 'repeats', 'curHint'], row: 117 }],
+    ['«Показать в структуре» на плашке', a => a.bindLocate().then(() => sleep(400))],
   ]],
   /* Такт 53. Кадр 16 — блок «территория», шаг «Общий вид территории» проверен и закрыт. Прототип его предлагает; у кита закрытый
      шаг из подбора исключён (строка 115), кнопка выключена, причина — в подсказке (строка 116). */
   'С-26': ['«Подобрать шаг»: закрытый шаг, новый объект, «Не то», честный отказ (§12.14)', [
-    ['просмотр кадра 16', a => a.viewer(16), { expect: { suggestOff: REASON_CLOSED }, row: 116 }],
-    ['«Подобрать шаг» — шаг закрыт', a => a.suggest(), { expect: { bind: 'свободен', suggestOff: REASON_CLOSED }, row: 115, blind: true }],
-    ['Enter — у закрытого не действует', a => a.key('Enter', 'Enter', { text: '\r' }), { expect: { bind: 'свободен' }, row: 115 }],
+    ['просмотр кадра 16', a => a.viewer(16)],
+    ['«Подобрать шаг» — шаг закрыт', a => a.suggest(), { blind: true }],
+    ['Enter — у закрытого не действует', a => a.key('Enter', 'Enter', { text: '\r' })],
     ['«Не то»', a => a.suggestNo()],
     ['Esc', a => a.key('Escape')],
-    ['просмотр кадра 7', a => a.viewer(7), { expect: { suggestOff: null }, row: 116 }],
+    ['просмотр кадра 7', a => a.viewer(7)],
     ['«Подобрать шаг» — новый объект', a => a.suggest()],
     ['«Не то» — снова', a => a.suggestNo()],
     ['Esc — после «Не то»', a => a.key('Escape')],
-    ['просмотр кадра 23', a => a.viewer(23), { expect: { suggestOff: REASON_UNKNOWN }, row: 116 }],
+    ['просмотр кадра 23', a => a.viewer(23)],
     /* Прототип: отказ уведомлением после нажатия; кит: кнопка выключена, уведомления нет. */
-    ['«Подобрать шаг» — не распознан', a => a.suggest(), { expect: { notices: [], suggestOff: REASON_UNKNOWN }, row: 116, blind: true }],
+    ['«Подобрать шаг» — не распознан', a => a.suggest(), { blind: true }],
     ['Esc — после отказа', a => a.key('Escape')],
   ]],
   /* Такт 53. Кадр 6 в демо-данных обеих сторон лежит в блоке «Пропиточная линия POLYPRISE» (строка 118): подбор предлагает
      открытый шаг. Привязка: у прототипа — кнопка «Принять», у кита — ссылка на шаг (строка 114). */
   'С-26/открытый шаг': ['«Подобрать шаг» → предложенный шаг: привязка, вспышка, переход (§12.14, строки 114, 118)', [
-    ['просмотр кадра 6', a => a.viewer(6), { expect: { suggestOff: null }, row: 116 }],
+    ['просмотр кадра 6', a => a.viewer(6)],
     ['«Подобрать шаг» — «Общий вид оборудования»', a => a.suggest()],
     ['принять предложенный шаг', a => flashProbe(a, () => a.suggestAccept())],
     ['Esc', a => a.key('Escape')],
@@ -1181,10 +975,10 @@ const SCENARIOS = {
   ]],
   'С-34': ['ширина панели 320–820 разделителем (§7)', [
     /* Строка 123: лента у кита не уже 600 — при окне 1440 (рабочая зона 1356) панель расширяется до 746; у прототипа — до 820. */
-    ['разделитель к левому краю — 820 (у кита — 746)', async (a) => { await a.splitterTo(5); a.probe = [await a.paneWidth()] }, { expect: { probe: [746] }, skip: ['cols'], row: 123 }],
+    ['разделитель к левому краю — 820 (у кита — 746)', async (a) => { await a.splitterTo(5); a.probe = [await a.paneWidth()] }],
     ['разделитель к правому краю — 320', async (a) => { await a.splitterTo(1435); a.probe = [await a.paneWidth()] }],
     /* Середину — в замеры: прототип ставит край панели под указатель, Reka сохраняет смещение точки захвата (раздел 15). */
-    ['разделитель на 900', async (a) => { await a.splitterTo(900); a.measure = { 'ширина панели, px': await a.paneWidth() } }, { skip: ['cols'], row: 6 }],
+    ['разделитель на 900', async (a) => { await a.splitterTo(900); a.measure = { 'ширина панели, px': await a.paneWidth() } }],
   ]],
   'С-36': ['окно входа: сводка состояния осмотра, «Распределить автоматически» (прототип showEntry)', [
     ['«Распределить автоматически»', a => a.windowButton('Распределить автоматически').then(() => sleep(300))],
@@ -1237,12 +1031,12 @@ const SCENARIOS = {
     ['наименование', a => a.formField('mark', 'Кран-балка')],
     /* Прототип после создания просмотр не перерисовывает (`render` без `renderLB`) — плашка прежняя до перехода; кит показывает
        привязку сразу. Строка раздела 15, такт 43; привязки модели сравниваются. */
-    ['«Создать»', a => a.windowButton('Создать'), { skip: ['bind'], row: 9 }],
+    ['«Создать»', a => a.windowButton('Создать')],
     ['Esc', a => a.key('Escape')],
     ['просмотр кадра 7', a => a.viewer(7)],
     ['«Подобрать шаг» — новый объект', a => a.suggest()],
     ['«Создать «…»» подбора', a => a.suggestCreate()],
-    ['«Создать»', a => a.windowButton('Создать'), { skip: ['bind'], row: 9 }],
+    ['«Создать»', a => a.windowButton('Создать')],
     ['Esc', a => a.key('Escape')],
   ]],
   'С-20': ['удаление повтора с подтверждением; у повтора с проверенными шагами «Удалить» нет (§6.2)', [
@@ -1255,21 +1049,20 @@ const SCENARIOS = {
     ['«Отмена»', a => a.windowButton('Отмена')],
     ['«Удалить» — снова', a => a.repeatDelete('o3')],
     ['«Удалить» — подтвердить', a => a.windowButton('Удалить')],
-  ]],
-}
+  ]] }
 
 /* ------------------------------ такт 53: решения владельца тактов 48–52 ------------------------------ */
 SCENARIOS['С-05/флажок'] = ['«Выделить всё» флажком: пусто, часть, все (строка 96 раздела 15)', [
-  ['кадр 21 — выделена часть', a => a.tile(21), { expect: { selectAll: 'some' }, row: 96 }],
-  ['флажок из неопределённого — все', a => a.selectAllButton(), { expect: { selectAll: 'all' }, row: 96 }],
-  ['флажок из отмеченного — снять', a => a.selectAllButton(), { expect: { selectAll: 'none' }, row: 96 }],
-  ['флажок из пустого — все', a => a.selectAllButton(), { expect: { selectAll: 'all' }, row: 96 }],
-  ['«Снять»', a => a.selbar('clear'), { expect: { selectAll: 'none' }, row: 96 }],
+  ['кадр 21 — выделена часть', a => a.tile(21)],
+  ['флажок из неопределённого — все', a => a.selectAllButton()],
+  ['флажок из отмеченного — снять', a => a.selectAllButton()],
+  ['флажок из пустого — все', a => a.selectAllButton()],
+  ['«Снять»', a => a.selbar('clear')],
 ]]
 SCENARIOS['С-34/меню'] = ['каркас: меню, развёрнутое бургером, двигает содержимое (строки 81, 105 — пересмотрена тактом 55)', [
-  ['бургер — развернуть', a => a.burger(), { expect: { menu: 256, feedLeft: 256 }, skip: ['cols'], row: 105 }],
-  ['кадр 21 при развёрнутом меню', a => a.tile(21), { expect: { menu: 256, feedLeft: 256 }, skip: ['cols'], row: 105 }],
-  ['бургер — свернуть', a => a.burger(), { expect: { menu: MENU_W, feedLeft: MENU_W }, row: 105 }],
+  ['бургер — развернуть', a => a.burger()],
+  ['кадр 21 при развёрнутом меню', a => a.tile(21)],
+  ['бургер — свернуть', a => a.burger()],
 ]]
 
 /* ------------------------------ такт 57: решения тактов 55–56 ------------------------------ */
@@ -1281,25 +1074,62 @@ SCENARIOS['С-36/обычный'] = ['окно входа обычного сц�
    принимает и отказывает уведомлением «Шаг принимает только фото». Привязки не меняются у обеих сторон. */
 SCENARIOS['С-09/тип'] = ['перенос видео на шаг «только фото»: у кита шаг приглушён, приёма нет (строка 131)', [
   ['заголовок o2 — текущий', a => a.repeat('o2'), { remember: 'до переноса' }],
-  ['тянуть видео 22 на e4 — не тот тип', a => a.dragTo(22, 'o2|e4'), { expect: { notices: [] }, sameBind: 'до переноса', row: 131 }],
+  ['тянуть видео 22 на e4 — не тот тип', a => a.dragTo(22, 'o2|e4'), { sameBind: 'до переноса' }],
   ['Esc', a => a.key('Escape')],
 ]]
 /* Строка 139: кит переносит кадр просмотра на пункт панели просмотра, прототип нажимает тот же пункт — итог обязан совпасть. */
-const DRAG = { note: 'кит — перенос кадра на пункт, прототип — нажатие по пункту', row: 139 }
 SCENARIOS['С-39'] = ['перенос кадра в просмотре: бросок на пункт — как нажатие по нему (строка 139)', [
   ['заголовок o2 — текущий', a => a.repeat('o2')],
   ['просмотр кадра 23', a => a.viewer(23)],
-  ['фото на «Узлы и агрегаты» — привязка, вспышка, переход', a => flashProbe(a, () => a.lbDrag('o2|e4')), DRAG],
-  ['фото на закрытый «Шильдик» — отказ', a => a.lbDrag('o2|e1'), DRAG],
+  ['фото на «Узлы и агрегаты» — привязка, вспышка, переход', a => flashProbe(a, () => a.lbDrag('o2|e4'))],
+  ['фото на закрытый «Шильдик» — отказ', a => a.lbDrag('o2|e1')],
   ['Esc', a => a.key('Escape')],
   ['просмотр видео 22', a => a.viewer(22)],
-  ['видео на «Узлы и агрегаты» — не тот тип', a => a.lbDrag('o2|e4'), DRAG],
-  ['видео на «Контрольное видео» — привязка', a => flashProbe(a, () => a.lbDrag('o2|e8')), DRAG],
+  ['видео на «Узлы и агрегаты» — не тот тип', a => a.lbDrag('o2|e4')],
+  ['видео на «Контрольное видео» — привязка', a => flashProbe(a, () => a.lbDrag('o2|e8'))],
   ['Esc — после видео', a => a.key('Escape')],
   ['просмотр кадра 25', a => a.viewer(25)],
-  ['кадр на «Новый объект» — форма нового повтора', a => a.lbDrag('new|eq'), DRAG],
+  ['кадр на «Новый объект» — форма нового повтора', a => a.lbDrag('new|eq')],
   ['«Отмена»', a => a.windowButton('Отмена')],
   ['Esc — после формы', a => a.key('Escape')],
+]]
+
+/* ------------------------------ такт 59: правки тактов 58–58Д3 ------------------------------ */
+SCENARIOS['С-29/убирать'] = ['режим «убирать» при автораспределении: предложенные кадры остаются в ленте до принятия объекта (такт 58)', [
+  ['открыть запуск', a => a.wand()],
+  ['запустить полное', a => a.windowButton('Запустить')],
+  ['конец обработки', a => a.waitWand()],
+  ['«К проверке»', a => a.windowButton('К проверке')],
+  ['убирать разобранные — предложенные на месте', a => a.mode('hide')],
+  ['принять o3 — его кадр ушёл из ленты', a => a.repeatAct('o3', 'accept')],
+  ['отклонить o4 — кадры вернулись свободными', a => a.repeatAct('o4', 'reject')],
+  ['«Принять все объекты» — в ленте только свободные', a => a.reviewAll('accept')],
+]]
+SCENARIOS['С-24/убирать'] = ['просмотр в режиме «убирать»: пункт «кадр привязан сюда» горит сразу, переход — к следующему по порядку (такт 58)', [
+  ['заголовок o2 — текущий', a => a.repeat('o2')],
+  ['убирать разобранные', a => a.mode('hide')],
+  ['просмотр кадра 23', a => a.viewer(23)],
+  ['пункт «Узлы и агрегаты» — подсветка сразу', a => a.lbItem('o2|e4')],
+  ['после вспышки — кадр 24', () => sleep(1300)],
+  ['бросок кадра 24 на «Органы управления» — подсветка сразу', a => a.lbDrag('o2|e5')],
+  ['после вспышки — кадр 25', () => sleep(1300)],
+  ['Esc', a => a.key('Escape')],
+]]
+SCENARIOS['С-33/волна'] = ['голосовая заметка: перемотка, воспроизведение, пауза (такт 58)', [
+  ['клик по дорожке на половину', async (a) => { a.probe = [await a.noteSeek(9000, 0.5)] }],
+  ['воспроизведение', a => a.notePlay(9000)],
+  ['пауза', a => a.notePlay(9000)],
+  ['клик по дорожке на четверть', async (a) => { a.probe = [await a.noteSeek(9000, 0.25)] }],
+]]
+SCENARIOS['С-11/глаз'] = ['миниатюра шага: «глаз» открывает просмотр кадра, крестик открепляет (такт 58)', [
+  ['заголовок o2 — текущий', a => a.repeat('o2')],
+  ['кадр 21', a => a.tile(21)],
+  ['шаг e4 — привязка', a => a.step('o2|e4')],
+  ['«глаз» миниатюры — просмотр кадра 21', a => a.thumbOpen('o2|e4', 0)],
+  ['Esc', a => a.key('Escape')],
+  ['«глаз» закрытого кадра в «Шильдике»', a => a.thumbOpen('o2|e1', 0)],
+  ['Esc — снова', a => a.key('Escape')],
+  ['крестик миниатюры', a => a.thumbRemove('o2|e4', 0)],
 ]]
 
 /* ------------------------------ такт 44: остаток поведения ------------------------------ */
@@ -1312,159 +1142,6 @@ SCENARIOS['С-38/создание'] = ['сверка «Оформлено еди
   ['«Создать»', a => a.windowButton('Создать')],
   ['вкладка «Форма осмотра» — сходится', a => a.tab('form')],
 ]]
-
-/**
- * Пары снимков «прототип / кит» входа приёмки владельца (такт 44, решение владельца 1): строки раздела 15 классов
- * «вкусовое решение» и «нехватка в ките», номер — номер строки перестроенного реестра (`free-shoot.md`, раздел 15).
- * Шаг — действие адаптера `(a, proto, page)` либо кадр `['shot', выражение прототипа, выражение кита]` (`null` — окно целиком).
- */
-const Q = s => `document.querySelector('${s}')`
-const MODAL = ['document.querySelector(\'#modal .mbox\')', 'document.querySelector(\'[data-slot=modal-card]\')']
-const cur = id => a => a.repeat(id)
-const bind21 = [cur('o2'), a => a.tile(21), a => a.step('o2|e4')]
-/* Привязка и уход уведомления «Отменить» (6 с): иначе плашка ложится на панель. */
-const bound21 = [...bind21, () => sleep(6500)]
-const SHOTS = {
-  '01': [...bound21, ['shot', Q('#feed .card[data-i="21"]'), Q('[data-slot=frame-tile][data-frame="21"]')]],
-  '02': [cur('o2'), a => a.locate(1), ['shot', null, null]],
-  '03': [a => a.dblTile(23), ['shot', null, null]],
-  '04': [a => a.noteToggle(9008), a => a.tile(21), a => a.tile(21), ['shot', Q('#feed .card[data-i="9008"]'), Q('[data-slot=feed-note][data-frame="9008"]')]],
-  '05': [a => a.tile(21), a => a.newObj(), ['shot', Q('#pop'), Q('[data-slot=popover]')]],
-  '06': [a => a.splitterTo(900), ['shot', null, null]],
-  '07': [...bound21, ['shot', Q('.step[data-owner="o2"][data-step="e4"]'), Q('[data-step-key="o2|e4"]')], a => a.viewer(21),
-    ['shot', Q('#lbList .it[data-owner="o2"][data-step="e4"]'), Q('[role=dialog] [data-value="o2|e4"]')]],
-  '08': [...bound21, (a, proto, page) => page.hover(proto ? Q('.step[data-owner="o2"][data-step="e4"] .th') : Q('[data-step-key="o2|e4"] [data-slot=step-thumb]')),
-    ['shot', Q('.step[data-owner="o2"][data-step="e4"]'), Q('[data-step-key="o2|e4"]')]],
-  '09': [a => a.viewer(21), a => a.lbCreate('eq'), a => a.formField('mark', 'Кран-балка'), a => a.windowButton('Создать'), ['shot', null, null]],
-  '10': [...bound21, cur('o1'), a => a.viewer(21),
-    ['shot', Q('[data-lg="bnd_o2"]'), "[...document.querySelectorAll('[role=dialog] [data-slot=stage-section]')].find(x => x.querySelector('[data-slot=stage-title]').textContent.startsWith('Привязан к'))"]],
-  '11': [a => a.wand(), ['shot', ...MODAL]],
-  '12': [a => a.hotkeys(), ['shot', ...MODAL]],
-  '13': [cur('o2'), a => a.repeatEdit('o2'), a => a.formField('mark', ''), a => a.windowButton('Сохранить'), ['shot', ...MODAL]],
-  '14': [a => a.tile(21), a => a.selbar('toStep'), a => a.key('Escape'), ['shot', null, null]],
-  '15': [['shot', Q('.topbar'), Q('[data-slot=app-bar]')]],
-  '16': [/* Фокус с клавиатуры: соседняя кнопка — программно, на цель — реальный Tab, иначе :focus-visible не включается. */
-    async (a, proto, page) => { await page.evaluate(proto ? "(document.getElementById('btnHelp').focus(), 1)" : "(document.querySelector('[data-slot=toolbar] button').focus(), 1)"); await page.key('Tab', 'Tab', { windowsVirtualKeyCode: 9 }) },
-    ['shot', Q('.topbar'), Q('[data-slot=toolbar]')]],
-  '17': [['shot', Q('#feed .card[data-i="9000"]'), Q('[data-slot=feed-note][data-frame="9000"]')], ['shot', Q('#feed .card[data-i="9001"]'), Q('[data-slot=feed-note][data-frame="9001"]')]],
-  '18': [a => a.tile(21), ['shot', Q('#selbar'), Q('[data-slot=action-bar]:not([data-fragment])')]],
-  '19': [a => a.viewer(21), ['shot', Q('#lbBind'), Q('[data-slot=frame-bind-bar]')]],
-  '20': [a => a.wand(), ['shot', ...MODAL]],
-  '21': [cur('o2'), a => a.repeatEdit('o2'), a => a.formField('mark', ''), a => a.windowButton('Сохранить'), ['shot', null, null]],
-  '22': [a => a.hotkeys(), ['shot', ...MODAL]],
-  '23': [...bind21, ['shot', null, null]],
-  /* Такт 45: середина пролёта — кадр сразу за «Запустить» у каждой стороны, без ожидания картинок. */
-  flight: [a => a.wand(), ['act-shot', a => a.windowButton('Запустить')]],
-  /* Такт 46, строка 78: длинная заметка в покое — обрезка и «Показать полностью». */
-  '78': [['shot', Q('#feed .card[data-i="9008"]'), Q('[data-slot=feed-note][data-frame="9008"]')]],
-  /* ------------------------------ такт 53: строки двух классов, добавленные тактами 48–52 ------------------------------ */
-  /* 86 — «Назад» вместо крошек; 87 — подписи полосы; 110 — счётчики подшапки. */
-  '86': [['shot', Q('.topbar'), "document.querySelector('[data-slot=toolbar] button').parentElement"]],
-  '87': [['shot', Q('.topbar'), Q('[data-slot=app-bar]')]],
-  '110': [['shot', Q('.subhead'), Q('[data-slot=toolbar]')]],
-  /* 88 — меню каркаса: у прототипа меню нет, кадр — окно целиком. */
-  '88': [['shot', null, null]],
-  /* 89 — ряд инструментов схемы над прокруткой панели. */
-  '89': [['shot', Q('.schtools'), "document.querySelector('[data-schtools]').parentElement"]],
-  /* 94 — кнопки полосы фрагмента заметки. */
-  '94': [a => a.noteSelect(9008, 15), ['shot', Q('#selact'), Q('[data-fragment]')]],
-  /* 99 — «Выделить всё»: неопределённое состояние флажка. */
-  '99': [a => a.tile(21), ['shot', Q('#btnSelAll'), Q('[data-select-all]')]],
-  /* 105 — меню, развёрнутое бургером, поверх содержимого. */
-  '105': [a => a.burger(), ['shot', null, null]],
-  /* 106 — заметка подвала окна (прогресс автораспределения): кадр сразу за «Запустить». */
-  '106': [a => a.wand(), ['act-shot', a => a.windowButton('Запустить')]],
-  /* 107 — кнопка воспроизведения заметки; 111 — глиф текстовой заметки. */
-  '107': [['shot', Q('#feed .card[data-i="9004"]'), Q('[data-slot=feed-note][data-frame="9004"]')]],
-  '111': [['shot', Q('#feed .card[data-i="9002"]'), Q('[data-slot=feed-note][data-frame="9002"]')]],
-  /* 108 — второстепенный текст строки шага. */
-  '108': [cur('o2'), ['shot', Q('.step[data-owner="o2"][data-step="e3"]'), Q('[data-step-key="o2|e3"]')]],
-  /* 109 — плитка свободного кадра; 119 — рамка плитки привязанного кадра; 121 — глиф видео. */
-  '109': [['shot', Q('#feed .card[data-i="6"]'), Q('[data-slot=frame-tile][data-frame="6"]')]],
-  '119': [['shot', Q('#feed .card[data-i="1"]'), Q('[data-slot=frame-tile][data-frame="1"]')]],
-  '121': [['shot', Q('#feed .card[data-i="22"]'), Q('[data-slot=frame-tile][data-frame="22"]')]],
-  /* 112 — предложенный шаг на плашке просмотра: «Принять» у прототипа, ссылка и «Enter» у кита. */
-  '112': [a => a.viewer(6), a => a.suggest(), ['shot', Q('#lbBind'), Q('[data-slot=frame-bind-bar]')]],
-  /* 120 — закрытый шаг: прототип предлагает, у кита «Подобрать шаг» выключена, причина — в подсказке (курсор на кнопке). */
-  '120': [a => a.viewer(16), a => a.suggest(), async (a, proto, page) => { if (!proto) { await page.hover(Q('[data-slot=frame-bind-suggest]')); await sleep(900) } }, ['shot', null, null]],
-  /* ------------------------------ такт 57: строки двух классов, добавленные тактами 55–56 ------------------------------ */
-  /* 123 — полоса ленты одной строкой. */
-  '123': [['shot', Q('.bar-tools'), Q('[data-feed-tools]')]],
-  /* 130 — уведомление над панелью выделения: «Нечего отменять» при выделенном кадре. */
-  '130': [a => a.tile(21), a => a.key('z', 'KeyZ', { modifiers: 2 }), ['shot', null, null]],
-  /* 133 — строка шага без номера клавиши и отступа под него. */
-  '133': [cur('o2'), ['shot', Q('.step[data-owner="o2"][data-step="e4"]'), Q('[data-step-key="o2|e4"]')]],
-  /* 138 — «Принять объект» следующего объекта после принятия. */
-  '138': [a => a.wand(), a => a.windowButton('Запустить'), a => a.waitWand(), a => a.windowButton('К проверке'), a => a.repeatAct('o3', 'accept'), () => sleep(1200), ['shot', null, null]],
-  /* Такт 45, строка 64: «Запустить» и через 0.2 с «Прервать» — нажатия скриптом, без ожидания адаптера; кадр через 60 мс после «Прервать». */
-  '64': [a => a.wand(), ['act-shot', async (a, proto, page) => {
-    await page.evaluate(proto ? "([...document.querySelectorAll('#mFoot button')].find(b => b.textContent.trim() === 'Запустить').click(), 1)" : "([...document.querySelectorAll('[data-slot=modal-card] button')].find(b => b.textContent.trim() === 'Запустить').click(), 1)")
-    await sleep(200)
-    await page.evaluate(proto ? "(document.getElementById('wStop').click(), 1)" : "([...document.querySelectorAll('[data-slot=modal-card] button')].find(b => b.textContent.trim() === 'Прервать').click(), 1)"); await sleep(60) }]],
-}
-
-/** Склейка пары: кадры прототипа слева, кита справа, по строке на каждый кадр шага; подписи сторон сверху. */
-async function compose(page, rows) {
-  await page.goto('about:blank', 200)
-  return page.evaluate(`(async () => {
-    const rows = ${JSON.stringify(rows)}
-    const load = b => new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = 'data:image/png;base64,' + b })
-    const imgs = await Promise.all(rows.map(async ([p, k]) => [await load(p), await load(k)]))
-    const pad = 16; const gap = 24; const band = 28
-    const wl = Math.max(...imgs.map(x => x[0].width)); const wr = Math.max(...imgs.map(x => x[1].width))
-    const hs = imgs.map(x => Math.max(x[0].height, x[1].height))
-    const c = document.createElement('canvas')
-    c.width = pad * 2 + wl + gap + wr; c.height = pad + band + hs.reduce((a, h) => a + h + pad, 0)
-    const g = c.getContext('2d'); g.fillStyle = '#ffffff'; g.fillRect(0, 0, c.width, c.height)
-    g.fillStyle = '#6e7885'; g.font = '600 14px sans-serif'
-    g.fillText('прототип v17', pad, pad + 14); g.fillText('кит', pad + wl + gap, pad + 14)
-    let y = pad + band
-    imgs.forEach(([a, b], n) => {
-      g.drawImage(a, pad, y); g.drawImage(b, pad + wl + gap, y)
-      g.strokeStyle = '#ccdef5'; g.strokeRect(pad - 0.5, y - 0.5, a.width + 1, a.height + 1); g.strokeRect(pad + wl + gap - 0.5, y - 0.5, b.width + 1, b.height + 1)
-      y += hs[n] + pad
-    })
-    return JSON.stringify({ data: c.toDataURL('image/png').slice(22), w: c.width, h: c.height })
-  })()`)
-}
-
-async function shots(only) {
-  const { writeFileSync } = await import('node:fs')
-  const out = []
-  for (const [nn, steps] of Object.entries(SHOTS).sort(([x], [y]) => (Number(x) || 999) - (Number(y) || 999))) {
-    if (only.length && !only.includes(nn)) continue
-    console.log(`пара ${nn}…`)
-    const pp = await openPage(PROTO_W)
-    const kp = await openPage()
-    const sides = [[prototype(pp), true, pp], [kit(kp), false, kp]]
-    try {
-      for (const [a] of sides) await a.start()
-      const rows = []
-      for (const st of steps) {
-        /* Действие и кадр сразу у каждой стороны — середина пролёта: картинки и шрифты не ждутся. */
-        if (Array.isArray(st) && st[0] === 'act-shot') {
-          const pair = []
-          for (const [a, proto, page] of sides) { await st[1](a, proto, page); pair.push(await page.shot(null, false, true)) }
-          rows.push(pair)
-        }
-        else if (Array.isArray(st)) {
-          const pair = []
-          for (const [, proto, page] of sides) pair.push(await page.shot(proto ? st[1] : st[2]))
-          rows.push(pair)
-        }
-        else for (const [a, proto, page] of sides) { await st(a, proto, page); await sleep(150) }
-      }
-      const r = JSON.parse(await compose(pp, rows))
-      const file = join(ROOT, nn === 'flight' ? 'docs/free-shoot-pair-flight.png' : `docs/free-shoot-registry-${nn}.png`)
-      writeFileSync(file, Buffer.from(r.data, 'base64'))
-      const bytes = Buffer.from(r.data, 'base64').length
-      out.push({ nn, w: r.w, h: r.h, bytes })
-      console.log(`пара ${nn}: ${r.w} × ${r.h}, ${bytes} байт`)
-    }
-    finally { await pp.close(); await kp.close() }
-  }
-  return out
-}
 
 /**
  * Замер «Показать в структуре» (С-22): какой шаг вспыхнул и какая миниатюра обведена — в сравнение (`probe`); сколько
@@ -1519,157 +1196,117 @@ function diff(a, b, path = '') {
   if (a && b && typeof a === 'object' && typeof b === 'object' && !Array.isArray(a)) {
     return [...new Set([...Object.keys(a), ...Object.keys(b)])].flatMap(k => diff(a[k], b[k], path ? `${path}.${k}` : k))
   }
-  const show = v => { const s = JSON.stringify(v); return s && s.length > 160 ? `${s.slice(0, 157)}…` : s }
+  const show = v => { const x = JSON.stringify(v); return x && x.length > 160 ? `${x.slice(0, 157)}…` : x }
   /* Длинные списки (лента, привязки) — с первой расходящейся позиции. */
   if (Array.isArray(a) && Array.isArray(b)) {
     const k = a.findIndex((x, n) => JSON.stringify(x) !== JSON.stringify(b[n]))
     const at = k < 0 ? Math.min(a.length, b.length) : k
-    return [`${path}[${at}…]: прототип ${show(a.slice(at, at + 6))} (всего ${a.length}) · кит ${show(b.slice(at, at + 6))} (всего ${b.length})`]
+    return [`${path}[${at}…]: эталон ${show(a.slice(at, at + 6))} (всего ${a.length}) · кит ${show(b.slice(at, at + 6))} (всего ${b.length})`]
   }
-  return [`${path}: прототип ${show(a)} · кит ${show(b)}`]
+  return [`${path}: эталон ${show(a)} · кит ${show(b)}`]
 }
 
-/**
- * Шаг — [название, действие, опции]. Опции П2: `remember: имя` — снять состояние модели обеих сторон до действия;
- * `same: имя` — после действия состояние каждой стороны глубоко равно запомненному (прерывание без частичного
- * применения, §12.6). Опция сценария `dataset` — набор старта.
- */
-/** Журнал исключений прогона: заменённые ожидания и снятые поля с номерами строк раздела 15 — печатается в конце. */
-const EXCEPTIONS = []
-/** Шаги, где хотя бы одна сторона показала уведомление, — итог проверки пустой зелени (такт 57). */
+/** Файл эталона сценария: `С-07/закрытый пункт` → `С-07--закрытый_пункт.json`. */
+const baselineFile = id => join(BASELINE, `${id.replace(/\//g, '--').replace(/\s+/g, '_')}.json`)
+
+/** Шаги, где кит показал уведомление, — счёт для отчёта. */
 const NOTICED = []
+/**
+ * Сценарий на ките: слепок после каждого шага, включая старт. Шаг — [название, действие, опции]. Опции: `remember: имя` —
+ * запомнить состояние модели до действия; `same: имя` — после действия модель глубоко равна запомненной (прерывание без
+ * частичного применения, §12.6); `sameBind: имя` — привязки прежние; `blind` — клик по выключенному элементу намеренный.
+ * Опции сценария: `dataset` — набор старта, `keepEntry` — окно входа не закрывать, `hover` — сравнивать подсветку наведения.
+ */
 async function run(id) {
   const [title, steps, opts = {}] = SCENARIOS[id]
-  const pp = await openPage(PROTO_W)
   const kp = await openPage()
-  const P = prototype(pp)
   const K = kit(kp)
   const fails = []
   const kept = {}
   const measures = []
-  let snaps = 0
-  let prevKit = null
+  const snaps = []
   try {
-    await P.start(opts.dataset, opts.keepEntry)
     await K.start(opts.dataset, opts.keepEntry)
-    const all = [['старт', null], ...steps]
-    for (const [name, act, o = {}] of all) {
-      if (o.remember) kept[o.remember] = [await P.dump(), await K.dump()]
-      if (act) { await act(P); await act(K); await sleep(150) }
-      for (const [side, pg] of [[P, pp], [K, kp]]) {
-        const blind = pg.blind.splice(0)
-        if (blind.length && !o.blind) fails.push({ step: name, lines: blind.map(x => `${side.name}: клик не попал в цель — ${x}`) })
-        if (blind.length && o.blind) EXCEPTIONS.push({ id, step: name, row: o.row ?? null, what: `${side.name}: клик по выключенному элементу — в цель не попадает, как и задумано`, tech: true })
-      }
+    for (const [name, act, o = {}] of [['старт', null], ...steps]) {
+      if (o.remember) kept[o.remember] = await K.dump()
+      if (act) { await act(K); await sleep(150) }
+      const blind = kp.blind.splice(0)
+      if (blind.length && !o.blind) fails.push({ step: name, lines: blind.map(x => `клик не попал в цель — ${x}`) })
       if (o.sameBind) {
-        const now = [await P.dump(), await K.dump()]
-        const bindOf = j => { const d = JSON.parse(j); return JSON.stringify([d.frames, d.objects, d.review]) }
-        ;[P, K].forEach((side, k) => {
-          if (bindOf(now[k]) !== bindOf(kept[o.sameBind][k])) fails.push({ step: name, lines: [`${side.name}: привязки изменились после отказов с «${o.sameBind}»`] })
-        })
+        const bindOf = (j) => { const d = JSON.parse(j); return JSON.stringify([d.frames, d.objects, d.review]) }
+        if (bindOf(await K.dump()) !== bindOf(kept[o.sameBind])) fails.push({ step: name, lines: [`привязки изменились после «${o.sameBind}»`] })
       }
       if (o.same) {
-        const now = [await P.dump(), await K.dump()]
-        ;[P, K].forEach((side, k) => {
-          if (now[k] !== kept[o.same][k]) fails.push({ step: name, lines: [`${side.name}: состояние модели не равно состоянию «${o.same}»`, ...diff(JSON.parse(kept[o.same][k]), JSON.parse(now[k])).slice(0, 6)] })
-        })
+        const now = await K.dump()
+        if (now !== kept[o.same]) fails.push({ step: name, lines: [`состояние модели не равно состоянию «${o.same}»`, ...diff(JSON.parse(kept[o.same]), JSON.parse(now)).slice(0, 6)] })
       }
-      const [a, b] = [await P.snapshot(), await K.snapshot()]
-      if (a.notices?.length || b.notices?.length) NOTICED.push({ id, step: name, p: a.notices, k: b.notices })
-      /* Замер действия (С-14): сохранение идёт сразу после операции и закончилось через 0.9 с. */
-      ;[[a, P], [b, K]].forEach(([x, side]) => { if (side.probe) { x.probe = side.probe; side.probe = null } })
-      if (process.env.DEBUG_PROBE && (a.probe || b.probe)) console.log('   замер', name, JSON.stringify(a.probe), JSON.stringify(b.probe))
-      if (P.measure || K.measure) { measures.push({ step: name, p: P.measure, k: K.measure }); P.measure = null; K.measure = null }
-      /* Ожидания по строке раздела 15 (решение чата, такт 53): поле у кита сверяется с ожиданием строки или со своим
-         прежним значением, из общего сравнения оно выходит. Поля, которых у прототипа нет, лежат в `kitOnly`. */
-      const kitFull = JSON.parse(JSON.stringify(b))
-      const kv = (snap, k) => (snap && k in (snap.kitOnly ?? {}) ? snap.kitOnly[k] : snap?.[k])
-      /* Строка раздела 15, где кит не делает того, что делает прототип: слепок кита прежний целиком (кроме замера),
-         уведомлений нет; стороны на этом шаге не сравниваются. */
-      if (o.still) {
-        const strip = (x) => { const c = JSON.parse(JSON.stringify(x ?? {})); delete c.notices; delete c.probe; return c }
-        const d = diff(strip(prevKit), strip(b)).map(l => l.replace('прототип', 'было').replace('кит', 'стало'))
-        if (d.length) fails.push({ step: name, lines: [`кит, строка ${o.row}: слепок должен остаться прежним`, ...d.slice(0, 6)] })
-        if (b.notices?.length) fails.push({ step: name, lines: [`кит, строка ${o.row}: уведомлений быть не должно — ${JSON.stringify(b.notices)}`] })
-        EXCEPTIONS.push({ id, step: name, row: o.row, what: 'у кита слепок прежний целиком, уведомлений нет; стороны не сравниваются' })
-        prevKit = kitFull
-        snaps += 2
-        continue
-      }
-      if (o.note) EXCEPTIONS.push({ id, step: name, row: o.row, what: o.note })
-      if (o.expect) {
-        for (const [k, want] of Object.entries(o.expect)) {
-          if (JSON.stringify(kv(b, k)) !== JSON.stringify(want)) fails.push({ step: name, lines: [`кит, строка ${o.row}: ${k} — ожидалось ${JSON.stringify(want)}, получено ${JSON.stringify(kv(b, k))}`] })
-          delete a[k]; delete b[k]
-        }
-        EXCEPTIONS.push({ id, step: name, row: o.row, what: `ожидание кита: ${Object.entries(o.expect).map(([k, v]) => `${k} = ${JSON.stringify(v)}`).join('; ')}` })
-      }
-      if (o.keep) {
-        for (const k of o.keep) {
-          if (JSON.stringify(kv(b, k)) !== JSON.stringify(kv(prevKit, k))) fails.push({ step: name, lines: [`кит, строка ${o.row}: ${k} должно остаться прежним — было ${JSON.stringify(kv(prevKit, k))}, стало ${JSON.stringify(kv(b, k))}`] })
-          delete a[k]; delete b[k]
-        }
-        EXCEPTIONS.push({ id, step: name, row: o.row, what: `у кита прежние: ${o.keep.join(', ')}` })
-      }
-      if (o.skip) EXCEPTIONS.push({ id, step: name, row: o.row ?? null, what: `не сравнивается: ${o.skip.join(', ')}` })
-      prevKit = kitFull
-      delete a.kitOnly; delete b.kitOnly
-      /* Шаг, где раскладка ленты различается до вёрстки П5, сравнивает только названные поля. */
-      if (o.only) for (const x of [a, b]) for (const key of Object.keys(x)) if (!o.only.includes(key)) delete x[key]
-      /* Шаг-цикл: стороны действуют по очереди, и уведомления первой истекают, пока идёт вторая, — их шаг не сравнивает. */
-      if (o.skip) for (const x of [a, b]) for (const key of o.skip) delete x[key]
-      /* Подсветку наведения сравнивают сценарии наведения (опция сценария `hover`): в остальных указатель остаётся там, где
-         кликнул, а прототип пересчитывает подсветку, когда перерисовка подменяет узел под курсором, — строка реестра, такт 41. */
-      if (!opts.hover) for (const x of [a, b]) for (const key of ['linked', 'dim', 'hl', 'hlObj']) delete x[key]
-      snaps += 2
-      const d = diff(a, b)
-      if (d.length) fails.push({ step: name, lines: d })
+      const b = await K.snapshot()
+      if (K.probe) { b.probe = K.probe; K.probe = null }
+      if (K.measure) { measures.push({ step: name, k: K.measure }); K.measure = null }
+      Object.assign(b, b.kitOnly)
+      delete b.kitOnly
+      /* Подсветку наведения сравнивают сценарии наведения (опция сценария `hover`): в остальных указатель остаётся там, где кликнул. */
+      if (!opts.hover) for (const key of ['linked', 'dim', 'hl', 'hlObj']) delete b[key]
+      if (b.notices?.length) NOTICED.push({ id, step: name, k: b.notices })
+      snaps.push({ step: name, snap: b })
     }
   }
-  finally { await pp.close(); await kp.close() }
-  return { id, title, steps: steps.length, snaps, fails, measures }
+  finally { await kp.close() }
+  /* Сверка с эталоном: шаги по порядку и именам, слепок — по полям. */
+  const file = baselineFile(id)
+  const old = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null
+  const changes = []
+  if (!old) changes.push({ step: '—', lines: ['эталона нет'] })
+  else {
+    if (old.steps.length !== snaps.length) changes.push({ step: '—', lines: [`шагов в эталоне ${old.steps.length}, в сценарии ${snaps.length}`] })
+    snaps.forEach((x, k) => {
+      const e = old.steps[k]
+      if (!e) return
+      if (e.step !== x.step) { changes.push({ step: x.step, lines: [`шаг эталона называется «${e.step}»`] }); return }
+      const d = diff(e.snap, x.snap)
+      if (d.length) changes.push({ step: x.step, lines: d })
+    })
+  }
+  if (UPDATE && (changes.length || !old)) {
+    mkdirSync(BASELINE, { recursive: true })
+    writeFileSync(file, `${JSON.stringify({ id, title, steps: snaps }, null, 1)}\n`)
+  }
+  return { id, title, steps: steps.length, snaps: snaps.length, fails, changes, measures }
 }
 
-await ensureChrome()
-if (process.argv[2] === '--shots') {
-  const r = await shots(process.argv.slice(3))
-  console.log(`\nПар ${r.length}; пустых ${r.filter(x => x.bytes < 2000).length}`)
-  process.exit(0)
-}
-const pick = process.argv.slice(2)
+const args = process.argv.slice(2)
+const UPDATE = args.includes('--update-baseline')
+const pick = args.filter(a => !a.startsWith('--'))
 const ids = pick.length ? pick : Object.keys(SCENARIOS)
+await ensureChrome()
+const started = Date.now()
 let failed = 0
 let totalSteps = 0
 let totalSnaps = 0
+const updated = []
 for (const id of ids) {
   if (!SCENARIOS[id]) { console.log(`${id}: нет такого сценария`); failed++; continue }
   const r = await run(id)
   totalSteps += r.steps
   totalSnaps += r.snaps
-  if (r.fails.length) {
+  /* Провал действия (клик мимо цели, нарушенный инвариант) — провал и при обновлении эталона. */
+  const bad = UPDATE ? r.fails : [...r.fails, ...r.changes]
+  if (bad.length) {
     failed++
     console.log(`✗ ${r.id} ${r.title} — шагов ${r.steps}, слепков ${r.snaps}`)
-    for (const f of r.fails) { console.log(`   шаг «${f.step}»:`); f.lines.forEach(l => console.log(`     ${l}`)) }
+    for (const f of bad) { console.log(`   шаг «${f.step}»:`); f.lines.forEach(l => console.log(`     ${l}`)) }
   }
-  else console.log(`✓ ${r.id} ${r.title} — шагов ${r.steps}, слепков ${r.snaps}, совпали`)
-  for (const x of r.measures) console.log(`   замер «${x.step}»: прототип ${JSON.stringify(x.p)} · кит ${JSON.stringify(x.k)}`)
+  else console.log(`✓ ${r.id} ${r.title} — шагов ${r.steps}, слепков ${r.snaps}, ${UPDATE ? (r.changes.length ? 'эталон обновлён' : 'эталон прежний') : 'совпали с эталоном'}`)
+  if (UPDATE && r.changes.length) updated.push(r)
+  for (const x of r.measures) console.log(`   замер «${x.step}»: ${JSON.stringify(x.k)}`)
 }
-console.log(`\nСценариев ${ids.length}, зелёных ${ids.length - failed}; шагов ${totalSteps}, слепков ${totalSnaps}`)
-console.log('\nИсключения прогона (решение чата, такт 53) — у всех шагов:')
-console.log(`  данные: кадр 6 в блоке «Пропиточная линия POLYPRISE» у обеих сторон — строка 118`)
-console.log(`  ширина окна прототипа ${PROTO_W} при окне кита ${KIT_W}: рабочая зона кита уже на меню ${MENU_W} — строка 81`)
-console.log('  старт: кит — `?data=reviewed`, сценарий прототипа «Частично проверен»; обычный сценарий кита — данные «Пустой осмотр» прототипа — строка 124')
-console.log('  curHint у кита — из модели: индикатора на экране нет — строка 97; у прототипа хвост «· клавиши 1–N» снят — строка 132')
-console.log('  stats у кита: значения блока «Объекты» — из модели, на экране блока нет — строка 126')
-console.log('  окно клавиш у прототипа: фраза «Перетаскивание работает так же, как клавиши.» снята — строка 133')
-console.log('  привязка в сценариях — кликом по строке шага и по пункту просмотра у обеих сторон: цифр у кита нет — строка 132')
-console.log('  hints у прототипа: «Новый объект из выделенного» читается как «Новый объект» — строка 103')
-console.log('  подсветка наведения (linked, dim, hl, hlObj) сравнивается только в сценариях наведения — строка 2')
-const seen = new Map()
-for (const e of EXCEPTIONS) { const k = `${e.id} · «${e.step}»`; seen.set(k, [...(seen.get(k) ?? []), `${e.what}${e.row ? ` — строка ${e.row}` : ' — техническое'}`]) }
-console.log(`Исключения по шагам — ${seen.size}:`)
-for (const [k, v] of seen) console.log(`  ${k}: ${v.join(' | ')}`)
-const same = NOTICED.filter(n => JSON.stringify(n.p) === JSON.stringify(n.k)).length
-console.log(`Шагов с уведомлениями — ${NOTICED.length}: у обеих сторон одинаковые — ${same}, по строкам раздела 15 различаются — ${NOTICED.length - same}`)
-if (process.env.NOTICES) for (const n of NOTICED) console.log(`  ${n.id} · «${n.step}»: прототип ${JSON.stringify(n.p)} · кит ${JSON.stringify(n.k)}`)
+const secs = Math.round((Date.now() - started) / 1000)
+console.log(`\nСценариев ${ids.length}, зелёных ${ids.length - failed}; шагов ${totalSteps}, слепков ${totalSnaps}; время ${Math.floor(secs / 60)} мин ${secs % 60} с`)
+console.log(`Файлов эталона: ${existsSync(BASELINE) ? readdirSync(BASELINE).filter(f => f.endsWith('.json')).length : 0}`)
+if (UPDATE) {
+  console.log(`\nЭталон обновлён у сценариев — ${updated.length}:`)
+  for (const r of updated) for (const c of r.changes) console.log(`  ${r.id} · «${c.step}»: ${c.lines.map(l => l.split(':')[0]).join(', ')}`)
+}
+console.log(`Шагов с уведомлениями — ${NOTICED.length}`)
+if (process.env.NOTICES) for (const n of NOTICED) console.log(`  ${n.id} · «${n.step}»: ${JSON.stringify(n.k)}`)
 process.exit(failed ? 1 : 0)

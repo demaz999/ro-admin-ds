@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { CHANGE_CLASS, CHANGES, COMPONENTS, HANDOVER, type ChangeClass } from '~/stands/kit-changes/handover-2026-10-01'
-import { DRAFT } from '~/stands/kit-changes/draft'
+import { HANDOVER_NEXT, NEXT } from '~/stands/kit-changes/handover-2026-10-02'
 
 /**
  * Стенд изменений кирпичиков версии передачи — правило 23 `docs/chat-protocol.md`, такт 54. Предложение чата, принятое
@@ -54,12 +54,12 @@ const mutedClicks = ref(0)
       </p>
     </header>
 
-    <!-- Черновик следующей версии — относительно выпущенной: строки тактов после метки (правило 23). -->
-    <section data-draft class="space-y-4">
+    <!-- Версия после первой: строки относительно предыдущей метки (правило 23). -->
+    <section data-next class="space-y-4">
       <h2 class="text-lg font-bold">
-        Следующая версия (черновик) — относительно {{ HANDOVER }}
+        Версия {{ HANDOVER_NEXT }} — относительно {{ HANDOVER }}
       </h2>
-      <div v-for="c in DRAFT" :key="c.id" :data-change="c.id" class="grid grid-cols-[minmax(0,5fr)_minmax(0,6fr)] gap-6 rounded-lg border border-border p-4">
+      <div v-for="c in NEXT" :key="c.id" :data-change="c.id" class="grid grid-cols-[minmax(0,5fr)_minmax(0,6fr)] gap-6 rounded-lg border border-border p-4">
         <div class="space-y-2">
           <span class="inline-flex h-5 items-center rounded-full px-2 text-2xs font-bold" :class="TONE[c.cls]">{{ CHANGE_CLASS[c.cls] }} · {{ c.component }}</span>
           <p class="text-sm">

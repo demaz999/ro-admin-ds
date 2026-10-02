@@ -47,6 +47,8 @@ export const COVERAGE_STATES = [
   'data=reviewed',
   /* Такт 57: перенос кадра в просмотре над пунктом-шагом — цель приёма. */
   'state=viewer-drag',
+  /* Такт 59: режим «убирать» в приёмке — предложенные кадры остаются в ленте до принятия объекта (такт 58). */
+  'view=review&mode=hide',
 ] as const
 
 const transparent = (c: string) => !c || c === 'transparent' || /rgba\([^)]*,\s*0\)$/.test(c)

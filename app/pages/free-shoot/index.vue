@@ -51,6 +51,7 @@ import proto from '~/stands/free-shoot/prototype-data.json'
  * | `?state=tooltip` | подсказка названия шага на плашке кадра (§15.4) |
  * | `?state=drop` | цель приёма перетаскивания и перетаскиваемые кадры (§9.5) |
  * | `?state=viewer-drag` | просмотр кадра 23 с переносом кадра над шагом «Узлы и агрегаты»: цель приёма у подходящего пункта, неподходящие приглушены — такт 57 (перетаскивание в просмотре, такт 56) |
+ * | `?mode=hide` | режим «Разобранные: убирать» при загрузке — с `?view=review` показывает ленту, где предложенные кадры остаются до принятия объекта (такт 59, правка такта 58) |
  * | `?state=marquee` | рамка выделения над первыми тремя кадрами ленты и их выделение (§10.1) — такт 40 |
  * | `?open=move` | окно «Перенести кадр?» над просмотром: кадр 21 привязан к «Узлам и агрегатам», выбран «Органы управления» (§11.4) — такт 41 |
  * | `?state=undo` | уведомление привязки с «Отменить» без таймера (§10.6) — такт 40: кадр 21 привязан к «Узлам и агрегатам» |
@@ -147,6 +148,7 @@ const m = createModel({
     cur: openWin === 'assign' && scenario === 'review' ? P.selectCur : D.cur,
     sel: state === 'drop' || ['assign', 'new', 'newobj'].includes(openWin) || q('selected') === 'demo' ? P.selected : [],
     rtab: q('tab') === 'form' ? 'form' : 'scheme',
+    mode: q('mode') === 'hide' ? 'hide' : 'keep',
     win: (WINDOWS as readonly string[]).includes(openWin) ? openWin as ScreenWindow : null,
     lb: viewer ? Math.max(0, LB_FRAMES.findIndex((f: any) => f.i === viewer.i)) : -1,
   },
