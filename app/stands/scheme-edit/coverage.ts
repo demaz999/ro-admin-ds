@@ -9,4 +9,6 @@ export const SCHEME_COVERAGE_STATES = [
   'section=access', 'open=comments',
   /* Такт 63, П3: шесть разделов «Настроек», оба типа схемы у «ИИ-анализа», сайд шаблона PDF, форма обоснования. */
   'section=mobile', 'section=web', 'section=web&open=reason', 'section=ai', 'section=ai&type=house', 'section=anomalies', 'section=pdf', 'open=template',
+  /* Такт 64, П4: модалки публикации, сброса и удаления, меню «⋯», сайд истории и дифф версии, просмотр версии, presence. */
+  'open=publish', 'data=new&open=first-publish', 'open=reset', 'open=delete', 'open=menu', 'open=history', 'open=history&version=v2', 'view=v1', 'presence=1',
 ] as const

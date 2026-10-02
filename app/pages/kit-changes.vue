@@ -71,7 +71,13 @@ const draftRoles = ref(['Администратор', 'Эксперт'])
           </p>
         </div>
         <div data-example class="flex min-w-0 flex-col items-stretch gap-3">
-          <template v-if="c.id === 'button-outline'">
+          <template v-if="c.id === 'icon-arrow-back'">
+            <span class="flex items-center gap-2 text-xs">
+              <Icon name="arrow-back" :size="24" />
+              <code>arrow-back</code>
+            </span>
+          </template>
+          <template v-else-if="c.id === 'button-outline'">
             <div class="flex flex-wrap items-center gap-3">
               <Button variant="outline">
                 Отменить

@@ -11,7 +11,7 @@ import {
 import demo from '~/stands/scheme-edit/demo-data.json'
 
 /**
- * Страница «Редактирование схемы осмотра» (VA-16377) — стенд, такты 61–63, порции П1–П3 (`docs/scheme-edit.md`,
+ * Страница «Редактирование схемы осмотра» (VA-16377) — стенд, такты 61–64, порции П1–П4 (`docs/scheme-edit.md`,
  * раздел 10).
  *
  * Вид и структура — макеты Figma (`docs/sources/scheme-edit/figma-nodes.md`), поведение и тексты — `spec-r2.md`.
@@ -30,8 +30,13 @@ import demo from '~/stands/scheme-edit/demo-data.json'
  * **П3.** Шесть остальных разделов «Настроек» (№ 25–37): «Мобильное приложение», «Веб-приложение» (обоснования
  * «название — ключ» с отменой удаления), «Права доступа» (роли и таблица групп по канону страницы-таблицы),
  * «ИИ-анализ» (модули зависят от типа схемы), «Аномалии» (14 детекторов с массовым управлением и наследованием роли),
- * «PDF» (шаблоны, подписание, формула имени файла); сайд «Добавление шаблона» (№ 38). Табы «Форма», «Процессы и
- * шаги», «Витрина» — порциями П6–П8: на их месте `Empty`.
+ * «PDF» (шаблоны, подписание, формула имени файла); сайд «Добавление шаблона» (№ 38).
+ *
+ * **П4.** Шапка: индикатор публикации `PublishStatus` с presence (№ 5, 59), «История версий», «Предпросмотр» (№ 6),
+ * меню «⋯» (№ 8). Модалка-гейт публикации с `Diff` и предупреждениями валидации (№ 54, 58), первая публикация
+ * (№ 55), «Сбросить черновик?» (№ 60), «Удалить схему?»; сайд истории версий с диффом версии вторым слоем (№ 56);
+ * просмотр прошлой версии (№ 57): плашка, содержимое только для чтения, «Перейти к текущей версии», «Сделать копию».
+ * Табы «Форма», «Процессы и шаги», «Витрина» — порциями П6–П8: на их месте `Empty`.
  *
  * ## Поведение — модель `~/stands/scheme-edit/model.ts`
  *
@@ -52,6 +57,11 @@ import demo from '~/stands/scheme-edit/demo-data.json'
  * | `?open=template` | сайд «Добавление шаблона» (раздел «PDF») |
  * | `?open=reason` | форма нового обоснования (раздел «Веб-приложение») |
  * | `?type=house` | тип схемы «Осмотр недвижимости»: анализ стоимости отделки доступен, модули для авто — нет |
+ * | `?open=publish` · `first-publish` · `reset` · `delete` · `menu` | модалка-гейт публикации (у новой схемы — первая публикация), «Сбросить черновик?», «Удалить схему?», меню «⋯» |
+ * | `?open=history`, `?version=v2` | сайд истории версий; с `version` — второй слой, дифф версии |
+ * | `?view=v1` | просмотр прошлой версии |
+ * | `?presence=1` | другой редактор в схеме: «Сейчас редактирует …» |
+ * | `?now=2026-10-03T09:00:00` | неподвижные часы стенда: дата правок и публикаций для прогона |
  * | `?save=saving` | статус «Сохранение…» без завершения записи |
  * | `?save=error` | статус «Ошибка сохранения» с «Повторить» |
  * | `?save=fail` | следующая запись черновика завершается ошибкой (СС-49) |
@@ -65,13 +75,23 @@ const q = (k: string) => String(route.query[k] ?? '')
 const D = demo as unknown as Record<'main' | 'fresh', Dataset>
 const tabAtLoad = TABS.find(t => t.id === q('tab'))?.id
 const saveAtLoad = (['saving', 'error'] as SaveState[]).find(s => s === q('save'))
-const m = createModel(q('data') === 'new' ? D.fresh : D.main, { tab: tabAtLoad, save: saveAtLoad, failNext: q('save') === 'fail' })
+const m = createModel(q('data') === 'new' ? D.fresh : D.main, {
+  tab: tabAtLoad,
+  save: saveAtLoad,
+  failNext: q('save') === 'fail',
+  editing: q('presence') ? 'Игорь Петров' : '',
+  viewing: q('view'),
+  now: q('now') ? () => q('now') : undefined,
+})
 const sectionAtLoad = SECTIONS.find(s => s.id === q('section'))?.id
 if (sectionAtLoad) m.setSection(sectionAtLoad)
 if (q('open') === 'comments') m.openSide('comments')
 if (q('type') === 'house') m.draft.config.settings.general.schemeType = 'house'
 
-const general = computed(() => m.draft.config.settings.general)
+/** Конфигурация на экране: черновик либо открытый на просмотр снимок. */
+const general = computed(() => m.shown.value.settings.general)
+/** Просмотр прошлой версии — только чтение (r2 §2, состояние 7). */
+const ro = computed(() => !!m.ui.viewing)
 /** Поле конфигурации как `v-model`: запись идёт в черновик и запускает автосохранение. */
 const bind = <T>(path: string, get: () => T) => computed<T>({ get, set: v => m.set(`settings.general.${path}`, v) })
 
@@ -113,7 +133,7 @@ const confirmHint = bind('confirm.hint', () => general.value.confirm.hint)
 const confirmCheckbox = bind('confirm.checkbox', () => general.value.confirm.checkbox)
 
 /* ------------------------------ разделы П3 ------------------------------ */
-const settings = computed(() => m.draft.config.settings)
+const settings = computed(() => m.shown.value.settings)
 const setS = (path: string, value: unknown) => m.set(`settings.${path}`, value)
 const bindS = <T>(path: string, get: () => T) => computed<T>({ get, set: v => m.set(`settings.${path}`, v) })
 
@@ -305,6 +325,34 @@ function saveSide() {
   m.closeSurface()
 }
 
+/* ------------------------------ публикация и версии — П4 ------------------------------ */
+/** Открытая поверхность модели как `v-model:open` окна: закрытие окна снимает её со стека. */
+const surface = (id: string) => computed({
+  get: () => m.topSurface.value?.id === id,
+  set: (v) => { if (!v && m.topSurface.value?.id === id) m.closeSurface() },
+})
+const publishOpen = surface('publish')
+const firstPublishOpen = surface('first-publish')
+const resetOpen = surface('reset')
+const deleteOpen = surface('delete')
+const historyOpen = surface('history')
+const menuOpen = ref(q('open') === 'menu')
+const MENU: { key: 'export' | 'dump' | 'copy' | 'reset', label: string }[] = [
+  { key: 'export', label: 'Экспортировать схему' },
+  { key: 'dump', label: 'Скачать дамп' },
+  { key: 'copy', label: 'Сделать копию' },
+  { key: 'reset', label: 'Сбросить черновик к текущей версии' },
+]
+function pickMenu(key: 'export' | 'dump' | 'copy' | 'reset' | 'delete') {
+  menuOpen.value = false
+  m.menu(key)
+}
+const currentDate = computed(() => m.history.value[0]?.date ?? '')
+if (q('open') === 'publish' || q('open') === 'first-publish') m.openPublish()
+if (q('open') === 'reset') m.openReset()
+if (q('open') === 'delete') m.menu('delete')
+if (q('open') === 'history') { m.openHistory(); if (q('version')) m.openVersion(q('version')) }
+
 /** Содержимое, которое соберут следующие порции, — план `scheme-edit.md`, раздел 10. */
 const PENDING: Record<Exclude<TabId, 'settings'>, { title: string, description: string }> = {
   form: { title: '«Форма» — порция П6', description: 'Группы, поля, сайды поля и группы, массовый выбор' },
@@ -327,6 +375,7 @@ if (import.meta.client) {
     :data-save="m.save.state"
     :data-publish="m.publishState.value"
     :data-surface="m.topSurface.value?.id ?? ''"
+    :data-viewing="m.ui.viewing"
     class="flex min-w-0 flex-col gap-6"
   >
     <div class="flex">
@@ -340,13 +389,68 @@ if (import.meta.client) {
         {{ general.name }}
       </Heading>
 
-      <!-- Строка состояния и действий: слева — индикатор публикации (П4) и статус автосохранения, справа — действия. -->
-      <div class="flex min-h-10 flex-wrap items-center justify-between gap-x-6 gap-y-2">
-        <AppBarStatus surface="light" retryable :state="m.save.state" @retry="m.retry()" />
-        <Button data-act="publish" @click="m.publish()">
-          Опубликовать схему
-        </Button>
+      <!-- Строка состояния и действий: слева — индикатор публикации, история и статус автосохранения, справа — действия. -->
+      <div class="flex min-h-10 flex-wrap items-center justify-between gap-x-6 gap-y-2" data-header-row>
+        <div class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
+          <PublishStatus
+            v-if="!ro"
+            :state="m.publishState.value"
+            :author="m.draft.author"
+            :date="m.draftDate.value"
+            :editing="m.ui.editing"
+            @open="m.openPublish()"
+          />
+          <ButtonAction size="sm" :show-icon="false" data-act="history" @click="m.openHistory()">
+            История версий
+          </ButtonAction>
+          <AppBarStatus v-if="!ro" surface="light" retryable :state="m.save.state" @retry="m.retry()" />
+        </div>
+
+        <!-- Просмотр прошлой версии: индикатора черновика и «Опубликовать схему» нет (r2 §2, состояние 7). -->
+        <div v-if="ro" class="ml-auto flex items-center gap-3">
+          <Button variant="outline" data-act="view-copy" @click="m.copy()">
+            Сделать копию
+          </Button>
+          <Button data-act="view-leave" @click="m.leaveView()">
+            Перейти к текущей версии
+          </Button>
+        </div>
+        <div v-else class="ml-auto flex items-center gap-3">
+          <Button variant="outline" show-icon data-act="preview" @click="m.preview()">
+            <template #icon>
+              <Icon name="visibility" :size="20" />
+            </template>
+            Предпросмотр
+          </Button>
+          <Button data-act="publish" @click="m.openPublish()">
+            Опубликовать схему
+          </Button>
+          <!-- Меню «⋯» — № 8: список действий в поповере, удаление — отдельной группой. -->
+          <Popover v-model:open="menuOpen">
+            <PopoverTrigger as-child>
+              <IconButton variant="secondary" size="lg" label="Действия со схемой" data-act="menu">
+                <Icon name="more" :size="20" />
+              </IconButton>
+            </PopoverTrigger>
+            <PopoverContent data-menu="scheme" align="end" :side-offset="4" class="p-1">
+              <SelectGroup>
+                <SelectItem v-for="a in MENU" :key="a.key" :data-action="a.key" @click="pickMenu(a.key)">
+                  {{ a.label }}
+                </SelectItem>
+              </SelectGroup>
+              <SelectGroup data-section="danger">
+                <SelectItem data-action="delete" @click="pickMenu('delete')">
+                  Удалить схему
+                </SelectItem>
+              </SelectGroup>
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
+
+      <Callout v-if="ro" data-viewing-banner>
+        {{ m.viewingText.value }}. Настройки открыты только для чтения
+      </Callout>
     </div>
 
     <Tabs v-model="tab">
@@ -360,6 +464,8 @@ if (import.meta.client) {
         <!-- Каркас «Настроек»: колонка содержимого 846 и правый навигатор 266, зазор 24 — макет `33346:5470`. -->
         <div class="flex items-start gap-6 pt-6">
           <div ref="column" class="flex max-w-settings min-w-0 flex-1 flex-col gap-8" data-settings-column>
+            <!-- Просмотр прошлой версии: содержимое разделов недоступно для правки; навигатор, табы и «Назад / Далее» работают. -->
+            <div class="contents" :inert="ro" :data-readonly="ro || undefined">
             <template v-if="m.ui.section === 'general'">
               <!-- ============================ Основное — № 16, 17, 19 ============================ -->
               <section id="anchor-main" data-anchor-section="main" class="flex flex-col gap-4">
@@ -1230,6 +1336,8 @@ if (import.meta.client) {
               </section>
             </template>
 
+            </div>
+
             <!-- «Назад / Далее» — № 15: соседний раздел; на первом выключена «Назад», на последнем — «Далее». -->
             <div class="flex items-center gap-4">
               <Button variant="secondary" :disabled="!m.neighbourSection(-1)" data-act="section-prev" @click="step(-1)">
@@ -1317,6 +1425,146 @@ if (import.meta.client) {
             {{ tpl.id ? 'Сохранить' : 'Добавить шаблон' }}
           </Button>
         </ModalCardFooter>
+      </ModalCardContent>
+    </ModalCard>
+
+    <!-- ============================ публикация: модалка-гейт с диффом — № 54, 58 ============================ -->
+    <ModalCard v-model:open="publishOpen">
+      <ModalCardContent data-modal="publish">
+        <ModalCardHeader title="Публикация схемы" subtitle="Эти изменения войдут в новую версию и будут применяться к новым осмотрам" />
+        <ModalCardBody>
+          <Diff
+            v-if="m.draftDiff.value"
+            :areas="m.draftDiff.value.areas"
+            :attention="m.draftDiff.value.attention"
+            :warnings="m.warnings.value"
+            :total="m.draftDiff.value.total"
+          />
+        </ModalCardBody>
+        <ModalCardFooter>
+          <template #note>
+            После публикации создаётся неизменяемый снимок версии
+          </template>
+          <Button variant="outline" data-act="publish-cancel" @click="m.closeSurface()">
+            Отменить
+          </Button>
+          <Button :disabled="m.blocked.value" data-act="publish-confirm" @click="m.confirmPublish()">
+            Опубликовать
+          </Button>
+        </ModalCardFooter>
+      </ModalCardContent>
+    </ModalCard>
+
+    <!-- ============================ первая публикация — № 55 ============================ -->
+    <ModalCard v-model:open="firstPublishOpen">
+      <ModalCardContent data-modal="first-publish">
+        <ModalCardHeader title="Первая публикация схемы" />
+        <ModalCardBody class="flex flex-col gap-4">
+          <ModalCardText>
+            Схема публикуется впервые. После публикации она станет доступна для создания осмотров.
+          </ModalCardText>
+          <Callout data-first-summary>
+            <ul>
+              <li v-for="line in m.summary.value" :key="line">
+                {{ line }}
+              </li>
+            </ul>
+          </Callout>
+          <Diff v-if="m.warnings.value.length" :warnings="m.warnings.value" />
+        </ModalCardBody>
+        <ModalCardFooter>
+          <template #note>
+            После публикации создаётся неизменяемый снимок версии
+          </template>
+          <Button variant="outline" data-act="first-cancel" @click="m.closeSurface()">
+            Отмена
+          </Button>
+          <Button :disabled="m.blocked.value" data-act="first-confirm" @click="m.confirmPublish()">
+            Опубликовать
+          </Button>
+        </ModalCardFooter>
+      </ModalCardContent>
+    </ModalCard>
+
+    <!-- ============================ «Сбросить черновик?» — № 60 ============================ -->
+    <ModalCard v-model:open="resetOpen">
+      <ModalCardContent data-modal="reset">
+        <ModalCardHeader title="Сбросить черновик?" :subtitle="`Черновик вернётся к текущей версии от ${currentDate}. Будет сброшено:`" />
+        <ModalCardBody>
+          <Diff v-if="m.draftDiff.value" :areas="m.draftDiff.value.areas" :attention="m.draftDiff.value.attention" :total="m.draftDiff.value.total" />
+        </ModalCardBody>
+        <ModalCardFooter>
+          <Button variant="secondary" data-act="reset-cancel" @click="m.closeSurface()">
+            Отмена
+          </Button>
+          <Button variant="destructive" data-act="reset-confirm" @click="m.confirmReset()">
+            Сбросить черновик
+          </Button>
+        </ModalCardFooter>
+      </ModalCardContent>
+    </ModalCard>
+
+    <!-- ============================ «Удалить схему?» — № 8 ============================ -->
+    <ModalCard v-model:open="deleteOpen">
+      <ModalCardContent size="sm" data-modal="delete">
+        <ModalCardHeader title="Удалить схему?" />
+        <ModalCardBody>
+          <ModalCardText>
+            Схема и её черновик будут удалены. Опубликованные версии останутся у осмотров, которые по ним прошли.
+          </ModalCardText>
+        </ModalCardBody>
+        <ModalCardFooter>
+          <Button variant="secondary" data-act="delete-cancel" @click="m.closeSurface()">
+            Отмена
+          </Button>
+          <Button variant="destructive" data-act="delete-confirm" @click="m.confirmDelete()">
+            Удалить
+          </Button>
+        </ModalCardFooter>
+      </ModalCardContent>
+    </ModalCard>
+
+    <!-- ============================ история версий: сайд и дифф версии — № 56 ============================ -->
+    <ModalCard v-model:open="historyOpen">
+      <ModalCardContent placement="edge" data-side="history">
+        <template v-if="!m.versionShown.value">
+          <ModalCardHeader title="История версий" subtitle="Публикации схемы: текущая версия сверху" />
+          <ModalCardBody class="flex flex-col gap-2">
+            <Empty v-if="!m.history.value.length" title="Публикаций ещё не было" description="Версия появится после первой публикации схемы" />
+            <ListRow v-for="v in m.history.value" :key="v.id" :active="v.current" :data-version="v.id" @click="m.openVersion(v.id)">
+              Версия от {{ v.date }}
+              <template #secondary>
+                {{ v.meta }}
+              </template>
+              <template v-if="v.current" #trailing>
+                <Badge>Текущая</Badge>
+              </template>
+            </ListRow>
+          </ModalCardBody>
+        </template>
+        <!-- Второй слой: дифф версии с предыдущей; «←» возвращает к списку. -->
+        <template v-else>
+          <ModalCardHeader back :title="`Версия от ${m.versionShown.value.date}`" :subtitle="m.versionShown.value.meta" @back="m.closeVersion()" />
+          <ModalCardBody class="flex flex-col gap-4">
+            <Diff
+              v-if="m.versionDiff.value"
+              :areas="m.versionDiff.value.areas"
+              :attention="m.versionDiff.value.attention"
+              :total="m.versionDiff.value.total"
+            />
+            <ModalCardText v-else data-version-first>
+              Первая публикация схемы: сравнивать не с чем
+            </ModalCardText>
+          </ModalCardBody>
+          <ModalCardFooter>
+            <Button variant="outline" data-act="version-copy" @click="m.copy()">
+              Сделать копию
+            </Button>
+            <Button v-if="!m.versionShown.value.current" variant="secondary" data-act="version-view" @click="m.view(m.versionShown.value.id)">
+              Открыть версию
+            </Button>
+          </ModalCardFooter>
+        </template>
       </ModalCardContent>
     </ModalCard>
 

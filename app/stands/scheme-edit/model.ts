@@ -1,7 +1,11 @@
 import { computed, reactive } from 'vue'
+import { DETECTOR_IDS, DETECTORS_ON, FIELD_SAMPLES, FINISH_CLASSES, SYSTEM_VARIABLES } from './catalogs'
+import { diffConfigs, formatDate, plural, summarize, validateConfig } from './diff'
+
+export * from './catalogs'
 
 /**
- * Модель состояния страницы «Редактирование схемы осмотра» (VA-16377) — такты 61–63, порции П1–П3.
+ * Модель состояния страницы «Редактирование схемы осмотра» (VA-16377) — такты 61–64, порции П1–П4.
  * План и границы — `docs/scheme-edit.md`, 6.2. Поведение — `docs/sources/scheme-edit/spec-r2.md`, обоснования —
  * `spec-audit.md`. HTML-прототипа нет: модель написана по спеке.
  *
@@ -23,7 +27,10 @@ import { computed, reactive } from 'vue'
  * (СС-15), соседние разделы (СС-16), сайд словаря комментариев (`openSide`, `closeSide`, СС-59). **П3 (такт 63):**
  * настройки шести остальных разделов (r2 §4) со значениями по умолчанию, правила «гасит» для веб-блока, ИИ-анализа и
  * аномалий, обоснования и шаблоны PDF с отменой удаления (`undo`), детекторы аномалий с массовым управлением и
- * наследованием роли, сброс стоимости классов, группы доступа. Дифф, валидация,
+ * наследованием роли, сброс стоимости классов, группы доступа. **П4 (такт 64):** публикация — модалка-гейт с диффом
+ * (`openPublish`, `confirmPublish`), первая публикация, валидация с критичным (`warnings`), история версий и дифф
+ * версии (`history`, `versionDiff`), просмотр снимка (`view`, `leaveView` — правка отказывает), сброс черновика
+ * (`openReset`, `confirmReset`), меню схемы (`menu`), presence. Расчёт диффа и валидации — `diff.ts`. Дифф, валидация,
  * поиск, публикация, сброс черновика, просмотр снимка, операции формы, процессов и витрины — по своим порциям
  * (`scheme-edit.md`, раздел 10).
  */
@@ -177,46 +184,6 @@ export interface PdfSettings {
   attachExtra: boolean
 }
 
-/** Классы отделки A0–D1: код и название статичны, правится стоимость (аудит, «Раздел „ИИ-анализ стоимости“»). */
-export const FINISH_CLASSES = [
-  { code: 'A0', title: 'Без отделки', cost: 0 },
-  { code: 'A1', title: 'Под чистовую отделку', cost: 15000 },
-  { code: 'B0', title: 'Эконом', cost: 5000 },
-  { code: 'B1', title: 'Эконом+', cost: 20000 },
-  { code: 'C0', title: 'Стандарт', cost: 25000 },
-  { code: 'C1', title: 'Стандарт+', cost: 35000 },
-  { code: 'D0', title: 'Евроремонт', cost: 50000 },
-  { code: 'D1', title: 'Эксклюзив', cost: 200000 },
-] as const
-
-/** 14 детекторов аномалий: три группы и одиночный без подзаголовка (r2 §4; макет `33351:9928`). */
-export const DETECTOR_GROUPS = [
-  { id: 'geo', title: 'Геолокация и трек', detectors: [
-    { id: 'spoof', title: 'Подмена координат', help: 'Координаты кадра заданы программно, а не получены от датчиков устройства' },
-    { id: 'noCoords', title: 'Отсутствие исходных координат', help: 'У кадра нет координат съёмки' },
-    { id: 'speed', title: 'Аномалии скорости перемещения', help: 'Между кадрами исполнитель переместился быстрее возможного' },
-    { id: 'angles', title: 'Аномалии углов направленности движения', help: 'Направление движения между кадрами меняется неправдоподобно' },
-    { id: 'cluster', title: 'Аномалии кластеризации (съёмка вне основной точки)', help: 'Часть кадров снята далеко от основной точки осмотра' },
-  ] },
-  { id: 'device', title: 'Целостность устройства', detectors: [
-    { id: 'root', title: 'Разблокирован root-доступ', help: 'На устройстве открыт доступ администратора системы' },
-    { id: 'checksum', title: 'Аномалия в контрольных суммах', help: 'Контрольная сумма приложения не совпала с эталонной' },
-    { id: 'versions', title: 'Разные версии приложения / телефона', help: 'В одном осмотре — кадры с разных версий приложения или устройств' },
-  ] },
-  { id: 'quality', title: 'Качество съёмки', detectors: [
-    { id: 'blur', title: 'Размытые изображения', help: 'Кадр нерезкий' },
-    { id: 'light', title: 'Плохая освещённость', help: 'Кадр слишком тёмный или пересвеченный' },
-    { id: 'palette', title: 'Сниженная цветовая палитра', help: 'В кадре мало цветов: возможна пересъёмка копии' },
-    { id: 'screen', title: 'Съёмка с экрана', help: 'Кадр снят с экрана другого устройства' },
-    { id: 'viewpoint', title: 'Детектор ракурсов транспортных средств', help: 'Ракурс автомобиля не соответствует шагу' },
-  ] },
-  { id: 'single', title: '', detectors: [
-    { id: 'otherRefusals', title: 'Отказ по другим осмотрам исполнителя', help: 'У исполнителя есть отказы по другим осмотрам' },
-  ] },
-] as const
-export const DETECTOR_IDS = DETECTOR_GROUPS.flatMap(g => g.detectors.map(d => d.id))
-const DETECTORS_ON = ['spoof', 'noCoords', 'blur', 'screen']
-
 /** Значения по умолчанию разделов П3: набор данных хранит только отличия. */
 export const SECTION_DEFAULTS: { mobile: MobileSettings, web: WebSettings, access: AccessSettings, ai: AiSettings, anomalies: AnomalySettings, pdf: PdfSettings } = {
   mobile: { mode: 'regular', photo: 'medium', video: 'vga', phone: '', phoneName: '', callConfirm: '', startAfterCreate: true, hideHints: true, skipConfirm: false },
@@ -241,94 +208,6 @@ export const SECTION_DEFAULTS: { mobile: MobileSettings, web: WebSettings, acces
     fileName: 'Лист осмотра {Car:vin}', attachExtra: false,
   },
 }
-
-/* Справочники стенда — вымышленные. */
-export const PHOTO_RESOLUTIONS = [
-  { value: 'low', label: 'Низкое — 1 Мп' },
-  { value: 'medium', label: 'Среднее — 2 Мп' },
-  { value: 'high', label: 'Высокое — 5 Мп' },
-]
-export const VIDEO_RESOLUTIONS = [
-  { value: 'vga', label: 'Ниже среднего — VGA' },
-  { value: 'hd', label: 'Среднее — HD' },
-  { value: 'fullhd', label: 'Высокое — Full HD' },
-]
-/** Роли выполнения и создания осмотра — шире ролей «Общих»: с создателем осмотра и клиентом (макет `33351:6108`). */
-export const ACCESS_ROLES = [
-  { value: 'creator', label: 'Создатель осмотра' },
-  { value: 'admin', label: 'Администратор' },
-  { value: 'expert', label: 'Эксперт' },
-  { value: 'operator', label: 'Оператор осмотров' },
-  { value: 'agent', label: 'Агент' },
-  { value: 'client', label: 'Клиент' },
-]
-/** «И выше» — лестница ролей для видимости и доступа к документам. */
-export const ROLE_LADDER = [
-  { value: 'client', label: 'Клиент и выше' },
-  { value: 'agent', label: 'Агент и выше' },
-  { value: 'operator', label: 'Оператор осмотров' },
-  { value: 'expert', label: 'Эксперт и выше' },
-  { value: 'admin', label: 'Только администратор' },
-]
-const GROUP_NAMES = ['Осмотр Юг', 'Служба проверок', 'Региональные операторы', 'Осмотр Восток', 'Служба контроля', 'Региональный контроль', 'Осмотр Север', 'Служба осмотров',
-  'Контроль Запад', 'Контроль Центр', 'Осмотр Урал', 'Выездные эксперты', 'Партнёрская сеть', 'Осмотр Волга', 'Контроль качества', 'Осмотр Сибирь', 'Дежурная смена',
-  'Осмотр Кавказ', 'Обучение и стажёры', 'Осмотр Дальний Восток', 'Проверка документов', 'Осмотр Северо-Запад', 'Резервная группа']
-const GROUP_OWNERS = ['Демо Страхование', 'Пример Лизинг', 'Образец Банк', 'Тест Финанс']
-/** Группы доступа — 23 строки: три страницы по десять. */
-export const ACCESS_GROUPS = GROUP_NAMES.map((name, k) => ({ id: `grp-${String(k + 1).padStart(2, '0')}`, name, owner: GROUP_OWNERS[k % GROUP_OWNERS.length]! }))
-export const REGION_MATRICES = [
-  { value: 'common', label: '[ОБЩИЙ] Корректировки по регионам' },
-  { value: 'south', label: 'Корректировки: южные регионы' },
-  { value: 'north', label: 'Корректировки: северные регионы' },
-]
-export const PDF_PROGRAMS = [
-  { value: 'act-vehicle-v2', label: 'act-vehicle-v2' },
-  { value: 'tech-report-v1', label: 'tech-report-v1' },
-  { value: 'client-summary-v1', label: 'client-summary-v1' },
-]
-export const PDF_WHEN = [
-  { value: 'always', label: 'Всегда' },
-  { value: 'expertise', label: 'После успешной экспертизы' },
-  { value: 'signed', label: 'После подписания' },
-]
-export const PDF_SIGNERS = [
-  { value: 'client', label: 'Клиент' },
-  { value: 'executor', label: 'Исполнитель осмотра' },
-]
-export const SCHEME_TYPES = [
-  { value: 'vehicle', label: 'Осмотр транспорта' },
-  { value: 'house', label: 'Осмотр недвижимости' },
-  { value: 'equipment', label: 'Осмотр оборудования' },
-]
-export const OWNERS = ['Демо Страхование', 'Пример Лизинг', 'Образец Банк'].map(v => ({ value: v, label: v }))
-export const ROLES = [
-  { value: 'admin', label: 'Администратор' },
-  { value: 'approver', label: 'Согласующий' },
-  { value: 'expert', label: 'Эксперт' },
-  { value: 'operator', label: 'Оператор' },
-  { value: 'agent', label: 'Агент' },
-]
-export const STATUS_DICTIONARIES = [
-  { value: 'standard', label: 'Стандартный словарь статусов' },
-  { value: 'short', label: 'Сокращённый словарь статусов' },
-]
-export const COMMENT_DICTIONARIES = [
-  { value: 'vehicle', label: 'Комментарии к осмотру транспорта', comments: ['Фото нерезкое', 'Не виден VIN', 'Кадр снят не с того ракурса', 'Объект снят не полностью'] },
-  { value: 'common', label: 'Общий словарь комментариев', comments: ['Фото нерезкое', 'Недостаточно света', 'Кадр не относится к шагу'] },
-  { value: 'docs', label: 'Комментарии к документам', comments: ['Документ не читается', 'Нет страницы с отметками'] },
-]
-export const DEADLINE_EVENTS = [
-  { value: 'expertise', label: 'От последнего попадания в экспертизу' },
-  { value: 'created', label: 'От создания осмотра' },
-  { value: 'finished', label: 'От завершения съёмки' },
-]
-/** Служебные переменные формул и демо-значения для превью; переменные полей берутся из формы черновика. */
-export const SYSTEM_VARIABLES = [
-  { value: 'Inspection:number', label: 'Номер осмотра', group: 'Осмотр', sample: '№ 1024' },
-  { value: 'Inspection:date', label: 'Дата осмотра', group: 'Осмотр', sample: '02.10.2026' },
-  { value: 'Scheme:type', label: 'Тип схемы', group: 'Схема', sample: 'Осмотр транспорта' },
-]
-const FIELD_SAMPLES: Record<string, string> = { policy_number: 'К-0001024', vin: 'DEMO0000000001024', regnum: 'А000АА00', mileage: '48 200' }
 
 export interface FormField { id: string, title: string, alias: string, type: string, required: boolean, webOnly: boolean, dependent: boolean, approval?: boolean }
 export interface FormGroup { id: string, title: string, alias: string, fields: FormField[] }
@@ -386,6 +265,10 @@ export interface ModelOptions {
   failNext?: boolean
   /** Часы — для проверки без таймеров. */
   now?: () => string
+  /** Presence: кто ещё редактирует схему — оснастка `?presence=`. */
+  editing?: string
+  /** Открытый на просмотр снимок — оснастка `?view=`. */
+  viewing?: string
 }
 
 /** Сколько длится запись черновика на стенде. */
@@ -400,12 +283,6 @@ function withDefaults(config: SchemeConfig): SchemeConfig {
   const all = config.settings as unknown as Record<string, object | undefined>
   for (const [key, def] of Object.entries(SECTION_DEFAULTS)) all[key] = { ...clone(def), ...all[key] }
   return config
-}
-/** «N полей» — согласование числительного. */
-const plural = (n: number, one: string, few: string, many: string) => {
-  const d = n % 10
-  const h = n % 100
-  return d === 1 && h !== 11 ? one : d >= 2 && d <= 4 && (h < 12 || h > 14) ? few : many
 }
 
 function setPath(root: unknown, path: string, value: unknown): boolean {
@@ -471,10 +348,15 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     /** Плашка «Сохранение теперь автоматическое» закрыта — СС-56. */
     hintClosed: false,
     /** Presence: кто ещё редактирует схему — r2 §2, состояние 6. */
-    editing: '',
+    editing: opts.editing ?? '',
     /** Открытый на просмотр снимок — r2 §2, состояние 7; пока он задан, правка отказывает. */
-    viewing: '' as string,
+    viewing: (opts.viewing && data.snapshots.some(v => v.id === opts.viewing) ? opts.viewing : '') as string,
+    /** Версия, открытая вторым слоем сайда истории. */
+    historyVersion: '',
   })
+
+  /** Конфигурация на экране: открытый снимок либо черновик. */
+  const shown = computed<SchemeConfig>(() => snapshots.find(v => v.id === ui.viewing)?.config ?? draft.config)
 
   /* ------------------------------ уведомления ------------------------------ */
   const notices = reactive<Notice[]>([])
@@ -515,20 +397,20 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   function setSection(section: SectionId, anchor = '') { ui.section = section; ui.anchor = anchor }
   function rememberScroll(tab: TabId, y: number) { ui.scroll[tab] = Math.round(y) }
   /* ------------------------------ зависимости — П2 ------------------------------ */
-  const allFields = computed(() => draft.config.form.groups.flatMap(g => g.fields))
+  const allFields = computed(() => shown.value.form.groups.flatMap(g => g.fields))
   const approvalCount = computed(() => allFields.value.filter(x => x.approval).length)
-  const hasRepeatable = computed(() => draft.config.processes.some(p => p.repeatable))
+  const hasRepeatable = computed(() => shown.value.processes.some(p => p.repeatable))
   const NONE: Rule = { reason: '', meta: '', metaTone: 'default' }
   /**
    * Матрица правил «Поведения процесса» — `spec-audit.md`, «Паттерны кросс-таб зависимостей». Матрицы «Назначения
    * схемы» в источниках нет: правило `quickAccept` — демо-строка с текстом причины из аудита.
    */
   const rules = computed<Record<string, Rule>>(() => {
-    const b = draft.config.settings.general.behavior
+    const b = shown.value.settings.general.behavior
     const n = approvalCount.value
     return {
       /* «гасит»: сквозной модификатор «Назначение схемы». */
-      quickAccept: draft.config.settings.general.purpose === 'standard' ? NONE : { ...NONE, reason: 'Доступно только для стандартной схемы' },
+      quickAccept: shown.value.settings.general.purpose === 'standard' ? NONE : { ...NONE, reason: 'Доступно только для стандартной схемы' },
       /* «гасит»: параметр родителя и состав схемы. */
       refuseRepeatable: !b.refuse
         ? { ...NONE, reason: 'Сначала разрешите отказ с отметкой «Осмотр невозможен»' }
@@ -541,12 +423,12 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
           : { ...NONE, meta: 'Отмечено 0 полей на согласование — согласование не сработает, пока поля не отмечены', metaTone: 'warning' },
       /* ---------- П3 ---------- */
       /* «гасит»: рубильник блока обратной связи — r2 §4, «Веб-приложение». */
-      feedbackBlock: draft.config.settings.web.feedback ? NONE : { ...NONE, reason: 'Включите блок обратной связи на странице экспертизы' },
+      feedbackBlock: shown.value.settings.web.feedback ? NONE : { ...NONE, reason: 'Включите блок обратной связи на странице экспертизы' },
       /* «гасит»: модули зависят от типа объекта схемы — аудит, «Раздел „ИИ-анализ стоимости“». */
-      finishCost: draft.config.settings.general.schemeType === 'house' ? NONE : { ...NONE, reason: 'Анализ стоимости доступен только для схем недвижимости' },
-      autoModules: draft.config.settings.general.schemeType === 'vehicle' ? NONE : { ...NONE, reason: 'Модули доступны только для схем с типом «Осмотр транспорта»' },
+      finishCost: shown.value.settings.general.schemeType === 'house' ? NONE : { ...NONE, reason: 'Анализ стоимости доступен только для схем недвижимости' },
+      autoModules: shown.value.settings.general.schemeType === 'vehicle' ? NONE : { ...NONE, reason: 'Модули доступны только для схем с типом «Осмотр транспорта»' },
       /* «гасит»: рубильник блока аномалий. */
-      anomalies: draft.config.settings.anomalies.enabled ? NONE : { ...NONE, reason: 'Включите отображение блока аномалий' },
+      anomalies: shown.value.settings.anomalies.enabled ? NONE : { ...NONE, reason: 'Включите отображение блока аномалий' },
     }
   })
   const rule = (key: string): Rule => rules.value[key] ?? NONE
@@ -555,21 +437,21 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   const sectionStatus = computed<Record<SectionId, SectionStatus>>(() => ({
     general: rules.value.approval!.metaTone === 'warning' ? 'attention' : 'none',
     mobile: 'none',
-    web: draft.config.settings.web.feedback ? 'on' : 'off',
+    web: shown.value.settings.web.feedback ? 'on' : 'off',
     access: 'none', ai: 'none',
-    anomalies: draft.config.settings.anomalies.enabled ? 'on' : 'off',
-    pdf: draft.config.settings.pdf.templates.length ? 'on' : 'off',
+    anomalies: shown.value.settings.anomalies.enabled ? 'on' : 'off',
+    pdf: shown.value.settings.pdf.templates.length ? 'on' : 'off',
   }))
 
   /* ------------------------------ формулы — П2 ------------------------------ */
   /** Переменные формул: поля формы черновика (`{Группа:алиас}`) и служебные. */
   const variables = computed(() => [
-    ...draft.config.form.groups.flatMap(g => g.fields.map(x => ({ value: `${g.alias}:${x.alias}`, label: x.title, group: g.title }))),
+    ...shown.value.form.groups.flatMap(g => g.fields.map(x => ({ value: `${g.alias}:${x.alias}`, label: x.title, group: g.title }))),
     ...SYSTEM_VARIABLES.map(({ value, label, group }) => ({ value, label, group })),
   ])
   /** Демо-значения переменных для превью результата (r2 §4). */
   const variableSamples = computed<Record<string, string>>(() => Object.fromEntries([
-    ...draft.config.form.groups.flatMap(g => g.fields.map(x => [`${g.alias}:${x.alias}`, FIELD_SAMPLES[x.alias] ?? x.title])),
+    ...shown.value.form.groups.flatMap(g => g.fields.map(x => [`${g.alias}:${x.alias}`, FIELD_SAMPLES[x.alias] ?? x.title])),
     ...SYSTEM_VARIABLES.map(v => [v.value, v.sample]),
   ]))
 
@@ -660,22 +542,115 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
 
   /** «Назад» — к списку схем; на стенде списка нет (СС-01). */
   function back() { notify('Список схем — вне стенда') }
-  /** «Опубликовать схему» — дифф и публикация собираются порцией П4. */
-  function publish() { notify('Публикация схемы — порция П4') }
+  /* ------------------------------ публикация и версии — П4 ------------------------------ */
+  /** Дифф черновика с текущей версией — модалка-гейт публикации и «Сбросить черновик». */
+  const draftDiff = computed(() => (current.value ? diffConfigs(current.value.config, draft.config) : null))
+  /** Предупреждения валидации черновика; критичное блокирует публикацию. */
+  const warnings = computed(() => validateConfig(draft.config))
+  const blocked = computed(() => warnings.value.some(w => w.critical))
+  /** Сводка настроенного — первая публикация. */
+  const summary = computed(() => summarize(draft.config))
+  const draftDate = computed(() => formatDate(draft.editedAt))
+
+  function openModal(id: string) { ui.surfaces.push({ kind: 'modal', id }) }
+  /**
+   * «Опубликовать схему» и клик по индикатору черновика: не применяет сразу — открывает гейт. У схемы без публикаций —
+   * подтверждение без диффа (`spec-audit.md`, «Первая публикация ≠ дифф»).
+   */
+  function openPublish() {
+    if (ui.viewing) { notify('Прошлая версия открыта только для чтения', 'err'); return }
+    if (!current.value) { openModal('first-publish'); return }
+    if (!dirty.value) { notify('Публиковать нечего: изменений нет'); return }
+    openModal('publish')
+  }
+  /** Подтверждение публикации: рождается неизменяемый снимок, он становится текущей версией. */
+  function confirmPublish(): boolean {
+    if (blocked.value) { notify('Публикация невозможна: исправьте критичные предупреждения', 'err'); return false }
+    const publishedAt = now()
+    snapshots.push({ id: `v${snapshots.length + 1}`, publishedAt, author: user, inspections: 0, config: clone(draft.config) })
+    closeSurface()
+    notify(`Схема опубликована: версия от ${formatDate(publishedAt)}`)
+    return true
+  }
+  /** «Сбросить черновик к текущей версии» — окно показывает, что сбрасывается. */
+  function openReset() {
+    if (!current.value || !dirty.value) { notify('Сбрасывать нечего: черновик совпадает с текущей версией'); return }
+    openModal('reset')
+  }
+  function confirmReset() {
+    if (!current.value) return
+    Object.assign(draft.config, clone(current.value.config))
+    draft.author = current.value.author
+    draft.editedAt = current.value.publishedAt
+    closeSurface()
+    write()
+    notify('Черновик сброшен к текущей версии')
+  }
+  /** «Сделать копию» — штатный механизм платформы; на стенде списка схем нет. */
+  function copy() { notify('Копия схемы — вне стенда') }
+  /** «Предпросмотр» — вход в демо-осмотр; сам демо-осмотр — вне VA-16377 (r2 §3, §9). */
+  function preview() { notify('Демо-осмотр — вне стенда') }
+  /** Меню «⋯»: экспорт, дамп, копия, сброс черновика, удаление (r2 §3). */
+  function menu(action: 'export' | 'dump' | 'copy' | 'reset' | 'delete') {
+    if (action === 'export') notify('Экспорт схемы — вне стенда')
+    else if (action === 'dump') notify('Дамп схемы — вне стенда')
+    else if (action === 'copy') copy()
+    else if (action === 'reset') openReset()
+    else openModal('delete')
+  }
+  function confirmDelete() {
+    closeSurface()
+    notify('Удаление схемы — вне стенда')
+  }
+
+  /** История версий: текущая сверху, ниже прошлые снимки (r2 §2). */
+  const history = computed(() => [...snapshots].reverse().map((v, k) => ({
+    id: v.id, date: formatDate(v.publishedAt), author: v.author, inspections: v.inspections, current: k === 0,
+    meta: `Опубликовал(а) ${v.author} · ${v.inspections} ${plural(v.inspections, 'осмотр', 'осмотра', 'осмотров')}`,
+  })))
+  function openHistory() {
+    ui.historyVersion = ''
+    openSide('history')
+  }
+  /** Версия вторым слоем сайда: её дифф с предыдущей; у первой версии сравнивать не с чем. */
+  function openVersion(id: string) { ui.historyVersion = id }
+  function closeVersion() { ui.historyVersion = '' }
+  const versionDiff = computed(() => {
+    const k = snapshots.findIndex(v => v.id === ui.historyVersion)
+    return k > 0 ? diffConfigs(snapshots[k - 1]!.config, snapshots[k]!.config) : null
+  })
+  const versionShown = computed(() => history.value.find(v => v.id === ui.historyVersion) ?? null)
+
+  /** Просмотр прошлой версии — r2 §2, состояние 7: поверхности закрываются, правка отказывает. */
+  function view(id: string) {
+    if (!snapshots.some(v => v.id === id)) return
+    ui.surfaces.splice(0)
+    ui.historyVersion = ''
+    ui.viewing = id
+  }
+  function leaveView() { ui.viewing = '' }
+  /** Плашка просмотра: «Вы смотрите версию от …, по ней проведено N осмотров. Текущая — от …». */
+  const viewingText = computed(() => {
+    const v = snapshots.find(x => x.id === ui.viewing)
+    if (!v || !current.value) return ''
+    return `Вы смотрите версию от ${formatDate(v.publishedAt)}, по ней ${plural(v.inspections, 'проведён', 'проведено', 'проведено')} ${v.inspections} ${plural(v.inspections, 'осмотр', 'осмотра', 'осмотров')}. Текущая — от ${formatDate(current.value.publishedAt)}`
+  })
 
   /** Состояние модели одной строкой — прогону, для сравнения «до / после». */
   function dump() {
     return JSON.stringify({
       draft: draft.config, author: draft.author, versions: snapshots.map(s => s.id), current: current.value?.id ?? null,
       publish: publishState.value, save: save.state, writes: save.writes,
-      ui: { tab: ui.tab, section: ui.section, anchor: ui.anchor, scroll: ui.scroll, viewing: ui.viewing, surfaces: ui.surfaces.map(x => x.id) },
+      ui: { tab: ui.tab, section: ui.section, anchor: ui.anchor, scroll: ui.scroll, viewing: ui.viewing, surfaces: ui.surfaces.map(x => x.id), historyVersion: ui.historyVersion },
     })
   }
 
   return {
     snapshots, current, draft, dirty, publishState, save, ui, notices,
     rules, rule, approvalCount, sectionStatus, variables, variableSamples, topSurface,
-    set, setTab, setSection, rememberScroll, back, publish, retry, notify, dismissNotice, dump,
+    shown, draftDiff, warnings, blocked, summary, draftDate, history, versionDiff, versionShown, viewingText,
+    openPublish, confirmPublish, openReset, confirmReset, copy, preview, menu, confirmDelete, openHistory, openVersion, closeVersion, view, leaveView,
+    set, setTab, setSection, rememberScroll, back, retry, notify, dismissNotice, dump,
     neighbourSection, stepSection, goToFields, openSide, closeSurface,
     undo, addReason, removeReason, toggleGroup, resetCosts, detectorsOn, detectorSetState, toggleDetectorSet, setDetector, saveTemplate, removeTemplate,
   }

@@ -7,21 +7,34 @@ import { cn } from '@/lib/utils'
 import { MODAL_CARD_KEY } from '.'
 
 /**
- * Шапка окна-карточки — мастер `modal_cards_header` `864:2747`, вариант `close`: строка 28,
- * заголовок 24/28 bold, крестик справа. Подзаголовок 15/20 — из «Экспорта в Excel»: у мастера
- * шапки его нет. У заблокированного окна крестика нет. Разбор — в `index.ts`.
+ * Шапка окна-карточки — мастер `modal_cards_header` `864:2747`: строка 28, заголовок 24/28 bold. Оба варианта
+ * мастера: `close` `864:2745` — крестик справа; `back` `864:2746` — стрелка «назад» слева от заголовка (такт 64).
+ * Подзаголовок 15/20 — из «Экспорта в Excel»: у мастера шапки его нет. У заблокированного окна крестика нет.
+ * Разбор — в `index.ts`.
  */
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   title: string
   subtitle?: string
+  /**
+   * Вариант `type=back` мастера: стрелка «назад» слева от заголовка, крестика нет — второй слой окна (история
+   * версий: список → дифф версии). Нажатие — событие `back`; закрытие окна остаётся за Esc и кликом мимо.
+   */
+  back?: boolean
   class?: string
-}>()
+}>(), { back: false })
+
+const emit = defineEmits<{ back: [] }>()
 
 const ctx = inject(MODAL_CARD_KEY, { closable: computed(() => true) })
 </script>
 
 <template>
-  <div data-slot="modal-card-header" :class="cn('flex shrink-0 items-start gap-4 pr-3 pl-4', props.class)">
+  <!-- Паддинги мастера: `close` — 0 / 12 / 0 / 16, `back` — 0 / 12 / 0 / 12; зазор стрелки и заголовка 16. -->
+  <div data-slot="modal-card-header" :data-type="props.back ? 'back' : 'close'" :class="cn('flex shrink-0 items-start gap-4 pr-3', props.back ? 'pl-3' : 'pl-4', props.class)">
+    <!-- Стрелка — бокс 24 по центру строки 28, видимый глиф 17.58 по ширине: `ic_keyboard_backspace24` `1944:1184`. -->
+    <IconButton v-if="props.back" data-modal-back variant="ghost" size="sm" label="Назад" class="mt-0.5" @click="emit('back')">
+      <Icon name="arrow-back" :size="17.6" class="text-foreground" />
+    </IconButton>
     <div class="flex min-w-0 flex-1 flex-col gap-1">
       <DialogTitle data-slot="modal-card-title" class="m-0 text-2xl font-bold text-foreground">
         {{ props.title }}
@@ -35,7 +48,7 @@ const ctx = inject(MODAL_CARD_KEY, { closable: computed(() => true) })
       </VisuallyHidden>
     </div>
     <!-- Строка 28, бокс крестика 24 — по центру строки. Глиф 13: видимый размер `24_close`. -->
-    <DialogClose v-if="ctx.closable.value" as-child>
+    <DialogClose v-if="ctx.closable.value && !props.back" as-child>
       <IconButton variant="ghost" size="sm" label="Закрыть" class="mt-0.5">
         <Icon name="close" :size="13" class="text-foreground" />
       </IconButton>

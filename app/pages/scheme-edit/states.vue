@@ -9,6 +9,7 @@ import { formulaPreview } from '~/components/ui/formula-input'
  * П1: ось `AppBarStatus` — `surface="light"` и `retryable`.
  * П2: `Card`, `SettingRow`, `SectionNav`, `FormulaInput` с `FormulaPreview`, ось `Select multiple`, ступени `Heading`
  * `title`, `group` и проп `description` (`docs/scheme-edit.md`, разделы 8 и 9).
+ * П4: `PublishStatus`, `Diff` с частями, ось `ModalCardHeader back` (`docs/scheme-edit.md`, раздел 8, карточки 5 и 6).
  * П3: вариант `Button variant="outline"` — мастер кита 1 `btn_outline` `1990:226`; события `edit` и `action` у
  * `TableRowActions`.
  */
@@ -45,6 +46,43 @@ const SAMPLES = { 'Car:vin': 'DEMO0000000001024', 'Car:regnum': 'А000АА00', '
 const formula = ref('Осмотр {Inspection:number} — {Car:vin}')
 const formulaEmpty = ref('')
 const formulaUnknown = ref('Архив {Car:vin}_{Car:color}')
+
+/* ------------------------------ П4 ------------------------------ */
+const statusLog = ref('—')
+const DIFF_AREAS = [
+  { id: 'settings', title: 'Настройки', count: '2 изменения', tone: 'changed' as const, groups: [
+    { kind: 'changed' as const, items: [
+      { label: 'Отправлять поля на согласование согласующему лицу', before: 'выключено', after: 'включено', effect: 'В процесс добавится этап согласования' },
+      { label: 'Описание', before: 'Осмотр автомобиля', after: 'Комплексный осмотр автомобиля' },
+    ] },
+  ] },
+  { id: 'form', title: 'Форма', count: '+7 полей', tone: 'added' as const, groups: [
+    { kind: 'added' as const, items: Array.from({ length: 7 }, (_, k) => ({ label: `Поле «Фото ${k + 1}»`, after: 'группа «Автомобиль»' })) },
+  ] },
+  { id: 'processes', title: 'Процессы и шаги', count: '−1 шаг', tone: 'removed' as const, groups: [
+    { kind: 'removed' as const, items: [{ label: 'Шаг «Страховой полис»', before: 'процесс «Осмотр документов»' }] },
+  ] },
+  { id: 'showcase', title: 'Витрина', count: 'без изменений', tone: 'none' as const, groups: [] },
+]
+const DIFF_WARNINGS = [
+  { text: 'Согласование включено, поля для согласования не отмечены', critical: false },
+  { text: 'У поля «Пробег» пустой алиас', critical: true },
+]
+
+const PUBLISH_STATUS_EXAMPLE = `<PublishStatus state="draft" author="Игорь Петров" date="01.10.2026, 11:40" @open="openDiff" />   <!-- кнопка: открывает дифф -->
+<PublishStatus state="published" />
+<PublishStatus state="never" />
+<PublishStatus state="draft" author="Анна Смирнова" date="03.10.2026, 09:00" editing="Игорь Петров" />   <!-- presence -->`
+
+const DIFF_EXAMPLE = `<!-- готовый результат сравнения: области, опасное, предупреждения, итог -->
+<Diff :areas="diff.areas" :attention="diff.attention" :warnings="warnings" :total="diff.total" />
+
+<!-- те же части по одной -->
+<DiffArea title="Форма" count="+1 поле" tone="added">
+  <DiffGroup kind="added" :items="[{ label: 'Поле «Цвет кузова»', after: 'группа «Автомобиль»' }]" />
+</DiffArea>`
+
+const HEADER_BACK_EXAMPLE = `<ModalCardHeader back title="Версия от 22.09.2026, 16:05" subtitle="Опубликовал(а) Игорь Петров" @back="toList" />`
 
 /* ------------------------------ П3 ------------------------------ */
 const rowLog = ref('—')
@@ -285,6 +323,65 @@ const FORMULA_EXAMPLE = `<Field label="Тема письма оповещени�
         </Field>
       </div>
       <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ SELECT_MULTIPLE_EXAMPLE }}</pre>
+    </section>
+
+    <!-- ============================ П4, такт 64 ============================ -->
+    <section class="flex flex-col gap-4" data-matrix="publish-status">
+      <Heading>PublishStatus — индикатор состояния публикации</Heading>
+      <div class="flex flex-col items-start gap-3">
+        <PublishStatus state="never" data-case="never" />
+        <PublishStatus state="draft" author="Игорь Петров" date="01.10.2026, 11:40" data-case="draft" @open="statusLog = 'open'" />
+        <PublishStatus state="draft" data-case="draft-bare" />
+        <PublishStatus state="published" data-case="published" />
+        <PublishStatus state="draft" author="Анна Смирнова" date="03.10.2026, 09:00" editing="Игорь Петров" data-case="editing" />
+        <PublishStatus state="published" editing="Игорь Петров" data-case="published-editing" />
+      </div>
+      <ToolbarText>
+        Событие индикатора черновика: {{ statusLog }}
+      </ToolbarText>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ PUBLISH_STATUS_EXAMPLE }}</pre>
+    </section>
+
+    <section class="flex flex-col gap-4" data-matrix="diff">
+      <Heading>Diff, DiffArea, DiffGroup, DiffChange — дифф конфигураций</Heading>
+      <div class="grid max-w-settings grid-cols-1 gap-6">
+        <Card data-case="full">
+          <Diff :areas="DIFF_AREAS" :attention="['Удалён шаг «Страховой полис»']" :warnings="DIFF_WARNINGS" total="Итого: 10 изменений в 3 разделах" />
+        </Card>
+        <Card data-case="open">
+          <Diff total="Итого: 2 изменения в 1 разделе">
+            <DiffArea title="Настройки" count="2 изменения" tone="changed" open>
+              <DiffGroup kind="changed" :items="DIFF_AREAS[0]!.groups[0]!.items" />
+            </DiffArea>
+            <DiffArea title="Форма" count="+7 полей" tone="added" open>
+              <DiffGroup kind="added" :items="DIFF_AREAS[1]!.groups[0]!.items" />
+            </DiffArea>
+            <DiffArea title="Процессы и шаги" count="−1 шаг" tone="removed" open>
+              <DiffGroup kind="removed" :items="DIFF_AREAS[2]!.groups[0]!.items" />
+            </DiffArea>
+            <DiffArea title="Витрина" count="без изменений" tone="none" />
+          </Diff>
+        </Card>
+        <Card data-case="warnings">
+          <Diff :warnings="[DIFF_WARNINGS[0]!]" />
+        </Card>
+      </div>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ DIFF_EXAMPLE }}</pre>
+    </section>
+
+    <section class="flex flex-col gap-4" data-matrix="modal-card-header-back">
+      <Heading>ModalCardHeader · back — вариант «←» мастера modal_cards_header 864:2746</Heading>
+      <div class="relative h-60 max-w-settings overflow-hidden">
+        <ModalCard :open="true" :modal="false">
+          <ModalCardContent inline placement="edge" data-case="back">
+            <ModalCardHeader back title="Версия от 22.09.2026, 16:05" subtitle="Опубликовал(а) Игорь Петров · 41 осмотр" />
+            <ModalCardBody>
+              <ModalCardText>Второй слой окна: стрелка возвращает к списку версий</ModalCardText>
+            </ModalCardBody>
+          </ModalCardContent>
+        </ModalCard>
+      </div>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ HEADER_BACK_EXAMPLE }}</pre>
     </section>
 
     <!-- ============================ П3, такт 63 ============================ -->

@@ -258,6 +258,22 @@ function kit(page) {
     },
     check: field => page.click(`document.querySelector('[data-field=${field}] [data-slot=choice-control], [data-field=${field}][data-slot=choice] [data-slot=choice-control]')`),
     async tabs(n) { for (let k = 0; k < n; k++) await page.key('Tab') },
+    /* ---------- П4 ---------- */
+    /** Очистить поле: клик, выделить всё, Delete. */
+    async clear(sel) {
+      const input = `(el => el?.matches('input') ? el : el?.querySelector('input'))(document.querySelector('${sel}'))`
+      await page.click(input)
+      await page.evaluate(`(${input}.select(), 1)`)
+      await page.key('Delete')
+    },
+    statusOpen: () => page.click(`document.querySelector('button[data-slot=publish-status-main]')`),
+    async menu(action) {
+      await page.click(Q.act('menu'))
+      if (action) await page.click(`document.querySelector('[data-menu=scheme] [data-action=${action}]')`)
+    },
+    version: id => page.click(`document.querySelector('[data-version=${id}]')`),
+    backLayer: () => page.click(`document.querySelector('[data-modal-back]')`),
+    area: id => page.click(`document.querySelector('[data-area=${id}] [data-slot=diff-area-trigger]')`),
     /* Формула: курсор в конец — клик по области и End. */
     async formulaEnd(key) {
       await page.click(Q.editor(key))
@@ -376,6 +392,37 @@ function kit(page) {
             program: t(r.querySelectorAll('[data-slot=table-cell]')[1].textContent), access: t(r.querySelectorAll('[data-slot=table-cell]')[2].textContent),
           })),
           focusInSide: !!document.activeElement?.closest?.('[data-side]'),
+          /* ---------- П4 ---------- */
+          status: (() => { const el = document.querySelector('[data-slot=publish-status]'); if (!el) return null
+            const main = el.querySelector('[data-slot=publish-status-main]')
+            return { state: el.dataset.state, text: t(main.textContent), clickable: main.matches('button'), editing: t(el.querySelector('[data-slot=publish-status-editing] > span:last-child')?.textContent) } })(),
+          headerActs: [...document.querySelectorAll('[data-header-row] [data-act]')].map(b => b.dataset.act),
+          modalTitle: t([...document.querySelectorAll('[data-slot=modal-card-title]')].pop()?.textContent) || null,
+          modalSub: t([...document.querySelectorAll('[data-slot=modal-card-subtitle]')].pop()?.textContent) || null,
+          headerType: [...document.querySelectorAll('[data-slot=modal-card-header]')].pop()?.dataset.type ?? null,
+          diff: (() => { const el = [...document.querySelectorAll('[data-slot=diff]')].pop(); if (!el) return null
+            return {
+              attention: [...el.querySelectorAll('[data-diff-attention] li')].map(x => t(x.textContent)),
+              warnings: [...el.querySelectorAll('[data-diff-warnings] li')].map(x => ({ text: t(x.textContent), critical: x.hasAttribute('data-critical') })),
+              areas: [...el.querySelectorAll('[data-slot=diff-area]')].map(a => ({ id: a.dataset.area ?? '', count: t(a.querySelector('[data-slot=diff-area-count]').textContent), tone: a.dataset.tone })),
+              open: [...el.querySelectorAll('[data-slot=diff-area][data-open]')].map(a => ({ id: a.dataset.area ?? '', groups: [...a.querySelectorAll('[data-slot=diff-group]')].map(grp => ({
+                kind: grp.dataset.kind, title: t(grp.querySelector('[data-slot=diff-group-title]').textContent),
+                items: [...grp.querySelectorAll('[data-slot=diff-change]')].map(c => [t(c.querySelector('[data-slot=diff-change-label]').textContent), [t(c.querySelector('[data-slot=diff-change-before]')?.textContent), t(c.querySelector('[data-slot=diff-change-after]')?.textContent)].filter(Boolean).join(' → '), t(c.querySelector('[data-slot=diff-change-effect]')?.textContent)].filter(Boolean).join(' | ')),
+              })) })),
+              total: t(el.querySelector('[data-slot=diff-total]')?.textContent) || null,
+            } })(),
+          confirmOff: (document.querySelector('[data-act=publish-confirm]') ?? document.querySelector('[data-act=first-confirm]'))?.disabled ?? null,
+          firstSummary: [...document.querySelectorAll('[data-first-summary] li')].map(x => t(x.textContent)),
+          historyRows: [...document.querySelectorAll('[data-version]')].map(r => ({ id: r.dataset.version, text: t(r.innerText), current: r.getAttribute('aria-current') === 'true' })),
+          historyEmpty: t(document.querySelector('[data-side=history] [data-slot=empty-title]')?.textContent) || null,
+          versionFirst: !!document.querySelector('[data-version-first]'),
+          sideActs: [...document.querySelectorAll('[data-side=history] [data-act]')].map(b => b.dataset.act),
+          menuItems: [...document.querySelectorAll('[data-menu=scheme] [data-slot=list-item]')].map(x => t(x.textContent)),
+          viewing: root.dataset.viewing,
+          banner7: t(document.querySelector('[data-viewing-banner]')?.textContent) || null,
+          readonly: !!document.querySelector('[data-readonly][inert]'),
+          shownDescription: document.querySelector('[data-field=description] textarea, textarea[data-field=description]')?.value ?? null,
+          current: M.current.value?.id ?? null,
           atMark: window.__markY == null ? null : Math.abs(window.scrollY - window.__markY) <= 1 && window.__markY > 300,
           surface: root.dataset.surface,
           sideTitle: t(document.querySelector('[data-side] [data-slot=modal-card-title]')?.textContent) || null,
@@ -392,7 +439,7 @@ function kit(page) {
 
 /* ------------------------------ сценарии ------------------------------ */
 /**
- * Сценарии П1–П3 — `docs/scheme-edit.md`, 6.1. Шаг — [название, действие, ожидание из спеки, опции].
+ * Сценарии П1–П4 — `docs/scheme-edit.md`, 6.1. Шаг — [название, действие, ожидание из спеки, опции].
  * Ожидание — подмножество слепка; источник — в названии сценария.
  */
 const NAME = 'КАСКО — осмотр легкового автомобиля'
@@ -529,6 +576,113 @@ const SCENARIOS = {
     ['повторный выбор в списке снимает роль', async (K) => { await K.pick('deadlineEditors', 'Оператор'); await K.settled() }, { 'g.deadlines.editors': ['expert'] }],
     ['делиться осмотром — «Только исполнитель»', async (K) => { await K.radio('share', 'Только исполнитель'); await K.settled() }, { 'g.deadlines.share': 'executor' }],
   ]],
+  /* ============================ П4, такт 64 ============================ */
+  'СС-02': ['новая схема: индикатор «Ни разу не опубликовано», главная кнопка ведёт в первую публикацию (r2 §2, состояние 1)', [
+    ['старт', null, { publish: 'never', status: { state: 'never', text: 'Ни разу не опубликовано', clickable: false, editing: '' }, versions: 0, current: null, headerActs: ['history', 'preview', 'publish', 'menu'] }],
+    ['«Опубликовать схему» — первая публикация', K => K.publish(), { surface: 'first-publish', modalTitle: 'Первая публикация схемы', diff: null, versions: 0 }],
+  ], { query: 'data=new&now=2026-10-03T09:00:00' }],
+  'СС-03': ['правка делает черновик грязным: индикатор «Черновик: правки {автор} от {дата}»; клик по индикатору открывает дифф (r2 §2, состояние 2; аудит, «Индикатор состояния схемы»)', [
+    ['старт: черновик с чужими правками', null, { publish: 'draft', status: { state: 'draft', text: 'Черновик: правки Игорь Петров от 01.10.2026, 11:40', clickable: true, editing: '' } }],
+    ['своя правка — автор и дата последних правок', async (K) => { await K.toggle('skipExpertise'); await K.settled() },
+      { 'status.text': 'Черновик: правки Анна Смирнова от 03.10.2026, 09:00', 'status.clickable': true, writes: 1 }],
+    ['клик по индикатору открывает дифф', K => K.statusOpen(), { surface: 'publish', modalTitle: 'Публикация схемы', 'diff.areas.0': { id: 'settings', count: '2 изменения', tone: 'changed' }, versions: 2 }],
+  ], { query: 'now=2026-10-03T09:00:00' }],
+  'СС-04': ['«Предпросмотр» открывает заглушку демо-осмотра (r2 §3, §9)', [
+    ['«Предпросмотр»', K => K.act('preview'), { notices: ['Демо-осмотр — вне стенда'], surface: '', writes: 0, versions: 2 }],
+  ]],
+  'СС-05': ['публикация: дифф-гейт — сводка по четырём областям, «Требует внимания» сверху, детали свёрнуты, подтверждение рождает снимок, current меняется, индикатор «Всё опубликовано» (r2 §2; аудит, «Как устроен дифф», «Масштабируемость диффа»)', [
+    ['«Опубликовать схему» — гейт с диффом, детали свёрнуты', K => K.publish(), { surface: 'publish', modalTitle: 'Публикация схемы', modalSub: 'Эти изменения войдут в новую версию и будут применяться к новым осмотрам',
+      diff: { attention: ['Удалён шаг «Страховой полис»'], warnings: [], areas: [{"id":"settings","count":"1 изменение","tone":"changed"},{"id":"form","count":"2 изменения","tone":"changed"},{"id":"processes","count":"−1 шаг","tone":"removed"},{"id":"showcase","count":"без изменений","tone":"none"}], open: [], total: 'Итого: 4 изменения в 3 разделах' }, confirmOff: false, versions: 2 }],
+    ['раскрыть «Форма» — группы «Добавлено» и «Изменено»', K => K.area('form'), { 'diff.open': [{ id: 'form', groups: [
+      { kind: 'added', title: 'Добавлено · 1', items: ['Поле «Цвет кузова» | группа «Автомобиль», алиас body_color'] },
+      { kind: 'changed', title: 'Изменено · 1', items: ['Поле «Пробег»: обязательное | нет → да'] }] }] }],
+    ['«Отменить» — версий по-прежнему две', K => K.act('publish-cancel'), { surface: '', versions: 2, current: 'v2', publish: 'draft', focusAct: 'publish' }],
+    ['включить согласование — в диффе правка со следствием', async (K) => { await K.toggle('approval'); await K.settled(); await K.publish(); await K.area('settings') },
+      { 'diff.areas.0': { id: 'settings', count: '2 изменения', tone: 'changed' }, 'diff.total': 'Итого: 5 изменений в 3 разделах',
+        'diff.open.0.groups.0.items': ['Описание | Осмотр автомобиля перед оформлением полиса добровольного страхования → Комплексный осмотр автомобиля перед оформлением полиса добровольного страхования',
+          'Отправлять поля на согласование согласующему лицу | выключено → включено | В процесс добавится этап согласования'] }],
+    ['«Опубликовать» — снимок, новая текущая версия', K => K.act('publish-confirm'), { surface: '', versions: 3, current: 'v3', publish: 'published', dirty: false,
+      status: { state: 'published', text: 'Всё опубликовано', clickable: false, editing: '' }, notices: ['Схема опубликована: версия от 03.10.2026, 09:00'] }],
+    ['история: новая версия сверху', K => K.act('history'), { surface: 'history', 'historyRows.0': { id: 'v3', text: 'Версия от 03.10.2026, 09:00 Опубликовал(а) Анна Смирнова · 0 осмотров Текущая', current: true }, 'historyRows.1.current': false }],
+  ], { query: 'now=2026-10-03T09:00:00' }],
+  'СС-06': ['первая публикация: подтверждение без диффа со сводкой настроенного (r2 §2; аудит, «Первая публикация ≠ дифф»)', [
+    ['«Опубликовать схему»', K => K.publish(), { surface: 'first-publish', modalTitle: 'Первая публикация схемы', diff: null, confirmOff: false,
+      firstSummary: ['Настройки — настроены', 'Форма — 0 полей в 0 группах', 'Процессы — 0 шагов в 0 процессах', 'Витрина — требует оформления'] }],
+    ['«Отмена»', K => K.act('first-cancel'), { surface: '', versions: 0, publish: 'never' }],
+    ['«Опубликовать» — первая версия', async (K) => { await K.publish(); await K.act('first-confirm') },
+      { surface: '', versions: 1, current: 'v1', publish: 'published', 'status.text': 'Всё опубликовано', notices: ['Схема опубликована: версия от 03.10.2026, 09:00'] }],
+    ['повторное нажатие — публиковать нечего', K => K.publish(), { surface: '', versions: 1, notices: ['Публиковать нечего: изменений нет'] }],
+  ], { query: 'data=new&now=2026-10-03T09:00:00' }],
+  'СС-07': ['меню «⋯»: экспорт, дамп, копия, удаление — пункты с уведомлением-заглушкой, удаление с подтверждением (r2 §3)', [
+    ['открыть меню', K => K.menu(), { menuItems: ['Экспортировать схему', 'Скачать дамп', 'Сделать копию', 'Сбросить черновик к текущей версии', 'Удалить схему'] }],
+    ['«Экспортировать схему»', K => K.act('menu').then(() => K.menu('export')), { notices: ['Экспорт схемы — вне стенда'], menuItems: [] }],
+    ['«Скачать дамп»', K => K.menu('dump'), { notices: ['Дамп схемы — вне стенда'] }],
+    ['«Сделать копию»', K => K.menu('copy'), { notices: ['Копия схемы — вне стенда'] }],
+    ['«Удалить схему» — подтверждение', K => K.menu('delete'), { surface: 'delete', modalTitle: 'Удалить схему?', notices: [] }],
+    ['«Отмена»', K => K.act('delete-cancel'), { surface: '', notices: [], versions: 2 }],
+    ['«Удалить»', async (K) => { await K.menu('delete'); await K.act('delete-confirm') }, { surface: '', notices: ['Удаление схемы — вне стенда'], versions: 2, writes: 0 }],
+  ]],
+  'СС-08': ['чистый черновик: индикатор «Всё опубликовано», перехода в дифф нет (r2 §2, состояние 3; аудит, «Дифф вместо переключателя»)', [
+    ['сбросить черновик — он чистый', async (K) => { await K.menu('reset'); await K.act('reset-confirm'); await K.settled() },
+      { dirty: false, publish: 'published', status: { state: 'published', text: 'Всё опубликовано', clickable: false, editing: '' } }],
+    ['«Опубликовать схему» — диффа нет, уведомление', K => K.publish(), { surface: '', notices: ['Публиковать нечего: изменений нет'], versions: 2 }],
+    ['правка возвращает черновик', async (K) => { await K.toggle('skipExpertise'); await K.settled() }, { dirty: true, 'status.state': 'draft', 'status.clickable': true }],
+  ], { query: 'now=2026-10-03T09:00:00' }],
+  'СС-45': ['история версий: сайд из шапки, current сверху, снимки с датой публикации и числом осмотров (r2 §2; аудит, «Список версий = read-only история публикаций»)', [
+    ['«История версий»', K => K.act('history'), { surface: 'history', modalTitle: 'История версий', headerType: 'close', focusInSide: true, historyEmpty: null, historyRows: [
+      { id: 'v2', text: 'Версия от 22.09.2026, 16:05 Опубликовал(а) Игорь Петров · 41 осмотр Текущая', current: true },
+      { id: 'v1', text: 'Версия от 14.08.2026, 10:20 Опубликовал(а) Анна Смирнова · 128 осмотров', current: false }] }],
+    ['Esc закрывает, фокус на «Истории версий»', K => K.key('Escape'), { surface: '', focusAct: 'history', writes: 0 }],
+  ]],
+  'СС-45/новая': ['история версий у новой схемы — «Публикаций ещё не было» (r2 §2, §8; аудит, «Пустые состояния»)', [
+    ['«История версий»', K => K.act('history'), { surface: 'history', historyRows: [], historyEmpty: 'Публикаций ещё не было' }],
+  ], { query: 'data=new' }],
+  'СС-46': ['история: клик по версии — её дифф с предыдущей вторым слоем сайда, «← назад», «Сделать копию» (r2 §2; аудит, «Два режима одного дифф-компонента»)', [
+    ['версия от 22.09 — второй слой с диффом', async (K) => { await K.act('history'); await K.version('v2') }, { surface: 'history', headerType: 'back', modalTitle: 'Версия от 22.09.2026, 16:05', modalSub: 'Опубликовал(а) Игорь Петров · 41 осмотр',
+      'diff.areas': [{ id: 'settings', count: '1 изменение', tone: 'changed' }, { id: 'form', count: '2 изменения', tone: 'changed' }, { id: 'processes', count: '6 изменений', tone: 'changed' }, { id: 'showcase', count: '4 изменения', tone: 'changed' }],
+      'diff.total': 'Итого: 13 изменений в 4 разделах', 'diff.attention': [], sideActs: ['version-copy'], versionFirst: false }],
+    ['раскрыть «Процессы и шаги»', K => K.area('processes'), { 'diff.open.0.groups.0': { kind: 'added', title: 'Добавлено · 4', items: ['Шаг «VIN на металле» | процесс «Осмотр автомобиля»', 'Шаг «Вид справа» | процесс «Осмотр автомобиля»', 'Процесс «Осмотр документов» | 2 шага', 'Процесс «Осмотр повреждений» | 0 шагов'] } }],
+    ['«←» — назад к списку', K => K.backLayer(), { headerType: 'close', modalTitle: 'История версий', 'historyRows.length': 2 }],
+    ['первая версия — сравнивать не с чем; «Открыть версию» есть', K => K.version('v1'), { headerType: 'back', modalTitle: 'Версия от 14.08.2026, 10:20', versionFirst: true, diff: null, sideActs: ['version-copy', 'version-view'] }],
+    ['«Сделать копию»', K => K.act('version-copy'), { notices: ['Копия схемы — вне стенда'], versions: 2, writes: 0 }],
+  ]],
+  'СС-47': ['просмотр прошлой версии: плашка с датой и числом осмотров, поля только для чтения, табы и навигатор работают, «Перейти к текущей версии», «Сделать копию»; индикатора черновика и «Опубликовать схему» нет (r2 §2, состояние 7)', [
+    ['история → версия от 14.08 → «Открыть версию»', async (K) => { await K.act('history'); await K.version('v1'); await K.act('version-view') },
+      { viewing: 'v1', surface: '', status: null, headerActs: ['history', 'view-copy', 'view-leave'], readonly: true,
+        banner7: 'Вы смотрите версию от 14.08.2026, 10:20, по ней проведено 128 осмотров. Текущая — от 22.09.2026, 16:05. Настройки открыты только для чтения',
+        shownDescription: 'Осмотр автомобиля перед оформлением полиса', title: 'КАСКО — осмотр легкового автомобиля' }],
+    ['нажатие по настройке — правки нет', K => K.toggle('skipExpertise'), { 'g.behavior.skipExpertise': false, writes: 0, saveLog: [], dirty: true }, { blind: true }],
+    ['навигатор работает: раздел «PDF»', K => K.section('pdf'), { section: 'pdf', viewing: 'v1', readonly: true, 'templates.length': 2 }],
+    ['табы работают', async (K) => { await K.tab('form'); await K.tab('settings') }, { tab: 'settings', viewing: 'v1' }],
+    ['«Сделать копию»', K => K.act('view-copy'), { notices: ['Копия схемы — вне стенда'], viewing: 'v1' }],
+    ['«Перейти к текущей версии» — снова черновик', K => K.act('view-leave'), { viewing: '', readonly: false, banner7: null, 'status.state': 'draft', headerActs: ['history', 'preview', 'publish', 'menu'] }],
+  ]],
+  'СС-47/вход': ['просмотр прошлой версии — вход адресом, как из осмотра, прошедшего по старому снимку (r2 §2, состояние 7)', [
+    ['старт', null, { viewing: 'v1', readonly: true, status: null, headerActs: ['history', 'view-copy', 'view-leave'], shownDescription: 'Осмотр автомобиля перед оформлением полиса' }],
+  ], { query: 'view=v1' }],
+  'СС-48': ['валидация: блок предупреждений в диффе; критичное выключает «Опубликовать» с причиной (r2 §8; аудит, «Валидационный гейт публикации»)', [
+    ['формула с переменной, которой нет в форме, — предупреждение, публикация доступна', async (K) => { await K.formulaEnd('zipName'); await K.paste('zipName', '_{Car:colour}'); await K.settled(); await K.publish() },
+      { surface: 'publish', 'diff.warnings': [{ text: 'Формула имени zip-архива ссылается на переменную {Car:colour}, которой нет в форме', critical: false }], confirmOff: false }],
+    ['пустое наименование — критичное: «Опубликовать» выключена', async (K) => { await K.act('publish-cancel'); await K.clear('[data-field=name]'); await K.settled(); await K.publish() },
+      { surface: 'publish', name: '', confirmOff: true, 'diff.warnings': [{ text: 'Наименование схемы не заполнено — публикация невозможна', critical: true }, { text: 'Формула имени zip-архива ссылается на переменную {Car:colour}, которой нет в форме', critical: false }] }],
+    ['нажатие по выключенной «Опубликовать» — снимка нет', K => K.act('publish-confirm'), { surface: 'publish', versions: 2 }, { blind: true }],
+  ], { query: 'now=2026-10-03T09:00:00' }],
+  'СС-48/первая': ['валидация в первой публикации: согласование без полей — предупреждение (аудит, «Валидационный гейт публикации»)', [
+    ['включить согласование и открыть первую публикацию', async (K) => { await K.toggle('approval'); await K.settled(); await K.publish() },
+      { surface: 'first-publish', 'diff.warnings': [{ text: 'Согласование включено, поля для согласования не отмечены', critical: false }], confirmOff: false }],
+  ], { query: 'data=new&now=2026-10-03T09:00:00' }],
+  'СС-50': ['presence: «Сейчас редактирует {кто}» (r2 §2, состояние 6)', [
+    ['старт', null, { status: { state: 'draft', text: 'Черновик: правки Игорь Петров от 01.10.2026, 11:40', clickable: true, editing: 'Сейчас редактирует Игорь Петров' }, save: 'saved' }],
+  ], { query: 'presence=1' }],
+  'СС-51': ['«Сбросить черновик к текущей версии»: окно показывает, что сбрасывается; после сброса черновик равен current (r2 §2; аудит, «Конкурентный доступ к черновику»)', [
+    ['меню → «Сбросить черновик к текущей версии»', K => K.menu('reset'), { surface: 'reset', modalTitle: 'Сбросить черновик?', modalSub: 'Черновик вернётся к текущей версии от 22.09.2026, 16:05. Будет сброшено:',
+      'diff.areas': [{"id":"settings","count":"1 изменение","tone":"changed"},{"id":"form","count":"2 изменения","tone":"changed"},{"id":"processes","count":"−1 шаг","tone":"removed"},{"id":"showcase","count":"без изменений","tone":"none"}], 'diff.total': 'Итого: 4 изменения в 3 разделах', 'diff.attention': ['Удалён шаг «Страховой полис»'] }],
+    ['«Отмена» — черновик прежний', K => K.act('reset-cancel'), { surface: '', dirty: true, writes: 0 }],
+    ['«Сбросить черновик» — черновик равен текущей версии', async (K) => { await K.menu('reset'); await K.act('reset-confirm'); await K.settled() },
+      { surface: '', dirty: false, publish: 'published', 'status.text': 'Всё опубликовано', notices: ['Черновик сброшен к текущей версии'], saveLog: ['saving', 'saved'],
+        shownDescription: 'Осмотр автомобиля перед оформлением полиса добровольного страхования', versions: 2 }],
+    ['сбрасывать нечего — уведомление', K => K.menu('reset'), { surface: '', notices: ['Сбрасывать нечего: черновик совпадает с текущей версией'] }],
+  ], { query: 'now=2026-10-03T09:00:00' }],
   /* ============================ П3, такт 63 ============================ */
   'СС-25': ['мобильное приложение: режим выполнения, разрешения, телефон; три настройки поведения (r2 §4)', [
     ['старт', null, { section: 'mobile', anchor: 'shooting', navAnchors: ['Параметры съёмки', 'Поведение в мобильном приложении'], 's.mobile.mode': 'regular', 's.mobile.photo': 'medium', 'rows.startAfterCreate.checked': true }],

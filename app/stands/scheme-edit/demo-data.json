@@ -90,7 +90,10 @@
       "author": "Игорь Петров",
       "editedAt": "2026-10-01T11:40:00",
       "patch": [
-        ["settings.general.description", "Комплексный осмотр автомобиля перед оформлением полиса добровольного страхования"]
+        ["settings.general.description", "Комплексный осмотр автомобиля перед оформлением полиса добровольного страхования"],
+        ["form.groups.1.fields.2.required", true],
+        ["form.groups.1.fields.3", { "id": "f-color", "title": "Цвет кузова", "alias": "body_color", "type": "text", "required": false, "webOnly": false, "dependent": false }],
+        ["processes.1.steps", [{ "id": "s-pts", "title": "Паспорт ТС (ПТС)", "kind": "tech", "method": "2 фото", "networks": ["Document Scanner"], "hints": 0 }]]
       ]
     }
   },
@@ -101,8 +104,9 @@
       "editedAt": "2026-10-02T09:00:00",
       "config": {
         "settings": {
-          "general": { "name": "Новая схема осмотра", "description": "", "schemeType": "vehicle", "owner": "Демо Страхование", "inspectionType": "regular", "purpose": "standard", "active": false },
-          "mobile": {}, "web": { "feedback": false, "reasons": [] }, "access": { "groups": [] }, "ai": {}, "anomalies": { "enabled": false }, "pdf": { "templates": [] }
+          "general": { "name": "Новая схема осмотра", "description": "", "schemeType": "vehicle", "owner": "Демо Страхование", "inspectionType": "regular", "purpose": "standard", "active": false,
+            "formulas": { "objectName": "", "schemeName": "", "zipName": "", "mailSubject": "" } },
+          "mobile": {}, "web": { "feedback": false, "reasons": [] }, "access": { "groups": [] }, "ai": {}, "anomalies": { "enabled": false }, "pdf": { "templates": [], "fileName": "" }
         },
         "form": { "groups": [] },
         "processes": [],
