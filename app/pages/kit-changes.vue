@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { CHANGE_CLASS, CHANGES, COMPONENTS, HANDOVER, type ChangeClass } from '~/stands/kit-changes/handover-2026-10-01'
 import { HANDOVER_NEXT, NEXT } from '~/stands/kit-changes/handover-2026-10-02'
+import { DRAFT, DRAFT_BASE } from '~/stands/kit-changes/draft'
 
 /**
  * Стенд изменений кирпичиков версии передачи — правило 23 `docs/chat-protocol.md`, такт 54. Предложение чата, принятое
@@ -33,6 +34,9 @@ const checkBare = ref(false)
 const checkMixed = ref(false)
 const fieldValue = ref('2014')
 const mutedClicks = ref(0)
+/* Черновик следующей версии — такт 62. */
+const DRAFT_ROLES = ['Администратор', 'Эксперт', 'Оператор', 'Агент'].map(x => ({ value: x, label: x }))
+const draftRoles = ref(['Администратор', 'Эксперт'])
 </script>
 
 <template>
@@ -53,6 +57,41 @@ const mutedClicks = ref(0)
         <span class="text-muted-foreground">компонентов — {{ COMPONENTS.length }}, строк — {{ CHANGES.length }}</span>
       </p>
     </header>
+
+    <!-- Черновик следующей версии: строки копятся до метки по закрытию страницы схемы (правило 23). -->
+    <section data-draft class="space-y-4">
+      <h2 class="text-lg font-bold">
+        Следующая версия (черновик) — относительно {{ DRAFT_BASE }}
+      </h2>
+      <div v-for="c in DRAFT" :key="c.id" :data-change="c.id" class="grid grid-cols-[minmax(0,5fr)_minmax(0,6fr)] gap-6 rounded-lg border border-border p-4">
+        <div class="space-y-2">
+          <span class="inline-flex h-5 items-center rounded-full px-2 text-2xs font-bold" :class="TONE[c.cls]">{{ CHANGE_CLASS[c.cls] }} · {{ c.component }}</span>
+          <p class="text-sm">
+            {{ c.text }}
+          </p>
+        </div>
+        <div data-example class="flex min-w-0 flex-col items-stretch gap-3">
+          <template v-if="c.id === 'select-multiple'">
+            <Field label="Кто может редактировать дедлайн">
+              <Select v-model:values="draftRoles" multiple :items="DRAFT_ROLES" placeholder="Выберите роли" />
+            </Field>
+          </template>
+          <template v-else-if="c.id === 'heading-levels'">
+            <Heading level="title">
+              Раздел страницы — title
+            </Heading>
+            <Heading level="group">
+              Группа в карточке — group
+            </Heading>
+          </template>
+          <template v-else-if="c.id === 'heading-description'">
+            <Heading level="title" description="Базовые параметры схемы осмотра">
+              Основное
+            </Heading>
+          </template>
+        </div>
+      </div>
+    </section>
 
     <!-- Версия после первой: строки относительно предыдущей метки (правило 23). -->
     <section data-next class="space-y-4">

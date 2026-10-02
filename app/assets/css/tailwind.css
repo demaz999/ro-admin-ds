@@ -183,6 +183,9 @@
     /* Колонка содержимого «Настроек» страницы схемы — такт 61 (docs/scheme-edit.md, 3.4):
        макет U829JoK7KMZV8do3KNkWBh, узел 32774:1952. Утилита — max-w-settings. */
     --container-settings: 846px;
+
+    /* Правый навигатор разделов SectionNav — такт 62: тот же макет, узел 33516:5411. Утилита — w-section-nav. */
+    --container-section-nav: 266px;
     --text-4xl--letter-spacing: 0;
 
     /* Вспышка шага после перехода «Показать в структуре» — спека VA-9265 §15.3,

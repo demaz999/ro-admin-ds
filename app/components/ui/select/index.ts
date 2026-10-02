@@ -5,6 +5,7 @@ export { default as Select } from './Select.vue'
 export { default as SelectContent } from './SelectContent.vue'
 export { default as SelectGroup } from './SelectGroup.vue'
 export { default as SelectItem } from './SelectItem.vue'
+export { default as SelectMultiple } from './SelectMultiple.vue'
 export { default as SelectTrigger } from './SelectTrigger.vue'
 
 /**
@@ -93,6 +94,81 @@ export const selectTriggerVariants = cva(
 export type SelectTriggerVariants = VariantProps<typeof selectTriggerVariants>
 
 /**
+ * ## Ось `multiple` — такт 62
+ *
+ * Ворота владельца 2026-10-02: карточка `TagsInput` слита с `Select`. Источник — мастер кита 1 `multiselect`
+ * `251:16816`, страница «select и multiselect» `281:61391`, файл `uG3HTIcMwr2jI2d7YEYPs2`; числа сняты
+ * read-only скриптом Plugin API 2026-10-03.
+ *
+ * ### Матрица мастера: `state` × `label` — 18 вариантов
+ *
+ * | ось мастера | значения | в коде |
+ * |---|---|---|
+ * | `state` | `Default`, `hovered`, `field`, `pressed`, `edit`, `disabled` | пусто в покое, наведение, выбраны значения, список открыт, список открыт при выбранных, `disabled` — состояния одного тела |
+ * | `label` | `left`, `top`, `no` | подпись несёт `Field` (`orientation`), как у `Input`: в селект осью не идёт |
+ * | `Show hint` | булев | строка подсказки и счётчика — `Field` (`hint`, `counter`) |
+ *
+ * ### Геометрия — с мастера
+ *
+ * | что | кит | мастер |
+ * |---|---|---|
+ * | тело: высота от 40, растёт с переносом чипов | `min-h-10` | `select_body` `250:16282` — 40; `badge_list` `251:16743`, `variant=6` — 240×88 |
+ * | поля тела 8 / 16, зазор 8, радиус 8 | `px-4 py-2 gap-2 rounded-md` | `250:16282` — `8,16,8,16`, зазор 8, радиус 8 |
+ * | чип: высота 24, поля 4 / 8, зазор 4, радиус 16 | `h-6 px-2 gap-1 rounded-xl` | `Badge` `250:15548` — 24, `4,8,4,8`, 4, 16 |
+ * | подпись чипа 12/16 regular | `text-2xs` | `250:15549` — Regular 12/16 |
+ * | крестик: коробка 16, глиф 9.2 | `Icon close` 9.2 | `16ic_close` `250:15550` — 16, контур 9.2 |
+ * | зазор чипов 8 в обе стороны | `gap-2` | `251:16756` — 8 и 8 |
+ * | шеврон: коробка 24 | кнопка 24, `Icon` 16 | `24_ic_keyboard_arrow_down` `19:1273` — 24, контур 11.2×6.6 |
+ * | строка списка с местом галочки 16 | `SelectItem show-icon`, глиф `check` у выбранной | `items3`, `multiselect=on` `238:7387` — `16ic_done` слева |
+ *
+ * ### Цвет — роли кита, значения мастера не переносятся
+ *
+ * Мастер красит тело `#f6f6f8`, наведение — обводкой `#93c5fd`, чип — `#3b82f6` с белым текстом: это коллекция
+ * `theme(primitives)` кита 1, легаси (`docs/tokens.md`). Тело стоит на ролях поля `--field` и `--field-hover` —
+ * тех же, что у одиночного `Select` и `Input`: наведение — заливка плотнее, обводки нет. Чип — заливка `--primary`,
+ * текст `--primary-foreground`, наведение `--primary-hover` (мастер: `Badge` `state=hover` `250:15621` — светлее),
+ * выключенный — прозрачность поля `--opacity-disabled` (мастер: `250:15631` — серая заливка `#d0d4dc`).
+ *
+ * ### Расхождения с мастером
+ *
+ * - шеврон — глиф кита 16 в кнопке 24 (правило оптики иконок: замена сверяется по видимому глифу; у мастера 11.2×6.6);
+ * - подсказка и счётчик — в `Field`; в теле их нет;
+ * - поиск в плашке (слот мастера `horizontal_slot` пустой) — проп `searchable`, по умолчанию выключен;
+ * - кнопка раскрытия — отдельная цель: чипы несут свои кнопки снятия, кнопка в кнопке недопустима; клик по
+ *   свободному месту тела тоже раскрывает список.
+ */
+export const selectMultiBodyVariants = cva(
+  'group/field relative flex min-h-10 w-full cursor-pointer items-center gap-2 rounded-md px-4 py-2 outline-none',
+  {
+    variants: {
+      variant: {
+        filled: 'bg-field hover:bg-field-hover',
+        elevated: 'bg-field-elevated shadow-elevated hover:shadow-elevated-hover',
+      },
+      disabled: {
+        true: 'pointer-events-none opacity-[var(--opacity-disabled)]',
+        false: '',
+      },
+    },
+    defaultVariants: { variant: 'filled', disabled: false },
+  },
+)
+
+/** Чип выбранного значения — мастер `Badge` `250:15544` (страница «select и multiselect»). */
+export const selectChipVariants = cva(
+  'inline-flex h-6 max-w-full items-center gap-1 rounded-xl px-2 text-2xs transition-colors',
+  {
+    variants: {
+      disabled: {
+        true: 'bg-primary text-primary-foreground',
+        false: 'bg-primary text-primary-foreground has-[button:hover]:bg-primary-hover',
+      },
+    },
+    defaultVariants: { disabled: false },
+  },
+)
+
+/**
  * ## Изменения после передачи
  *
  * Компонент передан фронтам 2026-09-30. Правило 23 `docs/chat-protocol.md`: каждое изменение переданного компонента
@@ -107,4 +183,10 @@ export type SelectTriggerVariants = VariantProps<typeof selectTriggerVariants>
  * - **Добавлено.** Проп `muted` у `SelectItem` — вид выключенного пункта (прозрачность `--opacity-disabled`, без наведения), при этом клик доходит до потребителя.
  * - **Меняет существующее.** При `placeholder=""` выбранное значение стоит по центру поля по вертикали, как у `Input`. С непустым `placeholder` — прежнее.
  * - **Меняет существующее.** Заголовок `SelectGroup` — по высоте текста с полем 8 сверху, зазор до списка 2 (было: высота 32 и зазор 8): от текста заголовка до текста первого двухстрочного пункта — 12. Отделение групп линией — прежнее.
+ *
+ * ### Черновик следующей версии — относительно `handover-2026-10-02`
+ *
+ * - **Добавлено.** Ось `multiple` — набор значений чипами «текст ×» по мастеру кита 1 `multiselect` `251:16816`:
+ *   значение — `v-model:values` (массив строк), тело растёт с переносом чипов, список остаётся открытым при выборе,
+ *   у выбранной строки — галочка. Без `multiple` вызовы прежние. Такт 62.
  */

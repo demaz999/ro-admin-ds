@@ -11,6 +11,11 @@ export { default as Heading } from './Heading.vue'
  * |---|---|---|---|
  * | `page` | `h1` | 24/28 bold `--foreground` — ступень `text-2xl` | заголовок модального окна кита 24/28 bold (`modal_cards_header` `864:2747`); предложение владельца 24/32 — такой ступени нет |
  * | `section` | `h2` | 17/24 bold `--foreground` — ступень `text-lg` | ступень шкалы над подписью поля 15/20 bold (мастер `Field` `720:11753`); предварительно 18/24 — такой ступени нет, ближайшая 17/24 (16/20 почти не отличается от подписи поля) |
+ * | `title` | `h2` | 24/28 bold `--foreground` — ступень `text-2xl` | заголовок раздела страницы настроек: макет страницы схемы `32876:4136`, `32875:2124` (файл `U829JoK7KMZV8do3KNkWBh`) — такт 62 |
+ * | `group` | `h3` | 20/24 bold `--foreground` — ступень `text-xl` | заголовок группы внутри карточки: тот же макет, `32875:1971` — такт 62 |
+ *
+ * Проп `description` — подпись под заголовком: 13/16 regular `--foreground-secondary`, зазор 4 (макет `32876:4136`,
+ * текст `32875:2126`). Заголовок с подписью — блок `heading-block`; класс снаружи ложится на блок.
  *
  * `as` меняет тег без смены вида (например, `legend` у группы полей). Отступы задаёт потребитель — у заголовка их нет.
  *
@@ -27,6 +32,9 @@ export const headingVariants = cva('font-bold text-foreground', {
       // ошибка ступени, такт 47 — 24/28.
       page: 'text-4xl',
       section: 'text-lg',
+      // Такт 62 — страница «Редактирование схемы осмотра»: раздел страницы 24/28 и группа в карточке 20/24.
+      title: 'text-2xl',
+      group: 'text-xl',
     },
   },
   defaultVariants: { level: 'section' },
@@ -40,7 +48,23 @@ export const headingVariants = cva('font-bold text-foreground', {
 export const headingMetaShift: Record<HeadingLevel, string> = {
   page: 'top-[calc(0.5ex+--spacing(0.5))]',
   section: 'top-[0.5ex]',
+  title: 'top-[0.5ex]',
+  group: 'top-[0.5ex]',
 }
 
 export type HeadingVariants = VariantProps<typeof headingVariants>
 export type HeadingLevel = NonNullable<HeadingVariants['level']>
+
+/**
+ * ## Изменения после передачи
+ *
+ * Компонент передан фронтам версией `handover-2026-10-01`. Правило 23 `docs/chat-protocol.md`: каждое изменение
+ * маркируется здесь, в `CHANGELOG.md` и в «Передано фронтам».
+ *
+ * ### Черновик следующей версии — относительно `handover-2026-10-02`
+ *
+ * - **Добавлено.** Ступени `level="title"` (24/28, тег `h2`) и `level="group"` (20/24, тег `h3`): заголовок раздела
+ *   страницы настроек и заголовок группы в карточке. Такт 62.
+ * - **Добавлено.** Проп `description` — подпись под заголовком, 13/16 `--foreground-secondary`, зазор 4. Без пропа
+ *   разметка прежняя. Такт 62.
+ */

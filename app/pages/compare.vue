@@ -76,6 +76,16 @@ const fieldCompare = [
 ] as const
 
 /**
+ * Select multiple — мастер кита 1 `multiselect` `251:16816`, 1352×1457 (такт 62). Варианты `label=no`: тело 304×40 и
+ * строка подсказки; смещения — положение варианта в компонент-сете, сняты Plugin API.
+ */
+const multiselectCompare = [
+  { t: 'пусто · state=Default', node: '251:16813', x: 856, y: 56, values: [] as string[], disabled: false },
+  { t: 'выбрано · state=field', node: '251:16800', x: 856, y: 347, values: ['a'], disabled: false },
+  { t: 'выключено · state=disabled', node: '251:16798', x: 856, y: 1317, values: [] as string[], disabled: true },
+]
+
+/**
  * MenuItem, мастер _MenuItemMaster 3465:22566 — 328×376.
  *
  * Наведение в мастере не нарисовано: оно живёт в таблице состояний спеки
@@ -875,6 +885,39 @@ const textareaVariants = [
         <Chip count="8">
           Badge text
         </Chip>
+      </CompareFrame>
+    </section>
+
+    <!-- Такт 62: ось `multiple` у Select — мастер кита 1 `multiselect` `251:16816`. -->
+    <section data-theme="rososmotr" class="space-y-2 bg-background font-sans text-foreground">
+      <h2 class="text-lg font-bold">
+        Select · multiple · кит 1, 251:16816 · такт 62
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Мастер <code>multiselect</code>: 18 вариантов, оси <code>state</code> × <code>label</code>. Подпись, подсказку и
+        счётчик несёт <code>Field</code>, как у поля ввода; состояния — у тела. Наложение сверяет геометрию: тело 304×40,
+        поля 8 / 16, чип 24 с полями 4 / 8, крестик в коробке 16, строка подсказки 16 с зазором 4.
+      </p>
+      <p class="max-w-3xl rounded-md border border-border p-3 text-sm">
+        <strong>Цвет разойдётся, и это ожидаемо.</strong> Мастер красит тело <code>#f6f6f8</code>, чип — синим коллекции
+        <code>theme(primitives)</code> кита 1: это легаси. Тело стоит на ролях поля кита, чип — на <code>--primary</code>.
+        Шеврон — глиф кита 16 в кнопке 24 против контура 11.2×6.6 мастера.
+      </p>
+
+      <CompareFrame
+        v-for="f in multiselectCompare"
+        :key="f.t"
+        :title="f.t"
+        :node="f.node"
+        master="kit1/multiselect_251-16816.png"
+        :x="f.x"
+        :y="f.y"
+        :width="304"
+        :height="60"
+      >
+        <Field hint="Подсказка" counter="10/25" :disabled="f.disabled">
+          <Select :values="f.values" multiple :items="[{ value: 'a', label: 'Badge text' }]" placeholder="Placeholder" :disabled="f.disabled" />
+        </Field>
       </CompareFrame>
     </section>
 

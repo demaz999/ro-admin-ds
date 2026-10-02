@@ -5,20 +5,25 @@ import { cn } from '@/lib/utils'
 import { headingMetaShift, headingVariants } from '.'
 
 /**
- * Заголовок страницы (`page`, h1) или блока (`section`, h2) — разбор в `index.ts`.
+ * Заголовок страницы (`page`, h1), раздела страницы (`title`, h2), группы в карточке (`group`, h3) или блока
+ * (`section`, h2) — разбор в `index.ts`.
  * Слот `meta` — текст в строке с заголовком, выровненный по середине строчных (такт 50).
+ * Проп `description` — подпись под заголовком (такт 62).
  */
 const props = withDefaults(defineProps<{
   level?: HeadingLevel
   /** Тег вместо уровня по умолчанию: `legend`, `h3`… Вид не меняется. */
   as?: string
+  /** Подпись под заголовком: 13/16 `--foreground-secondary`, зазор 4 — макет `32876:4136` (такт 62). */
+  description?: string
   class?: string
 }>(), {
   level: 'section',
   as: undefined,
+  description: '',
 })
 
-const tag = computed(() => props.as ?? (props.level === 'page' ? 'h1' : 'h2'))
+const tag = computed(() => props.as ?? ({ page: 'h1', title: 'h2', group: 'h3', section: 'h2' } as const)[props.level])
 </script>
 
 <template>
@@ -35,6 +40,15 @@ const tag = computed(() => props.as ?? (props.level === 'page' ? 'h1' : 'h2'))
     <span data-slot="heading-meta" :class="cn(headingVariants({ level: props.level }), 'relative bottom-[0.5ex] min-w-0 truncate font-normal leading-none')">
       <span :class="cn('relative text-xs text-muted-foreground', headingMetaShift[props.level])"><slot name="meta" /></span>
     </span>
+  </div>
+  <!-- Заголовок с подписью — один блок: класс снаружи ложится на блок, заголовок и подпись держат зазор 4. -->
+  <div v-else-if="props.description" data-slot="heading-block" :class="cn('flex min-w-0 flex-col gap-1', props.class)">
+    <component :is="tag" data-slot="heading" :data-level="props.level" :class="headingVariants({ level: props.level })">
+      <slot />
+    </component>
+    <p data-slot="heading-description" class="text-xs text-foreground-secondary">
+      {{ props.description }}
+    </p>
   </div>
   <component :is="tag" v-else data-slot="heading" :data-level="props.level" :class="cn(headingVariants({ level: props.level }), props.class)">
     <slot />

@@ -63,8 +63,8 @@
                 { "id": "f-number", "title": "Номер полиса", "alias": "policy_number", "type": "text", "required": true, "webOnly": false, "dependent": false }
               ] },
               { "id": "g-car", "title": "Автомобиль", "alias": "Car", "fields": [
-                { "id": "f-vin", "title": "VIN", "alias": "vin", "type": "text", "required": true, "webOnly": false, "dependent": false },
-                { "id": "f-plate", "title": "Госномер", "alias": "regnum", "type": "text", "required": true, "webOnly": false, "dependent": false },
+                { "id": "f-vin", "title": "VIN", "alias": "vin", "type": "text", "required": true, "webOnly": false, "dependent": false, "approval": true },
+                { "id": "f-plate", "title": "Госномер", "alias": "regnum", "type": "text", "required": true, "webOnly": false, "dependent": false, "approval": true },
                 { "id": "f-mileage", "title": "Пробег", "alias": "mileage", "type": "number", "required": false, "webOnly": false, "dependent": false }
               ] }
             ]

@@ -12,6 +12,7 @@ import {
 } from 'reka-ui'
 import SelectContent from './SelectContent.vue'
 import SelectItem from './SelectItem.vue'
+import SelectMultiple from './SelectMultiple.vue'
 import SelectTrigger from './SelectTrigger.vue'
 import type { SelectTriggerVariants } from '.'
 
@@ -36,6 +37,12 @@ import type { SelectTriggerVariants } from '.'
  * | можно ли значение вне списка | нет | да |
  *
  * Разбор для дизайнеров — `docs/naming.md`, раздел 5.
+ *
+ * ## Ось `multiple` — такт 62
+ *
+ * Набор значений чипами «текст ×» — мастер кита 1 `multiselect` `251:16816`. Значение — массив строк через
+ * `v-model:values`; одиночный `v-model` при этом не используется. Состав тела другой, поэтому рисует его
+ * `SelectMultiple.vue`; поиск в плашке у оси по умолчанию выключен — у мастера на его месте пустой слот.
  */
 const props = withDefaults(defineProps<{
   variant?: NonNullable<SelectTriggerVariants['variant']>
@@ -51,23 +58,39 @@ const props = withDefaults(defineProps<{
   searchable?: boolean
   showIcon?: boolean
   disabled?: boolean
+  /** Набор значений чипами — мастер `multiselect` `251:16816`; значение — `v-model:values`. Такт 62. */
+  multiple?: boolean
 }>(), {
   variant: 'filled',
   size: 'md',
   placeholder: 'Select option',
   items: () => [],
-  searchable: true,
+  searchable: undefined,
   showIcon: true,
   disabled: false,
+  multiple: false,
 })
 
 const model = defineModel<string>({ default: '' })
+/** Значение оси `multiple`. */
+const values = defineModel<string[]>('values', { default: () => [] })
+/** Поиск в плашке: у одиночного выбора включён по умолчанию (мастер `PopOverList`), у набора — выключен. */
+const searchable = computed(() => props.searchable ?? !props.multiple)
 
 const selected = computed(() => props.items.find(i => i.value === model.value))
 </script>
 
 <template>
-  <ComboboxRoot v-model="model" :disabled="props.disabled" class="w-full">
+  <SelectMultiple
+    v-if="props.multiple"
+    v-model="values"
+    :variant="props.variant"
+    :placeholder="props.placeholder"
+    :items="props.items"
+    :searchable="searchable"
+    :disabled="props.disabled"
+  />
+  <ComboboxRoot v-else v-model="model" :disabled="props.disabled" class="w-full">
     <ComboboxAnchor as-child>
       <!--
         Такт 36: ComboboxTrigger Reka ставит кнопке tabindex="-1" — фокус у комбобокса несёт поле
@@ -97,7 +120,7 @@ const selected = computed(() => props.items.find(i => i.value === model.value))
             Поиск внутри плашки — то самое, из-за чего взят Combobox.
             Геометрия поля берётся у Input: 40 высотой, 312 шириной.
           -->
-          <template v-if="props.searchable" #search>
+          <template v-if="searchable" #search>
             <ComboboxInput as-child>
               <input
                 data-slot="field-input"
