@@ -32,7 +32,8 @@ export { default as FeedNote } from './FeedNote.vue'
  * Выделение текста в расшифровке (§8.5) — событие `select-text`: выделенное от 2 до 120 знаков и его прямоугольник в окне;
  * полосу «Новый объект» ставит страница (`ActionBar`, второе размещение).
  */
-export const feedNoteVariants = cva('col-span-full flex flex-col gap-2 rounded-lg px-3 py-2.5', {
+/* Между частями заметки (дорожка, строка мета, текст) — 4: второй довесок к такту 58, решение владельца 2026-10-02 (было 8). */
+export const feedNoteVariants = cva('col-span-full flex flex-col gap-1 rounded-lg px-3 py-2.5', {
   variants: {
     kind: {
       voice: 'bg-secondary',

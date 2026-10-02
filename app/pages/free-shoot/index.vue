@@ -915,18 +915,26 @@ const gridWidth = ref(0)
 const gridColumns = computed(() => (gridWidth.value ? frameTileColumns(gridWidth.value, size.value) : undefined))
 /**
  * Строка полосы ленты — такт 55: по ширине ленты элементы уступают место поиску по порядку. 0 — всё на месте;
- * 1 — без подписи «Разобранные»; 2 — без подписи «Размер»; 3 — кнопка «Распределить автоматически» иконкой.
- * Довесок к такту 58, решение владельца 2026-10-02: поиск всегда шире кнопки — пока кнопка с текстом (261), поиск не уже
- * 280; с кнопкой-иконкой (52) — не уже 120.
+ * 1 — без подписи «Разобранные»; 2 — без подписи «Размер»; дальше поиск сужается до минимума 140; 3 — кнопка
+ * «Автораспределение» иконкой — последней. Второй довесок к такту 58, решение владельца 2026-10-02: на ноутбуке кнопка
+ * с подписью; правило «поиск шире кнопки» первого довеска снято. Подписи держатся, пока поиск не уже 280.
  * Пороги — ширина ленты, при которой строка с поиском 120 ещё помещается (замер — `free-shoot.md`, раздел 34).
  */
 const feedWidth = ref(0)
-const ROW_STEPS = [1113, 1024, 972]
-/** Лента не уже строки полосы в самом тесном виде (602, с запасом — 604): панель структуры уступает ей место в своих пределах. */
-const FEED_MIN = 604
+const ROW_STEPS = [1049, 960, 768]
+/**
+ * Панель структуры уступает ленте место в своих пределах: лента держит ширину, при которой кнопка ещё с подписью (768),
+ * пока панель при этом не уже 320; если так не выходит — ширину строки в самом тесном виде (622, с запасом 624).
+ */
+const FEED_TEXT = 768
+const FEED_MIN = 624
 const HANDLE = 10
 const zoneWidth = ref(0)
-const panelMax = computed(() => (zoneWidth.value ? Math.max(320, Math.min(820, zoneWidth.value - HANDLE - FEED_MIN)) : 820))
+const panelMax = computed(() => {
+  if (!zoneWidth.value) return 820
+  const room = zoneWidth.value - HANDLE
+  return Math.max(320, Math.min(820, room - (room - FEED_TEXT >= 320 ? FEED_TEXT : FEED_MIN)))
+})
 const rowStep = computed(() => (!feedWidth.value ? 0 : ROW_STEPS.filter(w => feedWidth.value < w).length))
 let gridObserver: ResizeObserver | undefined
 const selbarLeft = ref('50%')
@@ -1282,10 +1290,10 @@ function onUndo(id: number) {
           <ResizablePanel class="flex flex-col">
             <!--
               тулбар ленты, §7 — кит, такт 42: Toolbar (№ 15–21). Такт 55, решение владельца 2026-10-01 — одна строка:
-              «Выделить всё» — поиск — «Распределить автоматически» — «Разобранные» — «Размер». Поиск занимает свободное
+              «Выделить всё» — поиск — «Автораспределение» — «Разобранные» — «Размер». Поиск занимает свободное
               место и сужается вместе с лентой; строка не переносится: когда места мало, уступают по порядку подпись
-              «Разобранные», подпись «Размер», текст кнопки — последним, остаётся иконка с подсказкой (`rowStep`).
-              Поиск всегда шире кнопки: с кнопкой-текстом — не уже 280, с иконкой — не уже 120 (довесок к такту 58).
+              «Разобранные», подпись «Размер», затем поиск сужается до 140, текст кнопки — последним: остаётся иконка с
+              подсказкой (`rowStep`). Кнопка называется «Автораспределение» (второй довесок к такту 58).
               Индикатор текущего объекта (№ 19) с экрана снят: текущий отмечен в панели; `curHint` остаётся в модели.
             -->
             <Toolbar data-feed-tools class="flex-nowrap gap-3">
@@ -1294,7 +1302,7 @@ function onUndo(id: number) {
                   Выделить всё
                 </Checkbox>
               </div>
-              <div class="flex-1" :class="rowStep < 3 ? 'min-w-70' : 'min-w-30'" data-search>
+              <div class="min-w-35 flex-1" data-search>
                 <Input v-model="search" placeholder="Поиск по расшифровкам и именам файлов…" />
               </div>
               <!-- Такт 58, решение владельца 2026-10-02: действие автоматизации выделено ролью feature. -->
@@ -1302,18 +1310,18 @@ function onUndo(id: number) {
                 <template #icon>
                   <Icon name="auto-awesome" :size="20" />
                 </template>
-                Распределить автоматически
+                Автораспределение
               </Button>
               <TooltipProvider v-else>
                 <Tooltip>
                   <TooltipTrigger as-child>
-                    <Button variant="feature" show-icon aria-label="Распределить автоматически" @click="m.magicWand()">
+                    <Button variant="feature" show-icon aria-label="Автораспределение" @click="m.magicWand()">
                       <template #icon>
                         <Icon name="auto-awesome" :size="20" />
                       </template>
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>Распределить автоматически</TooltipContent>
+                  <TooltipContent>Автораспределение</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
               <ToolbarGroup :label="rowStep < 1 ? 'Разобранные' : ''" aria-label="Разобранные">
