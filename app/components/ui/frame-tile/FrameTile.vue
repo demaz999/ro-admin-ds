@@ -174,7 +174,8 @@ function onKeydown(event: KeyboardEvent) {
         class="absolute bottom-1.5 left-1.5 z-20 flex size-8 items-center justify-center outline-none"
         @click.stop="emit('unassign')"
       >
-        <span class="flex size-7 items-center justify-center rounded-sm bg-scrim-dark text-primary-foreground"><Icon name="close" :size="16" /></span>
+        <!-- Такт 58: крестик — в одной сетке с лупой и «во весь экран» (глиф 16 при контуре 720): контур крестика 560 — 12. -->
+        <span class="flex size-7 items-center justify-center rounded-sm bg-scrim-dark text-primary-foreground"><Icon name="close" :size="12" /></span>
       </button>
 
       <!-- «Показать в структуре» — правый нижний угол картинки, над полосой статуса. -->

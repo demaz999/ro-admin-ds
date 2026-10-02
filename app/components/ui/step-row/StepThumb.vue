@@ -21,14 +21,19 @@ import { stepThumbVariants, type StepThumbState } from '.'
  * кадр остаётся в истории шага перечёркнутым. Если Core выберет возврат в ленту,
  * состояние просто перестанет приходить.
  *
- * ## Наведение: крестик по центру, остальное открывает
+ * ## Наведение: две половины — такт 58, решение владельца 2026-10-02
  *
- * В прототипе заливка с крестиком накрывает миниатюру целиком, и клик по
- * свободной миниатюре всегда открепляет — открыть её кликом (§9.7) нельзя.
- * Здесь заливка `--scrim-dark` только рисуется, а целей две: крестик 16 по
- * центру открепляет, остальная площадь открывает кадр. Отклонение записано в
- * «Итоге сборки» разбора. Красная заливка прототипа заменена тёмной по правилу
- * «цвет по роли»: открепление обратимо (§10.6), это не удаление.
+ * На наведении миниатюра делится пополам: левая половина — «глаз», открывает кадр в просмотре; правая — крестик,
+ * открепляет. У кадра, который открепить нельзя (`locked`, `from-step`, `rejected`), крестика нет — вся миниатюра
+ * «глаз». Подложка — `--scrim-dark`; половина под курсором показывает глиф в полную силу, соседняя — на ступени
+ * `--opacity-icon-muted`. Открепление обратимо (§10.6) — красного нет.
+ *
+ * Геометрия на целых пикселях: миниатюра 80 × 60, рамка — слой поверх картинки (в раскладке не участвует), половины
+ * по 40 × 60. Глифы — официальная выгрузка Material в родной сетке 24: «глаз» `visibility` (контур 880 × 600 из 960) —
+ * 22 × 15, крестик `close` (контур 560) — 14 × 14. «Глаз» нечётной высоты стоит в половине с полем 1 снизу — на целом
+ * пикселе.
+ *
+ * До такта 58 (такт 30): крестик 16 по центру открепляет, остальная площадь открывает кадр.
  */
 const props = withDefaults(defineProps<{
   src: string
@@ -39,10 +44,10 @@ const props = withDefaults(defineProps<{
   /** Найдена переходом «Показать в структуре» (§15.3). */
   located?: boolean
   /**
-   * Оснастка приёмки: вид наведения без курсора. Headless-браузер не наводит
-   * курсор, а стенду нужна колонка «наведение». В продукт не идёт.
+   * Оснастка приёмки: вид наведения без курсора — `true` или `'open'` — курсор на «глазе», `'remove'` — на крестике.
+   * Headless-браузер не наводит курсор, а стенду нужна колонка «наведение». В продукт не идёт.
    */
-  demoHover?: boolean
+  demoHover?: boolean | 'open' | 'remove'
   class?: string
 }>(), {
   alt: '',
@@ -65,6 +70,12 @@ const REASON: Record<StepThumbState, string> = {
 
 const hint = computed(() => props.reason || REASON[props.state])
 const removable = computed(() => props.state === 'free' || props.state === 'suggested')
+/** Глиф половины: под курсором — в полную силу, у соседней — приглушён. */
+const glyph = (half: 'open' | 'remove') => {
+  if (!props.demoHover) return 'opacity-[var(--opacity-icon-muted)] group-hover/half:opacity-100 group-focus-visible/half:opacity-100'
+  const on = props.demoHover === true ? 'open' : props.demoHover
+  return on === half ? 'opacity-100' : 'opacity-[var(--opacity-icon-muted)]'
+}
 </script>
 
 <template>
@@ -74,25 +85,12 @@ const removable = computed(() => props.state === 'free' || props.state === 'sugg
     :data-located="props.located || undefined"
     :class="cn(stepThumbVariants({ state: props.state, located: props.located }), props.class)"
   >
-    <Tooltip>
-      <TooltipTrigger as-child>
-        <button
-          type="button"
-          data-slot="step-thumb-open"
-          :aria-label="`Открыть кадр. ${hint}`"
-          class="block size-full outline-none"
-          @click="emit('open')"
-        >
-          <img
-            :src="props.src"
-            :alt="props.alt"
-            class="size-full bg-muted object-cover"
-            :class="props.state === 'rejected' ? 'grayscale opacity-[var(--opacity-disabled)]' : ''"
-          >
-        </button>
-      </TooltipTrigger>
-      <TooltipContent>{{ hint }}</TooltipContent>
-    </Tooltip>
+    <img
+      :src="props.src"
+      :alt="props.alt"
+      class="size-full bg-muted object-cover"
+      :class="props.state === 'rejected' ? 'grayscale opacity-[var(--opacity-disabled)]' : ''"
+    >
 
     <!-- Перечёркивание отклонённого — диагональ самой миниатюры, из угла в угол. -->
     <svg
@@ -108,24 +106,44 @@ const removable = computed(() => props.state === 'free' || props.state === 'sugg
     <span
       v-if="props.state === 'locked' || props.state === 'from-step'"
       data-slot="step-thumb-badge"
-      class="pointer-events-none absolute right-1 bottom-1 flex size-5 items-center justify-center rounded-xs bg-field-elevated shadow-on-image"
-      :class="props.state === 'locked' ? 'text-muted-foreground' : 'text-primary'"
+      class="pointer-events-none absolute right-1 bottom-1 flex size-5 items-center justify-center rounded-xs bg-field-elevated shadow-on-image transition-opacity group-hover/thumb:opacity-0"
+      :class="[props.state === 'locked' ? 'text-muted-foreground' : 'text-primary', props.demoHover ? 'opacity-0' : '']"
+      :style="{ transitionDuration: 'var(--duration-hover)' }"
     >
       <Icon :name="props.state === 'locked' ? 'lock' : 'photo-camera'" :size="12" />
     </span>
 
-    <template v-if="removable">
-      <span class="pointer-events-none absolute inset-0 bg-scrim-dark transition-opacity group-hover/thumb:opacity-100" :class="props.demoHover ? 'opacity-100' : 'opacity-0'" :style="{ transitionDuration: 'var(--duration-hover)' }" />
+    <!-- Слой наведения: половины-кнопки на подложке `--scrim-dark`; виден на наведении и при фокусе с клавиатуры. -->
+    <div
+      data-slot="step-thumb-actions"
+      class="absolute inset-0 flex bg-scrim-dark text-primary-foreground transition-opacity group-hover/thumb:opacity-100 focus-within:opacity-100"
+      :class="props.demoHover ? 'opacity-100' : 'opacity-0'"
+      :style="{ transitionDuration: 'var(--duration-hover)' }"
+    >
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <button
+            type="button"
+            data-slot="step-thumb-open"
+            :aria-label="`Открыть кадр. ${hint}`"
+            class="group/half flex h-full min-w-0 flex-1 items-center justify-center pb-px outline-none"
+            @click="emit('open')"
+          >
+            <Icon name="visibility" :size="22" :class="glyph('open')" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>{{ hint }}</TooltipContent>
+      </Tooltip>
       <button
+        v-if="removable"
         type="button"
         data-slot="step-thumb-remove"
         aria-label="Открепить"
-        class="absolute inset-0 m-auto flex size-8 items-center justify-center text-primary-foreground outline-none group-hover/thumb:opacity-100 focus-visible:opacity-100"
-        :class="props.demoHover ? 'opacity-100' : 'opacity-0'"
+        class="group/half flex h-full min-w-0 flex-1 items-center justify-center outline-none"
         @click.stop="emit('remove')"
       >
-        <Icon name="close" :size="16" />
+        <Icon name="close" :size="14" :class="glyph('remove')" />
       </button>
-    </template>
+    </div>
   </div>
 </template>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { CHANGE_CLASS, CHANGES, COMPONENTS, HANDOVER, type ChangeClass } from '~/stands/kit-changes/handover-2026-10-01'
+import { DRAFT } from '~/stands/kit-changes/draft'
 
 /**
  * Стенд изменений кирпичиков версии передачи — правило 23 `docs/chat-protocol.md`, такт 54. Предложение чата, принятое
@@ -52,6 +53,62 @@ const mutedClicks = ref(0)
         <span class="text-muted-foreground">компонентов — {{ COMPONENTS.length }}, строк — {{ CHANGES.length }}</span>
       </p>
     </header>
+
+    <!-- Черновик следующей версии — относительно выпущенной: строки тактов после метки (правило 23). -->
+    <section data-draft class="space-y-4">
+      <h2 class="text-lg font-bold">
+        Следующая версия (черновик) — относительно {{ HANDOVER }}
+      </h2>
+      <div v-for="c in DRAFT" :key="c.id" :data-change="c.id" class="grid grid-cols-[minmax(0,5fr)_minmax(0,6fr)] gap-6 rounded-lg border border-border p-4">
+        <div class="space-y-2">
+          <span class="inline-flex h-5 items-center rounded-full px-2 text-2xs font-bold" :class="TONE[c.cls]">{{ CHANGE_CLASS[c.cls] }} · {{ c.component }}</span>
+          <p class="text-sm">
+            {{ c.text }}
+          </p>
+        </div>
+        <div data-example class="flex min-w-0 flex-col items-start gap-3">
+          <template v-if="c.id === 'button-feature'">
+            <div class="flex flex-wrap items-center gap-3">
+              <Button variant="feature" show-icon>
+                <template #icon>
+                  <Icon name="auto-awesome" :size="20" />
+                </template>
+                Распределить автоматически
+              </Button>
+              <Button variant="feature">
+                Без иконки
+              </Button>
+              <Button variant="feature" disabled>
+                Выключена
+              </Button>
+              <Button variant="secondary">
+                secondary — для сравнения
+              </Button>
+            </div>
+            <div data-feature-dark class="dark flex flex-wrap items-center gap-3 rounded-md bg-sidebar p-3">
+              <Button variant="feature" show-icon>
+                <template #icon>
+                  <Icon name="auto-awesome" :size="20" />
+                </template>
+                Распределить автоматически
+              </Button>
+              <Button variant="feature">
+                Без иконки
+              </Button>
+            </div>
+            <p class="text-2xs text-muted-foreground">
+              Вторая строка — пара токенов тёмной темы (узел с классом <code>dark</code>) на тёмной поверхности.
+            </p>
+          </template>
+          <template v-else-if="c.id === 'icon-visibility'">
+            <span class="flex items-center gap-2 text-xs">
+              <Icon name="visibility" :size="24" />
+              <code>visibility</code>
+            </span>
+          </template>
+        </div>
+      </div>
+    </section>
 
     <section v-for="component in COMPONENTS" :key="component" :data-component="component" class="space-y-4">
       <h2 class="text-lg font-bold">

@@ -428,6 +428,11 @@
     --color-primary-disabled: var(--primary-disabled);
 
     --color-secondary-hover: var(--secondary-hover);
+
+    /* Роль feature — подсветка фич (такт 58): текст и иконка, подложка, наведение. */
+    --color-feature: var(--feature);
+    --color-feature-surface: var(--feature-surface);
+    --color-feature-hover: var(--feature-hover);
     --color-secondary-disabled: var(--secondary-disabled);
 
     --color-surface-contrast: var(--surface-contrast);
@@ -743,6 +748,13 @@
     /* Тональная кнопка: третья ступень заливки. В теме Рососмотра её нет —
        см. design-debt.md, поэтому нажатие сидит на значении наведения. */
     --secondary-pressed: var(--secondary-hover);
+
+    /* Роль feature — подсветка фич: автоматизация, новые возможности. Только для них: статусы и семантику она не
+       несёт. Решение владельца 2026-10-02, такт 58; в мастерах кита 1 роли нет — строка в figma-fixes.md.
+       Контраст текста к подложке — 6.25:1, к подложке наведения — 5.61:1. */
+    --feature: #6d28d9;
+    --feature-surface: #f3eeff;
+    --feature-hover: #e9e0ff;
 }
 
 /* ---------------------------------------------------------------------------
@@ -896,7 +908,11 @@
    sidebar-токенах в :root и сюда не относится. См. docs/tokens.md, раздел 5.
    --------------------------------------------------------------------------- */
 .dark {
-    /* пусто до появления тёмного мода в ките 1 */
+    /* Тёмного мода в ките 1 нет; заведена только пара роли feature — решение агента по поручению владельца, такт 58:
+       те же роли, контраст текста к подложке 8.25:1, к подложке наведения 7.04:1. */
+    --feature: #c4b5fd;
+    --feature-surface: #2e1065;
+    --feature-hover: #3b1a7a;
 }
 
 @layer base {

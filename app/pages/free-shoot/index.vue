@@ -1295,7 +1295,8 @@ function onUndo(id: number) {
               <div class="min-w-30 flex-1" data-search>
                 <Input v-model="search" placeholder="Поиск по расшифровкам и именам файлов…" />
               </div>
-              <Button v-if="rowStep < 3" variant="secondary" show-icon @click="m.magicWand()">
+              <!-- Такт 58, решение владельца 2026-10-02: действие автоматизации выделено ролью feature. -->
+              <Button v-if="rowStep < 3" variant="feature" show-icon @click="m.magicWand()">
                 <template #icon>
                   <Icon name="auto-awesome" :size="20" />
                 </template>
@@ -1304,9 +1305,11 @@ function onUndo(id: number) {
               <TooltipProvider v-else>
                 <Tooltip>
                   <TooltipTrigger as-child>
-                    <IconButton variant="secondary" size="lg" label="Распределить автоматически" @click="m.magicWand()">
-                      <Icon name="auto-awesome" :size="20" />
-                    </IconButton>
+                    <Button variant="feature" show-icon aria-label="Распределить автоматически" @click="m.magicWand()">
+                      <template #icon>
+                        <Icon name="auto-awesome" :size="20" />
+                      </template>
+                    </Button>
                   </TooltipTrigger>
                   <TooltipContent>Распределить автоматически</TooltipContent>
                 </Tooltip>
@@ -1357,10 +1360,10 @@ function onUndo(id: number) {
                       :duration="f.dur ?? ''"
                       :name="f.n"
                       :text="f.text"
+                      :seed="f.i"
                       :expanded="expandedNotes.has(f.i)"
                       @toggle="toggleNote(f.i)"
                       @copy="copyNote(f)"
-                      @play="m.noteAction(f.i, 'play')"
                       @select-text="onNoteSelect"
                     />
                   </template>

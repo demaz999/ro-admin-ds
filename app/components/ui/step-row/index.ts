@@ -126,15 +126,16 @@ export type StepCounterTone = 'neutral' | 'error' | 'warning' | 'success' | 'fro
  * подложка `--field-elevated` с тенью `--shadow-on-image`; крестик на наведении — зона 32, иконка 16.
  */
 export const stepThumbVariants = cva(
-  'group/thumb relative w-20 shrink-0 overflow-hidden rounded-xs border outline-none aspect-4/3 focus-visible:ring-2 focus-visible:ring-ring',
+  /* Рамка — слой `after` поверх картинки (такт 58): в раскладке не участвует, внутри ровно 80 × 60 — половины наведения по 40. */
+  'group/thumb relative w-20 shrink-0 overflow-hidden rounded-xs outline-none aspect-4/3 focus-visible:ring-2 focus-visible:ring-ring after:pointer-events-none after:absolute after:inset-0 after:rounded-xs after:border',
   {
     variants: {
       state: {
-        'free': 'border-border-soft',
-        'suggested': 'border-warning',
-        'locked': 'border-stroke-secondary',
-        'from-step': 'border-primary',
-        'rejected': 'border-destructive',
+        'free': 'after:border-border-soft',
+        'suggested': 'after:border-warning',
+        'locked': 'after:border-stroke-secondary',
+        'from-step': 'after:border-primary',
+        'rejected': 'after:border-destructive',
       },
       /** Найдена переходом «Показать в структуре» (§15.3). */
       located: {

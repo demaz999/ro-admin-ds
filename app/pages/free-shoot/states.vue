@@ -812,9 +812,21 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
             </p>
           </div>
           <div class="space-y-1">
-            <StepThumb :src="img(36)" demo-hover />
+            <StepThumb :src="img(36)" demo-hover="open" />
             <p class="text-2xs text-muted-foreground">
-              наведение
+              наведение — «глаз»
+            </p>
+          </div>
+          <div class="space-y-1">
+            <StepThumb :src="img(36)" demo-hover="remove" />
+            <p class="text-2xs text-muted-foreground">
+              наведение — крестик
+            </p>
+          </div>
+          <div class="space-y-1">
+            <StepThumb :src="img(36)" state="locked" demo-hover />
+            <p class="text-2xs text-muted-foreground">
+              закрытый — только «глаз»
             </p>
           </div>
           <div class="space-y-1">
@@ -1902,7 +1914,7 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
       <div data-subsection="feed-note" class="grid max-w-6xl grid-cols-[repeat(2,minmax(0,1fr))] items-start gap-6">
         <div class="space-y-1">
           <p class="text-2xs text-muted-foreground">голосовой комментарий, короткий</p>
-          <FeedNote time="09:52" duration="0:26" name="AUDIO_17.m4a" text="Компрессорная. Четыре машины ALUP, три из них на консервации с десятого года" />
+          <FeedNote time="09:52" duration="0:26" name="AUDIO_17.m4a" seed="17" text="Компрессорная. Четыре машины ALUP, три из них на консервации с десятого года" />
         </div>
         <div class="space-y-1">
           <p class="text-2xs text-muted-foreground">текстовая заметка</p>
@@ -1910,7 +1922,7 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
         </div>
         <div class="space-y-1">
           <p class="text-2xs text-muted-foreground">длинная — свёрнута до двух строк, «Показать полностью»</p>
-          <FeedNote time="11:40" duration="2:07" name="AUDIO_19.m4a" :text="LONG_NOTE" />
+          <FeedNote time="11:40" duration="2:07" name="AUDIO_19.m4a" seed="19" :text="LONG_NOTE" />
         </div>
         <div class="space-y-1">
           <p class="text-2xs text-muted-foreground">длинная — развёрнута, «Свернуть»</p>

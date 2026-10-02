@@ -102,6 +102,11 @@ export interface UiState {
   closed: Set<string>
   rtab: 'scheme' | 'form'
   lb: number
+  /**
+   * Кадр, открытый в просмотре (такт 58): остаётся в списке просмотра, пока показан, — в режиме «убирать» привязанный
+   * кадр иначе сразу выпадал из списка, просмотр перескакивал на следующий, и пункт «кадр привязан сюда» не загорался.
+   */
+  lbPin: number | null
   review: boolean
   reviewOnly: boolean
   /** Сколько объектов предложено последним автораспределением — «Проверено N из M» (§13.2). */
@@ -171,6 +176,7 @@ export function createModel(opts: ModelOptions) {
     closed: new Set(),
     rtab: init.rtab ?? 'scheme',
     lb: init.lb ?? -1,
+    lbPin: null,
     review: init.review ?? false,
     reviewOnly: init.reviewOnly ?? true,
     reviewTotal: init.reviewTotal ?? 0,
@@ -225,12 +231,17 @@ export function createModel(opts: ModelOptions) {
     const q = state.q.trim().toLowerCase()
     return frames.filter((f) => {
       if (isMedia(f) && f.origin === 'step') return false
-      if (state.mode === 'hide' && isMedia(f) && f.objId) return false
+      /* «Убирать» (такт 58, решение владельца 2026-10-02): кадр, предложенный автораспределением (`auto`), остаётся в
+         ленте до принятия объекта («Принять объект», «Принять все»); отклонённый объект возвращает кадры свободными.
+         Кадр, открытый в просмотре, держится в списке, пока показан (`lbPin`). */
+      if (state.mode === 'hide' && isMedia(f) && f.objId && !f.auto && f.i !== state.lbPin) return false
       if (q && !(`${f.ocr || ''} ${f.text || ''} ${f.n}`).toLowerCase().includes(q)) return false
       return true
     })
   }
   const feed = computed(visible)
+  /* Оснастка адреса открывает просмотр сразу — показанный кадр закрепляется так же, как при `setViewer`. */
+  if (state.lb >= 0) state.lbPin = visible().filter(isMedia)[state.lb]?.i ?? null
 
   /* ------------------------------ подшапка (§7.1–7.2) — прототип `renderStats` ------------------------------ */
   const stats = computed(() => {
@@ -343,8 +354,15 @@ export function createModel(opts: ModelOptions) {
     state.formWin = { obj, stage: O(obj)!.stageId, group, ids: [], preset: '' }
     state.win = 'form'
   }
-  /** Полноэкранный просмотр (§11): индекс кадра в списке просмотра, -1 — закрыт. */
-  function setViewer(index: number) { state.lb = index }
+  /**
+   * Полноэкранный просмотр (§11): индекс кадра в списке просмотра, -1 — закрыт. Показанный кадр закрепляется в списке
+   * (`lbPin`): индекс считается по кадру — прежний закреплённый, уйдя из списка, сдвигает номера.
+   */
+  function setViewer(index: number) {
+    const target = index >= 0 ? visible().filter(isMedia)[index] : undefined
+    state.lbPin = target ? target.i : null
+    state.lb = target ? visible().filter(isMedia).findIndex(f => f.i === target.i) : -1
+  }
 
   /* ------------------------------ П2: повторы ------------------------------ */
   /** Прототип `createObject`: новый повтор становится текущим и раскрывается. */

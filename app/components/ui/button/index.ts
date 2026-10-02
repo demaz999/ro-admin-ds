@@ -95,6 +95,12 @@ export const buttonVariants = cva(
         secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary-hover active:bg-secondary-pressed focus-visible:ring-offset-2 focus-visible:ring-offset-background',
         destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive-hover active:bg-destructive-pressed focus-visible:ring-offset-2 focus-visible:ring-offset-background',
         /**
+         * Подсветка фичи — такт 58, решение владельца 2026-10-02: действие автоматизации или новой возможности выделено
+         * цветом роли `feature`, по весу — как `secondary`: подложка `--feature-surface`, текст и иконка `--feature`,
+         * наведение и нажатие `--feature-hover`. В мастере `Button` `57:340` роли нет — наше расширение матрицы.
+         */
+        feature: 'bg-feature-surface text-feature hover:bg-feature-hover active:bg-feature-hover focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+        /**
          * Текстовая кнопка на тёмной полосе приложения — такт 42, нехватка в ките (дыра с такта 8). Прецедент —
          * `IconButton variant="sidebar"`: фона нет, наведение — ступень `--sidebar-accent`.
          * Такт 48, `top_menu` `33970:14832`: подписи полосы — regular белым (`--sidebar-active-foreground`, `menu/fg/activ`),
@@ -120,6 +126,7 @@ export const buttonVariants = cva(
       { variant: 'default', class: 'disabled:opacity-[var(--opacity-disabled-strong)]' },
       { variant: 'destructive', class: 'disabled:opacity-[var(--opacity-disabled-strong)]' },
       { variant: 'secondary', class: 'disabled:opacity-[var(--opacity-disabled)]' },
+      { variant: 'feature', class: 'disabled:opacity-[var(--opacity-disabled)]' },
       { variant: 'sidebar', class: 'px-2 font-normal disabled:opacity-[var(--opacity-disabled)]' },
     ],
     defaultVariants: {
@@ -137,6 +144,10 @@ export type ButtonVariants = VariantProps<typeof buttonVariants>
  *
  * Компонент передан фронтам 2026-09-30. Правило 23 `docs/chat-protocol.md`: каждое изменение переданного компонента
  * маркируется здесь, в `CHANGELOG.md` и в «Передано фронтам»; живые примеры — стенд `/kit-changes`.
+ *
+ * ### Следующая версия (черновик) — относительно `handover-2026-10-01`
+ *
+ * - **Добавлено.** Вариант `variant="feature"` — подсветка фичи (автоматизация, новая возможность): подложка `--feature-surface`, текст и иконка `--feature`, наведение и нажатие `--feature-hover`; по весу как `secondary`. Токены роли — `--feature`, `--feature-surface`, `--feature-hover` (такт 58).
  *
  * ### Версия `handover-2026-10-01` — относительно передачи 2026-09-30
  *

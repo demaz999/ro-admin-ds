@@ -4,7 +4,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { cn } from '@/lib/utils'
 import { ButtonAction } from '@/components/ui/button-action'
 import { Icon } from '@/components/ui/icon'
-import { PlayerButton } from '@/components/ui/player'
+import { PlayerAudio } from '@/components/ui/player'
 import { feedNoteVariants } from '.'
 
 /** Заметка в ленте (§8.4) — разбор и провенанс в `index.ts`. */
@@ -16,6 +16,10 @@ const props = withDefaults(defineProps<{
   duration?: string
   /** Имя файла голосовой — подпись строки воспроизведения. */
   name?: string
+  /** Волна голосовой — высоты столбиков, доли 0–1; без неё волна строится из `seed` (такт 58). */
+  wave?: number[]
+  /** Зерно волны — id заметки: волна одна и та же при каждой загрузке. */
+  seed?: string | number
   text: string
   /** Длинная расшифровка развёрнута. Состояние держит страница. */
   expanded?: boolean
@@ -24,6 +28,8 @@ const props = withDefaults(defineProps<{
   kind: 'voice',
   duration: '',
   name: '',
+  wave: undefined,
+  seed: 0,
   expanded: false,
 })
 
@@ -34,8 +40,10 @@ const emit = defineEmits<{
   'select-text': [selection: FeedNoteSelection]
 }>()
 
-/** Мета строкой: время · имя файла · длительность; у текстовой заметки — время. */
-const meta = computed(() => [props.time, props.kind === 'voice' ? props.name : '', props.kind === 'voice' ? props.duration : ''].filter(Boolean).join(' · '))
+/** Мета строкой: время · имя файла; длительность голосовой — в строке воспроизведения (такт 58). */
+const meta = computed(() => [props.time, props.kind === 'voice' ? props.name : ''].filter(Boolean).join(' · '))
+/** Длительность «м:сс» — в секунды для плеера. */
+const seconds = computed(() => { const [m, s] = props.duration.split(':').map(Number); return Number.isFinite(m) && Number.isFinite(s) ? m! * 60 + s! : 0 })
 
 /** Длинная — от 110 знаков, как у прототипа (`clamp = text.length > 110`). */
 const long = computed(() => props.text.length > 110)
@@ -80,13 +88,10 @@ function onMouseup() {
   >
     <!--
       Строка мета — такт 50, решение владельца 2026-10-01: главное в заметке — текст расшифровки. В одной строке: кнопка
-      воспроизведения 28 (зона 32) у голосовой, тип 15/20 bold в тоне заметки обычным регистром (такт 51: «тип > мета»), время · имя файла ·
+      воспроизведения — с такта 58 в строке плеера ниже, тип 15/20 bold в тоне заметки обычным регистром (такт 51: «тип > мета»), время · имя файла ·
       длительность — приглушённо (`--opacity-on-tone`), справа «Копировать».
     -->
     <div data-slot="feed-note-head" class="flex min-h-8 items-center gap-2">
-      <span v-if="props.kind === 'voice'" data-slot="feed-note-play" class="flex size-8 shrink-0 items-center justify-center">
-        <PlayerButton size="xs" @click="emit('play')" />
-      </span>
       <!-- У текстовой заметки — глиф в тоне заметки, без круга и подложки: он не интерактивен (такт 51). -->
       <Icon v-if="props.kind === 'note'" name="article" :size="16" class="text-warning-strong" />
       <span
@@ -100,6 +105,18 @@ function onMouseup() {
         </ButtonAction>
       </span>
     </div>
+    <!--
+      Голосовая — как голосовое в мессенджере (такт 58, решение владельца 2026-10-02): кнопка, волновая дорожка с заливкой
+      по мере воспроизведения, время «прошло / всего» — `PlayerAudio variant="wave"`.
+    -->
+    <PlayerAudio
+      v-if="props.kind === 'voice'"
+      variant="wave"
+      :duration="seconds"
+      :peaks="props.wave"
+      :seed="props.seed"
+      @toggle="$event && emit('play')"
+    />
     <p
       ref="textEl"
       data-slot="feed-note-text"

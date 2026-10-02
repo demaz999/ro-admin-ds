@@ -6,6 +6,11 @@ export { default as PlayerButton } from './PlayerButton.vue'
 export { default as PlayerVideo } from './PlayerVideo.vue'
 
 /**
+ * `PlayerAudio variant="wave"` — голосовое с волновой дорожкой (такт 58, решение владельца 2026-10-02): расширение
+ * матрицы мастера `PlayerAudio` `6921:57397`, разбор — в `PlayerAudio.vue`.
+ */
+
+/**
  * Кнопка плеера — мастер `ButtonPlayer` `6143:49984`, спека `6056:56215`.
  *
  * Пришла сюда из волны 2 решением от 2026-08-13: она медийная по природе и
