@@ -104,9 +104,10 @@ function onMouseup() {
       воспроизведения — с такта 58 в строке плеера ниже, тип 15/20 bold в тоне заметки обычным регистром (такт 51: «тип > мета»), время · имя файла ·
       длительность — приглушённо (`--opacity-on-tone`), справа «Копировать».
     -->
-    <div data-slot="feed-note-head" class="flex min-h-8 items-center gap-2">
+    <!-- Третий довесок к такту 58: тип, серая мета и «Копировать» — на базовой линии типа (правило такта 47); глиф — по центру строки типа. -->
+    <div data-slot="feed-note-head" class="flex h-8 items-baseline gap-2 pt-1.5">
       <!-- У текстовой заметки — глиф в тоне заметки, без круга и подложки: он не интерактивен (такт 51). -->
-      <Icon v-if="props.kind === 'note'" name="article" :size="16" class="text-warning-strong" />
+      <Icon v-if="props.kind === 'note'" name="article" :size="16" class="mt-0.5 self-start text-warning-strong" />
       <span
         data-slot="feed-note-type"
         :class="cn('shrink-0 text-sm font-bold', props.kind === 'note' ? 'text-warning-strong' : 'text-primary')"
