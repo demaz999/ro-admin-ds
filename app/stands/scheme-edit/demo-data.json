@@ -102,7 +102,7 @@
       "config": {
         "settings": {
           "general": { "name": "Новая схема осмотра", "description": "", "schemeType": "vehicle", "owner": "Демо Страхование", "inspectionType": "regular", "purpose": "standard", "active": false },
-          "mobile": {}, "web": {}, "access": {}, "ai": {}, "anomalies": {}, "pdf": {}
+          "mobile": {}, "web": { "feedback": false, "reasons": [] }, "access": { "groups": [] }, "ai": {}, "anomalies": { "enabled": false }, "pdf": { "templates": [] }
         },
         "form": { "groups": [] },
         "processes": [],

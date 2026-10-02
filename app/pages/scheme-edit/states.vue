@@ -9,6 +9,8 @@ import { formulaPreview } from '~/components/ui/formula-input'
  * П1: ось `AppBarStatus` — `surface="light"` и `retryable`.
  * П2: `Card`, `SettingRow`, `SectionNav`, `FormulaInput` с `FormulaPreview`, ось `Select multiple`, ступени `Heading`
  * `title`, `group` и проп `description` (`docs/scheme-edit.md`, разделы 8 и 9).
+ * П3: вариант `Button variant="outline"` — мастер кита 1 `btn_outline` `1990:226`; события `edit` и `action` у
+ * `TableRowActions`.
  */
 definePageMeta({ layout: false })
 useHead({ title: 'Редактирование схемы осмотра — матрицы' })
@@ -43,6 +45,23 @@ const SAMPLES = { 'Car:vin': 'DEMO0000000001024', 'Car:regnum': 'А000АА00', '
 const formula = ref('Осмотр {Inspection:number} — {Car:vin}')
 const formulaEmpty = ref('')
 const formulaUnknown = ref('Архив {Car:vin}_{Car:color}')
+
+/* ------------------------------ П3 ------------------------------ */
+const rowLog = ref('—')
+const ROW_ACTIONS = [{ key: 'delete', label: 'Удалить', icon: 'delete' as const, destructive: true }]
+
+const BUTTON_OUTLINE_EXAMPLE = `<Button variant="outline">Отменить</Button>                       <!-- контурная: рамка 1 и текст --primary, фона нет -->
+<Button variant="outline" show-icon>
+  <template #icon><Icon name="add" :size="16" /></template>
+  Добавить шаблон
+</Button>
+<Button variant="outline" disabled>Сбросить к значениям по умолчанию</Button>   <!-- выключено — цветом --primary-disabled -->`
+
+const ROW_ACTIONS_EXAMPLE = `<TableRowActions
+  :actions="[{ key: 'delete', label: 'Удалить', icon: 'delete', destructive: true }]"
+  @edit="openTemplate(row.id)"            <!-- карандаш -->
+  @action="key => remove(row.id, key)"    <!-- вторичное действие: ключ из actions -->
+/>`
 
 const HEADING_EXAMPLE = `<Heading level="title" description="Базовые параметры схемы осмотра">Основное</Heading>   <!-- раздел страницы: 24/28, подпись 13/16 -->
 <Heading level="group">Экспертиза и проверка</Heading>                                        <!-- группа в карточке: 20/24 -->`
@@ -266,6 +285,63 @@ const FORMULA_EXAMPLE = `<Field label="Тема письма оповещени�
         </Field>
       </div>
       <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ SELECT_MULTIPLE_EXAMPLE }}</pre>
+    </section>
+
+    <!-- ============================ П3, такт 63 ============================ -->
+    <section class="flex flex-col gap-4" data-matrix="button-outline">
+      <Heading>Button · variant="outline" — контурная кнопка, мастер кита 1 btn_outline 1990:226</Heading>
+      <div class="flex flex-wrap items-center gap-4">
+        <Button variant="outline" data-case="default">
+          Отменить
+        </Button>
+        <Button variant="outline" show-icon data-case="icon">
+          <template #icon>
+            <Icon name="add" :size="16" />
+          </template>
+          Добавить шаблон
+        </Button>
+        <Button variant="outline" disabled data-case="disabled">
+          Выключена
+        </Button>
+        <Button variant="outline" size="sm" data-case="sm">
+          Малая
+        </Button>
+        <Button variant="outline" size="lg" data-case="lg">
+          Большая
+        </Button>
+        <Button variant="secondary">
+          secondary — для сравнения
+        </Button>
+        <Button>
+          default — для сравнения
+        </Button>
+      </div>
+      <div class="max-w-80">
+        <Button variant="outline" wide data-case="wide">
+          Во всю ширину
+        </Button>
+      </div>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ BUTTON_OUTLINE_EXAMPLE }}</pre>
+    </section>
+
+    <section class="flex flex-col gap-4" data-matrix="table-row-actions">
+      <Heading>TableRowActions — события edit и action</Heading>
+      <div class="flex max-w-settings flex-col">
+        <Table>
+          <TableRow>
+            <TableCell class="min-w-0 flex-1 px-4">
+              Наведите на строку и нажмите действие
+            </TableCell>
+            <TableCell variant="slot" class="w-50 justify-end px-4">
+              <TableRowActions :actions="ROW_ACTIONS" @edit="rowLog = 'edit'" @action="rowLog = `action: ${$event}`" />
+            </TableCell>
+          </TableRow>
+        </Table>
+      </div>
+      <ToolbarText data-row-log>
+        Последнее событие: {{ rowLog }}
+      </ToolbarText>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ ROW_ACTIONS_EXAMPLE }}</pre>
     </section>
 
     <section class="flex flex-col gap-4" data-matrix="formula-input">

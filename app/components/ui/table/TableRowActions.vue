@@ -68,7 +68,17 @@ const props = withDefaults(defineProps<{
   reserveSecondary: undefined,
 })
 
+/**
+ * Такт 63: действия строки сообщают о нажатии — `edit` у карандаша, `action` с ключом у вторичных. До такта 63
+ * страницы ставили действия заглушками; существующие вызовы без обработчиков не меняются.
+ */
+const emit = defineEmits<{ edit: [], action: [key: string] }>()
+
 const menuOpen = ref(false)
+function pick(key: string) {
+  menuOpen.value = false
+  emit('action', key)
+}
 
 /** Вторичный слот есть только при вторичных действиях — такт 27. */
 const reserve = computed(() => props.reserveSecondary ?? props.actions.length > 0)
@@ -91,7 +101,7 @@ const menuDanger = computed(() => ordered.value.filter(a => a.destructive))
 <template>
   <div data-slot="table-row-actions" class="flex items-center justify-end gap-2" @click.stop>
     <!-- Подпись и карандаш: всегда, при любом числе действий. -->
-    <TableRowAction :disabled="props.editDisabled">
+    <TableRowAction :disabled="props.editDisabled" @click="emit('edit')">
       {{ props.editLabel }}
     </TableRowAction>
 
@@ -100,7 +110,7 @@ const menuDanger = computed(() => ordered.value.filter(a => a.destructive))
       <TooltipProvider v-if="single">
         <Tooltip>
           <TooltipTrigger as-child>
-            <IconButton variant="service" size="sm" :label="single.label" :disabled="single.disabled">
+            <IconButton variant="service" size="sm" :label="single.label" :disabled="single.disabled" @click="emit('action', single.key)">
               <Icon :name="single.icon" :size="16" />
             </IconButton>
           </TooltipTrigger>
@@ -122,7 +132,8 @@ const menuDanger = computed(() => ordered.value.filter(a => a.destructive))
                 v-for="a in menuMain"
                 :key="a.key"
                 :disabled="a.disabled"
-                @click="menuOpen = false"
+                :data-action="a.key"
+                @click="pick(a.key)"
               >
                 {{ a.label }}
               </SelectItem>
@@ -132,7 +143,8 @@ const menuDanger = computed(() => ordered.value.filter(a => a.destructive))
                 v-for="a in menuDanger"
                 :key="a.key"
                 :disabled="a.disabled"
-                @click="menuOpen = false"
+                :data-action="a.key"
+                @click="pick(a.key)"
               >
                 {{ a.label }}
               </SelectItem>

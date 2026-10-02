@@ -83,11 +83,12 @@ async function openPage(width = 1440) {
     /**
      * Центр элемента в окне: клик — когда цель встала и не накрыта. В видимую часть цель ставится, только если она за
      * краем окна: прокрутка ради клика по видимой цели сбивала положение страницы, и возврат прокрутки таба (СС-13)
-     * проверялся на нуле.
+     * проверялся на нуле. Цель внутри окна, срезанная областью прокрутки (пункт длинного списка в поповере), ставится
+     * в видимую часть этой области — `nearest` видимую цель не двигает.
      */
     async point(sel) {
       await send('Page.bringToFront')
-      const at = scroll => evaluate(`(() => { const el = ${sel}; if (!el) return null; ${scroll ? "{ const v = el.getBoundingClientRect(); if (v.top < 0 || v.bottom > innerHeight) el.scrollIntoView({ block: 'center', behavior: 'instant' }) }" : ''} const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()`)
+      const at = scroll => evaluate(`(() => { const el = ${sel}; if (!el) return null; ${scroll ? "{ const v = el.getBoundingClientRect(); if (v.top < 0 || v.bottom > innerHeight) el.scrollIntoView({ block: 'center', behavior: 'instant' }); else el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' }) }" : ''} const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()`)
       let p = await at(true)
       if (!p) throw new Error(`нет элемента для клика: ${sel}`)
       for (let k = 0; k < 30; k++) { await sleep(100); const q = await at(false); if (q && q.x === p.x && q.y === p.y) break; p = q }
@@ -117,7 +118,7 @@ async function openPage(width = 1440) {
      * редактируемой области не доходят (ловушка `CLAUDE.md`, «Синтетический Delete по CDP»).
      */
     async key(key, code = key, extra = {}) {
-      const VK = { End: 35, Home: 36, ArrowLeft: 37, ArrowRight: 39, Backspace: 8, Delete: 46, Escape: 27, Enter: 13 }
+      const VK = { End: 35, Home: 36, ArrowLeft: 37, ArrowRight: 39, Backspace: 8, Delete: 46, Escape: 27, Enter: 13, Tab: 9 }
       const vk = VK[key] ? { windowsVirtualKeyCode: VK[key], nativeVirtualKeyCode: VK[key] } : {}
       await send('Page.bringToFront')
       await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key, code, ...vk, ...extra })
@@ -153,7 +154,7 @@ async function until(page, expr, ms = 6000) {
 const WATCH = `(() => {
   const t = s => (s ?? '').replace(/\\s+/g, ' ').trim()
   window.__notices = []; window.__saveLog = []
-  const take = el => setTimeout(() => { const x = t(el.querySelector('[data-slot=toast-title]')?.textContent || el.textContent); if (x) window.__notices.push(x) }, 0)
+  const take = el => setTimeout(() => { const c = el.cloneNode(true); c.querySelectorAll('button').forEach(b => b.remove()); const x = t(c.textContent); if (x) window.__notices.push(x) }, 0)
   new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach((n) => { if (n.nodeType !== 1) return
     if (n.matches?.('[data-slot=toast]')) take(n); else n.querySelectorAll?.('[data-slot=toast]').forEach(take) }))).observe(document.body, { childList: true, subtree: true })
   const root = document.querySelector('[data-scheme-edit]')
@@ -209,7 +210,7 @@ function kit(page) {
     act: id => page.click(Q.act(id)),
     /** Прокрутка колесом до подраздела: его начало встаёт на 24 от верха окна и на 6 дальше — якорь уже сменился. */
     async wheelTo(id) {
-      const dy = await page.evaluate(`Math.round(document.getElementById('general-${id}').getBoundingClientRect().top - 24 + 6)`)
+      const dy = await page.evaluate(`Math.round(document.getElementById('anchor-${id}').getBoundingClientRect().top - 24 + 6)`)
       await page.wheel(dy)
       await sleep(300)
     },
@@ -234,6 +235,29 @@ function kit(page) {
       await page.click(`document.querySelector('[data-field=${field}]')`)
       await page.type(text)
     },
+    /* ---------- П3 ---------- */
+    /** Заменить значение поля: клик, выделить всё, набрать. */
+    async fill(sel, text) {
+      const input = `(el => el?.matches('input') ? el : el?.querySelector('input'))(document.querySelector('${sel}'))`
+      await page.click(input)
+      await page.evaluate(`(${input}.select(), 1)`)
+      await page.type(text)
+    },
+    /** «Отменить» в уведомлении. */
+    undo: () => page.click(`[...document.querySelectorAll('[data-slot=toast] button')].find(b => b.textContent.replace(/\\s+/g, ' ').trim() === 'Отменить')`),
+    removeReason: key => page.click(`document.querySelector('[data-reason=${key}] [data-slot=chip-remove]')`),
+    groupCheck: id => page.click(`document.querySelector('[data-group=${id}] [data-slot=choice-control]')`),
+    groupsAll: () => page.click(`document.querySelector('[data-groups-all] [data-slot=choice-control], [data-groups-all][data-slot=choice-control]')`),
+    groupsPage: n => page.click(`[...document.querySelectorAll('[data-groups-table] [data-slot=pagination-page]')].find(b => b.textContent.trim() === '${n}')`),
+    groupsReset: () => page.click(`document.querySelector('[data-groups-table] [data-slot=table-empty-search] button')`),
+    detectorSet: id => page.click(`document.querySelector('[data-detector-set=${id}] [data-slot=choice-control]')`),
+    templateEdit: id => page.click(`document.querySelector('[data-template=${id}] [data-slot=table-row-action]')`),
+    async templateDelete(id) {
+      await page.click(`document.querySelector('[data-template=${id}] [data-slot=table-row-actions-secondary] button')`)
+      await page.click(`document.querySelector('[data-menu=row-actions] [data-action=delete]')`)
+    },
+    check: field => page.click(`document.querySelector('[data-field=${field}] [data-slot=choice-control], [data-field=${field}][data-slot=choice] [data-slot=choice-control]')`),
+    async tabs(n) { for (let k = 0; k < n; k++) await page.key('Tab') },
     /* Формула: курсор в конец — клик по области и End. */
     async formulaEnd(key) {
       await page.click(Q.editor(key))
@@ -291,7 +315,7 @@ function kit(page) {
           navAnchors: [...document.querySelectorAll('[data-slot=section-nav-anchor]')].map(b => t(b.textContent)),
           anchorActive: [...document.querySelectorAll('[data-slot=section-nav-anchor][aria-current=location]')].map(b => t(b.textContent)),
           /* Где стоит начало активного подраздела относительно верха окна. */
-          anchorTop: (() => { const el = document.getElementById('general-' + root.dataset.anchor); return el ? Math.round(el.getBoundingClientRect().top) : null })(),
+          anchorTop: (() => { const el = document.getElementById('anchor-' + root.dataset.anchor); return el ? Math.round(el.getBoundingClientRect().top) : null })(),
           navSticky: (() => { const n = document.querySelector('[data-slot=section-nav]'); return n ? Math.round(n.getBoundingClientRect().top) : null })(),
           dots: Object.fromEntries([...document.querySelectorAll('[data-slot=section-nav-item]')].filter(b => b.dataset.status !== 'none').map(b => [b.dataset.value, b.dataset.status])),
           prevDisabled: document.querySelector('[data-act=section-prev]')?.disabled ?? null,
@@ -326,6 +350,32 @@ function kit(page) {
             frag.querySelectorAll('[data-slot=formula-chip]').forEach(c => c.remove())
             return { chips, text: frag.textContent.length }
           })(),
+          /* ---------- П3 ---------- */
+          s: M.draft.config.settings,
+          reasons: [...document.querySelectorAll('[data-reason]')].map(c => t(c.querySelector('[data-slot=chip-label]').textContent)),
+          reasonsRemovable: [...document.querySelectorAll('[data-reason] [data-slot=chip-remove]')].length,
+          reasonForm: !!document.querySelector('[data-reason-form]'),
+          reasonAddOff: document.querySelector('[data-act=reason-add]')?.disabled ?? null,
+          callouts: Object.fromEntries([...document.querySelectorAll('[data-reason-callout]')].map(c => [c.dataset.reasonCallout, t(c.textContent)])),
+          banner: t(document.querySelector('[data-ai-banner]')?.textContent) || null,
+          fieldsOff: [...document.querySelectorAll('[data-field]')].filter(x => x.querySelector('[data-multiple][data-disabled], button[data-slot=field]:disabled, input:disabled')).map(x => x.dataset.field),
+          groupRows: [...document.querySelectorAll('[data-group]')].map(r => t(r.querySelector('[data-slot=table-cell-identity]').textContent)),
+          groupsChecked: [...document.querySelectorAll('[data-group]')].filter(r => r.querySelector('[data-slot=choice-control]').getAttribute('aria-checked') === 'true').length,
+          groupsCount: t(document.querySelector('[data-groups-count]')?.textContent) || null,
+          groupsRange: t(document.querySelector('[data-groups-table] [data-slot=table-range]')?.textContent) || null,
+          groupsAll: document.querySelector('[data-groups-all] [data-slot=choice-control], [data-groups-all][data-slot=choice-control]')?.getAttribute('aria-checked') ?? null,
+          groupsEmpty: !!document.querySelector('[data-groups-table] [data-slot=table-empty-search]'),
+          costs: Object.fromEntries([...document.querySelectorAll('[data-cost]')].map(x => [x.dataset.cost, (x.matches('input') ? x : x.querySelector('input')).value])),
+          costsOff: [...document.querySelectorAll('[data-cost]')].filter(x => (x.matches('input') ? x : x.querySelector('input')).disabled).length,
+          resetOff: document.querySelector('[data-act=costs-reset]')?.disabled ?? null,
+          linkTarget: document.querySelector('[data-link=region-matrices]')?.getAttribute('target') ?? null,
+          detSets: Object.fromEntries([...document.querySelectorAll('[data-detector-set]')].map(x => [x.dataset.detectorSet, x.querySelector('[data-slot=choice-control]').getAttribute('aria-checked')])),
+          detAll: t(document.querySelector('[data-detector-set=all] [data-slot=choice-title]')?.textContent) || null,
+          templates: [...document.querySelectorAll('[data-template]')].map(r => ({
+            title: t(r.querySelector('[data-slot=table-cell-identity]').textContent), main: !!r.querySelector('[data-template-main]'),
+            program: t(r.querySelectorAll('[data-slot=table-cell]')[1].textContent), access: t(r.querySelectorAll('[data-slot=table-cell]')[2].textContent),
+          })),
+          focusInSide: !!document.activeElement?.closest?.('[data-side]'),
           atMark: window.__markY == null ? null : Math.abs(window.scrollY - window.__markY) <= 1 && window.__markY > 300,
           surface: root.dataset.surface,
           sideTitle: t(document.querySelector('[data-side] [data-slot=modal-card-title]')?.textContent) || null,
@@ -342,7 +392,7 @@ function kit(page) {
 
 /* ------------------------------ сценарии ------------------------------ */
 /**
- * Сценарии П1–П2 — `docs/scheme-edit.md`, 6.1. Шаг — [название, действие, ожидание из спеки, опции].
+ * Сценарии П1–П3 — `docs/scheme-edit.md`, 6.1. Шаг — [название, действие, ожидание из спеки, опции].
  * Ожидание — подмножество слепка; источник — в названии сценария.
  */
 const NAME = 'КАСКО — осмотр легкового автомобиля'
@@ -366,17 +416,19 @@ const SCENARIOS = {
     ['якорь «Формулы и служебное»', K => K.anchor('formulas'), { anchor: 'formulas', anchorActive: ['Формулы и служебное'], anchorTop: 24, section: 'general', writes: 0 }],
     ['прокрутка колесом до «Словарей» — якорь следует', K => K.wheelTo('dictionaries'), { anchor: 'dictionaries', anchorActive: ['Словари'], navSticky: 24 }],
     ['прокрутка колесом назад к «Поведению процесса»', K => K.wheelTo('behavior'), { anchor: 'behavior', anchorActive: ['Поведение процесса'], navSticky: 24 }],
-    ['раздел «Права доступа»', K => K.section('access'), { section: 'access', navActive: ['access'], navAnchors: [], anchor: '', pending: '«Права доступа» — порция П3' }],
+    ['раздел «Права доступа»', K => K.section('access'), { section: 'access', navActive: ['access'], navAnchors: ['Выполнение осмотра', 'Создание и проверка осмотров', 'Группы доступа'], anchor: 'execution', anchorActive: ['Выполнение осмотра'] }],
+    ['якорь «Группы доступа»', K => K.anchor('groups'), { anchor: 'groups', anchorActive: ['Группы доступа'], anchorTop: 24 }],
+    ['раздел «Аномалии» — якорей нет', K => K.section('anomalies'), { section: 'anomalies', navAnchors: [], anchor: '' }],
     ['раздел «Общие»', K => K.section('general'), { section: 'general', navActive: ['general'], anchor: 'main', anchorActive: ['Основное'], save: 'saved', writes: 0 }],
   ]],
   'СС-15': ['навигатор: статус-точки разделов по единой системе индикаторов (r2 §4; аудит, «Единая система статус-индикаторов»)', [
-    ['старт: выключенные разделы — серая точка', null, { dots: { anomalies: 'off', pdf: 'off' } }],
+    ['старт: включённые разделы — точка «включено»', null, { dots: { web: 'on', anomalies: 'on', pdf: 'on' } }],
     ['согласование включено, поля отмечены — точки у «Общих» нет', async (K) => { await K.toggle('approval'); await K.settled() },
-      { dots: { anomalies: 'off', pdf: 'off' }, 'g.behavior.approval': true }],
+      { dots: { web: 'on', anomalies: 'on', pdf: 'on' }, 'g.behavior.approval': true }],
   ]],
   'СС-16': ['«Назад / Далее»: соседний раздел; на первом выключена «Назад», на последнем — «Далее» (r2 §3)', [
     ['старт: первый раздел', null, { section: 'general', prevDisabled: true, nextDisabled: false }],
-    ['«Далее»', K => K.act('section-next'), { section: 'mobile', navActive: ['mobile'], prevDisabled: false, nextDisabled: false, pending: '«Мобильное приложение» — порция П3' }],
+    ['«Далее»', K => K.act('section-next'), { section: 'mobile', navActive: ['mobile'], prevDisabled: false, nextDisabled: false, anchor: 'shooting', navAnchors: ['Параметры съёмки', 'Поведение в мобильном приложении'] }],
     ['«Далее» до последнего', async (K) => { for (let k = 0; k < 5; k++) await K.act('section-next') }, { section: 'pdf', navActive: ['pdf'], prevDisabled: false, nextDisabled: true }],
     ['«Назад»', K => K.act('section-prev'), { section: 'anomalies', prevDisabled: false, nextDisabled: false, writes: 0 }],
   ]],
@@ -407,11 +459,11 @@ const SCENARIOS = {
     ['назад в «Настройки» — на прежнем месте', K => K.tab('settings'), { tab: 'settings', section: 'general', atMark: true, 'rows.approval.meta': 'Отмечено 2 поля на согласование' }],
   ]],
   'СС-19/ноль': ['«вооружает» при нуле: предупреждение и точка «требует внимания» у раздела (аудит, «Паттерны кросс-таб зависимостей», «Единая система статус-индикаторов»)', [
-    ['старт: новая схема, полей нет', null, { 'rows.approval.meta': '', dots: { anomalies: 'off', pdf: 'off' }, publish: 'never' }],
+    ['старт: новая схема, полей нет', null, { 'rows.approval.meta': '', dots: { web: 'off', anomalies: 'off', pdf: 'off' }, publish: 'never' }],
     ['включить согласование — предупреждение', async (K) => { await K.toggle('approval'); await K.settled() },
       { 'rows.approval.meta': 'Отмечено 0 полей на согласование — согласование не сработает, пока поля не отмечены', 'rows.approval.tone': 'warning',
-        dots: { general: 'attention', anomalies: 'off', pdf: 'off' } }],
-    ['выключить — предупреждение снято', async (K) => { await K.toggle('approval'); await K.settled() }, { 'rows.approval.meta': '', dots: { anomalies: 'off', pdf: 'off' } }],
+        dots: { general: 'attention', web: 'off', anomalies: 'off', pdf: 'off' } }],
+    ['выключить — предупреждение снято', async (K) => { await K.toggle('approval'); await K.settled() }, { 'rows.approval.meta': '', dots: { web: 'off', anomalies: 'off', pdf: 'off' } }],
   ], { query: 'data=new' }],
   'СС-21': ['«Поведение процесса»: число минут разблокировки доступно при включённом родителе (r2 §4)', [
     ['старт', null, { 'steppers.unlockMinutes': 60, 'g.behavior.unlockMinutes': 60 }],
@@ -477,6 +529,123 @@ const SCENARIOS = {
     ['повторный выбор в списке снимает роль', async (K) => { await K.pick('deadlineEditors', 'Оператор'); await K.settled() }, { 'g.deadlines.editors': ['expert'] }],
     ['делиться осмотром — «Только исполнитель»', async (K) => { await K.radio('share', 'Только исполнитель'); await K.settled() }, { 'g.deadlines.share': 'executor' }],
   ]],
+  /* ============================ П3, такт 63 ============================ */
+  'СС-25': ['мобильное приложение: режим выполнения, разрешения, телефон; три настройки поведения (r2 §4)', [
+    ['старт', null, { section: 'mobile', anchor: 'shooting', navAnchors: ['Параметры съёмки', 'Поведение в мобильном приложении'], 's.mobile.mode': 'regular', 's.mobile.photo': 'medium', 'rows.startAfterCreate.checked': true }],
+    ['режим «Чек-лист»', async (K) => { await K.radio('mobileMode', 'Чек-лист Пошаговое выполнение с отметкой о завершении каждого пункта'); await K.settled() }, { 's.mobile.mode': 'checklist', saveLog: ['saving', 'saved'], writes: 1 }],
+    ['разрешение фото и видео', async (K) => { await K.select('photo', 'Высокое — 5 Мп'); await K.select('video', 'Среднее — HD'); await K.settled() }, { 's.mobile.photo': 'high', 's.mobile.video': 'hd' }],
+    ['телефон и его название', async (K) => { await K.typeInto('phone', '+7 900 000 00 00'); await K.typeInto('phoneName', 'Служба поддержки'); await K.settled() },
+      { 's.mobile.phone': '+7 900 000 00 00', 's.mobile.phoneName': 'Служба поддержки', save: 'saved' }],
+    ['запрос подтверждения звонка', async (K) => { await K.typeInto('callConfirm', 'Позвонить в поддержку?'); await K.settled() }, { 's.mobile.callConfirm': 'Позвонить в поддержку?' }],
+    ['поведение: три настройки', async (K) => { await K.toggle('startAfterCreate'); await K.toggle('hideHints'); await K.toggle('skipConfirm'); await K.settled() },
+      { 's.mobile.startAfterCreate': false, 's.mobile.hideHints': false, 's.mobile.skipConfirm': true, save: 'saved' }],
+  ], { query: 'section=mobile' }],
+  'СС-26': ['веб-приложение: рубильник блока гасит варианты и запреты; добавление обоснования «ключ — название», удаление с отменой (r2 §4)', [
+    ['старт', null, { section: 'web', reasons: ['Координаты — geo', 'Фото с экрана — screen-photo'], reasonsRemovable: 2, reasonForm: false, reasonAddOff: false, 'rows.blockRepeat.off': false, callouts: {}, 'dots.web': 'on' }],
+    ['«Добавить вариант» — форма с пустыми полями', K => K.act('reason-add'), { reasonForm: true, writes: 0 }],
+    ['«Создать обоснование» с пустыми полями — отказ', K => K.act('reason-create'), { notices: ['Заполните ключ и название обоснования'], reasonForm: true, reasons: ['Координаты — geo', 'Фото с экрана — screen-photo'], writes: 0 }],
+    ['ключ «blur», название «Размытое фото» — создано', async (K) => { await K.typeInto('reasonKey', 'blur'); await K.typeInto('reasonTitle', 'Размытое фото'); await K.act('reason-create'); await K.settled() },
+      { reasons: ['Координаты — geo', 'Фото с экрана — screen-photo', 'Размытое фото — blur'], reasonForm: false, saveLog: ['saving', 'saved'], writes: 1 }],
+    ['повтор ключа «geo» — отказ', async (K) => { await K.act('reason-add'); await K.typeInto('reasonKey', 'geo'); await K.typeInto('reasonTitle', 'Геометка'); await K.act('reason-create') },
+      { notices: ['Обоснование с ключом «geo» уже есть'], reasonForm: true, writes: 1 }],
+    ['«Отменить» закрывает форму', K => K.act('reason-cancel'), { reasonForm: false, writes: 1 }],
+    ['удалить «Координаты» крестиком — уведомление с отменой', async (K) => { await K.removeReason('geo'); await K.settled() },
+      { reasons: ['Фото с экрана — screen-photo', 'Размытое фото — blur'], notices: ['Обоснование «Координаты» удалено'], writes: 2 }],
+    ['«Отменить» в уведомлении — вариант на месте', async (K) => { await K.undo(); await K.settled() }, { reasons: ['Координаты — geo', 'Фото с экрана — screen-photo', 'Размытое фото — blur'], writes: 3 }],
+    ['выключить блок — варианты и запреты погашены с причиной', async (K) => { await K.toggle('feedback'); await K.settled() },
+      { 's.web.feedback': false, reasonsRemovable: 0, reasonAddOff: true, 'rows.blockRepeat.off': true, 'rows.blockRefuse.off': true, 'rows.blockContract.off': true,
+        callouts: { feedback: 'Включите блок обратной связи на странице экспертизы' }, 'dots.web': 'off' }],
+    ['включить блок и поставить запрет перехода в «Отказ»', async (K) => { await K.toggle('feedback'); await K.toggle('blockRefuse'); await K.settled() },
+      { 's.web.feedback': true, 's.web.blockRefuse': true, 'rows.blockRefuse.off': false, callouts: {}, reasonsRemovable: 3 }],
+  ], { query: 'section=web' }],
+  'СС-27': ['права доступа: роли чипами, режим управления созданием (r2 §4)', [
+    ['старт', null, { section: 'access', anchor: 'execution', 'chips.executors': ['Создатель осмотра', 'Администратор', 'Эксперт', 'Оператор осмотров', 'Агент', 'Клиент'], 's.access.manage': 'all', 's.access.createMode': 'groups', fieldsOff: [] }],
+    ['убрать роль «Клиент» крестиком', async (K) => { await K.unpick('executors', 'client'); await K.settled() }, { 's.access.executors': ['creator', 'admin', 'expert', 'operator', 'agent'], saveLog: ['saving', 'saved'], writes: 1 }],
+    ['управление выполнением — «Эксперт и выше»', async (K) => { await K.radio('manage', 'Эксперт и выше'); await K.settled() }, { 's.access.manage': 'expert' }],
+    ['«Открытое создание» — поле ролей выключено', async (K) => { await K.radio('createMode', 'Открытое создание Создавать может любой пользователь с доступом к схеме, роль не проверяется'); await K.settled() },
+      { 's.access.createMode': 'open', fieldsOff: ['createRoles'] }],
+    ['«Только по роли» — поле ролей доступно, добавить «Эксперт»', async (K) => { await K.radio('createMode', 'Только по роли Достаточно подходящей роли без проверки групп'); await K.pick('createRoles', 'Эксперт'); await K.settled() },
+      { 's.access.createMode': 'role', 's.access.createRoles': ['admin', 'operator', 'agent', 'expert'], fieldsOff: [], 'chips.createRoles': ['Администратор', 'Оператор осмотров', 'Агент', 'Эксперт'] }],
+  ], { query: 'section=access' }],
+  'СС-28': ['группы доступа: поиск, выбор строк, пагинация; счётчик строк согласован с пагинацией (r2 §4; figma-nodes.md, «Права доступа»)', [
+    ['старт', null, { groupsCount: 'Выбрано 2', groupsRange: '1 – 10 из 23', groupsChecked: 2, groupsAll: 'mixed', groupsEmpty: false,
+      groupRows: ['Осмотр Юг', 'Служба проверок', 'Региональные операторы', 'Осмотр Восток', 'Служба контроля', 'Региональный контроль', 'Осмотр Север', 'Служба осмотров', 'Контроль Запад', 'Контроль Центр'] }],
+    ['отметить «Региональные операторы»', async (K) => { await K.groupCheck('grp-03'); await K.settled() }, { 's.access.groups': ['grp-01', 'grp-02', 'grp-03'], groupsCount: 'Выбрано 3', groupsChecked: 3, saveLog: ['saving', 'saved'], writes: 1 }],
+    ['страница 2', K => K.groupsPage(2), { groupsRange: '11 – 20 из 23', groupsChecked: 0, groupsAll: 'false', 'groupRows.0': 'Осмотр Урал', writes: 1 }],
+    ['флажок шапки — все строки страницы', async (K) => { await K.groupsAll(); await K.settled() }, { groupsCount: 'Выбрано 13', groupsChecked: 10, groupsAll: 'true', writes: 2 }],
+    ['поиск «контроль» — по названию без учёта регистра', K => K.typeInto('groupQuery', 'контроль'), { groupsRange: '1 – 4 из 4', groupRows: ['Региональный контроль', 'Контроль Запад', 'Контроль Центр', 'Контроль качества'], writes: 2 }],
+    ['поиск по компании — «образец»', K => K.fill('[data-field=groupQuery]', 'образец'), { groupsRange: '1 – 6 из 6', 'groupRows.0': 'Региональные операторы' }],
+    ['поиск без совпадений — пустой результат, подвала нет', K => K.fill('[data-field=groupQuery]', 'нет такой группы'), { groupRows: [], groupsEmpty: true, groupsRange: null }],
+    ['сброс поиска', K => K.groupsReset(), { groupsEmpty: false, groupsRange: '1 – 10 из 23' }],
+    ['фильтр «Только выбранные»', K => K.select('groupFilter', 'Только выбранные'), { groupsRange: '1 – 10 из 13', groupsChecked: 10, groupsAll: 'true' }],
+  ], { query: 'section=access' }],
+  'СС-29': ['ИИ-анализ: алиасы полей, стоимость классов, «Сбросить к значениям по умолчанию», матрица регионов со ссылкой в новой вкладке (r2 §1, §4; аудит, «Раздел „ИИ-анализ стоимости“»)', [
+    ['старт: схема недвижимости', null, { section: 'ai', banner: 'Доступные ИИ-модули зависят от типа объекта схемы Текущий тип: Осмотр недвижимости', costsOff: 0, resetOff: false,
+      'costs.A1': '15000', 'costs.D1': '200000', linkTarget: '_blank', navAnchors: ['Анализ стоимости отделки', 'Стоимость классов отделки', 'Матрица регионов'] }],
+    ['алиас общей площади', async (K) => { await K.fill('[data-field=aliasTotal]', 'common:area'); await K.settled() }, { 's.ai.aliasTotal': 'common:area', saveLog: ['saving', 'saved'] }],
+    ['стоимость класса B0 — «7 500 руб»: остаются цифры', async (K) => { await K.fill('[data-cost=B0]', '7 500 руб'); await K.settled() }, { 's.ai.costs.B0': 7500, 'costs.B0': '7500' }],
+    ['«Сбросить к значениям по умолчанию»', async (K) => { await K.act('costs-reset'); await K.settled() }, { 's.ai.costs.B0': 5000, 'costs.B0': '5000', notices: ['Стоимость классов сброшена к значениям по умолчанию'] }],
+    ['«Отменить» возвращает стоимость', async (K) => { await K.undo(); await K.settled() }, { 's.ai.costs.B0': 7500, 'costs.B0': '7500' }],
+    ['матрица регионов — «Корректировки: южные регионы»', async (K) => { await K.select('regionMatrix', 'Корректировки: южные регионы'); await K.settled() }, { 's.ai.regionMatrix': 'south', linkTarget: '_blank' }],
+  ], { query: 'section=ai&type=house' }],
+  'СС-30': ['ИИ-анализ: модули, недоступные для типа объекта, выключены с причиной (r2 §4; аудит, «Раздел „ИИ-анализ стоимости“»)', [
+    ['старт: схема транспорта — анализ отделки погашен', null, { banner: 'Доступные ИИ-модули зависят от типа объекта схемы Текущий тип: Осмотр транспорта',
+      callouts: { finish: "Анализ стоимости доступен только для схем недвижимости. Тип схемы задаётся в разделе «Общие → Основное»" }, costsOff: 8, resetOff: true, fieldsOff: ['aliasTotal', 'aliasRoom', 'regionMatrix'], 'rows.damage.off': false }],
+    ['модуль для авто включается', async (K) => { await K.toggle('damageCost'); await K.settled() }, { 's.ai.damageCost': true, writes: 1 }],
+    ['тип схемы «Осмотр недвижимости» в «Общих» — доступность переворачивается', async (K) => { await K.section('general'); await K.select('schemeType', 'Осмотр недвижимости'); await K.settled(); await K.section('ai') },
+      { 'g.schemeType': 'house', callouts: { auto: "Модули доступны только для схем с типом «Осмотр транспорта». Тип схемы задаётся в разделе «Общие → Основное»" }, costsOff: 0, resetOff: false, fieldsOff: [], 'rows.damage.off': true, 'rows.vinRecognition.off': true, 'rows.damageCost.off': true }],
+    ['нажатие по выключенному модулю — значение прежнее', K => K.toggle('damage'), { 's.ai.damage': true, saveLog: [] }, { blind: true }],
+  ], { query: 'section=ai' }],
+  'СС-31': ['аномалии: рубильник блока, «N из 14 включено», включить и снять группу, роль по умолчанию и её переопределение у детектора (r2 §4; аудит, «Раздел „Аномалии“»)', [
+    ['старт', null, { section: 'anomalies', detAll: '4 из 14 включено', detSets: { all: 'mixed', geo: 'mixed', device: 'false', quality: 'mixed' },
+      'rows.det-spoof.meta': 'роль: Эксперт и выше — по умолчанию', 'rows.det-spoof.help': true, 'dots.anomalies': 'on' }],
+    ['включить группу «Целостность устройства»', async (K) => { await K.detectorSet('device'); await K.settled() }, { detAll: '7 из 14 включено', 'detSets.device': 'true', saveLog: ['saving', 'saved'], writes: 1 }],
+    ['группа «Геолокация и трек»: из части — все', async (K) => { await K.detectorSet('geo'); await K.settled() }, { detAll: '10 из 14 включено', 'detSets.geo': 'true' }],
+    ['группа «Геолокация и трек»: из всех — снять', async (K) => { await K.detectorSet('geo'); await K.settled() }, { detAll: '5 из 14 включено', 'detSets.geo': 'false', 's.anomalies.detectors.spoof.on': false }],
+    ['детектор «Плохая освещённость»', async (K) => { await K.toggle('det-light'); await K.settled() }, { detAll: '6 из 14 включено', 's.anomalies.detectors.light.on': true }],
+    ['роль по умолчанию — «Только администратор»', async (K) => { await K.select('defaultRole', 'Только администратор'); await K.settled() },
+      { 's.anomalies.defaultRole': 'admin', 'rows.det-blur.meta': 'роль: Только администратор — по умолчанию' }],
+    ['«Переопределить роль» у «Размытых изображений» и выбрать «Эксперт и выше»', async (K) => { await K.act('det-override-blur'); await K.select('detRole-blur', 'Эксперт и выше'); await K.settled() },
+      { 's.anomalies.detectors.blur.role': 'expert', 'rows.det-blur.meta': 'роль: Эксперт и выше — задана у детектора', 'rows.det-light.meta': 'роль: Только администратор — по умолчанию' }],
+    ['«Вернуть роль по умолчанию»', async (K) => { await K.act('det-inherit-blur'); await K.settled() }, { 's.anomalies.detectors.blur.role': '', 'rows.det-blur.meta': 'роль: Только администратор — по умолчанию' }],
+    ['рубильник блока выключен — детекторы погашены с причиной', async (K) => { await K.toggle('anomaliesEnabled'); await K.settled() },
+      { 's.anomalies.enabled': false, callouts: { anomalies: 'Включите отображение блока аномалий' }, 'rows.det-blur.off': true, 'rows.det-otherRefusals.off': true, fieldsOff: ['defaultRole'], 'dots.anomalies': 'off' }],
+    ['включить блок, «включить все» и «снять все»', async (K) => { await K.toggle('anomaliesEnabled'); await K.detectorSet('all'); await K.settled() }, { detAll: '14 из 14 включено', 'detSets.all': 'true', 'dots.anomalies': 'on' }],
+    ['«снять все»', async (K) => { await K.detectorSet('all'); await K.settled() }, { detAll: '0 из 14 включено', detSets: { all: 'false', geo: 'false', device: 'false', quality: 'false' } }],
+  ], { query: 'section=anomalies' }],
+  'СС-32': ['PDF: шаблон добавляется в сайде, меняется, удаляется с отменой (r2 §4, §7; аудит, «Раздел „PDF“»)', [
+    ['старт', null, { section: 'pdf', templates: [{ title: 'Акт осмотра', main: true, program: 'act-vehicle-v2', access: 'Всегда, клиент и выше' }, { title: 'Технический отчёт', main: false, program: 'tech-report-v1', access: 'После успешной экспертизы, эксперт и выше' }], 'dots.pdf': 'on' }],
+    ['«Добавить шаблон» открывает сайд', K => K.act('template-add'), { surface: 'template', sideTitle: 'Добавление шаблона', writes: 0 }],
+    ['пустое название — отказ, сайд открыт', K => K.act('template-save'), { notices: ['Заполните отображаемое название шаблона'], surface: 'template', 's.pdf.templates.length': 2, writes: 0 }],
+    ['заполнить и добавить — основной шаблон один', async (K) => { await K.typeInto('tplTitle', 'Краткая сводка'); await K.select('tplProgram', 'client-summary-v1'); await K.check('tplMain'); await K.radio('tplRole', 'Агент и выше'); await K.select('tplWhen', 'После подписания'); await K.act('template-save'); await K.settled() },
+      { surface: '', saveLog: ['saving', 'saved'], writes: 1, templates: [{ title: 'Акт осмотра', main: false, program: 'act-vehicle-v2', access: 'Всегда, клиент и выше' }, { title: 'Технический отчёт', main: false, program: 'tech-report-v1', access: 'После успешной экспертизы, эксперт и выше' },
+        { title: 'Краткая сводка', main: true, program: 'client-summary-v1', access: 'После подписания, агент и выше' }] }],
+    ['изменить «Технический отчёт»', async (K) => { await K.templateEdit('tpl-tech'); await K.fill('[data-field=tplTitle]', 'Технический отчёт для эксперта'); await K.act('template-save'); await K.settled() },
+      { surface: '', 'templates.1.title': 'Технический отчёт для эксперта', 's.pdf.templates.length': 3, writes: 2 }],
+    ['удалить «Краткую сводку» из меню строки', async (K) => { await K.templateDelete('tpl-new-1'); await K.settled() }, { 's.pdf.templates.length': 2, notices: ['Шаблон «Краткая сводка» удалён'], writes: 3 }],
+    ['«Отменить» возвращает шаблон', async (K) => { await K.undo(); await K.settled() }, { 's.pdf.templates.length': 3, 'templates.2.title': 'Краткая сводка', 'templates.2.main': true }],
+  ], { query: 'section=pdf' }],
+  'СС-33': ['PDF: подписание — родитель и параметры; формула имени файла; вложения (r2 §4; аудит, «Раздел „PDF“»)', [
+    ['старт: подписание выключено — параметров нет', null, { 'rows.pdfSign.checked': false, 'rows.pdfSign.children': false, 'rows.unsignedShow.checked': true,
+      'formulas.pdfFileName': { chips: ['VIN'], preview: 'Лист осмотра DEMO0000000001024' } }],
+    ['включить подписание — параметры родителя', async (K) => { await K.toggle('pdfSign'); await K.settled() }, { 's.pdf.sign': true, 'rows.pdfSign.children': true, 'rows.showSigned.checked': true, 'rows.mailSigned.checked': false, writes: 1 }],
+    ['кто подписывает и отправка на почту', async (K) => { await K.select('signer', 'Исполнитель осмотра'); await K.toggle('mailSigned'); await K.settled() }, { 's.pdf.signer': 'executor', 's.pdf.mailSigned': true }],
+    ['PDF без подписи — на почту', async (K) => { await K.toggle('unsignedMail'); await K.settled() }, { 's.pdf.unsignedMail': true, 's.pdf.unsignedShow': true }],
+    ['формула имени файла: переменная «Номер осмотра»', async (K) => { await K.formulaEnd('pdfFileName'); await K.type(' '); await K.addVariable('pdfFileName', 'Inspection:number'); await K.settled() },
+      { 's.pdf.fileName': 'Лист осмотра {Car:vin} {Inspection:number}', 'formulas.pdfFileName': { chips: ['VIN', 'Номер осмотра'], preview: 'Лист осмотра DEMO0000000001024 № 1024' } }],
+    ['вложения из дополнительных файлов', async (K) => { await K.toggle('attachExtra'); await K.settled() }, { 's.pdf.attachExtra': true }],
+    ['выключить подписание — параметры скрыты, значения целы', async (K) => { await K.toggle('pdfSign'); await K.settled() }, { 's.pdf.sign': false, 'rows.pdfSign.children': false, 's.pdf.signer': 'executor', 's.pdf.mailSigned': true }],
+  ], { query: 'section=pdf' }],
+  'СС-57': ['сайд: ловушка фокуса, Esc закрывает, фокус возвращается к триггеру; «Отмена» отбрасывает правки сайда, полотно остаётся прежним (r2 §7; аудит, «Принцип: сайд = атомарная транзакция поверх автосейв-страницы», «Клавиатура и фокус»)', [
+    ['сайд шаблона открыт — фокус внутри', K => K.act('template-add'), { surface: 'template', focusInSide: true }],
+    ['Tab по кругу — фокус остаётся в сайде', K => K.tabs(14), { surface: 'template', focusInSide: true }],
+    ['название введено, «Отмена» — шаблон не добавлен', async (K) => { await K.typeInto('tplTitle', 'Черновик шаблона'); await K.act('template-cancel') },
+      { surface: '', 's.pdf.templates.length': 2, writes: 0, saveLog: [], focusAct: 'template-add' }],
+    ['снова открыть — поля пустые; Esc закрывает, фокус на кнопке', async (K) => { await K.act('template-add'); await K.typeInto('tplTitle', 'Ещё черновик'); await K.key('Escape') },
+      { surface: '', 's.pdf.templates.length': 2, writes: 0, focusAct: 'template-add' }],
+    ['сайд словаря комментариев: Tab по кругу и Esc', async (K) => { await K.section('general'); await K.act('open-comments'); await K.tabs(8) }, { surface: 'comments', focusInSide: true }],
+    ['Esc — сайд словаря закрыт, фокус на строке словаря', K => K.key('Escape'), { surface: '', focusAct: 'open-comments', writes: 0 }],
+  ], { query: 'section=pdf' }],
   'СС-59': ['сайд словаря комментариев: привязка словаря к схеме, «Сохранить» меняет значение в «Словарях»; «Отмена» и Esc отбрасывают (r2 §4, §7; аудит, «Финальная карта подсекций „Общих“», п. 4)', [
     ['открыть сайд', K => K.act('open-comments'), { surface: 'comments', sideTitle: 'Словарь комментариев', sideDict: 'Комментарии к осмотру транспорта', sideComments: 4 }],
     ['выбрать «Общий словарь комментариев» — черновик сайда', K => K.select('sideDict', 'Общий словарь комментариев'),

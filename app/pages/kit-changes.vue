@@ -71,7 +71,26 @@ const draftRoles = ref(['Администратор', 'Эксперт'])
           </p>
         </div>
         <div data-example class="flex min-w-0 flex-col items-stretch gap-3">
-          <template v-if="c.id === 'select-multiple'">
+          <template v-if="c.id === 'button-outline'">
+            <div class="flex flex-wrap items-center gap-3">
+              <Button variant="outline">
+                Отменить
+              </Button>
+              <Button variant="outline" show-icon>
+                <template #icon>
+                  <Icon name="add" :size="16" />
+                </template>
+                Добавить шаблон
+              </Button>
+              <Button variant="outline" disabled>
+                Выключена
+              </Button>
+              <Button variant="secondary">
+                secondary — для сравнения
+              </Button>
+            </div>
+          </template>
+          <template v-else-if="c.id === 'select-multiple'">
             <Field label="Кто может редактировать дедлайн">
               <Select v-model:values="draftRoles" multiple :items="DRAFT_ROLES" placeholder="Выберите роли" />
             </Field>

@@ -107,6 +107,26 @@ export const buttonVariants = cva(
          * иконка перед подписью — слот `icon`; поля 8 — зазор 24 между подписями соседних пунктов.
          */
         sidebar: 'bg-transparent text-sidebar-active-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+        /**
+         * Контурная кнопка — такт 63: мастер кита 1 `btn_outline` `1990:226` (страница «Buttons» `1:153`, файл
+         * `uG3HTIcMwr2jI2d7YEYPs2`), строка мапинга `tokens.md`: `btn_outline` → `variant="outline"`.
+         *
+         * Матрица мастера — 8 вариантов: `state` (`Default`, `Hover`, `Pressed`, `Dissabled`) × `size` (44, 32).
+         *
+         * | состояние | рамка 1, текст, иконка | мастер | роль кита |
+         * |---|---|---|---|
+         * | покой | `#0059cf` | `1990:227` | `--primary` |
+         * | наведение | `#337ad9` | `1990:232` | `--primary-hover` |
+         * | нажатие | `#004eb5` | `1990:237` | `--primary-pressed` |
+         * | выключено | `#80ace7` | `1990:242` | `--primary-disabled` |
+         *
+         * Фона нет во всех состояниях; радиус 8. Выключенное — цветом, без прозрачности: так в мастере.
+         *
+         * Расхождения с мастером (`waves.md`): размеры 44 и 32 мастера ложатся на размеры кита (`md` 40, `sm` 24) —
+         * решение 4 `modal-family.md`, строка 24 реестра `scheme-edit.md`; подпись — `font-medium`, как у остальных
+         * вариантов кнопки кита (у мастера Bold); поля и зазор — размера кита (у мастера поля 10, иконки в коробках 24).
+         */
+        outline: 'border border-primary bg-transparent text-primary hover:border-primary-hover hover:text-primary-hover active:border-primary-pressed active:text-primary-pressed disabled:border-primary-disabled disabled:text-primary-disabled',
       },
       size: {
         lg: 'h-16 gap-1.5 rounded-3xl px-8 text-sm',
@@ -144,6 +164,12 @@ export type ButtonVariants = VariantProps<typeof buttonVariants>
  *
  * Компонент передан фронтам 2026-09-30. Правило 23 `docs/chat-protocol.md`: каждое изменение переданного компонента
  * маркируется здесь, в `CHANGELOG.md` и в «Передано фронтам»; живые примеры — стенд `/kit-changes`.
+ *
+ * ### Черновик следующей версии — относительно `handover-2026-10-02`
+ *
+ * - **Добавлено.** Вариант `variant="outline"` — контурная кнопка по мастеру кита 1 `btn_outline` `1990:226`: рамка 1 и
+ *   текст `--primary`, наведение `--primary-hover`, нажатие `--primary-pressed`, выключено `--primary-disabled`; фона
+ *   нет. Прочие варианты прежние. Такт 63.
  *
  * ### Версия `handover-2026-10-02` — относительно `handover-2026-10-01`
  *

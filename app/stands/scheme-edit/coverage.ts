@@ -5,6 +5,8 @@
  */
 export const SCHEME_COVERAGE_STATES = [
   '', 'data=new', 'tab=form', 'tab=processes', 'tab=showcase', 'save=saving', 'save=error',
-  /* Такт 62, П2: раздел порции П3 на месте содержимого, сайд словаря комментариев. */
+  /* Такт 62, П2: раздел «Права доступа», сайд словаря комментариев. */
   'section=access', 'open=comments',
+  /* Такт 63, П3: шесть разделов «Настроек», оба типа схемы у «ИИ-анализа», сайд шаблона PDF, форма обоснования. */
+  'section=mobile', 'section=web', 'section=web&open=reason', 'section=ai', 'section=ai&type=house', 'section=anomalies', 'section=pdf', 'open=template',
 ] as const

@@ -1,7 +1,7 @@
 import { computed, reactive } from 'vue'
 
 /**
- * Модель состояния страницы «Редактирование схемы осмотра» (VA-16377) — такты 61–62, порции П1–П2.
+ * Модель состояния страницы «Редактирование схемы осмотра» (VA-16377) — такты 61–63, порции П1–П3.
  * План и границы — `docs/scheme-edit.md`, 6.2. Поведение — `docs/sources/scheme-edit/spec-r2.md`, обоснования —
  * `spec-audit.md`. HTML-прототипа нет: модель написана по спеке.
  *
@@ -20,7 +20,10 @@ import { computed, reactive } from 'vue'
  * уведомлений. Операции и вычисления — сценарии П1: СС-01 (`back`), СС-13 (`setTab`, `setSection`, `rememberScroll`),
  * СС-20 (`set`), СС-49 (`retry`). **П2 (такт 62):** настройки раздела «Общие» целиком (r2 §4), матрица зависимостей
  * `rules` — «гасит» и «вооружает» (СС-17–СС-19, СС-21), переменные и превью формул (СС-22), статус-точки разделов
- * (СС-15), соседние разделы (СС-16), сайд словаря комментариев (`openSide`, `closeSide`, СС-59). Дифф, валидация,
+ * (СС-15), соседние разделы (СС-16), сайд словаря комментариев (`openSide`, `closeSide`, СС-59). **П3 (такт 63):**
+ * настройки шести остальных разделов (r2 §4) со значениями по умолчанию, правила «гасит» для веб-блока, ИИ-анализа и
+ * аномалий, обоснования и шаблоны PDF с отменой удаления (`undo`), детекторы аномалий с массовым управлением и
+ * наследованием роли, сброс стоимости классов, группы доступа. Дифф, валидация,
  * поиск, публикация, сброс черновика, просмотр снимка, операции формы, процессов и витрины — по своим порциям
  * (`scheme-edit.md`, раздел 10).
  */
@@ -54,6 +57,17 @@ export const GENERAL_ANCHORS = [
   { id: 'confirm', label: 'Экран подтверждения' },
 ] as const
 export type GeneralAnchor = typeof GENERAL_ANCHORS[number]['id']
+
+/** Якоря подразделов по разделам — `scheme-edit.md`, 3.4, с правками строки 08 раздела 11. */
+export const SECTION_ANCHORS: Record<SectionId, readonly { id: string, label: string }[]> = {
+  general: GENERAL_ANCHORS,
+  mobile: [{ id: 'shooting', label: 'Параметры съёмки' }, { id: 'mobile-behavior', label: 'Поведение в мобильном приложении' }],
+  web: [{ id: 'feedback', label: 'Обратная связь' }],
+  access: [{ id: 'execution', label: 'Выполнение осмотра' }, { id: 'creation', label: 'Создание и проверка осмотров' }, { id: 'groups', label: 'Группы доступа' }],
+  ai: [{ id: 'finish', label: 'Анализ стоимости отделки' }, { id: 'costs', label: 'Стоимость классов отделки' }, { id: 'regions', label: 'Матрица регионов' }],
+  anomalies: [],
+  pdf: [],
+}
 
 /** «Поведение процесса» — дерево решений (аудит, «Группировка чекбоксов»); порядок групп — r2 §4. */
 export interface BehaviorSettings {
@@ -116,7 +130,171 @@ export const GENERAL_DEFAULTS: Pick<GeneralSettings, 'behavior' | 'formulas' | '
   confirm: { hint: '', checkbox: '' },
 }
 
+/* ------------------------------ разделы П3 — r2 §4 ------------------------------ */
+export interface MobileSettings {
+  mode: 'regular' | 'checklist'
+  photo: string
+  video: string
+  phone: string
+  phoneName: string
+  callConfirm: string
+  startAfterCreate: boolean
+  hideHints: boolean
+  skipConfirm: boolean
+}
+export interface FeedbackReason { key: string, title: string }
+export interface WebSettings { feedback: boolean, reasons: FeedbackReason[], blockRepeat: boolean, blockRefuse: boolean, blockContract: boolean }
+export interface AccessSettings {
+  executors: string[]
+  manage: 'all' | 'expert' | 'admin'
+  createMode: 'groups' | 'role' | 'open'
+  createRoles: string[]
+  groups: string[]
+}
+export interface AiSettings {
+  aliasTotal: string
+  aliasRoom: string
+  /** Стоимость классов отделки, ₽/м² — по коду класса. */
+  costs: Record<string, number>
+  regionMatrix: string
+  damage: boolean
+  vinRecognition: boolean
+  damageCost: boolean
+}
+/** Детектор: включён ли и роль видимости; пустая роль — наследует роль по умолчанию (аудит, «Раздел „Аномалии“»). */
+export interface DetectorState { on: boolean, role: string }
+export interface AnomalySettings { enabled: boolean, defaultRole: string, detectors: Record<string, DetectorState> }
+export interface PdfTemplate { id: string, title: string, template: string, main: boolean, role: string, when: string }
+export interface PdfSettings {
+  templates: PdfTemplate[]
+  sign: boolean
+  signer: string
+  showSigned: boolean
+  mailSigned: boolean
+  unsignedShow: boolean
+  unsignedMail: boolean
+  fileName: string
+  attachExtra: boolean
+}
+
+/** Классы отделки A0–D1: код и название статичны, правится стоимость (аудит, «Раздел „ИИ-анализ стоимости“»). */
+export const FINISH_CLASSES = [
+  { code: 'A0', title: 'Без отделки', cost: 0 },
+  { code: 'A1', title: 'Под чистовую отделку', cost: 15000 },
+  { code: 'B0', title: 'Эконом', cost: 5000 },
+  { code: 'B1', title: 'Эконом+', cost: 20000 },
+  { code: 'C0', title: 'Стандарт', cost: 25000 },
+  { code: 'C1', title: 'Стандарт+', cost: 35000 },
+  { code: 'D0', title: 'Евроремонт', cost: 50000 },
+  { code: 'D1', title: 'Эксклюзив', cost: 200000 },
+] as const
+
+/** 14 детекторов аномалий: три группы и одиночный без подзаголовка (r2 §4; макет `33351:9928`). */
+export const DETECTOR_GROUPS = [
+  { id: 'geo', title: 'Геолокация и трек', detectors: [
+    { id: 'spoof', title: 'Подмена координат', help: 'Координаты кадра заданы программно, а не получены от датчиков устройства' },
+    { id: 'noCoords', title: 'Отсутствие исходных координат', help: 'У кадра нет координат съёмки' },
+    { id: 'speed', title: 'Аномалии скорости перемещения', help: 'Между кадрами исполнитель переместился быстрее возможного' },
+    { id: 'angles', title: 'Аномалии углов направленности движения', help: 'Направление движения между кадрами меняется неправдоподобно' },
+    { id: 'cluster', title: 'Аномалии кластеризации (съёмка вне основной точки)', help: 'Часть кадров снята далеко от основной точки осмотра' },
+  ] },
+  { id: 'device', title: 'Целостность устройства', detectors: [
+    { id: 'root', title: 'Разблокирован root-доступ', help: 'На устройстве открыт доступ администратора системы' },
+    { id: 'checksum', title: 'Аномалия в контрольных суммах', help: 'Контрольная сумма приложения не совпала с эталонной' },
+    { id: 'versions', title: 'Разные версии приложения / телефона', help: 'В одном осмотре — кадры с разных версий приложения или устройств' },
+  ] },
+  { id: 'quality', title: 'Качество съёмки', detectors: [
+    { id: 'blur', title: 'Размытые изображения', help: 'Кадр нерезкий' },
+    { id: 'light', title: 'Плохая освещённость', help: 'Кадр слишком тёмный или пересвеченный' },
+    { id: 'palette', title: 'Сниженная цветовая палитра', help: 'В кадре мало цветов: возможна пересъёмка копии' },
+    { id: 'screen', title: 'Съёмка с экрана', help: 'Кадр снят с экрана другого устройства' },
+    { id: 'viewpoint', title: 'Детектор ракурсов транспортных средств', help: 'Ракурс автомобиля не соответствует шагу' },
+  ] },
+  { id: 'single', title: '', detectors: [
+    { id: 'otherRefusals', title: 'Отказ по другим осмотрам исполнителя', help: 'У исполнителя есть отказы по другим осмотрам' },
+  ] },
+] as const
+export const DETECTOR_IDS = DETECTOR_GROUPS.flatMap(g => g.detectors.map(d => d.id))
+const DETECTORS_ON = ['spoof', 'noCoords', 'blur', 'screen']
+
+/** Значения по умолчанию разделов П3: набор данных хранит только отличия. */
+export const SECTION_DEFAULTS: { mobile: MobileSettings, web: WebSettings, access: AccessSettings, ai: AiSettings, anomalies: AnomalySettings, pdf: PdfSettings } = {
+  mobile: { mode: 'regular', photo: 'medium', video: 'vga', phone: '', phoneName: '', callConfirm: '', startAfterCreate: true, hideHints: true, skipConfirm: false },
+  web: {
+    feedback: true,
+    reasons: [{ key: 'geo', title: 'Координаты' }, { key: 'screen-photo', title: 'Фото с экрана' }],
+    blockRepeat: true, blockRefuse: false, blockContract: false,
+  },
+  access: { executors: ['creator', 'admin', 'expert', 'operator', 'agent', 'client'], manage: 'all', createMode: 'groups', createRoles: ['admin', 'operator', 'agent'], groups: ['grp-01', 'grp-02'] },
+  ai: {
+    aliasTotal: 'common:totalarea', aliasRoom: 'room:area',
+    costs: Object.fromEntries(FINISH_CLASSES.map(c => [c.code, c.cost])),
+    regionMatrix: 'common', damage: true, vinRecognition: true, damageCost: false,
+  },
+  anomalies: { enabled: true, defaultRole: 'expert', detectors: Object.fromEntries(DETECTOR_IDS.map(id => [id, { on: DETECTORS_ON.includes(id), role: '' }])) },
+  pdf: {
+    templates: [
+      { id: 'tpl-act', title: 'Акт осмотра', template: 'act-vehicle-v2', main: true, role: 'client', when: 'always' },
+      { id: 'tpl-tech', title: 'Технический отчёт', template: 'tech-report-v1', main: false, role: 'expert', when: 'expertise' },
+    ],
+    sign: false, signer: 'client', showSigned: true, mailSigned: false, unsignedShow: true, unsignedMail: false,
+    fileName: 'Лист осмотра {Car:vin}', attachExtra: false,
+  },
+}
+
 /* Справочники стенда — вымышленные. */
+export const PHOTO_RESOLUTIONS = [
+  { value: 'low', label: 'Низкое — 1 Мп' },
+  { value: 'medium', label: 'Среднее — 2 Мп' },
+  { value: 'high', label: 'Высокое — 5 Мп' },
+]
+export const VIDEO_RESOLUTIONS = [
+  { value: 'vga', label: 'Ниже среднего — VGA' },
+  { value: 'hd', label: 'Среднее — HD' },
+  { value: 'fullhd', label: 'Высокое — Full HD' },
+]
+/** Роли выполнения и создания осмотра — шире ролей «Общих»: с создателем осмотра и клиентом (макет `33351:6108`). */
+export const ACCESS_ROLES = [
+  { value: 'creator', label: 'Создатель осмотра' },
+  { value: 'admin', label: 'Администратор' },
+  { value: 'expert', label: 'Эксперт' },
+  { value: 'operator', label: 'Оператор осмотров' },
+  { value: 'agent', label: 'Агент' },
+  { value: 'client', label: 'Клиент' },
+]
+/** «И выше» — лестница ролей для видимости и доступа к документам. */
+export const ROLE_LADDER = [
+  { value: 'client', label: 'Клиент и выше' },
+  { value: 'agent', label: 'Агент и выше' },
+  { value: 'operator', label: 'Оператор осмотров' },
+  { value: 'expert', label: 'Эксперт и выше' },
+  { value: 'admin', label: 'Только администратор' },
+]
+const GROUP_NAMES = ['Осмотр Юг', 'Служба проверок', 'Региональные операторы', 'Осмотр Восток', 'Служба контроля', 'Региональный контроль', 'Осмотр Север', 'Служба осмотров',
+  'Контроль Запад', 'Контроль Центр', 'Осмотр Урал', 'Выездные эксперты', 'Партнёрская сеть', 'Осмотр Волга', 'Контроль качества', 'Осмотр Сибирь', 'Дежурная смена',
+  'Осмотр Кавказ', 'Обучение и стажёры', 'Осмотр Дальний Восток', 'Проверка документов', 'Осмотр Северо-Запад', 'Резервная группа']
+const GROUP_OWNERS = ['Демо Страхование', 'Пример Лизинг', 'Образец Банк', 'Тест Финанс']
+/** Группы доступа — 23 строки: три страницы по десять. */
+export const ACCESS_GROUPS = GROUP_NAMES.map((name, k) => ({ id: `grp-${String(k + 1).padStart(2, '0')}`, name, owner: GROUP_OWNERS[k % GROUP_OWNERS.length]! }))
+export const REGION_MATRICES = [
+  { value: 'common', label: '[ОБЩИЙ] Корректировки по регионам' },
+  { value: 'south', label: 'Корректировки: южные регионы' },
+  { value: 'north', label: 'Корректировки: северные регионы' },
+]
+export const PDF_PROGRAMS = [
+  { value: 'act-vehicle-v2', label: 'act-vehicle-v2' },
+  { value: 'tech-report-v1', label: 'tech-report-v1' },
+  { value: 'client-summary-v1', label: 'client-summary-v1' },
+]
+export const PDF_WHEN = [
+  { value: 'always', label: 'Всегда' },
+  { value: 'expertise', label: 'После успешной экспертизы' },
+  { value: 'signed', label: 'После подписания' },
+]
+export const PDF_SIGNERS = [
+  { value: 'client', label: 'Клиент' },
+  { value: 'executor', label: 'Исполнитель осмотра' },
+]
 export const SCHEME_TYPES = [
   { value: 'vehicle', label: 'Осмотр транспорта' },
   { value: 'house', label: 'Осмотр недвижимости' },
@@ -169,7 +347,7 @@ export interface Showcase {
   hiddenModules: string[]
 }
 export interface SchemeConfig {
-  settings: { general: GeneralSettings } & Record<Exclude<SectionId, 'general'>, Record<string, unknown>>
+  settings: { general: GeneralSettings, mobile: MobileSettings, web: WebSettings, access: AccessSettings, ai: AiSettings, anomalies: AnomalySettings, pdf: PdfSettings }
   form: { groups: FormGroup[] }
   processes: Process[]
   showcase: Showcase
@@ -183,6 +361,8 @@ export type SaveState = 'saving' | 'saved' | 'error'
 /** Состояние публикации для индикатора шапки — r2 §2, состояния 1–3. */
 export type PublishState = 'never' | 'draft' | 'published'
 export interface Notice { id: number, text: string, kind: 'ok' | 'err', undo: boolean }
+/** Черновик шаблона PDF в сайде: `id` пуст у нового. */
+export type PdfTemplateDraft = Omit<PdfTemplate, 'id'> & { id: string }
 /** Правило зависимости для строки настройки: причина недоступности («гасит») либо счётчик связи («вооружает»). */
 export interface Rule { reason: string, meta: string, metaTone: 'default' | 'warning' }
 export type SectionStatus = 'none' | 'on' | 'off' | 'attention'
@@ -217,6 +397,8 @@ const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x))
 function withDefaults(config: SchemeConfig): SchemeConfig {
   const g = config.settings.general as unknown as Record<string, unknown>
   for (const [key, def] of Object.entries(GENERAL_DEFAULTS)) g[key] = { ...clone(def), ...(g[key] as object | undefined) }
+  const all = config.settings as unknown as Record<string, object | undefined>
+  for (const [key, def] of Object.entries(SECTION_DEFAULTS)) all[key] = { ...clone(def), ...all[key] }
   return config
 }
 /** «N полей» — согласование числительного. */
@@ -297,9 +479,19 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   /* ------------------------------ уведомления ------------------------------ */
   const notices = reactive<Notice[]>([])
   let noticeSeq = 0
-  function notify(text: string, kind: 'ok' | 'err' = 'ok', undo = false) {
-    while (notices.length > 2) notices.shift()
+  /** Отмена действия — аудит, «Отмена при автосейве»: уведомление с «Отменить» помнит, что вернуть. */
+  const restores = new Map<number, () => void>()
+  function notify(text: string, kind: 'ok' | 'err' = 'ok', undo = false, restore?: () => void) {
+    while (notices.length > 2) { restores.delete(notices[0]!.id); notices.shift() }
     notices.push({ id: ++noticeSeq, text, kind, undo })
+    if (restore) restores.set(noticeSeq, restore)
+  }
+  /** «Отменить» в уведомлении: возвращает прежнее значение и закрывает уведомление. */
+  function undo(id: number) {
+    const restore = restores.get(id)
+    restores.delete(id)
+    dismissNotice(id)
+    restore?.()
   }
   function dismissNotice(id: number) {
     const k = notices.findIndex(n => n.id === id)
@@ -347,6 +539,14 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
         : n
           ? { ...NONE, meta: `Отмечено ${n} ${plural(n, 'поле', 'поля', 'полей')} на согласование` }
           : { ...NONE, meta: 'Отмечено 0 полей на согласование — согласование не сработает, пока поля не отмечены', metaTone: 'warning' },
+      /* ---------- П3 ---------- */
+      /* «гасит»: рубильник блока обратной связи — r2 §4, «Веб-приложение». */
+      feedbackBlock: draft.config.settings.web.feedback ? NONE : { ...NONE, reason: 'Включите блок обратной связи на странице экспертизы' },
+      /* «гасит»: модули зависят от типа объекта схемы — аудит, «Раздел „ИИ-анализ стоимости“». */
+      finishCost: draft.config.settings.general.schemeType === 'house' ? NONE : { ...NONE, reason: 'Анализ стоимости доступен только для схем недвижимости' },
+      autoModules: draft.config.settings.general.schemeType === 'vehicle' ? NONE : { ...NONE, reason: 'Модули доступны только для схем с типом «Осмотр транспорта»' },
+      /* «гасит»: рубильник блока аномалий. */
+      anomalies: draft.config.settings.anomalies.enabled ? NONE : { ...NONE, reason: 'Включите отображение блока аномалий' },
     }
   })
   const rule = (key: string): Rule => rules.value[key] ?? NONE
@@ -354,9 +554,11 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   /** Статус-точки разделов — единая система индикаторов (аудит). Разделы П3 получают статус в своей порции. */
   const sectionStatus = computed<Record<SectionId, SectionStatus>>(() => ({
     general: rules.value.approval!.metaTone === 'warning' ? 'attention' : 'none',
-    mobile: 'none', web: 'none', access: 'none', ai: 'none',
+    mobile: 'none',
+    web: draft.config.settings.web.feedback ? 'on' : 'off',
+    access: 'none', ai: 'none',
     anomalies: draft.config.settings.anomalies.enabled ? 'on' : 'off',
-    pdf: (draft.config.settings.pdf.templates as unknown[] | undefined)?.length ? 'on' : 'off',
+    pdf: draft.config.settings.pdf.templates.length ? 'on' : 'off',
   }))
 
   /* ------------------------------ формулы — П2 ------------------------------ */
@@ -386,6 +588,76 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   function closeSurface() { ui.surfaces.pop() }
   const topSurface = computed<Surface | null>(() => ui.surfaces[ui.surfaces.length - 1] ?? null)
 
+  /* ------------------------------ операции П3 ------------------------------ */
+  /** Обоснования обратной связи — «ключ — название» (r2 §4): ключ и название обязательны, ключ не повторяется. */
+  function addReason(key: string, title: string): boolean {
+    const k = key.trim()
+    const t = title.trim()
+    const list = draft.config.settings.web.reasons
+    if (!k || !t) { notify('Заполните ключ и название обоснования', 'err'); return false }
+    if (list.some(r => r.key === k)) { notify(`Обоснование с ключом «${k}» уже есть`, 'err'); return false }
+    return set('settings.web.reasons', [...list, { key: k, title: t }])
+  }
+  function removeReason(key: string) {
+    const before = clone(draft.config.settings.web.reasons)
+    const gone = before.find(r => r.key === key)
+    if (!gone || !set('settings.web.reasons', before.filter(r => r.key !== key))) return
+    notify(`Обоснование «${gone.title}» удалено`, 'ok', true, () => set('settings.web.reasons', before))
+  }
+
+  /** Группа доступа схемы: отметка строки таблицы. */
+  function toggleGroup(id: string) {
+    const list = draft.config.settings.access.groups
+    set('settings.access.groups', list.includes(id) ? list.filter(g => g !== id) : [...list, id])
+  }
+
+  /** «Сбросить к значениям по умолчанию» — стоимость классов отделки (r2 §1, §4). */
+  function resetCosts() {
+    const before = clone(draft.config.settings.ai.costs)
+    if (!set('settings.ai.costs', Object.fromEntries(FINISH_CLASSES.map(c => [c.code, c.cost])))) { notify('Стоимость классов уже равна значениям по умолчанию'); return }
+    notify('Стоимость классов сброшена к значениям по умолчанию', 'ok', true, () => set('settings.ai.costs', before))
+  }
+
+  /* Аномалии: массовое управление по уровням — блок, группа; роль — переопределением у детектора. */
+  const detectors = computed(() => draft.config.settings.anomalies.detectors)
+  const detectorsOn = computed(() => DETECTOR_IDS.filter(id => detectors.value[id]?.on).length)
+  /** Состояние набора детекторов для флажка трёх состояний: все, часть, ни одного. */
+  function detectorSetState(ids: readonly string[]): 'all' | 'some' | 'none' {
+    const on = ids.filter(id => detectors.value[id]?.on).length
+    return on === 0 ? 'none' : on === ids.length ? 'all' : 'some'
+  }
+  /** Включить либо снять набор: из «все» — снять, иначе — включить все. */
+  function toggleDetectorSet(ids: readonly string[]) {
+    const on = detectorSetState(ids) !== 'all'
+    const next = clone(detectors.value)
+    for (const id of ids) next[id] = { ...next[id]!, on }
+    set('settings.anomalies.detectors', next)
+  }
+  function setDetector(id: string, patch: Partial<DetectorState>) {
+    set(`settings.anomalies.detectors.${id}`, { ...detectors.value[id]!, ...patch })
+  }
+
+  /* Шаблоны PDF: добавление и правка — сайд, удаление — в строке с отменой (r2 §4, §7). */
+  let templateSeq = 0
+  function saveTemplate(t: PdfTemplateDraft): boolean {
+    if (!t.title.trim()) { notify('Заполните отображаемое название шаблона', 'err'); return false }
+    const list = clone(draft.config.settings.pdf.templates)
+    const item: PdfTemplate = { ...t, title: t.title.trim(), id: t.id || `tpl-new-${++templateSeq}` }
+    const k = list.findIndex(x => x.id === item.id)
+    if (k >= 0) list[k] = item
+    else list.push(item)
+    /* Основной шаблон один. */
+    if (item.main) for (const x of list) if (x.id !== item.id) x.main = false
+    set('settings.pdf.templates', list)
+    return true
+  }
+  function removeTemplate(id: string) {
+    const before = clone(draft.config.settings.pdf.templates)
+    const gone = before.find(t => t.id === id)
+    if (!gone || !set('settings.pdf.templates', before.filter(t => t.id !== id))) return
+    notify(`Шаблон «${gone.title}» удалён`, 'ok', true, () => set('settings.pdf.templates', before))
+  }
+
   /** «Назад» — к списку схем; на стенде списка нет (СС-01). */
   function back() { notify('Список схем — вне стенда') }
   /** «Опубликовать схему» — дифф и публикация собираются порцией П4. */
@@ -405,6 +677,7 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     rules, rule, approvalCount, sectionStatus, variables, variableSamples, topSurface,
     set, setTab, setSection, rememberScroll, back, publish, retry, notify, dismissNotice, dump,
     neighbourSection, stepSection, goToFields, openSide, closeSurface,
+    undo, addReason, removeReason, toggleGroup, resetCosts, detectorsOn, detectorSetState, toggleDetectorSet, setDetector, saveTemplate, removeTemplate,
   }
 }
 

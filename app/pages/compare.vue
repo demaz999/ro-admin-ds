@@ -86,6 +86,15 @@ const multiselectCompare = [
 ]
 
 /**
+ * Button outline — мастер кита 1 `btn_outline` `1990:226`, 204×634 (такт 63): четыре состояния размера 44. Смещения —
+ * положение варианта в компонент-сете, сняты Plugin API.
+ */
+const outlineCompare = [
+  { t: 'покой · state=Default', node: '1990:227', y: 16, disabled: false },
+  { t: 'выключено · state=Dissabled', node: '1990:242', y: 190, disabled: true },
+]
+
+/**
  * MenuItem, мастер _MenuItemMaster 3465:22566 — 328×376.
  *
  * Наведение в мастере не нарисовано: оно живёт в таблице состояний спеки
@@ -918,6 +927,43 @@ const textareaVariants = [
         <Field hint="Подсказка" counter="10/25" :disabled="f.disabled">
           <Select :values="f.values" multiple :items="[{ value: 'a', label: 'Badge text' }]" placeholder="Placeholder" :disabled="f.disabled" />
         </Field>
+      </CompareFrame>
+    </section>
+
+    <!-- Такт 63: вариант `outline` у Button — мастер кита 1 `btn_outline` `1990:226`. -->
+    <section data-theme="rososmotr" class="space-y-2 bg-background font-sans text-foreground">
+      <h2 class="text-lg font-bold">
+        Button · outline · кит 1, 1990:226 · такт 63
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Мастер <code>btn_outline</code>: 8 вариантов, <code>state</code> × <code>size</code> (44, 32). С мастера взяты рамка 1,
+        цвет рамки, текста и иконок по состояниям и отсутствие фона; радиус 8 совпадает с кнопкой кита.
+      </p>
+      <p class="max-w-3xl rounded-md border border-border p-3 text-sm">
+        <strong>Геометрия разойдётся, и это ожидаемо.</strong> Вариант ложится на размеры кнопки кита: высота 40 против 44
+        мастера, поля 16 и зазор 6 против полей 10 и коробок иконок 24, подпись Medium против Bold. Наложение сверяет
+        цвет и толщину рамки, цвет текста и иконок; наведение и нажатие сверены по значениям — <code>1990:232</code>,
+        <code>1990:237</code>.
+      </p>
+
+      <CompareFrame
+        v-for="f in outlineCompare"
+        :key="f.t"
+        :title="f.t"
+        :node="f.node"
+        master="kit1/btn-outline_1990-226.png"
+        :x="16"
+        :y="f.y"
+        :width="152"
+        :height="44"
+      >
+        <Button variant="outline" show-icon :disabled="f.disabled">
+          <template #icon>
+            <Icon name="expand-circle-down" :size="20" />
+          </template>
+          Button text
+          <Icon name="add" :size="14" />
+        </Button>
       </CompareFrame>
     </section>
 
