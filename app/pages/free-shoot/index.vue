@@ -915,14 +915,15 @@ const gridWidth = ref(0)
 const gridColumns = computed(() => (gridWidth.value ? frameTileColumns(gridWidth.value, size.value) : undefined))
 /**
  * Строка полосы ленты — такт 55: по ширине ленты элементы уступают место поиску по порядку. 0 — всё на месте;
- * 1 — без подписи «Размер»; 2 — без подписи «Разобранные»; 3 — кнопка «Распределить автоматически» иконкой: главное
- * действие ленты держит подпись дольше всех (решение чата 2026-10-01, такт 56; в такте 55 кнопка уступала второй).
+ * 1 — без подписи «Разобранные»; 2 — без подписи «Размер»; 3 — кнопка «Распределить автоматически» иконкой.
+ * Довесок к такту 58, решение владельца 2026-10-02: поиск всегда шире кнопки — пока кнопка с текстом (261), поиск не уже
+ * 280; с кнопкой-иконкой (52) — не уже 120.
  * Пороги — ширина ленты, при которой строка с поиском 120 ещё помещается (замер — `free-shoot.md`, раздел 34).
  */
 const feedWidth = ref(0)
-const ROW_STEPS = [953, 901, 812]
-/** Лента не уже строки полосы в самом тесном виде (594, с запасом — 600): панель структуры уступает ей место в своих пределах. */
-const FEED_MIN = 600
+const ROW_STEPS = [1113, 1024, 972]
+/** Лента не уже строки полосы в самом тесном виде (602, с запасом — 604): панель структуры уступает ей место в своих пределах. */
+const FEED_MIN = 604
 const HANDLE = 10
 const zoneWidth = ref(0)
 const panelMax = computed(() => (zoneWidth.value ? Math.max(320, Math.min(820, zoneWidth.value - HANDLE - FEED_MIN)) : 820))
@@ -1282,8 +1283,9 @@ function onUndo(id: number) {
             <!--
               тулбар ленты, §7 — кит, такт 42: Toolbar (№ 15–21). Такт 55, решение владельца 2026-10-01 — одна строка:
               «Выделить всё» — поиск — «Распределить автоматически» — «Разобранные» — «Размер». Поиск занимает свободное
-              место и сужается вместе с лентой, не уже 120; строка не переносится: когда места мало, уступают по порядку
-              подпись «Размер», подпись «Разобранные», текст кнопки — последним, остаётся иконка с подсказкой (`rowStep`).
+              место и сужается вместе с лентой; строка не переносится: когда места мало, уступают по порядку подпись
+              «Разобранные», подпись «Размер», текст кнопки — последним, остаётся иконка с подсказкой (`rowStep`).
+              Поиск всегда шире кнопки: с кнопкой-текстом — не уже 280, с иконкой — не уже 120 (довесок к такту 58).
               Индикатор текущего объекта (№ 19) с экрана снят: текущий отмечен в панели; `curHint` остаётся в модели.
             -->
             <Toolbar data-feed-tools class="flex-nowrap gap-3">
@@ -1292,7 +1294,7 @@ function onUndo(id: number) {
                   Выделить всё
                 </Checkbox>
               </div>
-              <div class="min-w-30 flex-1" data-search>
+              <div class="flex-1" :class="rowStep < 3 ? 'min-w-70' : 'min-w-30'" data-search>
                 <Input v-model="search" placeholder="Поиск по расшифровкам и именам файлов…" />
               </div>
               <!-- Такт 58, решение владельца 2026-10-02: действие автоматизации выделено ролью feature. -->
@@ -1314,7 +1316,7 @@ function onUndo(id: number) {
                   <TooltipContent>Распределить автоматически</TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              <ToolbarGroup :label="rowStep < 2 ? 'Разобранные' : ''" aria-label="Разобранные">
+              <ToolbarGroup :label="rowStep < 1 ? 'Разобранные' : ''" aria-label="Разобранные">
                 <Tabs v-model="mode">
                   <TabsList variant="segmented">
                     <TabsTrigger value="keep" variant="segmented">оставлять</TabsTrigger>
@@ -1322,7 +1324,7 @@ function onUndo(id: number) {
                   </TabsList>
                 </Tabs>
               </ToolbarGroup>
-              <ToolbarGroup :label="rowStep < 1 ? 'Размер' : ''" aria-label="Размер">
+              <ToolbarGroup :label="rowStep < 2 ? 'Размер' : ''" aria-label="Размер">
                 <Tabs v-model="size">
                   <TabsList variant="segmented">
                     <TabsTrigger value="md" variant="segmented">M</TabsTrigger>

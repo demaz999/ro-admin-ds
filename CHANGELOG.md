@@ -15,12 +15,12 @@
 
 ### Добавлено
 
-- **Button.** Вариант `variant="feature"` — подсветка фичи (автоматизация, новая возможность): подложка `--feature-surface`, текст и иконка `--feature`, наведение и нажатие `--feature-hover`; по весу как `secondary`. Токены роли — `--feature`, `--feature-surface`, `--feature-hover`, пара для тёмной темы — в `.dark`.
+- **Button.** Вариант `variant="feature"` — подсветка фичи (автоматизация, новая возможность): подложка `--feature-surface`, текст и иконка `--feature`, наведение и нажатие `--feature-hover`; по весу как `secondary`. Токены роли — `--feature`, `--feature-surface`, `--feature-hover`.
 - **Icon.** Глиф `visibility` (глаз) — Material Symbols, официальная выгрузка `default/24px`, границы 880×600.
-- **Токены.** Роль `feature` — подсветка фич: `--feature` `#6d28d9`, `--feature-surface` `#f3eeff`, `--feature-hover` `#e9e0ff`;
-  в `.dark` — `#c4b5fd`, `#2e1065`, `#3b1a7a`. Только для автоматизации и новых возможностей: статусы она не несёт.
+- **Токены.** Роль `feature` — подсветка фич: `--feature` `#6d28d9`, `--feature-surface` `#f3eeff`, `--feature-hover` `#e9e0ff`.
+  Значения для тёмной темы — когда она появится. Только для автоматизации и новых возможностей: статусы она не несёт.
 - **Составные компоненты экрана.** `PlayerAudio variant="wave"` — голосовое с волновой дорожкой (пропы `duration`, `peaks`,
-  `seed`, события `toggle`, `seek`); `FeedNote` — строка плеера с волной, пропы `wave`, `seed`; `StepThumb` — на наведении
+  `seed`, события `toggle`, `seek`); `FeedNote` — строка плеера с волной первой строкой заметки, пропы `wave`, `seed`; `StepThumb` — на наведении
   две половины: «глаз» и крестик; `FrameTile` — крестик 12. Подробности — `docs/free-shoot.md`, раздел 38.
 
 ### Исправлено

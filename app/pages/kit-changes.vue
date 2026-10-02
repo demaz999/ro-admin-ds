@@ -85,20 +85,6 @@ const mutedClicks = ref(0)
                 secondary — для сравнения
               </Button>
             </div>
-            <div data-feature-dark class="dark flex flex-wrap items-center gap-3 rounded-md bg-sidebar p-3">
-              <Button variant="feature" show-icon>
-                <template #icon>
-                  <Icon name="auto-awesome" :size="20" />
-                </template>
-                Распределить автоматически
-              </Button>
-              <Button variant="feature">
-                Без иконки
-              </Button>
-            </div>
-            <p class="text-2xs text-muted-foreground">
-              Вторая строка — пара токенов тёмной темы (узел с классом <code>dark</code>) на тёмной поверхности.
-            </p>
           </template>
           <template v-else-if="c.id === 'icon-visibility'">
             <span class="flex items-center gap-2 text-xs">

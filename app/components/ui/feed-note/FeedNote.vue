@@ -87,6 +87,19 @@ function onMouseup() {
     :class="cn(feedNoteVariants({ kind: props.kind }), props.class)"
   >
     <!--
+      Голосовая — как голосовое в мессенджере (такт 58, решение владельца 2026-10-02): кнопка, волновая дорожка с заливкой
+      по мере воспроизведения, время «прошло / всего» — `PlayerAudio variant="wave"`. Довесок к такту 58: дорожка — первой строкой заметки, строка мета — под ней,
+      расшифровка — ниже.
+    -->
+    <PlayerAudio
+      v-if="props.kind === 'voice'"
+      variant="wave"
+      :duration="seconds"
+      :peaks="props.wave"
+      :seed="props.seed"
+      @toggle="$event && emit('play')"
+    />
+    <!--
       Строка мета — такт 50, решение владельца 2026-10-01: главное в заметке — текст расшифровки. В одной строке: кнопка
       воспроизведения — с такта 58 в строке плеера ниже, тип 15/20 bold в тоне заметки обычным регистром (такт 51: «тип > мета»), время · имя файла ·
       длительность — приглушённо (`--opacity-on-tone`), справа «Копировать».
@@ -105,18 +118,6 @@ function onMouseup() {
         </ButtonAction>
       </span>
     </div>
-    <!--
-      Голосовая — как голосовое в мессенджере (такт 58, решение владельца 2026-10-02): кнопка, волновая дорожка с заливкой
-      по мере воспроизведения, время «прошло / всего» — `PlayerAudio variant="wave"`.
-    -->
-    <PlayerAudio
-      v-if="props.kind === 'voice'"
-      variant="wave"
-      :duration="seconds"
-      :peaks="props.wave"
-      :seed="props.seed"
-      @toggle="$event && emit('play')"
-    />
     <p
       ref="textEl"
       data-slot="feed-note-text"
