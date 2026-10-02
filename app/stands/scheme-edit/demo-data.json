@@ -1,0 +1,113 @@
+{
+  "main": {
+    "snapshots": [
+      {
+        "id": "v1",
+        "publishedAt": "2026-08-14T10:20:00",
+        "author": "Анна Смирнова",
+        "inspections": 128,
+        "config": {
+          "settings": {
+            "general": {
+              "name": "КАСКО — осмотр легкового автомобиля",
+              "description": "Осмотр автомобиля перед оформлением полиса",
+              "schemeType": "vehicle",
+              "owner": "Демо Страхование",
+              "inspectionType": "regular",
+              "purpose": "standard",
+              "active": true
+            },
+            "mobile": {}, "web": {}, "access": {}, "ai": {}, "anomalies": {}, "pdf": {}
+          },
+          "form": {
+            "groups": [
+              { "id": "g-lead", "title": "Заявка", "alias": "Lead", "fields": [
+                { "id": "f-number", "title": "Номер полиса", "alias": "policy_number", "type": "text", "required": true, "webOnly": false, "dependent": false }
+              ] },
+              { "id": "g-car", "title": "Автомобиль", "alias": "Car", "fields": [
+                { "id": "f-vin", "title": "VIN", "alias": "vin", "type": "text", "required": true, "webOnly": false, "dependent": false },
+                { "id": "f-mileage", "title": "Пробег", "alias": "mileage", "type": "number", "required": false, "webOnly": false, "dependent": false }
+              ] }
+            ]
+          },
+          "processes": [
+            { "id": "p-auto", "title": "Осмотр автомобиля", "alias": "auto_inspection", "repeatable": false, "steps": [
+              { "id": "s-vin-glass", "title": "VIN под стеклом", "kind": "main", "method": "1 фото", "networks": ["LLM Vin"], "hints": 0 },
+              { "id": "s-front", "title": "Передняя часть", "kind": "main", "method": "2–7 фото", "networks": ["CarAngles · Передняя"], "hints": 0 }
+            ] }
+          ],
+          "showcase": { "status": "draft", "title": "", "summary": "", "priceFrom": null, "industry": "", "spheres": [], "problems": [], "metrics": [], "hiddenModules": [] }
+        }
+      },
+      {
+        "id": "v2",
+        "publishedAt": "2026-09-22T16:05:00",
+        "author": "Игорь Петров",
+        "inspections": 41,
+        "config": {
+          "settings": {
+            "general": {
+              "name": "КАСКО — осмотр легкового автомобиля",
+              "description": "Осмотр автомобиля перед оформлением полиса добровольного страхования",
+              "schemeType": "vehicle",
+              "owner": "Демо Страхование",
+              "inspectionType": "regular",
+              "purpose": "standard",
+              "active": true
+            },
+            "mobile": {}, "web": {}, "access": {}, "ai": {}, "anomalies": {}, "pdf": {}
+          },
+          "form": {
+            "groups": [
+              { "id": "g-lead", "title": "Заявка", "alias": "Lead", "fields": [
+                { "id": "f-number", "title": "Номер полиса", "alias": "policy_number", "type": "text", "required": true, "webOnly": false, "dependent": false }
+              ] },
+              { "id": "g-car", "title": "Автомобиль", "alias": "Car", "fields": [
+                { "id": "f-vin", "title": "VIN", "alias": "vin", "type": "text", "required": true, "webOnly": false, "dependent": false },
+                { "id": "f-plate", "title": "Госномер", "alias": "regnum", "type": "text", "required": true, "webOnly": false, "dependent": false },
+                { "id": "f-mileage", "title": "Пробег", "alias": "mileage", "type": "number", "required": false, "webOnly": false, "dependent": false }
+              ] }
+            ]
+          },
+          "processes": [
+            { "id": "p-auto", "title": "Осмотр автомобиля", "alias": "auto_inspection", "repeatable": false, "steps": [
+              { "id": "s-vin-glass", "title": "VIN под стеклом", "kind": "main", "method": "1 фото", "networks": ["LLM Vin"], "hints": 5 },
+              { "id": "s-vin-metal", "title": "VIN на металле", "kind": "main", "method": "1 фото", "networks": ["LLM Vin"], "hints": 0 },
+              { "id": "s-front", "title": "Передняя часть", "kind": "main", "method": "2–7 фото", "networks": ["CarAngles · Передняя"], "hints": 8 },
+              { "id": "s-right", "title": "Вид справа", "kind": "main", "method": "2–7 фото", "networks": ["CarAngles · Правая сторона"], "hints": 0 }
+            ] },
+            { "id": "p-docs", "title": "Осмотр документов", "alias": "docs_inspection", "repeatable": false, "steps": [
+              { "id": "s-pts", "title": "Паспорт ТС (ПТС)", "kind": "tech", "method": "2 фото", "networks": ["Document Scanner"], "hints": 0 },
+              { "id": "s-policy", "title": "Страховой полис", "kind": "tech", "method": "1 фото", "networks": [], "hints": 3 }
+            ] },
+            { "id": "p-damage", "title": "Осмотр повреждений", "alias": "damage_inspection", "repeatable": true, "steps": [] }
+          ],
+          "showcase": { "status": "draft", "title": "Дистанционный осмотр автомобиля перед страхованием", "summary": "", "priceFrom": 2599, "industry": "insurance", "spheres": ["pso"], "problems": [], "metrics": [], "hiddenModules": [] }
+        }
+      }
+    ],
+    "draft": {
+      "author": "Игорь Петров",
+      "editedAt": "2026-10-01T11:40:00",
+      "patch": [
+        ["settings.general.description", "Комплексный осмотр автомобиля перед оформлением полиса добровольного страхования"]
+      ]
+    }
+  },
+  "fresh": {
+    "snapshots": [],
+    "draft": {
+      "author": "Анна Смирнова",
+      "editedAt": "2026-10-02T09:00:00",
+      "config": {
+        "settings": {
+          "general": { "name": "Новая схема осмотра", "description": "", "schemeType": "vehicle", "owner": "Демо Страхование", "inspectionType": "regular", "purpose": "standard", "active": false },
+          "mobile": {}, "web": {}, "access": {}, "ai": {}, "anomalies": {}, "pdf": {}
+        },
+        "form": { "groups": [] },
+        "processes": [],
+        "showcase": { "status": "needs", "title": "", "summary": "", "priceFrom": null, "industry": "", "spheres": [], "problems": [], "metrics": [], "hiddenModules": [] }
+      }
+    }
+  }
+}

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { auditMarkup, auditMarkupSource, MARKUP_CONTROL } from '~/stands/free-shoot/markup'
+import { auditMarkup, auditMarkupSource, MARKUP_CONTROL, type MarkupScreen } from '~/stands/free-shoot/markup'
 
 /**
  * Статическая проверка разметки экрана `/free-shoot` — довесок 1 к такту 35. Правило и что
@@ -7,12 +7,14 @@ import { auditMarkup, auditMarkupSource, MARKUP_CONTROL } from '~/stands/free-sh
  * поэтому считается сразу, без кнопки. Прогон — в приёмку каждого такта, который трогает экран,
  * вместе с проверкой покрытия (`CLAUDE.md`, «Сборка страниц»).
  */
-const result = auditMarkup()
+/** Экран: `/free-shoot` (по умолчанию) или `/scheme-edit` — такт 61. */
+const props = withDefaults(defineProps<{ screen?: MarkupScreen }>(), { screen: 'free-shoot' })
+const result = auditMarkup(props.screen)
 const control = auditMarkupSource('контрольный образец', MARKUP_CONTROL.source)
 </script>
 
 <template>
-  <div data-markup-audit class="space-y-3 text-sm">
+  <div data-markup-audit :data-screen="props.screen" class="space-y-3 text-sm">
     <p data-markup-total>
       Файлов: {{ result.files.length }} ({{ result.files.join(', ') }}). Проверено элементов разметки вне «как есть»:
       {{ result.checked }}. Нарушений: {{ result.findings.length }}.

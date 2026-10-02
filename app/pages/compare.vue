@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { SCHEME_COVERAGE_STATES } from '~/stands/scheme-edit/coverage'
 useHead({ title: 'Наложение — сверка с Атомом' })
 
 /**
@@ -1723,6 +1724,28 @@ const textareaVariants = [
         <code>v-html</code>. Классы раскладки разрешены. Довесок 1 к такту 35.
       </p>
       <CompareMarkupAudit />
+    </section>
+
+    <section class="space-y-3">
+      <h2 class="text-lg font-bold">
+        Автопроверка покрытия страницы схемы
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Страница <code>/scheme-edit</code> — то же правило: каждый видимый элемент с отрисовкой лежит внутри компонента
+        кита. Состояния оснастки — <code>app/stands/scheme-edit/coverage.ts</code>. Такт 61.
+      </p>
+      <CompareCoverageAudit path="/scheme-edit" :states="SCHEME_COVERAGE_STATES" />
+    </section>
+
+    <section class="space-y-3">
+      <h2 class="text-lg font-bold">
+        Автопроверка разметки страницы схемы
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Исходники <code>app/pages/scheme-edit/*.vue</code>, кроме стенда матриц: на странице только компоненты кита и
+        классы раскладки. Такт 61.
+      </p>
+      <CompareMarkupAudit screen="scheme-edit" />
     </section>
 
     <section class="space-y-2">

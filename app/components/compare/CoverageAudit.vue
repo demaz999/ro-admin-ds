@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { auditCoverage, COVERAGE_STATES, type CoverageFinding } from '~/stands/free-shoot/coverage'
+import { settle } from '~/stands/audit/settle'
 
 /**
  * Автопроверка покрытия экрана `/free-shoot` — довесок 2 к такту 35. Правило и что считается
@@ -13,6 +14,9 @@ import { auditCoverage, COVERAGE_STATES, type CoverageFinding } from '~/stands/f
  */
 interface Row { state: string, checked: number, findings: CoverageFinding[] }
 
+/** Экран и его состояния оснастки: по умолчанию `/free-shoot`; `/scheme-edit` — такт 61. */
+const props = withDefaults(defineProps<{ path?: string, states?: readonly string[] }>(), { path: '/free-shoot', states: () => COVERAGE_STATES })
+
 const rows = ref<Row[]>([])
 const running = ref(false)
 const done = ref(false)
@@ -22,8 +26,8 @@ function load(url: string) {
   return new Promise<Document>((resolve) => {
     const f = frame.value!
     f.onload = () => {
-      /* Окна оснастки открываются после монтирования — даём им появиться, как автопроверкам. */
-      setTimeout(() => resolve(f.contentDocument!), 2500)
+      /* Окна оснастки открываются после монтирования — даём им появиться, как автопроверкам; затем правило снимка (такт 61). */
+      setTimeout(async () => { await settle(f.contentDocument!, 0); resolve(f.contentDocument!) }, 2500)
     }
     f.src = url
   })
@@ -33,8 +37,8 @@ async function run() {
   running.value = true
   done.value = false
   rows.value = []
-  for (const state of COVERAGE_STATES) {
-    const doc = await load(`/free-shoot${state ? `?${state}` : ''}`)
+  for (const state of props.states) {
+    const doc = await load(`${props.path}${state ? `?${state}` : ''}`)
     const r = auditCoverage(doc)
     rows.value.push({ state: state || 'по умолчанию', checked: r.checked, findings: r.findings })
   }
@@ -47,13 +51,13 @@ const offenders = () => rows.value.reduce((a, r) => a + r.findings.length, 0)
 </script>
 
 <template>
-  <div data-coverage-audit class="space-y-3 text-sm">
+  <div data-coverage-audit :data-path="props.path" class="space-y-3 text-sm">
     <div class="flex items-center gap-4">
       <Button variant="secondary" :disabled="running" data-coverage-run @click="run">
         {{ running ? 'Проверяется…' : 'Запустить проверку покрытия' }}
       </Button>
       <span v-if="rows.length" data-coverage-total>
-        Состояний: {{ rows.length }} из {{ COVERAGE_STATES.length }}. Проверено элементов: {{ total() }}. Непомеченных: {{ offenders() }}.
+        Состояний: {{ rows.length }} из {{ props.states.length }}. Проверено элементов: {{ total() }}. Непомеченных: {{ offenders() }}.
       </span>
     </div>
     <p v-if="done && !offenders()" data-coverage-verdict class="text-sm">
@@ -82,6 +86,6 @@ const offenders = () => rows.value.reduce((a, r) => a + r.findings.length, 0)
         </li>
       </template>
     </ul>
-    <iframe ref="frame" title="Экран свободной съёмки для проверки покрытия" class="pointer-events-none absolute -left-[10000px] h-225 w-360" aria-hidden="true" />
+    <iframe ref="frame" title="Экран для проверки покрытия" class="pointer-events-none absolute -left-[10000px] h-225 w-360" aria-hidden="true" />
   </div>
 </template>

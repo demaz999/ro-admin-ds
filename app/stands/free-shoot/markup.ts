@@ -37,8 +37,15 @@ export interface MarkupResult {
   findings: MarkupFinding[]
 }
 
-/** Исходники экрана — все `.vue` в `app/pages/free-shoot/`, кроме стенда матриц. */
-const SOURCES = import.meta.glob('../../pages/free-shoot/*.vue', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
+/**
+ * Исходники экрана — все `.vue` в папке страницы, кроме стенда матриц. Экранов два: `/free-shoot` и, с такта 61,
+ * `/scheme-edit` (`docs/scheme-edit.md`): правило стендов экрана у них одно.
+ */
+export type MarkupScreen = 'free-shoot' | 'scheme-edit'
+const SCREENS: Record<MarkupScreen, Record<string, string>> = {
+  'free-shoot': import.meta.glob('../../pages/free-shoot/*.vue', { query: '?raw', import: 'default', eager: true }) as Record<string, string>,
+  'scheme-edit': import.meta.glob('../../pages/scheme-edit/*.vue', { query: '?raw', import: 'default', eager: true }) as Record<string, string>,
+}
 const EXCLUDED = new Set(['states.vue'])
 
 const STYLING = /^(?:text|bg|border|font|shadow|ring|rounded)(?:-|$)/
@@ -126,14 +133,14 @@ export function auditMarkupSource(file: string, source: string): { checked: numb
 }
 
 /** Проверка всех исходников экрана. */
-export function auditMarkup(): MarkupResult {
+export function auditMarkup(screen: MarkupScreen = 'free-shoot'): MarkupResult {
   const files: string[] = []
   const findings: MarkupFinding[] = []
   let checked = 0
-  for (const [path, source] of Object.entries(SOURCES).sort()) {
+  for (const [path, source] of Object.entries(SCREENS[screen]).sort()) {
     const file = path.split('/').pop()!
     if (EXCLUDED.has(file)) continue
-    files.push(`app/pages/free-shoot/${file}`)
+    files.push(`app/pages/${screen}/${file}`)
     const r = auditMarkupSource(file, source)
     checked += r.checked
     findings.push(...r.findings)

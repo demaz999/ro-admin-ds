@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onMounted, ref } from 'vue'
+import { settle } from '~/stands/audit/settle'
 
 /**
  * Автопроверка текстовых ролей: ловит провал шрифта в системный дефолт.
@@ -161,16 +162,19 @@ function run() {
  */
 onMounted(async () => {
   await nextTick()
-  // Именно таймер, а не requestAnimationFrame: rAF не срабатывает во вкладке,
+  // Именно таймеры, а не requestAnimationFrame: rAF не срабатывает во вкладке,
   // которую браузер не отрисовывает, и обе проверки молча показывали ноль.
-  setTimeout(run, 0)
+  // Такт 61: обход идёт после правила снимка — шрифты, картинки, отложенный старт
+  // (`~/stands/audit/settle`): на холодном старте счёт расходился на три узла.
+  await settle()
+  run()
 })
 </script>
 
 <template>
   <div class="space-y-3">
     <p class="text-sm text-muted-foreground">
-      Проверено текстовых узлов внутри компонентов: <strong>{{ checked }}</strong>.
+      Проверено текстовых узлов внутри компонентов: <strong data-font-audit-count>{{ checked }}</strong>.
       Разрешённые семейства: {{ allowedFamilies.join(', ') }}.
       Шкала кегля (прочитана из токенов): {{ kitSizes.join(', ') }}.
     </p>

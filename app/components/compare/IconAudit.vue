@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onMounted, ref } from 'vue'
+import { settle } from '~/stands/audit/settle'
 
 /**
  * Автопроверка оптики иконок: ловит подмену пикты глифом другого визуального поля.
@@ -65,14 +66,15 @@ function run() {
  */
 onMounted(async () => {
   await nextTick()
-  setTimeout(run, 0)
+  await settle()
+  run()
 })
 </script>
 
 <template>
   <div class="space-y-3">
     <p class="text-sm text-muted-foreground">
-      Проверено иконок: <strong>{{ checked }}</strong>. Правило: видимый глиф заполняет свой бокс,
+      Проверено иконок: <strong data-icon-audit-count>{{ checked }}</strong>. Правило: видимый глиф заполняет свой бокс,
       как пикта Атома. Порог — {{ Math.round(MIN_RATIO * 100) }}%.
     </p>
 

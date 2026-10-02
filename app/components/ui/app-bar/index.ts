@@ -26,5 +26,18 @@ export { default as AppBarStatus } from './AppBarStatus.vue'
  * | статус (`AppBarStatus`) | точка `Indicator` sm (`success` / `warning` / `destructive`), подпись 13/16 `--sidebar-foreground`, поля 8 | `.saved` 12.5, точка 7 `#4FBF7B`, в работе — `#E6C77E` с пульсом |
  *
  * Тексты статуса — спека §17.2: «Сохранение…», «Все изменения сохранены»; ошибка выводится отдельно и сама не скрывается.
+ *
+ * ## Изменения после передачи
+ *
+ * Правило 23 `docs/chat-protocol.md`. Составной компонент экрана «Свободная съёмка» — пакет `free-shoot.md`, раздел 32.
+ *
+ * ### Черновик следующей версии — относительно `handover-2026-10-02`
+ *
+ * - **Добавлено.** `AppBarStatus`: ось `surface` (`dark` — по умолчанию, `light`) — статус сохранения на светлой
+ *   поверхности шапки страницы: подпись `--muted-foreground`, точка и тексты прежние. Проп `retryable` — у состояния
+ *   `error` кнопка «Повторить» (`ButtonAction` sm на светлой поверхности, `Button variant="sidebar"` sm на тёмной) и
+ *   событие `retry`. Существующие вызовы не меняются: без пропов разметка прежняя. Источник — страница схемы,
+ *   `spec-r2.md`, §2, состояния 4–5 (такт 61).
  */
 export type AppBarSaveState = 'saving' | 'saved' | 'error'
+export type AppBarStatusSurface = 'dark' | 'light'
