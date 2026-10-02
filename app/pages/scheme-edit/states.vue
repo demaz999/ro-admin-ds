@@ -9,6 +9,7 @@ import { formulaPreview } from '~/components/ui/formula-input'
  * П1: ось `AppBarStatus` — `surface="light"` и `retryable`.
  * П2: `Card`, `SettingRow`, `SectionNav`, `FormulaInput` с `FormulaPreview`, ось `Select multiple`, ступени `Heading`
  * `title`, `group` и проп `description` (`docs/scheme-edit.md`, разделы 8 и 9).
+ * П5: ось `highlighted` у `SettingRow` — подсветка найденного.
  * П4: `PublishStatus`, `Diff` с частями, ось `ModalCardHeader back` (`docs/scheme-edit.md`, раздел 8, карточки 5 и 6).
  * П3: вариант `Button variant="outline"` — мастер кита 1 `btn_outline` `1990:226`; события `edit` и `action` у
  * `TableRowActions`.
@@ -46,6 +47,13 @@ const SAMPLES = { 'Car:vin': 'DEMO0000000001024', 'Car:regnum': 'А000АА00', '
 const formula = ref('Осмотр {Inspection:number} — {Car:vin}')
 const formulaEmpty = ref('')
 const formulaUnknown = ref('Архив {Car:vin}_{Car:color}')
+
+/* ------------------------------ П5 ------------------------------ */
+const flash = ref<number | null>(null)
+const HIGHLIGHT_EXAMPLE = `<!-- новое число запускает вспышку строки; длительность держит компонент -->
+<SettingRow :highlighted="found === 'cadastreMap' ? foundCount : null">
+  <Checkbox v-model="value" subtitle="Пояснение">Показывать координаты на кадастровой карте</Checkbox>
+</SettingRow>`
 
 /* ------------------------------ П4 ------------------------------ */
 const statusLog = ref('—')
@@ -323,6 +331,29 @@ const FORMULA_EXAMPLE = `<Field label="Тема письма оповещени�
         </Field>
       </div>
       <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ SELECT_MULTIPLE_EXAMPLE }}</pre>
+    </section>
+
+    <!-- ============================ П5, такт 65 ============================ -->
+    <section class="flex flex-col gap-4" data-matrix="setting-row-highlighted">
+      <Heading>SettingRow · highlighted — подсветка найденного</Heading>
+      <Card class="flex max-w-settings flex-col gap-2">
+        <SettingRow data-case="highlighted" :highlighted="flash">
+          <Checkbox :model-value="true" subtitle="Вспышка: заливка держится и гаснет за 1.5 с">
+            Строка, найденная поиском
+          </Checkbox>
+        </SettingRow>
+        <SettingRow data-case="rest">
+          <Checkbox :model-value="false">
+            Соседняя строка — без подсветки
+          </Checkbox>
+        </SettingRow>
+      </Card>
+      <div class="flex">
+        <Button variant="secondary" data-act="flash" @click="flash = (flash ?? 0) + 1">
+          Подсветить строку
+        </Button>
+      </div>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ HIGHLIGHT_EXAMPLE }}</pre>
     </section>
 
     <!-- ============================ П4, такт 64 ============================ -->

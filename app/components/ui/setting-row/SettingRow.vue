@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { cn } from '@/lib/utils'
 import { Icon } from '../icon'
 import { IconButton } from '../icon-button'
@@ -22,12 +23,44 @@ const props = withDefaults(defineProps<{
   metaTone?: 'default' | 'warning'
   /** Вложенные параметры скрыты — родитель выключен. */
   collapsed?: boolean
+  /**
+   * Подсветка найденного — такт 65: новое число запускает вспышку строки. Длительность держит компонент
+   * (`--duration-flash`), страница только выдаёт число — прецедент `flash` у `StepRow`.
+   */
+  highlighted?: number | null
   class?: string
-}>(), { help: '', reason: '', meta: '', metaTone: 'default', collapsed: false })
+}>(), { help: '', reason: '', meta: '', metaTone: 'default', collapsed: false, highlighted: null })
+
+/**
+ * Вспышка. Повторная подсветка той же строки перезапускает анимацию: класс снимается и ставится следующим тактом —
+ * узел строки при этом прежний, контрол в слоте не пересоздаётся.
+ */
+const flashing = ref(false)
+let timer: ReturnType<typeof setTimeout> | undefined
+watch(() => props.highlighted, async (value) => {
+  if (value == null) return
+  clearTimeout(timer)
+  flashing.value = false
+  await nextTick()
+  flashing.value = true
+  const ms = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--duration-flash')) * 1000 || 1500
+  timer = setTimeout(() => { flashing.value = false }, ms)
+})
+onBeforeUnmount(() => clearTimeout(timer))
 </script>
 
 <template>
-  <div data-slot="setting-row" :data-disabled="props.reason ? '' : undefined" :class="cn('flex min-w-0 flex-col', props.class)">
+  <!-- Поля 8 по бокам с обратным отступом: заливка вспышки шире текста, строка стоит на прежнем месте. -->
+  <div
+    data-slot="setting-row"
+    :data-disabled="props.reason ? '' : undefined"
+    :data-flash="flashing || undefined"
+    :class="cn(
+      '-mx-2 flex min-w-0 flex-col rounded-md px-2',
+      flashing ? 'animate-step-flash motion-reduce:animate-none motion-reduce:bg-secondary-hover' : '',
+      props.class,
+    )"
+  >
     <!-- Провайдер подсказок — внутри корня: безрендерный корень съел бы атрибуты страницы (`CLAUDE.md`). -->
     <TooltipProvider>
       <div data-slot="setting-row-main" class="flex min-w-0 items-start gap-2 py-2">

@@ -21,7 +21,7 @@
 - **Heading.** Ступени `level="title"` (24/28, тег `h2`) и `level="group"` (20/24, тег `h3`): заголовок раздела страницы настроек и заголовок группы в карточке. Такт 62.
 - **Heading.** Проп `description` — подпись под заголовком, 13/16 `--foreground-secondary`, зазор 4. Без пропа разметка прежняя. Такт 62.
 - **Составные компоненты.** `Card` — поверхность блока настроек (радиус 24, поля 24, `tone`: `default` · `muted`); `SettingRow` — строка
-  настройки (`help`, `reason`, `meta`, `metaTone`, `collapsed`, слоты `action` и `children`); `SectionNav` с
+  настройки (`help`, `reason`, `meta`, `metaTone`, `collapsed`, `highlighted` — вспышка найденного, такт 65; слоты `action` и `children`); `SectionNav` с
   `SectionNavItem` и `SectionNavAnchor` — навигатор разделов со статус-точками; `FormulaInput` с `FormulaPreview` —
   текст с переменными `{Группа:ключ}`. Матрицы и примеры вызова — `/scheme-edit/states`. Такт 62.
 - **Составные компоненты.** `ModalCardHeader` — проп `back`: вариант `type=back` мастера `modal_cards_header` `864:2746` — стрелка «назад»

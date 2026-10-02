@@ -11,4 +11,6 @@ export const SCHEME_COVERAGE_STATES = [
   'section=mobile', 'section=web', 'section=web&open=reason', 'section=ai', 'section=ai&type=house', 'section=anomalies', 'section=pdf', 'open=template',
   /* Такт 64, П4: модалки публикации, сброса и удаления, меню «⋯», сайд истории и дифф версии, просмотр версии, presence. */
   'open=publish', 'data=new&open=first-publish', 'open=reset', 'open=delete', 'open=menu', 'open=history', 'open=history&version=v2', 'view=v1', 'presence=1',
+  /* Такт 65, П5: выдача поиска, пустая выдача, подсветка найденного. */
+  'q=подпис', 'q=фаыфа', 'found=cadastreMap',
 ] as const

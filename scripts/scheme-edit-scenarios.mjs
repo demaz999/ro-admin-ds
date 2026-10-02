@@ -109,7 +109,7 @@ async function openPage(width = 1440) {
     /** Реальный клик мышью по элементу: выражение `sel` возвращает элемент. */
     async click(sel) {
       const p = await this.point(sel)
-      if (process.env.DEBUG_CLICK) console.log('   клик', p, await evaluate(`document.elementFromPoint(${p.x}, ${p.y})?.outerHTML.slice(0, 120)`))
+      if (process.env.DEBUG_CLICK) console.log('   клик', p, await evaluate(`(e => e ? e.outerHTML.slice(0, 90) + ' «' + e.textContent.trim().slice(0, 40) + '»' : null)(document.elementFromPoint(${p.x}, ${p.y}))`))
       for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', { type, x: p.x, y: p.y, button: 'left', clickCount: 1 })
       await sleep(250)
     },
@@ -126,6 +126,13 @@ async function openPage(width = 1440) {
       await sleep(150)
     },
     async type(text) { await send('Input.insertText', { text }); await sleep(200) },
+    /** «/» — клавиша с текстом: `keyDown` доходит до обработчика хоткея; если его не перехватили, знак печатается. */
+    async slash() {
+      await send('Page.bringToFront')
+      await send('Input.dispatchKeyEvent', { type: 'keyDown', key: '/', code: 'Slash', text: '/', unmodifiedText: '/', windowsVirtualKeyCode: 191, nativeVirtualKeyCode: 191 })
+      await send('Input.dispatchKeyEvent', { type: 'keyUp', key: '/', code: 'Slash', windowsVirtualKeyCode: 191, nativeVirtualKeyCode: 191 })
+      await sleep(150)
+    },
     /** Прокрутка окна колесом — реальным вводом. */
     async wheel(dy) {
       await send('Page.bringToFront')
@@ -258,6 +265,13 @@ function kit(page) {
     },
     check: field => page.click(`document.querySelector('[data-field=${field}] [data-slot=choice-control], [data-field=${field}][data-slot=choice] [data-slot=choice-control]')`),
     async tabs(n) { for (let k = 0; k < n; k++) await page.key('Tab') },
+    /* ---------- П5 ---------- */
+    /** Клавиша «/» реальным вводом — как набор знака: событие клавиши и текст. */
+    slash: () => page.slash(),
+    searchClick: () => page.click(`document.querySelector('[data-field=search] input')`),
+    result: key => page.click(`document.querySelector('[data-search-results] [data-result="${key}"]')`),
+    quickLink: k => page.click(`document.querySelector('[data-search-results] [data-quick="${k}"]')`),
+    /** Вспышка живёт 1.5 с — снять слепок раньше: короткая пауза вместо обычной. */
     /* ---------- П4 ---------- */
     /** Очистить поле: клик, выделить всё, Delete. */
     async clear(sel) {
@@ -392,6 +406,25 @@ function kit(page) {
             program: t(r.querySelectorAll('[data-slot=table-cell]')[1].textContent), access: t(r.querySelectorAll('[data-slot=table-cell]')[2].textContent),
           })),
           focusInSide: !!document.activeElement?.closest?.('[data-side]'),
+          /* ---------- П5 ---------- */
+          query: document.querySelector('[data-field=search] input')?.value ?? null,
+          searchFocus: document.activeElement === document.querySelector('[data-field=search] input'),
+          searchOpen: !!document.querySelector('[data-search-results]'),
+          results: [...document.querySelectorAll('[data-search-results] [data-slot=list-group]')].map(grp => ({
+            path: t(grp.querySelector('[data-slot=list-group-header]')?.textContent),
+            items: [...grp.querySelectorAll('[data-slot=list-item]')].map(i => [t(i.querySelector('[data-slot=list-item-title]').textContent), t(i.querySelector('[data-slot=list-item-subtitle]')?.textContent)].filter(Boolean).join(' | ')),
+          })),
+          resultActive: t(document.querySelector('[data-search-results] [data-slot=list-item][data-selected] [data-slot=list-item-title]')?.textContent) || null,
+          searchEmpty: t(document.querySelector('[data-search-empty] [data-slot=empty-title]')?.textContent) || null,
+          quickLinks: [...document.querySelectorAll('[data-search-results] [data-quick]')].map(b => t(b.textContent)),
+          searchMore: t(document.querySelector('[data-search-more]')?.textContent) || null,
+          hotkey: t(document.querySelector('[data-search-hotkey]')?.textContent) || null,
+          flash: [...document.querySelectorAll('[data-setting][data-flash]')].map(r => r.dataset.setting),
+          /* Найденное в окне: цель перехода видна целиком. */
+          foundVisible: (() => { const key = M.ui.found.target; if (!key) return null
+            const el = ['data-setting', 'data-field', 'data-radio', 'data-formula'].map(a => document.querySelector('[' + a + '="' + key + '"]')).find(Boolean); if (!el) return false
+            const r = el.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight })(),
+          focusField: document.activeElement?.closest?.('[data-field]')?.dataset.field ?? null,
           /* ---------- П4 ---------- */
           status: (() => { const el = document.querySelector('[data-slot=publish-status]'); if (!el) return null
             const main = el.querySelector('[data-slot=publish-status-main]')
@@ -439,7 +472,7 @@ function kit(page) {
 
 /* ------------------------------ сценарии ------------------------------ */
 /**
- * Сценарии П1–П4 — `docs/scheme-edit.md`, 6.1. Шаг — [название, действие, ожидание из спеки, опции].
+ * Сценарии П1–П5 — `docs/scheme-edit.md`, 6.1. Шаг — [название, действие, ожидание из спеки, опции].
  * Ожидание — подмножество слепка; источник — в названии сценария.
  */
 const NAME = 'КАСКО — осмотр легкового автомобиля'
@@ -575,6 +608,56 @@ const SCENARIOS = {
       { 'g.deadlines.editors': ['expert', 'operator'], 'chips.deadlineEditors': ['Эксперт', 'Оператор'], 'chips.manualCoordinate': ['Администратор'] }],
     ['повторный выбор в списке снимает роль', async (K) => { await K.pick('deadlineEditors', 'Оператор'); await K.settled() }, { 'g.deadlines.editors': ['expert'] }],
     ['делиться осмотром — «Только исполнитель»', async (K) => { await K.radio('share', 'Только исполнитель'); await K.settled() }, { 'g.deadlines.share': 'executor' }],
+  ]],
+  /* ============================ П5, такт 65 ============================ */
+  'СС-09': ['поиск: хоткей `/` ставит фокус, Esc очищает и снимает выдачу (r2 §3; аудит, «Клавиатура и фокус»)', [
+    ['старт: поиск под шапкой, подсказка хоткея', null, { query: '', searchFocus: false, searchOpen: false, hotkey: '/' }],
+    ['«/» — фокус в поиске, знак не напечатан', K => K.slash(), { searchFocus: true, query: '', searchOpen: false }],
+    ['набор «согл» — выдача открыта, фокус в поле', K => K.type('согл'), { query: 'согл', searchFocus: true, searchOpen: true,
+      results: [{ path: 'Настройки → Общие', items: ['Отправлять поля на согласование согласующему лицу', 'Обязательное согласование осмотра после экспертизы'] },
+        { path: 'Настройки → PDF', items: ['Запрашивать подписание документа после успешной экспертизы | по запросу «согласование с клиентом»'] }],
+      resultActive: 'Отправлять поля на согласование согласующему лицу' }],
+    ['Esc — запрос очищен, выдача снята', K => K.key('Escape'), { query: '', searchOpen: false, writes: 0 }],
+    ['«/» при наборе в поле — знак печатается в поле', async (K) => { await K.typeInto('confirmHint', 'Да'); await K.slash(); await K.settled() },
+      { 'g.confirm.hint': 'Да/', searchFocus: false, focusField: 'confirmHint' }],
+  ]],
+  'СС-10': ['поиск: буквальный матч сквозь все табы и разделы, синонимы из словаря; выдача сгруппирована по пути (r2 §3; аудит, «Требования к поиску»)', [
+    ['«подпис» — два раздела, группы по пути', async (K) => { await K.searchClick(); await K.type('подпис') }, { searchOpen: true, searchEmpty: null, results: [
+      { path: 'Настройки → Веб-приложение', items: ['Запретить переход в «Подписание» или «Контракт»'] },
+      { path: 'Настройки → PDF', items: ['Запрашивать подписание документа после успешной экспертизы', 'Кто подписывает документ', 'Показывать подписанный PDF в приложении', 'Отправлять подписанный PDF на почту',
+        'Формировать PDF без подписи и показывать в приложении после экспертизы', 'Отправлять PDF без подписи на почту'] }], searchMore: null }],
+    ['синоним «размытые фото» — детектор размытых изображений', K => K.fill('[data-field=search]', 'размытые фото'),
+      { results: [{ path: 'Настройки → Аномалии', items: ['Детектор «Размытые изображения» | по запросу «размытые фото»'] }] }],
+    ['регистр и «ё» не мешают: «СЪЕМК»', K => K.fill('[data-field=search]', 'СЪЕМК'),
+      { 'results.0.path': 'Настройки → Аномалии', 'results.0.items': ['Детектор «Аномалии кластеризации (съёмка вне основной точки)»', 'Детектор «Съёмка с экрана»'] }],
+    ['по описанию: «промежуточного экрана»', K => K.fill('[data-field=search]', 'промежуточного экрана'),
+      { results: [{ path: 'Настройки → Мобильное приложение', items: ['Запустить осмотр сразу после создания | Пользователь сразу переходит к выполнению без промежуточного экрана'] }] }],
+    ['длинная выдача обрезается с подсказкой: «детектор»', K => K.fill('[data-field=search]', 'детектор'), { searchMore: 'Показаны первые 12 из 15 — уточните запрос', 'results.0.path': 'Настройки → Аномалии', 'results.0.items.0': 'Отображать блок аномалий | Детекторы подозрительной активности при проведении осмотра' }],
+    ['поиск работает с любого таба', async (K) => { await K.key('Escape'); await K.tab('showcase'); await K.slash(); await K.type('дедлайн') },
+      { tab: 'showcase', searchOpen: true, 'results.0.path': 'Настройки → Общие', 'results.0.items.0': 'Дедлайн проверки' }],
+  ]],
+  'СС-11': ['поиск: выбор результата ведёт к месту — таб, раздел, прокрутка, подсветка (r2 §3; аудит, «Требование к поиску при вложенности»)', [
+    ['с таба «Форма»: «/», «размытые фото», Enter — раздел «Аномалии», строка подсвечена', async (K) => { await K.tab('form'); await K.slash(); await K.type('размытые фото'); await K.key('Enter') },
+      { tab: 'settings', section: 'anomalies', navActive: ['anomalies'], flash: ['det-blur'], foundVisible: true, query: '', searchOpen: false, searchFocus: false, writes: 0 }],
+    ['клик по результату: «кадастр» — «Общие», якорь «Поведение процесса», прокрутка и подсветка', async (K) => { await K.searchClick(); await K.type('кадастр'); await K.result('general.behavior.cadastreMap') },
+      { section: 'general', anchor: 'behavior', flash: ['cadastreMap'], foundVisible: true, searchOpen: false, query: '' }],
+    ['стрелка вниз и Enter — второй результат', async (K) => { await K.slash(); await K.type('опытным'); await K.key('ArrowDown'); await K.key('Enter') },
+      { section: 'mobile', anchor: 'mobile-behavior', flash: ['skipConfirm'], foundVisible: true }],
+    ['цель — поле: «наименование» — фокус в поле «Наименование»', async (K) => { await K.slash(); await K.type('наименование'); await K.key('Enter') },
+      { section: 'general', anchor: 'main', focusField: 'name', flash: [], foundVisible: true, writes: 0 }],
+    ['настройка, скрытая под выключенным родителем, — подсвечен родитель: «кто подписывает»', async (K) => { await K.searchClick(); await K.type('кто подписывает'); await K.key('Enter') },
+      { section: 'pdf', flash: ['pdfSign'], foundVisible: true, 'rows.pdfSign.children': false }],
+  ]],
+  'СС-11/просмотр': ['поиск работает в просмотре прошлой версии: переход и подсветка есть, правки нет (r2 §2, состояние 7)', [
+    ['«/», «пропускать», Enter', async (K) => { await K.slash(); await K.type('пропускать'); await K.key('Enter') },
+      { viewing: 'v1', section: 'general', flash: ['skipExpertise'], foundVisible: true, readonly: true, writes: 0 }],
+  ], { query: 'view=v1' }],
+  'СС-12': ['поиск: пустая выдача — «Ничего не найдено по «…»» и «Быстрый переход» (r2 §3; аудит, «Требования к поиску»)', [
+    ['«фаыфа» — пустая выдача подсказывает', async (K) => { await K.searchClick(); await K.type('фаыфа') },
+      { searchOpen: true, results: [], searchEmpty: 'Ничего не найдено по «фаыфа»', quickLinks: ['Аномалии', 'Права доступа', 'PDF', 'Процессы и шаги'] }],
+    ['Enter при пустой выдаче — на месте', K => K.key('Enter'), { searchOpen: true, section: 'general', tab: 'settings' }],
+    ['быстрый переход «PDF»', K => K.quickLink(2), { section: 'pdf', tab: 'settings', searchOpen: false, query: '', 'templates.length': 2 }],
+    ['быстрый переход «Процессы и шаги»', async (K) => { await K.searchClick(); await K.type('ъъъ'); await K.quickLink(3) }, { tab: 'processes', searchOpen: false, query: '', pending: '«Процессы и шаги» — порция П7' }],
   ]],
   /* ============================ П4, такт 64 ============================ */
   'СС-02': ['новая схема: индикатор «Ни разу не опубликовано», главная кнопка ведёт в первую публикацию (r2 §2, состояние 1)', [
@@ -785,7 +868,7 @@ const SCENARIOS = {
     ['включить подписание — параметры родителя', async (K) => { await K.toggle('pdfSign'); await K.settled() }, { 's.pdf.sign': true, 'rows.pdfSign.children': true, 'rows.showSigned.checked': true, 'rows.mailSigned.checked': false, writes: 1 }],
     ['кто подписывает и отправка на почту', async (K) => { await K.select('signer', 'Исполнитель осмотра'); await K.toggle('mailSigned'); await K.settled() }, { 's.pdf.signer': 'executor', 's.pdf.mailSigned': true }],
     ['PDF без подписи — на почту', async (K) => { await K.toggle('unsignedMail'); await K.settled() }, { 's.pdf.unsignedMail': true, 's.pdf.unsignedShow': true }],
-    ['формула имени файла: переменная «Номер осмотра»', async (K) => { await K.formulaEnd('pdfFileName'); await K.type(' '); await K.addVariable('pdfFileName', 'Inspection:number'); await K.settled() },
+    ['формула имени файла: переменная «Номер осмотра»', async (K) => { await K.formulaEnd('pdfFileName'); await K.type(' '); await K.settled(); await K.addVariable('pdfFileName', 'Inspection:number'); await K.settled() },
       { 's.pdf.fileName': 'Лист осмотра {Car:vin} {Inspection:number}', 'formulas.pdfFileName': { chips: ['VIN', 'Номер осмотра'], preview: 'Лист осмотра DEMO0000000001024 № 1024' } }],
     ['вложения из дополнительных файлов', async (K) => { await K.toggle('attachExtra'); await K.settled() }, { 's.pdf.attachExtra': true }],
     ['выключить подписание — параметры скрыты, значения целы', async (K) => { await K.toggle('pdfSign'); await K.settled() }, { 's.pdf.sign': false, 'rows.pdfSign.children': false, 's.pdf.signer': 'executor', 's.pdf.mailSigned': true }],

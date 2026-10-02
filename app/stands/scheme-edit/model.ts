@@ -1,11 +1,12 @@
 import { computed, reactive } from 'vue'
 import { DETECTOR_IDS, DETECTORS_ON, FIELD_SAMPLES, FINISH_CLASSES, SYSTEM_VARIABLES } from './catalogs'
 import { diffConfigs, formatDate, plural, summarize, validateConfig } from './diff'
+import { QUICK_LINKS, searchSettings, type SearchItem } from './search'
 
 export * from './catalogs'
 
 /**
- * Модель состояния страницы «Редактирование схемы осмотра» (VA-16377) — такты 61–64, порции П1–П4.
+ * Модель состояния страницы «Редактирование схемы осмотра» (VA-16377) — такты 61–65, порции П1–П5.
  * План и границы — `docs/scheme-edit.md`, 6.2. Поведение — `docs/sources/scheme-edit/spec-r2.md`, обоснования —
  * `spec-audit.md`. HTML-прототипа нет: модель написана по спеке.
  *
@@ -30,7 +31,9 @@ export * from './catalogs'
  * наследованием роли, сброс стоимости классов, группы доступа. **П4 (такт 64):** публикация — модалка-гейт с диффом
  * (`openPublish`, `confirmPublish`), первая публикация, валидация с критичным (`warnings`), история версий и дифф
  * версии (`history`, `versionDiff`), просмотр снимка (`view`, `leaveView` — правка отказывает), сброс черновика
- * (`openReset`, `confirmReset`), меню схемы (`menu`), presence. Расчёт диффа и валидации — `diff.ts`. Дифф, валидация,
+ * (`openReset`, `confirmReset`), меню схемы (`menu`), presence. Расчёт диффа и валидации — `diff.ts`. **П5 (такт 65):**
+ * поиск по настройкам — `setQuery`, `results`, `goTo` (таб → раздел → якорь → цель для прокрутки и подсветки), `quick`;
+ * индекс и словарь синонимов — `search.ts`. Дифф, валидация,
  * поиск, публикация, сброс черновика, просмотр снимка, операции формы, процессов и витрины — по своим порциям
  * (`scheme-edit.md`, раздел 10).
  */
@@ -353,6 +356,8 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     viewing: (opts.viewing && data.snapshots.some(v => v.id === opts.viewing) ? opts.viewing : '') as string,
     /** Версия, открытая вторым слоем сайда истории. */
     historyVersion: '',
+    /** Найденное: цель на странице и счётчик перехода — страница прокручивает к цели и подсвечивает её. */
+    found: { target: '', n: 0 },
   })
 
   /** Конфигурация на экране: открытый снимок либо черновик. */
@@ -540,6 +545,29 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     notify(`Шаблон «${gone.title}» удалён`, 'ok', true, () => set('settings.pdf.templates', before))
   }
 
+  /* ------------------------------ поиск — П5 ------------------------------ */
+  /** Выдача по текущему запросу: группы по пути «Настройки → Раздел». */
+  const results = computed(() => searchSettings(ui.query))
+  function setQuery(q: string) { ui.query = q }
+  /**
+   * Переход к найденному — `spec-audit.md`, «Требования к поиску»: таб → раздел → якорь; цель для прокрутки и
+   * подсветки страница берёт из `ui.found`. Запрос очищается, выдача снимается.
+   */
+  function goTo(item: SearchItem) {
+    ui.tab = 'settings'
+    setSection(item.section as SectionId, item.anchor)
+    ui.found = { target: item.target, n: ui.found.n + 1 }
+    ui.query = ''
+  }
+  /** «Быстрый переход» пустой выдачи: раздел либо таб. */
+  function quick(index: number) {
+    const link = QUICK_LINKS[index]
+    if (!link) return
+    ui.tab = link.tab
+    if (link.section) setSection(link.section as SectionId, SECTION_ANCHORS[link.section as SectionId][0]?.id ?? '')
+    ui.query = ''
+  }
+
   /** «Назад» — к списку схем; на стенде списка нет (СС-01). */
   function back() { notify('Список схем — вне стенда') }
   /* ------------------------------ публикация и версии — П4 ------------------------------ */
@@ -648,6 +676,7 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   return {
     snapshots, current, draft, dirty, publishState, save, ui, notices,
     rules, rule, approvalCount, sectionStatus, variables, variableSamples, topSurface,
+    results, setQuery, goTo, quick,
     shown, draftDiff, warnings, blocked, summary, draftDate, history, versionDiff, versionShown, viewingText,
     openPublish, confirmPublish, openReset, confirmReset, copy, preview, menu, confirmDelete, openHistory, openVersion, closeVersion, view, leaveView,
     set, setTab, setSection, rememberScroll, back, retry, notify, dismissNotice, dump,

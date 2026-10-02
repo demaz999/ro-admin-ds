@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { formulaPreview } from '~/components/ui/formula-input'
 import { tableRowActionsColumn, type TableRowActionItem } from '~/components/ui/table'
+import { QUICK_LINKS, type SearchItem } from '~/stands/scheme-edit/search'
 import {
   ACCESS_GROUPS, ACCESS_ROLES, COMMENT_DICTIONARIES, createModel, DEADLINE_EVENTS, DETECTOR_GROUPS, DETECTOR_IDS, FINISH_CLASSES, OWNERS,
   PDF_PROGRAMS, PDF_SIGNERS, PDF_WHEN, PHOTO_RESOLUTIONS, REGION_MATRICES, ROLE_LADDER, ROLES, SCHEME_TYPES, SECTION_ANCHORS, SECTIONS,
@@ -11,7 +12,7 @@ import {
 import demo from '~/stands/scheme-edit/demo-data.json'
 
 /**
- * Страница «Редактирование схемы осмотра» (VA-16377) — стенд, такты 61–64, порции П1–П4 (`docs/scheme-edit.md`,
+ * Страница «Редактирование схемы осмотра» (VA-16377) — стенд, такты 61–65, порции П1–П5 (`docs/scheme-edit.md`,
  * раздел 10).
  *
  * Вид и структура — макеты Figma (`docs/sources/scheme-edit/figma-nodes.md`), поведение и тексты — `spec-r2.md`.
@@ -36,6 +37,11 @@ import demo from '~/stands/scheme-edit/demo-data.json'
  * меню «⋯» (№ 8). Модалка-гейт публикации с `Diff` и предупреждениями валидации (№ 54, 58), первая публикация
  * (№ 55), «Сбросить черновик?» (№ 60), «Удалить схему?»; сайд истории версий с диффом версии вторым слоем (№ 56);
  * просмотр прошлой версии (№ 57): плашка, содержимое только для чтения, «Перейти к текущей версии», «Сделать копию».
+ *
+ * **П5.** Поиск строкой под шапкой, над табами (№ 9): `Input` с подсказкой хоткея `Kbd`; выдача — `Popover` с группами по
+ * пути «Настройки → Раздел» (№ 10); пустая выдача с «Быстрым переходом» (№ 11); переход к месту и подсветка
+ * найденного — ось `highlighted` у `SettingRow` (№ 12). Клавиатура: `/` — фокус в поиск, стрелки — по выдаче, Enter —
+ * переход, Esc — очистить и снять выдачу.
  * Табы «Форма», «Процессы и шаги», «Витрина» — порциями П6–П8: на их месте `Empty`.
  *
  * ## Поведение — модель `~/stands/scheme-edit/model.ts`
@@ -62,6 +68,8 @@ import demo from '~/stands/scheme-edit/demo-data.json'
  * | `?view=v1` | просмотр прошлой версии |
  * | `?presence=1` | другой редактор в схеме: «Сейчас редактирует …» |
  * | `?now=2026-10-03T09:00:00` | неподвижные часы стенда: дата правок и публикаций для прогона |
+ * | `?q=подпис` | запрос в поиске и открытая выдача; `?q=фаыфа` — пустая выдача с «Быстрым переходом» |
+ * | `?found=cadastreMap` | подсветка найденного: цель — значение `data-setting` |
  * | `?save=saving` | статус «Сохранение…» без завершения записи |
  * | `?save=error` | статус «Ошибка сохранения» с «Повторить» |
  * | `?save=fail` | следующая запись черновика завершается ошибкой (СС-49) |
@@ -325,6 +333,90 @@ function saveSide() {
   m.closeSurface()
 }
 
+/* ------------------------------ поиск — П5 ------------------------------ */
+const query = computed({ get: () => m.ui.query, set: v => m.setQuery(v) })
+const searchFocused = ref(false)
+/** Выдача открыта, пока в поиске есть запрос и фокус; оснастка `?q=` открывает её при загрузке. */
+const searchPinned = ref(!!q('q'))
+const searchOpen = computed(() => !!m.ui.query.trim() && (searchFocused.value || searchPinned.value))
+const flat = computed(() => m.results.value.groups.flatMap(grp => grp.items))
+/** Активная строка выдачи: стрелки двигают её, Enter переходит; по умолчанию — первая. */
+const activeResult = ref(0)
+watch(() => m.ui.query, () => { activeResult.value = 0 })
+const searchField = () => document.querySelector<HTMLInputElement>('[data-field=search] input')
+function go(item: SearchItem) {
+  searchPinned.value = false
+  m.goTo(item)
+  searchField()?.blur()
+}
+function goQuick(index: number) {
+  searchPinned.value = false
+  m.quick(index)
+  searchField()?.blur()
+}
+function onSearchKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    /* Esc очищает запрос и снимает выдачу (аудит, «Клавиатура и фокус»). */
+    event.preventDefault()
+    searchPinned.value = false
+    m.setQuery('')
+  }
+  else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    if (!flat.value.length) return
+    event.preventDefault()
+    activeResult.value = (activeResult.value + (event.key === 'ArrowDown' ? 1 : flat.value.length - 1)) % flat.value.length
+  }
+  else if (event.key === 'Enter') {
+    const item = flat.value[activeResult.value]
+    if (item) { event.preventDefault(); go(item) }
+  }
+}
+/** Хоткей `/` — фокус в поиск; набор в поле ввода и в редактируемой области хоткей не перехватывает. */
+function onHotkey(event: KeyboardEvent) {
+  if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return
+  const el = event.target as HTMLElement | null
+  if (el?.closest('input, textarea, [contenteditable=true], [role=textbox]')) return
+  event.preventDefault()
+  searchField()?.focus()
+}
+
+/**
+ * Подсветка найденного: номер перехода — у строки-цели, у остальных — `null`. Номер выдаётся, когда цель уже
+ * отрисована и стоит в окне: строка, смонтированная с готовым номером, смены пропа не видит и не вспыхивает.
+ */
+const flashed = ref({ target: '', n: 0 })
+const hl = (key: string) => (flashed.value.target === key && flashed.value.n ? flashed.value.n : null)
+/** Цель на странице: строка настройки, поле, группа выбора, формула, поле стоимости, кнопка. */
+function findTarget(target: string): HTMLElement | null {
+  const cost = target.match(/^cost-(\w+)$/)
+  if (cost) return document.querySelector(`[data-cost="${cost[1]}"]`)
+  return document.querySelector(`[data-setting="${target}"], [data-field="${target}"], [data-radio="${target}"], [data-formula="${target}"], [data-act="${target}"]`)
+}
+/**
+ * Переход к месту: раздел уже выставлен моделью; цель ждём, пока раздел отрисуется, ставим в верхнюю треть окна.
+ * У строки настройки — вспышка (`highlighted`), у поля — фокус на его контроле.
+ */
+watch(() => m.ui.found.n, async (n) => {
+  if (!n || !import.meta.client) return
+  const target = m.ui.found.target
+  let el: HTMLElement | null = null
+  for (let k = 0; k < 40 && !el; k++) {
+    await new Promise(r => setTimeout(r, 16))
+    el = findTarget(target)
+  }
+  if (!el || m.ui.found.n !== n) return
+  const top = el.getBoundingClientRect().top + window.scrollY - Math.round(window.innerHeight / 3)
+  window.scrollTo({ top: Math.max(0, top), behavior: 'instant' })
+  flashed.value = { target, n }
+  if (!el.matches('[data-setting]') && !ro.value) el.querySelector<HTMLElement>('input, textarea, button, [contenteditable=true]')?.focus({ preventScroll: true })
+})
+if (q('q')) m.setQuery(q('q'))
+onMounted(() => {
+  window.addEventListener('keydown', onHotkey)
+  if (q('found')) m.goTo({ key: '', label: '', section: m.ui.section, anchor: m.ui.anchor, target: q('found'), via: 'label', hint: '' })
+})
+onBeforeUnmount(() => window.removeEventListener('keydown', onHotkey))
+
 /* ------------------------------ публикация и версии — П4 ------------------------------ */
 /** Открытая поверхность модели как `v-model:open` окна: закрытие окна снимает её со стека. */
 const surface = (id: string) => computed({
@@ -453,6 +545,59 @@ if (import.meta.client) {
       </Callout>
     </div>
 
+    <!-- ============================ поиск — № 9–11: строкой под шапкой, над табами, на всех табах ============================ -->
+    <Popover :open="searchOpen">
+      <PopoverAnchor as-child>
+        <div class="flex max-w-settings items-center gap-3" data-search>
+          <div class="min-w-0 flex-1" data-field="search" @keydown="onSearchKeydown" @focusin="searchFocused = true" @focusout="searchFocused = false">
+            <Input v-model="query" placeholder="Поиск по настройкам схемы" clearable />
+          </div>
+          <Kbd data-search-hotkey>
+            /
+          </Kbd>
+        </div>
+      </PopoverAnchor>
+      <!-- Фокус остаётся в поле: выдача его не забирает; клик по выдаче не снимает фокус с поля до перехода. -->
+      <PopoverContent
+        data-search-results
+        align="start"
+        :side-offset="4"
+        :width="600"
+        class="p-1"
+        @open-auto-focus="$event.preventDefault()"
+        @close-auto-focus="$event.preventDefault()"
+        @mousedown.prevent
+      >
+        <template v-if="m.results.value.count">
+          <SelectGroup v-for="grp in m.results.value.groups" :key="grp.path" :header="grp.path">
+            <SelectItem
+              v-for="item in grp.items"
+              :key="item.key"
+              :selected="flat[activeResult]?.key === item.key"
+              :subtitle="item.hint"
+              :data-result="item.key"
+              @click="go(item)"
+            >
+              {{ item.label }}
+            </SelectItem>
+          </SelectGroup>
+          <ToolbarText v-if="m.results.value.count > flat.length" class="px-4 py-2" data-search-more>
+            Показаны первые {{ flat.length }} из {{ m.results.value.count }} — уточните запрос
+          </ToolbarText>
+        </template>
+        <!-- Пустая выдача подсказывает: «Быстрый переход» к разделам. -->
+        <Empty v-else :title="`Ничего не найдено по «${m.ui.query.trim()}»`" description="Быстрый переход" class="px-4 py-4" data-search-empty>
+          <template #action>
+            <div class="flex flex-wrap justify-center gap-2">
+              <Button v-for="(link, k) in QUICK_LINKS" :key="link.label" variant="secondary" size="sm" :data-quick="k" @click="goQuick(k)">
+                {{ link.label }}
+              </Button>
+            </div>
+          </template>
+        </Empty>
+      </PopoverContent>
+    </Popover>
+
     <Tabs v-model="tab">
       <TabsList>
         <TabsTrigger v-for="t in TABS" :key="t.id" :value="t.id" :data-tab-trigger="t.id">
@@ -528,12 +673,12 @@ if (import.meta.client) {
                     <Heading level="group">
                       Экспертиза и проверка
                     </Heading>
-                    <SettingRow data-setting="skipExpertise">
+                    <SettingRow data-setting="skipExpertise" :highlighted="hl('skipExpertise')">
                       <Checkbox :model-value="beh.skipExpertise" subtitle="Осмотр будет сразу передан на проверку без этапа экспертизы" @update:model-value="setB('skipExpertise', $event)">
                         Пропускать экспертизу
                       </Checkbox>
                     </SettingRow>
-                    <SettingRow data-setting="lockOnReview" :collapsed="!beh.lockOnReview">
+                    <SettingRow data-setting="lockOnReview" :highlighted="hl('lockOnReview')" :collapsed="!beh.lockOnReview">
                       <Checkbox :model-value="beh.lockOnReview" subtitle="Запрещает редактирование осмотра другими пользователями во время проверки" @update:model-value="setB('lockOnReview', $event)">
                         Блокировать осмотр при проверке
                       </Checkbox>
@@ -543,17 +688,17 @@ if (import.meta.client) {
                         </Field>
                       </template>
                     </SettingRow>
-                    <SettingRow v-slot="{ disabled }" data-setting="quickAccept" :reason="m.rule('quickAccept').reason">
+                    <SettingRow v-slot="{ disabled }" data-setting="quickAccept" :highlighted="hl('quickAccept')" :reason="m.rule('quickAccept').reason">
                       <Checkbox :model-value="beh.quickAccept" :disabled="disabled" subtitle="Проверяющий сможет утвердить осмотр без поэтапного прохождения всех шагов" @update:model-value="setB('quickAccept', $event)">
                         Разрешить принимать осмотр одной кнопкой
                       </Checkbox>
                     </SettingRow>
-                    <SettingRow data-setting="requireAllSteps">
+                    <SettingRow data-setting="requireAllSteps" :highlighted="hl('requireAllSteps')">
                       <Checkbox :model-value="beh.requireAllSteps" subtitle="Возврат на доработку возможен только после вынесения решения по каждому шагу" @update:model-value="setB('requireAllSteps', $event)">
                         Требовать решения во всех шагах для возврата на доработку
                       </Checkbox>
                     </SettingRow>
-                    <SettingRow data-setting="lowRolesReturn">
+                    <SettingRow data-setting="lowRolesReturn" :highlighted="hl('lowRolesReturn')">
                       <Checkbox :model-value="beh.lowRolesReturn" subtitle="Агенты и операторы смогут инициировать возврат осмотра на доработку" @update:model-value="setB('lowRolesReturn', $event)">
                         Разрешить низким ролям возвращать осмотр на доработку
                       </Checkbox>
@@ -564,12 +709,12 @@ if (import.meta.client) {
                     <Heading level="group">
                       Отказ от осмотра
                     </Heading>
-                    <SettingRow data-setting="refuse" help="Исполнитель сможет завершить осмотр без съёмки, указав причину">
+                    <SettingRow data-setting="refuse" :highlighted="hl('refuse')" help="Исполнитель сможет завершить осмотр без съёмки, указав причину">
                       <Checkbox :model-value="beh.refuse" @update:model-value="setB('refuse', $event)">
                         Разрешить отказываться с отметкой «Осмотр невозможен»
                       </Checkbox>
                       <template #children>
-                        <SettingRow v-slot="{ disabled }" data-setting="refuseRepeatable" :reason="m.rule('refuseRepeatable').reason">
+                        <SettingRow v-slot="{ disabled }" data-setting="refuseRepeatable" :highlighted="hl('refuseRepeatable')" :reason="m.rule('refuseRepeatable').reason">
                           <Checkbox :model-value="beh.refuseRepeatable" :disabled="disabled" @update:model-value="setB('refuseRepeatable', $event)">
                             Разрешить отказываться от повторяемых процессов с той же отметкой
                           </Checkbox>
@@ -597,6 +742,7 @@ if (import.meta.client) {
                     </Heading>
                     <SettingRow
                       data-setting="approval"
+                      :highlighted="hl('approval')"
                       help="Поля для согласования отмечаются в табе «Форма»"
                       :meta="m.rule('approval').meta"
                       :meta-tone="m.rule('approval').metaTone"
@@ -610,7 +756,7 @@ if (import.meta.client) {
                         </ButtonAction>
                       </template>
                     </SettingRow>
-                    <SettingRow data-setting="approvalRequired">
+                    <SettingRow data-setting="approvalRequired" :highlighted="hl('approvalRequired')">
                       <Checkbox :model-value="beh.approvalRequired" subtitle="Осмотр не будет принят, пока не пройдёт согласование" @update:model-value="setB('approvalRequired', $event)">
                         Обязательное согласование осмотра после экспертизы
                       </Checkbox>
@@ -621,12 +767,12 @@ if (import.meta.client) {
                     <Heading level="group">
                       Расширенное
                     </Heading>
-                    <SettingRow data-setting="cadastreMap">
+                    <SettingRow data-setting="cadastreMap" :highlighted="hl('cadastreMap')">
                       <Checkbox :model-value="beh.cadastreMap" subtitle="Отображает геолокацию объекта на карте по кадастровому номеру" @update:model-value="setB('cadastreMap', $event)">
                         Показывать координаты на кадастровой карте
                       </Checkbox>
                     </SettingRow>
-                    <SettingRow data-setting="forbidExtraFiles">
+                    <SettingRow data-setting="forbidExtraFiles" :highlighted="hl('forbidExtraFiles')">
                       <Checkbox :model-value="beh.forbidExtraFiles" subtitle="Пользователь не сможет прикрепить файлы за пределами обязательных полей" @update:model-value="setB('forbidExtraFiles', $event)">
                         Запретить использовать блок дополнительных файлов
                       </Checkbox>
@@ -799,17 +945,17 @@ if (import.meta.client) {
                   <Heading level="group">
                     Поведение в мобильном приложении
                   </Heading>
-                  <SettingRow data-setting="startAfterCreate">
+                  <SettingRow data-setting="startAfterCreate" :highlighted="hl('startAfterCreate')">
                     <Checkbox :model-value="mob.startAfterCreate" subtitle="Пользователь сразу переходит к выполнению без промежуточного экрана" @update:model-value="setS('mobile.startAfterCreate', $event)">
                       Запустить осмотр сразу после создания
                     </Checkbox>
                   </SettingRow>
-                  <SettingRow data-setting="hideHints">
+                  <SettingRow data-setting="hideHints" :highlighted="hl('hideHints')">
                     <Checkbox :model-value="mob.hideHints" subtitle="Опытные пользователи — те, кто проходил осмотр минимум три раза по данной схеме" @update:model-value="setS('mobile.hideHints', $event)">
                       Разрешать опытным пользователям скрывать подсказки к шагам
                     </Checkbox>
                   </SettingRow>
-                  <SettingRow data-setting="skipConfirm">
+                  <SettingRow data-setting="skipConfirm" :highlighted="hl('skipConfirm')">
                     <Checkbox :model-value="mob.skipConfirm" subtitle="Опытные пользователи — те, кто проходил осмотр минимум три раза по данной схеме" @update:model-value="setS('mobile.skipConfirm', $event)">
                       Разрешать опытным пользователям пропускать подтверждение после шага
                     </Checkbox>
@@ -829,7 +975,7 @@ if (import.meta.client) {
                     <Heading level="group">
                       Обоснования
                     </Heading>
-                    <SettingRow data-setting="feedback">
+                    <SettingRow data-setting="feedback" :highlighted="hl('feedback')">
                       <Checkbox :model-value="web.feedback" subtitle="Позволяет экспертам оставлять комментарии и оценки по результатам проверки" @update:model-value="setS('web.feedback', $event)">
                         Блок обратной связи на странице экспертизы
                       </Checkbox>
@@ -882,17 +1028,17 @@ if (import.meta.client) {
                   <Heading level="group">
                     Если не заполнен блок обратной связи
                   </Heading>
-                  <SettingRow data-setting="blockRepeat">
+                  <SettingRow data-setting="blockRepeat" :highlighted="hl('blockRepeat')">
                     <Checkbox :model-value="web.blockRepeat" :disabled="!web.feedback" @update:model-value="setS('web.blockRepeat', $event)">
                       Запретить переход в «Повтор»
                     </Checkbox>
                   </SettingRow>
-                  <SettingRow data-setting="blockRefuse">
+                  <SettingRow data-setting="blockRefuse" :highlighted="hl('blockRefuse')">
                     <Checkbox :model-value="web.blockRefuse" :disabled="!web.feedback" @update:model-value="setS('web.blockRefuse', $event)">
                       Запретить переход в «Отказ»
                     </Checkbox>
                   </SettingRow>
-                  <SettingRow data-setting="blockContract">
+                  <SettingRow data-setting="blockContract" :highlighted="hl('blockContract')">
                     <Checkbox :model-value="web.blockContract" :disabled="!web.feedback" @update:model-value="setS('web.blockContract', $event)">
                       Запретить переход в «Подписание» или «Контракт»
                     </Checkbox>
@@ -1120,17 +1266,17 @@ if (import.meta.client) {
                   <Callout v-if="autoOff" tone="warning" data-reason-callout="auto">
                     {{ m.rule('autoModules').reason }}. Тип схемы задаётся в разделе «Общие → Основное»
                   </Callout>
-                  <SettingRow data-setting="damage">
+                  <SettingRow data-setting="damage" :highlighted="hl('damage')">
                     <Checkbox :model-value="ai.damage" :disabled="autoOff" subtitle="Находит повреждения кузова на фотографиях" @update:model-value="setS('ai.damage', $event)">
                       Распознавание повреждений
                     </Checkbox>
                   </SettingRow>
-                  <SettingRow data-setting="vinRecognition">
+                  <SettingRow data-setting="vinRecognition" :highlighted="hl('vinRecognition')">
                     <Checkbox :model-value="ai.vinRecognition" :disabled="autoOff" subtitle="Читает VIN с фотографии и сверяет с полем формы" @update:model-value="setS('ai.vinRecognition', $event)">
                       Распознавание VIN
                     </Checkbox>
                   </SettingRow>
-                  <SettingRow data-setting="damageCost">
+                  <SettingRow data-setting="damageCost" :highlighted="hl('damageCost')">
                     <Checkbox :model-value="ai.damageCost" :disabled="autoOff" subtitle="Оценивает стоимость ремонта найденных повреждений" @update:model-value="setS('ai.damageCost', $event)">
                       Оценка ущерба
                     </Checkbox>
@@ -1143,7 +1289,7 @@ if (import.meta.client) {
             <template v-else-if="m.ui.section === 'anomalies'">
               <section class="flex flex-col gap-4" data-anomalies>
                 <Card class="flex flex-col">
-                  <SettingRow data-setting="anomaliesEnabled">
+                  <SettingRow data-setting="anomaliesEnabled" :highlighted="hl('anomaliesEnabled')">
                     <Switch :model-value="anomalies.enabled" subtitle="Детекторы подозрительной активности при проведении осмотра" @update:model-value="setS('anomalies.enabled', $event)">
                       Отображать блок аномалий
                     </Switch>
@@ -1186,6 +1332,7 @@ if (import.meta.client) {
                         v-for="d in g.detectors"
                         :key="d.id"
                         :data-setting="`det-${d.id}`"
+                        :highlighted="hl(`det-${d.id}`)"
                         :help="d.help"
                         :meta="detectorRoleText(d.id)"
                       >
@@ -1275,7 +1422,7 @@ if (import.meta.client) {
                   <Heading level="group">
                     Формирование и подписание
                   </Heading>
-                  <SettingRow data-setting="pdfSign" :collapsed="!pdf.sign">
+                  <SettingRow data-setting="pdfSign" :highlighted="hl('pdfSign')" :collapsed="!pdf.sign">
                     <Checkbox :model-value="pdf.sign" subtitle="Добавляет в процесс этап подписания клиентом — статус «Согласование с клиентом». Клиент получает документ и подписывает его кодом из СМС" @update:model-value="setS('pdf.sign', $event)">
                       Запрашивать подписание документа после успешной экспертизы
                     </Checkbox>
@@ -1285,12 +1432,12 @@ if (import.meta.client) {
                           <Select v-model="pdfSigner" :items="PDF_SIGNERS" placeholder="" :show-icon="false" :searchable="false" />
                         </Field>
                       </div>
-                      <SettingRow data-setting="showSigned">
+                      <SettingRow data-setting="showSigned" :highlighted="hl('showSigned')">
                         <Checkbox :model-value="pdf.showSigned" @update:model-value="setS('pdf.showSigned', $event)">
                           Показывать подписанный PDF в приложении
                         </Checkbox>
                       </SettingRow>
-                      <SettingRow data-setting="mailSigned">
+                      <SettingRow data-setting="mailSigned" :highlighted="hl('mailSigned')">
                         <Checkbox :model-value="pdf.mailSigned" @update:model-value="setS('pdf.mailSigned', $event)">
                           Отправлять подписанный PDF на почту
                         </Checkbox>
@@ -1298,12 +1445,12 @@ if (import.meta.client) {
                     </template>
                   </SettingRow>
                   <FieldSet legend="PDF без подписи">
-                    <SettingRow data-setting="unsignedShow">
+                    <SettingRow data-setting="unsignedShow" :highlighted="hl('unsignedShow')">
                       <Checkbox :model-value="pdf.unsignedShow" @update:model-value="setS('pdf.unsignedShow', $event)">
                         Формировать PDF без подписи и показывать в приложении после экспертизы
                       </Checkbox>
                     </SettingRow>
-                    <SettingRow data-setting="unsignedMail">
+                    <SettingRow data-setting="unsignedMail" :highlighted="hl('unsignedMail')">
                       <Checkbox :model-value="pdf.unsignedMail" @update:model-value="setS('pdf.unsignedMail', $event)">
                         Отправлять PDF без подписи на почту
                       </Checkbox>
@@ -1327,7 +1474,7 @@ if (import.meta.client) {
                     </Field>
                     <FormulaPreview :value="formulaPreview(pdf.fileName, m.variableSamples.value)" />
                   </div>
-                  <SettingRow data-setting="attachExtra">
+                  <SettingRow data-setting="attachExtra" :highlighted="hl('attachExtra')">
                     <Checkbox :model-value="pdf.attachExtra" @update:model-value="setS('pdf.attachExtra', $event)">
                       Прикреплять в конец документа PDF-файлы из дополнительных файлов
                     </Checkbox>
