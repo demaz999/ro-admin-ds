@@ -40,8 +40,8 @@
           },
           "processes": [
             { "id": "p-auto", "title": "Осмотр автомобиля", "alias": "auto_inspection", "repeatable": false, "steps": [
-              { "id": "s-vin-glass", "title": "VIN под стеклом", "kind": "main", "method": "1 фото", "networks": ["LLM Vin"], "hints": 0 },
-              { "id": "s-front", "title": "Передняя часть", "kind": "main", "method": "2–7 фото", "networks": ["CarAngles · Передняя"], "hints": 0 }
+              { "id": "s-vin-glass", "title": "VIN под стеклом", "description": "Сфотографируйте VIN-номер через лобовое стекло, номер должен быть чётко виден", "kind": "main", "method": "1 фото", "networks": ["Распознавание VIN","Распознавание шильдиков"], "hints": 0, "required": true },
+              { "id": "s-front", "title": "Передняя часть", "description": "Снимите переднюю часть автомобиля с расстояния 3–5 метров", "kind": "main", "method": "2–7 фото", "networks": ["Ракурсы авто · Передняя","Оценка повреждений"], "hints": 0, "required": true }
             ] }
           ],
           "showcase": { "status": "draft", "title": "", "summary": "", "priceFrom": null, "industry": "", "spheres": [], "problems": [], "metrics": [], "hiddenModules": [] }
@@ -87,14 +87,14 @@
           },
           "processes": [
             { "id": "p-auto", "title": "Осмотр автомобиля", "alias": "auto_inspection", "repeatable": false, "steps": [
-              { "id": "s-vin-glass", "title": "VIN под стеклом", "kind": "main", "method": "1 фото", "networks": ["LLM Vin"], "hints": 5 },
-              { "id": "s-vin-metal", "title": "VIN на металле", "kind": "main", "method": "1 фото", "networks": ["LLM Vin"], "hints": 0 },
-              { "id": "s-front", "title": "Передняя часть", "kind": "main", "method": "2–7 фото", "networks": ["CarAngles · Передняя"], "hints": 8 },
-              { "id": "s-right", "title": "Вид справа", "kind": "main", "method": "2–7 фото", "networks": ["CarAngles · Правая сторона"], "hints": 0 }
+              { "id": "s-vin-glass", "title": "VIN под стеклом", "description": "Сфотографируйте VIN-номер через лобовое стекло, номер должен быть чётко виден", "kind": "main", "method": "1 фото", "networks": ["Распознавание VIN","Распознавание шильдиков"], "hints": 5, "required": true },
+              { "id": "s-vin-metal", "title": "VIN на металле", "description": "Найдите выбитый VIN на кузове автомобиля: моторный отсек или дверная стойка", "kind": "main", "method": "1 фото", "networks": ["Распознавание VIN"], "hints": 0, "required": true },
+              { "id": "s-front", "title": "Передняя часть", "description": "Снимите переднюю часть автомобиля с расстояния 3–5 метров", "kind": "main", "method": "2–7 фото", "networks": ["Ракурсы авто · Передняя","Оценка повреждений"], "hints": 8, "required": true },
+              { "id": "s-right", "title": "Вид справа", "description": "Боковая съёмка правой стороны автомобиля", "kind": "main", "method": "2–7 фото", "networks": ["Ракурсы авто · Правая сторона"], "hints": 0 }
             ] },
             { "id": "p-docs", "title": "Осмотр документов", "alias": "docs_inspection", "repeatable": false, "steps": [
-              { "id": "s-pts", "title": "Паспорт ТС (ПТС)", "kind": "tech", "method": "2 фото", "networks": ["Document Scanner"], "hints": 0 },
-              { "id": "s-policy", "title": "Страховой полис", "kind": "tech", "method": "1 фото", "networks": [], "hints": 3 }
+              { "id": "s-pts", "title": "Паспорт ТС (ПТС)", "description": "Разворот с основными данными автомобиля", "kind": "tech", "method": "2 фото", "networks": ["Сканер документов"], "hints": 0, "gallery": true, "docScan": true },
+              { "id": "s-policy", "title": "Страховой полис", "description": "Главная страница действующего полиса", "kind": "tech", "method": "1 фото", "networks": [], "hints": 3, "docScan": true }
             ] },
             { "id": "p-damage", "title": "Осмотр повреждений", "alias": "damage_inspection", "repeatable": true, "steps": [] }
           ],
@@ -109,7 +109,7 @@
         ["settings.general.description", "Комплексный осмотр автомобиля перед оформлением полиса добровольного страхования"],
         ["form.groups.1.fields.2.required", true],
         ["form.groups.1.fields.3", { "id": "f-color", "title": "Цвет кузова", "alias": "body_color", "type": "text", "required": false, "webOnly": false, "dependent": false }],
-        ["processes.1.steps", [{ "id": "s-pts", "title": "Паспорт ТС (ПТС)", "kind": "tech", "method": "2 фото", "networks": ["Document Scanner"], "hints": 0 }]]
+        ["processes.1.steps", [{ "id": "s-pts", "title": "Паспорт ТС (ПТС)", "description": "Разворот с основными данными автомобиля", "kind": "tech", "method": "2 фото", "networks": ["Сканер документов"], "hints": 0, "gallery": true, "docScan": true }]]
       ]
     }
   },

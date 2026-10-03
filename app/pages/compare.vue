@@ -1686,6 +1686,21 @@ const textareaVariants = [
         <div class="w-side-panel rounded-xs border border-border-soft">
           <FrameMeta :rows="[{ label: 'Файл', value: 'IMG_3315.jpeg' }, { label: 'Время', value: '10:25:54' }, { label: 'Тип', value: 'Фото' }, { label: 'Распознано', value: 'Ткацкий участок' }]" />
         </div>
+        <!-- Такт 70: TableCellIdentity, слот description — строка шага страницы схемы; мастера нет, наложения нет. -->
+        <div class="w-90" data-compare="table-cell-identity-description">
+          <Table>
+            <TableRow>
+              <TableCell variant="slot" class="h-auto min-w-0 flex-1 items-start px-4 py-3 contain-inline-size">
+                <TableCellIdentity>
+                  VIN под стеклом
+                  <template #description>
+                    Сфотографируйте VIN-номер через лобовое стекло, номер должен быть чётко виден
+                  </template>
+                </TableCellIdentity>
+              </TableCell>
+            </TableRow>
+          </Table>
+        </div>
         <!-- Такт 69, довесок 1: FrameMeta layout="stack" — «Настройки группы» страницы схемы; мастера нет, наложения нет. -->
         <div class="w-group-list p-4">
           <FrameMeta layout="stack" :rows="[{ label: 'Алиас', value: 'Body' }, { label: 'Экран создания', value: '2-й экран' }, { label: 'В мобильном', value: 'После создания' }, { label: 'Редактирование', value: 'Разрешено' }]" />

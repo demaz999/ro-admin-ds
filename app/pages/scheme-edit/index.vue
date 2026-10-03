@@ -7,11 +7,12 @@ import { QUICK_LINKS, type SearchItem } from '~/stands/scheme-edit/search'
 import {
   ACCESS_GROUPS, ACCESS_ROLES, COMMENT_DICTIONARIES, createModel, CREATE_SCREENS, DEADLINE_EVENTS, DETECTOR_GROUPS, DETECTOR_IDS, FIELD_DEFAULTS, FIELD_TYPES,
   FINISH_CLASSES, GROUP_DEFAULTS, HINT_CONFIGS, MOBILE_SHOW, OWNERS, PDF_PROGRAMS, PDF_SIGNERS, PDF_WHEN, PHOTO_RESOLUTIONS, REGION_MATRICES, ROLE_LADDER,
-  ROLES, SCHEME_TYPES, SECTION_ANCHORS, SECTIONS, STATUS_DICTIONARIES, suggestAlias, TABS, VIDEO_RESOLUTIONS,
+  ROLES, SCHEME_TYPES, SECTION_ANCHORS, SECTIONS, STATUS_DICTIONARIES, STEP_FLAGS, STEP_KINDS, STEP_METHODS, suggestAlias, TABS, VIDEO_RESOLUTIONS,
   type BehaviorSettings, type Dataset, type FieldDraft, type FormulaSettings, type GroupDraft, type PdfTemplate, type PdfTemplateDraft, type SaveState,
   type SectionId, type TabId,
 } from '~/stands/scheme-edit/model'
 import demo from '~/stands/scheme-edit/demo-data.json'
+import { useReorder } from '~/stands/scheme-edit/reorder'
 
 /**
  * Страница «Редактирование схемы осмотра» (VA-16377) — стенд, такты 61–65, порции П1–П5 (`docs/scheme-edit.md`,
@@ -48,7 +49,13 @@ import demo from '~/stands/scheme-edit/demo-data.json'
  * группы парами `FrameMeta layout="stack"` (довесок 1), «Добавить группу»; панель полей — заголовок группы со счётом, «Добавить поле», «Вставить из
  * другой схемы» (заглушка), «Заполнить алиасы автоматически»; поля — `Table` с выбором строк, признаком «зависимое» и
  * действиями строки; массовые действия — `ActionBar layout="panel"`; сайды поля (четыре секции) и группы — `ModalCard edge`.
- * Табы «Процессы и шаги», «Витрина» — порциями П7–П8: на их месте `Empty`.
+ * **П7, часть 1 (такт 70).** Таб «Процессы и шаги» (№ 43–47, 61): действия таба, панель массовых действий
+ * `ActionBar layout="panel"` — флаги в трёх состояниях (`Checkbox`), способ съёмки, нейросети (заглушка), удаление; карточки
+ * процессов — `Card` с шапкой и `Table` шагов: ручка перестановки, выбор, номер, название с описанием и типом шага
+ * (`Chip` со списком), способ, нейросети (`Chip neutral`), фото-подсказка с инлайн-загрузкой (`Badge`, `ButtonAction`,
+ * `FileUpload`), действия строки. Ручка перестановки — и у таблицы полей «Формы» (`~/stands/scheme-edit/reorder.ts`).
+ * Сайды процесса и шага, оверлей повторяемого — такт 71: кнопки дают уведомление-заглушку. Таб «Витрина» — порция П8:
+ * на его месте `Empty`.
  *
  * ## Поведение — модель `~/stands/scheme-edit/model.ts`
  *
@@ -83,6 +90,8 @@ import demo from '~/stands/scheme-edit/demo-data.json'
  * | `?selected=f-vin,f-plate` | таб «Форма»: выделенные поля и панель массовых действий |
  * | `?open=field` · `new-field` | сайд поля: `?field=f-trim` — это поле, без него — первое поле группы; `new-field` — новое поле |
  * | `?open=group` · `new-group` | сайд группы: выбранная группа либо новая |
+ * | `?steps=s-vin-glass,s-vin-metal` | таб «Процессы и шаги»: выделенные шаги и панель массовых действий (такт 70) |
+ * | `?upload=s-vin-metal` | таб «Процессы и шаги»: инлайн-загрузчик фото-подсказки шага раскрыт (такт 70) |
  */
 definePageMeta({ layout: 'admin' })
 useHead({ title: 'Редактирование схемы осмотра — стенд' })
@@ -93,7 +102,7 @@ const q = (k: string) => String(route.query[k] ?? '')
 const D = demo as unknown as Record<'main' | 'fresh', Dataset>
 /** Окна и выделение «Формы» открывают таб «Форма» (такт 69). */
 const FORM_OPEN = ['field', 'new-field', 'group', 'new-group']
-const tabAtLoad = FORM_OPEN.includes(q('open')) || q('selected') ? 'form' : TABS.find(t => t.id === q('tab'))?.id
+const tabAtLoad = FORM_OPEN.includes(q('open')) || q('selected') ? 'form' : q('steps') || q('upload') ? 'processes' : TABS.find(t => t.id === q('tab'))?.id
 const saveAtLoad = (['saving', 'error'] as SaveState[]).find(s => s === q('save'))
 const m = createModel(q('data') === 'new' ? D.fresh : D.main, {
   tab: tabAtLoad,
@@ -104,6 +113,7 @@ const m = createModel(q('data') === 'new' ? D.fresh : D.main, {
   now: q('now') ? () => q('now') : undefined,
   group: q('group'),
   selectedFields: q('selected') ? q('selected').split(',') : [],
+  selectedSteps: q('steps') ? q('steps').split(',') : [],
 })
 const sectionAtLoad = SECTIONS.find(s => s.id === q('section'))?.id
 if (sectionAtLoad) m.setSection(sectionAtLoad)
@@ -407,6 +417,9 @@ function findTarget(target: string): HTMLElement | null {
   /* Поле формы (такт 69): строка таблицы полей; фокус встаёт на её флажок выбора. */
   const row = target.match(/^row-(.+)$/)
   if (row) return document.querySelector(`[data-form-row="${row[1]}"]`)
+  /* Шаг процесса (такт 70): строка таблицы шагов; фокус встаёт на её флажок выбора. */
+  const step = target.match(/^step-(.+)$/)
+  if (step) return document.querySelector(`[data-step-row="${step[1]}"]`)
   return document.querySelector(`[data-setting="${target}"], [data-field="${target}"], [data-radio="${target}"], [data-formula="${target}"], [data-act="${target}"]`)
 }
 /**
@@ -426,7 +439,9 @@ watch(() => m.ui.found.n, async (n) => {
   window.scrollTo({ top: Math.max(0, top), behavior: 'instant' })
   flashed.value = { target, n }
   /* В просмотре версии (такт 68) поле — «только чтение»: фокус встаёт и на нём — значение читается и выделяется. */
-  if (!el.matches('[data-setting]')) el.querySelector<HTMLElement>('input, textarea, button, [contenteditable=true], [tabindex="0"]')?.focus({ preventScroll: true })
+  /* У строки таблицы (поле, шаг) первая кнопка — ручка перестановки (такт 70): фокус встаёт на флажок выбора строки. */
+  const row = el.matches('[data-form-row], [data-step-row]') ? el.querySelector<HTMLElement>('[data-slot=choice-control]') : null
+  if (!el.matches('[data-setting]')) (row ?? el.querySelector<HTMLElement>('input, textarea, button, [contenteditable=true], [tabindex="0"]'))?.focus({ preventScroll: true })
 })
 if (q('q')) m.setQuery(q('q'))
 onMounted(() => {
@@ -548,11 +563,42 @@ if (q('open') === 'new-field') openField('')
 if (q('open') === 'group') openGroup(fg.value?.id ?? '')
 if (q('open') === 'new-group') openGroup('')
 
-/** Содержимое, которое соберут следующие порции, — план `scheme-edit.md`, раздел 10. */
-const PENDING: Record<'processes' | 'showcase', { title: string, description: string }> = {
-  processes: { title: '«Процессы и шаги» — порция П7', description: 'Процессы, таблицы шагов, массовые действия, сайды и оверлей' },
-  showcase: { title: '«Витрина» — порция П8', description: 'Статус карточки, витринная карточка, «Зачем нужен осмотр», «Из схемы»' },
+/* ------------------------------ перестановка строк — такт 70, решение 3 оркестратора ------------------------------ */
+/** Один механизм на обе таблицы: список `fields:<группа>` либо `steps:<процесс>`; номер «№» идёт за порядком. */
+const reorder = useReorder((list, id, to) => {
+  const [kind, owner] = list.split(':') as [string, string]
+  return kind === 'steps' ? m.moveStep(owner, id, to) : m.moveField(owner, id, to)
+})
+const fieldRows = computed(() => (fg.value ? reorder.ordered(`fields:${fg.value.id}`, fg.value.fields) : []))
+
+/* ------------------------------ «Процессы и шаги» — П7, такт 70 ------------------------------ */
+const stepsCount = computed(() => m.selectedSteps.value.length)
+const stepsText = computed(() => `Выбрано: ${stepsCount.value} ${plural(stepsCount.value, 'шаг', 'шага', 'шагов')}`)
+const stepsWord = (n: number) => `${n} ${plural(n, 'шаг', 'шага', 'шагов')}`
+const STEP_ACTIONS: TableRowActionItem[] = [{ key: 'delete', label: 'Удалить', icon: 'delete', destructive: true }]
+const STEP_ACTIONS_COLUMN = tableRowActionsColumn(STEP_ACTIONS)
+const kindLabel = (k: string) => STEP_KINDS.find(x => x.value === k)?.label ?? k
+/** Тип шага в строке — атрибут правится по месту (аудит, «Принцип: атрибут — инлайн по месту»): список у метки типа. */
+const kindOpen = ref('')
+function pickKind(processId: string, stepId: string, kind: string) {
+  kindOpen.value = ''
+  m.setStepKind(processId, stepId, kind)
 }
+/** Инлайн-загрузчик фото-подсказки — раскрыт у одного шага; оснастка `?upload=`. */
+const uploadOpen = ref(q('upload'))
+function toggleUpload(id: string) { uploadOpen.value = uploadOpen.value === id ? '' : id }
+/** Загрузка применяется сразу: на стенде нажатие на зону — один файл, перетаскивание — столько, сколько файлов. */
+function upload(processId: string, stepId: string, count = 1) {
+  m.uploadHints(processId, stepId, count)
+  uploadOpen.value = ''
+}
+function dropFiles(event: DragEvent, processId: string, stepId: string) {
+  upload(processId, stepId, event.dataTransfer?.files.length || 1)
+}
+const hintText = (n: number) => (n ? `${n} · Все установлены` : 'Не установлена')
+
+/** Содержимое, которое соберёт следующая порция, — план `scheme-edit.md`, раздел 10. */
+const PENDING = { title: '«Витрина» — порция П8', description: 'Статус карточки, витринная карточка, «Зачем нужен осмотр», «Из схемы»' }
 
 if (import.meta.client) {
   /* Прогону — состояние модели для сравнения «до / после»; оснастка приёмки. */
@@ -1712,9 +1758,10 @@ if (import.meta.client) {
                 </Button>
               </ActionBar>
 
-              <Table v-if="fg.fields.length" data-fields-table>
+              <Table v-if="fg.fields.length" data-fields-table :data-reorder-list="`fields:${fg.id}`">
                 <TableRow>
-                  <TableHead variant="column" class="w-14 justify-center px-4" aria-label="Выбор полей группы">
+                  <TableHead variant="column" class="w-10 pl-4" aria-label="Порядок полей" />
+                  <TableHead variant="column" class="w-10 justify-center px-2" aria-label="Выбор полей группы">
                     <Checkbox
                       :readonly="ro"
                       :model-value="m.selectionState.value === 'all'"
@@ -1723,7 +1770,7 @@ if (import.meta.client) {
                       @update:model-value="m.toggleAllFields()"
                     />
                   </TableHead>
-                  <TableHead variant="column" class="w-12 px-2">
+                  <TableHead variant="column" class="w-10 px-2">
                     №
                   </TableHead>
                   <TableHead variant="column" class="min-w-0 flex-1 px-4">
@@ -1738,15 +1785,31 @@ if (import.meta.client) {
                   <TableHead variant="column" aria-label="Действия" :class="['justify-end px-4', FIELD_ACTIONS_COLUMN]" />
                 </TableRow>
                 <TableRow
-                  v-for="(f, k) in fg.fields"
+                  v-for="(f, k) in fieldRows"
                   :key="f.id"
                   :state="m.ui.selectedFields.includes(f.id) ? 'selected' : 'default'"
                   :data-form-row="f.id"
+                  :data-reorder-id="f.id"
+                  :data-dragging="reorder.drag.value?.id === f.id || undefined"
                 >
-                  <TableCell variant="slot" class="w-14 justify-center px-4">
+                  <!-- Ручка перестановки — такт 70 (макет `32765:5659`): протяжка мышью, Alt+↑ и Alt+↓ с клавиатуры. -->
+                  <TableCell variant="slot" class="w-10 pl-4">
+                    <IconButton
+                      :inert="ro"
+                      variant="service"
+                      size="sm"
+                      :label="`Переставить поле «${f.title}»`"
+                      :data-reorder-handle="f.id"
+                      @pointerdown="reorder.start($event, `fields:${fg.id}`, f.id, fg.fields.map(x => x.id))"
+                      @keydown="reorder.key($event, `fields:${fg.id}`, f.id, fg.fields.map(x => x.id))"
+                    >
+                      <Icon name="drag" :size="12" />
+                    </IconButton>
+                  </TableCell>
+                  <TableCell variant="slot" class="w-10 justify-center px-2">
                     <Checkbox :readonly="ro" :model-value="m.ui.selectedFields.includes(f.id)" :aria-label="f.title" @update:model-value="m.toggleField(f.id)" />
                   </TableCell>
-                  <TableCell class="w-12 px-2">
+                  <TableCell class="w-10 px-2" data-row-number>
                     {{ k + 1 }}
                   </TableCell>
                   <!--
@@ -1790,9 +1853,259 @@ if (import.meta.client) {
         </div>
       </TabsContent>
 
-      <TabsContent v-for="t in TABS.slice(2)" :key="t.id" :value="t.id">
+      <!-- ============================ «Процессы и шаги» — № 43–47, 61: процессы карточками с таблицей шагов (r2 §6; макет `32765:6552`) ============================ -->
+      <TabsContent value="processes">
+        <!-- Просмотр прошлой версии (решение 4 такта 70, правило строк 108 и 125): флажки — «только чтение», действия — под `inert`. -->
+        <div class="flex flex-col gap-3 pt-6" data-processes :data-readonly="ro || undefined">
+          <!-- Действия таба — № 43 (`32765:6553`): «Заполнить изображения» — заглушка (r2 §9), «Вставить шаг из другой схемы» — № 70. -->
+          <div :inert="ro" class="flex flex-wrap items-center gap-3" data-processes-actions>
+            <Button variant="outline" show-icon data-act="process-add" @click="m.processStub('add')">
+              <template #icon>
+                <Icon name="add" :size="16" />
+              </template>
+              Добавить процесс
+            </Button>
+            <Button variant="outline" show-icon data-act="step-paste" @click="m.pasteStep()">
+              <template #icon>
+                <Icon name="copy" :size="16" />
+              </template>
+              Вставить шаг из другой схемы
+            </Button>
+            <Button variant="outline" show-icon class="ml-auto" data-act="fill-images" @click="m.fillImages()">
+              <template #icon>
+                <Icon name="auto-fix" :size="16" />
+              </template>
+              Заполнить изображения
+            </Button>
+          </div>
+
+          <!--
+            Панель массовых действий — № 44 (`32765:6576`): выделение идёт сквозь процессы. Флаги — флажки трёх состояний:
+            «все» — у всех выбранных, «−» — у части; нажатие из «все» снимает, иначе ставит всем. «Фото» — способ съёмки
+            выбранных (строка 128). Действие — уведомление «Применено к N шагам» с «Отменить» (№ 61).
+          -->
+          <ActionBar layout="panel" :open="stepsCount > 0" :count="stepsText" :inert="ro" data-steps-bar>
+            <div class="flex w-full min-w-0 flex-col gap-3">
+              <Field label="Флаги" orientation="left" :control-height="20" data-steps-flags>
+                <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
+                  <Checkbox
+                    v-for="f in STEP_FLAGS"
+                    :key="f.key"
+                    :model-value="m.flagState(f.key) === 'all'"
+                    :indeterminate="m.flagState(f.key) === 'some'"
+                    :data-flag="f.key"
+                    @update:model-value="m.bulkFlag(f.key)"
+                  >
+                    {{ f.label }}
+                  </Checkbox>
+                </div>
+              </Field>
+              <div class="flex flex-wrap items-center gap-2">
+                <Field label="Фото" orientation="left" :control-height="40" data-field="bulkMethod">
+                  <div class="w-50">
+                    <Select :model-value="''" :items="STEP_METHODS" placeholder="Способ съёмки" :show-icon="false" :searchable="false" @update:model-value="m.bulkMethod(String($event))" />
+                  </div>
+                </Field>
+                <Button variant="secondary" data-act="bulk-networks" @click="m.processStub('networks')">
+                  Настроить нейросети
+                </Button>
+                <Button variant="outline" data-act="steps-clear" @click="m.clearStepSelection()">
+                  Снять выделение
+                </Button>
+                <Button variant="destructive" class="ml-auto" data-act="steps-delete" @click="m.bulkDeleteSteps()">
+                  Удалить выбранные
+                </Button>
+              </div>
+            </div>
+          </ActionBar>
+
+          <!-- Карточка процесса — № 45 (`32765:6623`, `32765:6922`, `32765:7066`): шапка и таблица шагов. -->
+          <Card v-for="p in m.processes.value" :key="p.id" class="flex flex-col gap-4" :data-process="p.id">
+            <div class="flex flex-wrap items-center gap-3">
+              <div class="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+                <Heading data-process-title>
+                  {{ p.title }}
+                  <template #meta>
+                    {{ stepsWord(p.steps.length) }}
+                  </template>
+                </Heading>
+                <Chip variant="neutral" data-process-alias>
+                  {{ p.alias }}
+                </Chip>
+                <Badge v-if="p.repeatable" variant="success" data-badge="repeatable">
+                  Повторяемый
+                </Badge>
+              </div>
+              <div class="flex shrink-0 items-center gap-3">
+                <!-- «Открыть процесс» — полноэкранный оверлей повторяемого (№ 64, такт 71); чтение, поэтому и в просмотре версии. -->
+                <Button v-if="p.repeatable" variant="outline" show-icon data-act="process-open" @click="m.processStub('open')">
+                  <template #icon>
+                    <Icon name="article" :size="16" />
+                  </template>
+                  Открыть процесс
+                </Button>
+                <div :inert="ro" class="flex items-center gap-3">
+                  <Button variant="outline" show-icon data-act="process-edit" @click="m.processStub('edit')">
+                    <template #icon>
+                      <Icon name="edit" :size="16" />
+                    </template>
+                    Изменить процесс
+                  </Button>
+                  <IconButton variant="ghost" size="lg" :label="`Удалить процесс «${p.title}»`" data-act="process-delete" @click="m.removeProcess(p.id)">
+                    <Icon name="delete" :size="20" />
+                  </IconButton>
+                </div>
+              </div>
+            </div>
+
+            <!--
+              Таблица шагов — № 46 (`32765:6642`, `32765:6652`): ручка, выбор, номер, название с описанием и типом шага, способ,
+              нейросети, фото-подсказка, действия. Строку растит ячейка названия; соседние стоят у первой линии (ось `start`).
+            -->
+            <Table v-if="p.steps.length" :data-steps-table="p.id" :data-reorder-list="`steps:${p.id}`">
+              <TableRow>
+                <TableHead variant="column" class="w-10 pl-4" aria-label="Порядок шагов" />
+                <TableHead variant="column" class="w-10 justify-center px-2" aria-label="Выбор шагов процесса">
+                  <Checkbox
+                    :readonly="ro"
+                    :model-value="m.processSelection(p.id) === 'all'"
+                    :indeterminate="m.processSelection(p.id) === 'some'"
+                    :data-steps-all="p.id"
+                    @update:model-value="m.toggleProcessSteps(p.id)"
+                  />
+                </TableHead>
+                <TableHead variant="column" class="w-10 px-2">
+                  №
+                </TableHead>
+                <TableHead variant="column" class="min-w-0 flex-1 px-4">
+                  Название · тип шага
+                </TableHead>
+                <TableHead variant="column" class="w-28 px-4">
+                  Способ
+                </TableHead>
+                <TableHead variant="column" class="w-44 px-4">
+                  Нейросети
+                </TableHead>
+                <TableHead variant="column" class="w-44 px-4">
+                  Фото-подсказка
+                </TableHead>
+                <TableHead variant="column" aria-label="Действия" :class="['justify-end px-4', STEP_ACTIONS_COLUMN]" />
+              </TableRow>
+              <TableRow
+                v-for="(st, k) in reorder.ordered(`steps:${p.id}`, p.steps)"
+                :key="st.id"
+                :state="m.ui.selectedSteps.includes(st.id) ? 'selected' : 'default'"
+                :data-step-row="st.id"
+                :data-reorder-id="st.id"
+                :data-dragging="reorder.drag.value?.id === st.id || undefined"
+              >
+                <!-- Ручка перестановки — решение 3 оркестратора (макет `32765:6653`): протяжка мышью, Alt+↑ и Alt+↓ с клавиатуры. -->
+                <TableCell variant="slot" align="start" class="w-10 pl-4">
+                  <IconButton
+                    :inert="ro"
+                    variant="service"
+                    size="sm"
+                    :label="`Переставить шаг «${st.title}»`"
+                    :data-reorder-handle="st.id"
+                    @pointerdown="reorder.start($event, `steps:${p.id}`, st.id, p.steps.map(x => x.id))"
+                    @keydown="reorder.key($event, `steps:${p.id}`, st.id, p.steps.map(x => x.id))"
+                  >
+                    <Icon name="drag" :size="12" />
+                  </IconButton>
+                </TableCell>
+                <TableCell variant="slot" align="start" class="w-10 justify-center px-2">
+                  <Checkbox :readonly="ro" :model-value="m.ui.selectedSteps.includes(st.id)" :aria-label="st.title" @update:model-value="m.toggleStep(st.id)" />
+                </TableCell>
+                <TableCell align="start" class="w-10 px-2" data-row-number>
+                  {{ k + 1 }}
+                </TableCell>
+                <!--
+                  Название, описание, тип шага списком у метки и флаги метками — ячейка растит строку. Колонка тянется, а таблица
+                  стоит на `min-w-max`: `contain-inline-size` не даёт длинному описанию растянуть строку за карточку.
+                -->
+                <TableCell variant="slot" class="h-auto min-w-0 flex-1 flex-col items-start gap-2 px-4 pt-4.5 pb-3 contain-inline-size" data-step-name>
+                  <TableCellIdentity class="w-full flex-none">
+                    {{ st.title }}
+                    <template v-if="st.description" #description>
+                      {{ st.description }}
+                    </template>
+                  </TableCellIdentity>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <Popover :open="kindOpen === st.id" @update:open="kindOpen = $event ? st.id : ''">
+                      <PopoverTrigger as="span" as-child>
+                        <Chip trailing="expand" :expanded="kindOpen === st.id" :inert="ro" data-step-kind>
+                          {{ kindLabel(st.kind) }}
+                        </Chip>
+                      </PopoverTrigger>
+                      <PopoverContent :data-kind-menu="st.id" align="start" :side-offset="4" class="p-1">
+                        <SelectItem v-for="x in STEP_KINDS" :key="x.value" :selected="x.value === st.kind" :data-kind="x.value" @click="pickKind(p.id, st.id, x.value)">
+                          {{ x.label }}
+                        </SelectItem>
+                      </PopoverContent>
+                    </Popover>
+                    <template v-for="f in STEP_FLAGS" :key="f.key">
+                      <Badge v-if="st[f.key]" size="sm" :variant="f.key === 'required' ? 'default' : 'neutral'" :data-badge="f.key">
+                        {{ f.label }}
+                      </Badge>
+                    </template>
+                  </div>
+                </TableCell>
+                <TableCell align="start" class="w-28 px-4" data-step-method>
+                  {{ st.method }}
+                </TableCell>
+                <!-- Нейросети строками 13/16 (макет `32765:6684`): длинное имя обрезается с подсказкой; настройка — сайд шага, такт 71. -->
+                <TableCell variant="slot" class="h-auto w-44 flex-col items-start gap-1 px-4 pt-4.5 pb-3" data-step-networks>
+                  <TableCellText v-for="n in st.networks" :key="n" size="sm" class="w-full">
+                    {{ n }}
+                  </TableCellText>
+                  <ToolbarText v-if="!st.networks.length" data-networks-empty>
+                    Нейросети не выбраны
+                  </ToolbarText>
+                  <div :inert="ro" class="flex pt-1">
+                    <ButtonAction size="sm" :show-icon="false" data-act="step-networks" @click="m.processStub('networks')">
+                      Настроить нейросети
+                    </ButtonAction>
+                  </div>
+                </TableCell>
+                <!-- Фото-подсказка — № 47 (`32765:6709`, `32765:6773`): статус на месте, загрузка инлайн в ячейке, без «Сохранить». -->
+                <TableCell variant="slot" class="h-auto w-44 flex-col items-start gap-2 px-4 pt-4 pb-3" :data-step-hints="st.hints">
+                  <Badge :variant="st.hints ? 'success' : 'warning'" data-hint-status>
+                    {{ hintText(st.hints) }}
+                  </Badge>
+                  <div :inert="ro" class="flex w-full flex-col items-start gap-2">
+                    <ButtonAction size="sm" :show-icon="false" :data-act="st.hints ? 'hint-edit' : 'hint-upload'" @click="toggleUpload(st.id)">
+                      {{ uploadOpen === st.id ? 'Свернуть' : st.hints ? 'Редактировать' : 'Загрузить' }}
+                    </ButtonAction>
+                    <button
+                      v-if="uploadOpen === st.id"
+                      type="button"
+                      class="w-full"
+                      :data-upload-zone="st.id"
+                      @click="upload(p.id, st.id)"
+                      @dragover.prevent
+                      @drop.prevent="dropFiles($event, p.id, st.id)"
+                    >
+                      <FileUpload>
+                        {{ st.hints ? 'Добавить подсказку' : 'Загрузить подсказку' }}
+                        <template #hint>
+                          или перетащите файл сюда
+                        </template>
+                      </FileUpload>
+                    </button>
+                  </div>
+                </TableCell>
+                <TableCell variant="slot" align="start" :class="['justify-end px-4', STEP_ACTIONS_COLUMN]">
+                  <TableRowActions :inert="ro" :actions="STEP_ACTIONS" @edit="m.processStub('step')" @action="m.removeStep(p.id, st.id)" />
+                </TableCell>
+              </TableRow>
+            </Table>
+          </Card>
+        </div>
+      </TabsContent>
+
+      <TabsContent value="showcase">
         <div class="flex flex-col pt-6">
-          <Empty :title="PENDING[t.id as 'processes' | 'showcase'].title" :description="PENDING[t.id as 'processes' | 'showcase'].description" />
+          <Empty :title="PENDING.title" :description="PENDING.description" />
         </div>
       </TabsContent>
     </Tabs>

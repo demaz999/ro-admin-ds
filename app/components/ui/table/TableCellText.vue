@@ -47,6 +47,12 @@ const props = withDefaults(defineProps<{
   /** Класс снаружи — слиянием: кегль и ширину задаёт колонка. */
   class?: string
   /**
+   * Кегль строки — такт 70. `inherit` (по умолчанию) — кегль ячейки, как раньше; `sm` — 13/16 (`text-xs`): строки
+   * списка внутри ячейки-композиции, где ячейка кегля не задаёт (нейросети шага страницы схемы, Figma `32765:6684` —
+   * 12/16, в шкале кита 13). Решение агента, строка 127 реестра расхождений `docs/scheme-edit.md`.
+   */
+  size?: 'inherit' | 'sm'
+  /**
    * Подсказка открыта сразу. **Оснастка приёмки:** headless-браузер снимает
    * страницу без курсора, а показать плашку надо. В продукт не идёт.
    */
@@ -57,6 +63,7 @@ const props = withDefaults(defineProps<{
   copy: true,
   class: undefined,
   defaultOpen: false,
+  size: 'inherit',
 })
 
 const el = ref<HTMLElement | null>(null)
@@ -111,7 +118,7 @@ function copyText() {
           ref="el"
           data-slot="table-cell-text"
           :data-clipped="clipped ? '' : undefined"
-          :class="cn('min-w-0', clampClass, props.class)"
+          :class="cn('min-w-0', clampClass, props.size === 'sm' ? 'text-xs' : '', props.class)"
         >
           <slot />
         </span>

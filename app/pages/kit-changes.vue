@@ -122,6 +122,15 @@ const ro = ref({ name: 'КАСКО — осмотр', text: 'Осмотр авт
             </Input>
             <span class="text-xs text-muted-foreground">пустое поле — слот; значение — крестик на месте слота</span>
           </template>
+          <template v-else-if="c.id === 'icon-drag'">
+            <span class="flex items-center gap-4 text-xs">
+              <Icon name="drag" :size="12" />
+              <Icon name="drag" :size="16" />
+              <Icon name="drag" :size="24" />
+              <code>drag</code>
+            </span>
+            <span class="text-xs text-muted-foreground">12 — ручка строки таблицы (IconButton service sm), 16 и 24 — для сравнения</span>
+          </template>
           <template v-else-if="c.id === 'icon-arrow-back'">
             <span class="flex items-center gap-2 text-xs">
               <Icon name="arrow-back" :size="24" />

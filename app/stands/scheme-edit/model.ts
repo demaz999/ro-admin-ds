@@ -1,5 +1,5 @@
 import { computed, reactive } from 'vue'
-import { ALIAS_RE, DETECTOR_IDS, DETECTORS_ON, FIELD_SAMPLES, FINISH_CLASSES, suggestAlias, SYSTEM_VARIABLES } from './catalogs'
+import { ALIAS_RE, DETECTOR_IDS, DETECTORS_ON, FIELD_SAMPLES, FINISH_CLASSES, suggestAlias, SYSTEM_VARIABLES, type StepFlag } from './catalogs'
 import { diffConfigs, formatDate, plural, summarize, validateConfig } from './diff'
 import { QUICK_LINKS, searchSettings, type SearchItem } from './search'
 
@@ -36,7 +36,11 @@ export * from './catalogs'
  * индекс и словарь синонимов — `search.ts`. **П6 (такт 69):** таб «Форма» — выбор группы (`selectGroup`), сайд поля
  * (`saveField`, четыре секции, «зависимое» — `dependsOn`) и сайд группы (`saveGroup`), удаление поля и группы с отменой,
  * массовый выбор и действия (`toggleField`, `toggleAllFields`, `bulkFields`), «Заполнить алиасы автоматически» — только
- * пустые (`fillAliases`), «Вставить из другой схемы» — заглушка; поля формы входят в поиск. Дифф, валидация,
+ * пустые (`fillAliases`), «Вставить из другой схемы» — заглушка; поля формы входят в поиск. **П7, часть 1 (такт 70):**
+ * таб «Процессы и шаги» — массовый выбор шагов сквозь процессы (`toggleStep`, `toggleProcessSteps`), флаги в трёх
+ * состояниях (`flagState`, `bulkFlag`), способ съёмки и удаление выделенных, тип шага в строке, инлайн-загрузка
+ * фото-подсказок (`uploadHints`), удаление шага и процесса с отменой, перестановка шагов и полей (`moveStep`,
+ * `moveField`); сайды процесса и шага — заглушки до такта 71; шаги входят в поиск. Дифф, валидация,
  * поиск, публикация, сброс черновика, просмотр снимка, операции формы, процессов и витрины — по своим порциям
  * (`scheme-edit.md`, раздел 10).
  */
@@ -258,7 +262,24 @@ export const GROUP_DEFAULTS: Pick<FormGroup, 'createScreen' | 'mobile' | 'editab
 /** Черновик сайда поля и сайда группы: `id` пуст у новой сущности; порядковый номер поля — `order`. */
 export type FieldDraft = FormField & { order: number }
 export type GroupDraft = Omit<FormGroup, 'fields'>
-export interface ProcessStep { id: string, title: string, kind: string, method: string, networks: string[], hints: number }
+/**
+ * Шаг процесса — строка таблицы шагов макета `32765:6652` (такт 70): название, описание, тип шага, способ съёмки,
+ * нейросети, число фото-подсказок; флаги — строка «Флаги» панели массовых действий `32765:6585`. Набор данных хранит
+ * только отличия от `STEP_DEFAULTS`.
+ */
+export interface ProcessStep extends Record<StepFlag, boolean> {
+  id: string
+  title: string
+  description: string
+  kind: string
+  method: string
+  networks: string[]
+  /** Фото-подсказок загружено: 0 — «Не установлена». */
+  hints: number
+}
+export const STEP_DEFAULTS: Omit<ProcessStep, 'id' | 'title' | 'kind' | 'method' | 'networks' | 'hints'> = {
+  description: '', required: false, hidden: false, gallery: false, web: false, noConfidential: false, docScan: false,
+}
 export interface Process { id: string, title: string, alias: string, repeatable: boolean, steps: ProcessStep[] }
 export interface Showcase {
   /** Жизненный цикл карточки — аудит, «Структура таба»: требует украшения → черновик → опубликована. */
@@ -319,6 +340,8 @@ export interface ModelOptions {
   /** Выбранная группа «Формы» и выделенные поля — оснастка `?group=`, `?selected=` (такт 69). */
   group?: string
   selectedFields?: string[]
+  /** Выделенные шаги «Процессов и шагов» — оснастка `?steps=` (такт 70). */
+  selectedSteps?: string[]
 }
 
 /** Сколько длится запись черновика на стенде. */
@@ -343,6 +366,8 @@ function withFormDefaults(config: SchemeConfig): SchemeConfig {
       return { ...x, dependent: !!x.dependsOn || x.dependent }
     }),
   }))
+  /* Шаги процессов (такт 70): недостающие атрибуты и флаги — из значений по умолчанию. */
+  config.processes = config.processes.map(p => ({ ...p, steps: p.steps.map(st => ({ ...STEP_DEFAULTS, ...st })) }))
   return config
 }
 
@@ -407,7 +432,7 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     /** Выбранная группа таба «Форма» — такт 69; пусто — первая группа. */
     group: (opts.group ?? '') as string,
     selectedFields: [...(opts.selectedFields ?? [])] as string[],
-    selectedSteps: [] as string[],
+    selectedSteps: [...(opts.selectedSteps ?? [])] as string[],
     query: '',
     /** Плашка «Сохранение теперь автоматическое» закрыта — СС-56. */
     hintClosed: false,
@@ -766,10 +791,147 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     ui.selectedFields.splice(0)
     notify(`Группа «${gone.title}» удалена`, 'ok', true, () => { writeGroups(before); ui.group = id })
   }
+  /**
+   * Перестановка поля в группе — ручка строки таблицы полей (такт 70, решение 3 оркестратора): поле встаёт на место `to`
+   * (с нуля), номер «№» и «Порядковый номер» сайда идут за порядком; запись — автосохранением.
+   */
+  function moveField(groupId: string, fieldId: string, to: number): boolean {
+    const groups = groupsCopy()
+    const g = groups.find(x => x.id === groupId)
+    const k = g?.fields.findIndex(x => x.id === fieldId) ?? -1
+    if (!g || k < 0) return false
+    const at = Math.min(Math.max(0, to), g.fields.length - 1)
+    if (at === k) return false
+    g.fields.splice(at, 0, g.fields.splice(k, 1)[0]!)
+    return writeGroups(groups)
+  }
+
+  /* ------------------------------ «Процессы и шаги» — П7, такт 70 ------------------------------ */
+  /**
+   * Таб «Процессы и шаги» — r2 §6: процессы карточками с таблицей шагов. Полотно пишет в черновик сразу
+   * (`set('processes')` — тот же отказ в просмотре версии). Массовые действия и удаление — с «Отменить» в уведомлении
+   * (аудит, «Отмена при автосейве»); фото-подсказка — инлайн-загрузкой в строке (аудит, «Принцип: атрибут — инлайн по
+   * месту»). Сайды процесса и шага — такт 71: до него кнопки дают уведомление-заглушку (решение 2 оркестратора).
+   */
+  const processes = computed(() => shown.value.processes)
+  const processesCopy = () => clone(draft.config.processes)
+  const writeProcesses = (list: Process[]) => set('processes', list)
+  const stepsWord = (n: number) => plural(n, 'шаг', 'шага', 'шагов')
+  const stepsDative = (n: number) => plural(n, 'шагу', 'шагам', 'шагам')
+  const allSteps = computed(() => processes.value.flatMap(p => p.steps))
+  /** Выделенные шаги, которые есть в конфигурации на экране, — выделение идёт сквозь процессы. */
+  const selectedSteps = computed(() => allSteps.value.filter(st => ui.selectedSteps.includes(st.id)))
+
+  function toggleStep(id: string) {
+    const k = ui.selectedSteps.indexOf(id)
+    if (k >= 0) ui.selectedSteps.splice(k, 1)
+    else ui.selectedSteps.push(id)
+  }
+  /** Флажок шапки таблицы процесса — три состояния по шагам этого процесса. */
+  function processSelection(processId: string): 'all' | 'some' | 'none' {
+    const ids = processes.value.find(p => p.id === processId)?.steps.map(st => st.id) ?? []
+    const n = ids.filter(id => ui.selectedSteps.includes(id)).length
+    return n === 0 ? 'none' : n === ids.length ? 'all' : 'some'
+  }
+  /** Из «все» — снять шаги процесса, иначе — выбрать все; выделение других процессов не трогается. */
+  function toggleProcessSteps(processId: string) {
+    const ids = processes.value.find(p => p.id === processId)?.steps.map(st => st.id) ?? []
+    const rest = ui.selectedSteps.filter(id => !ids.includes(id))
+    ui.selectedSteps = processSelection(processId) === 'all' ? rest : [...rest, ...ids]
+  }
+  function clearStepSelection() { ui.selectedSteps.splice(0) }
+  /** Флаг у выделенных шагов: все, часть, ни одного — флажок трёх состояний панели. */
+  function flagState(flag: StepFlag): 'all' | 'some' | 'none' {
+    const list = selectedSteps.value
+    const n = list.filter(st => st[flag]).length
+    return n === 0 ? 'none' : n === list.length ? 'all' : 'some'
+  }
+  /** Правка выделенных шагов одной записью; уведомление «Применено к N шагам» с «Отменить». */
+  function bulkSteps(change: (st: ProcessStep) => void): boolean {
+    const ids = selectedSteps.value.map(st => st.id)
+    if (!ids.length) return false
+    const before = processesCopy()
+    const list = processesCopy()
+    for (const p of list) for (const st of p.steps) if (ids.includes(st.id)) change(st)
+    if (!writeProcesses(list)) { notify('Выбранные шаги уже в этом состоянии'); return false }
+    notify(`Применено к ${ids.length} ${stepsDative(ids.length)}`, 'ok', true, () => writeProcesses(before))
+    return true
+  }
+  /** Флаг панели: из «все» — снять у выделенных, иначе (часть, ни одного) — поставить всем (прецедент флажка «все»). */
+  function bulkFlag(flag: StepFlag) {
+    const on = flagState(flag) !== 'all'
+    bulkSteps((st) => { st[flag] = on })
+  }
+  /** Способ съёмки у выделенных — поле «Фото» панели (строка 128 реестра расхождений). */
+  function bulkMethod(method: string) { bulkSteps((st) => { st.method = method }) }
+  function bulkDeleteSteps() {
+    const ids = selectedSteps.value.map(st => st.id)
+    if (!ids.length) return
+    const before = processesCopy()
+    const list = processesCopy().map(p => ({ ...p, steps: p.steps.filter(st => !ids.includes(st.id)) }))
+    if (!writeProcesses(list)) return
+    ui.selectedSteps.splice(0)
+    notify(`Удалено ${ids.length} ${stepsWord(ids.length)}`, 'ok', true, () => writeProcesses(before))
+  }
+  /** Правка одного шага на месте: тип шага в строке, фото-подсказки инлайн-загрузкой. */
+  function patchStep(processId: string, stepId: string, change: (st: ProcessStep) => void): boolean {
+    const list = processesCopy()
+    const st = list.find(p => p.id === processId)?.steps.find(x => x.id === stepId)
+    if (!st) return false
+    change(st)
+    return writeProcesses(list)
+  }
+  function setStepKind(processId: string, stepId: string, kind: string) { patchStep(processId, stepId, (st) => { st.kind = kind }) }
+  /**
+   * Инлайн-загрузка фото-подсказок в ячейке (аудит, «Принцип: атрибут — инлайн по месту»): применяется сразу, без
+   * «Сохранить»; статус меняется на месте — «Не установлена» → «N · Все установлены».
+   */
+  function uploadHints(processId: string, stepId: string, count = 1) { patchStep(processId, stepId, (st) => { st.hints += Math.max(1, count) }) }
+  /** Удаление шага в строке — уведомление с «Отменить» (аудит, «Точечные фиксы», «Отмена при автосейве»). */
+  function removeStep(processId: string, stepId: string) {
+    const before = processesCopy()
+    const list = processesCopy()
+    const p = list.find(x => x.id === processId)
+    const gone = p?.steps.find(x => x.id === stepId)
+    if (!p || !gone) return
+    p.steps = p.steps.filter(x => x.id !== stepId)
+    if (!writeProcesses(list)) return
+    ui.selectedSteps = ui.selectedSteps.filter(id => id !== stepId)
+    notify(`Шаг «${gone.title}» удалён`, 'ok', true, () => writeProcesses(before))
+  }
+  function removeProcess(processId: string) {
+    const before = processesCopy()
+    const gone = before.find(x => x.id === processId)
+    if (!gone || !writeProcesses(before.filter(x => x.id !== processId))) return
+    const ids = gone.steps.map(st => st.id)
+    ui.selectedSteps = ui.selectedSteps.filter(id => !ids.includes(id))
+    notify(`Процесс «${gone.title}» удалён`, 'ok', true, () => writeProcesses(before))
+  }
+  /** Перестановка шага в процессе — ручка строки (решение 3 оркестратора); механизм тот же, что у полей. */
+  function moveStep(processId: string, stepId: string, to: number): boolean {
+    const list = processesCopy()
+    const p = list.find(x => x.id === processId)
+    const k = p?.steps.findIndex(x => x.id === stepId) ?? -1
+    if (!p || k < 0) return false
+    const at = Math.min(Math.max(0, to), p.steps.length - 1)
+    if (at === k) return false
+    p.steps.splice(at, 0, p.steps.splice(k, 1)[0]!)
+    return writeProcesses(list)
+  }
+  /**
+   * Заглушки такта 70 (решение 2 оркестратора): сайды процесса и шага, оверлей повторяемого процесса — такт 71;
+   * «Заполнить изображения» и «Вставить шаг из другой схемы» — вне стенда (r2 §8, §9).
+   */
+  function processStub(what: 'add' | 'edit' | 'open' | 'step' | 'networks') {
+    if (ui.viewing && what !== 'open') { notify('Прошлая версия открыта только для чтения', 'err'); return }
+    notify(what === 'networks' ? 'Настройка нейросетей — сайд шага, такт 71' : 'Сайд — такт 71')
+  }
+  function fillImages() { notify('Массовая заливка изображений — вне стенда') }
+  function pasteStep() { notify('Выбор шага из другой схемы — вне стенда') }
 
   /* ------------------------------ поиск — П5 ------------------------------ */
   /** Выдача по текущему запросу: группы по пути «Настройки → Раздел», поля формы — «Форма → Группа» (такт 69). */
-  const results = computed(() => searchSettings(ui.query, shown.value.form))
+  const results = computed(() => searchSettings(ui.query, shown.value.form, shown.value.processes))
   function setQuery(q: string) { ui.query = q }
   /**
    * Переход к найденному — `spec-audit.md`, «Требования к поиску»: таб → раздел → якорь; цель для прокрутки и
@@ -780,6 +942,10 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
       /* Поле формы (такт 69): таб «Форма», его группа; цель — строка поля. */
       ui.tab = 'form'
       selectGroup(item.group)
+    }
+    else if (item.process) {
+      /* Шаг процесса (такт 70): таб «Процессы и шаги»; цель — строка шага. */
+      ui.tab = 'processes'
     }
     else {
       ui.tab = 'settings'
@@ -898,7 +1064,7 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     return JSON.stringify({
       draft: draft.config, author: draft.author, versions: snapshots.map(s => s.id), current: current.value?.id ?? null,
       publish: publishState.value, save: save.state, writes: save.writes,
-      ui: { tab: ui.tab, section: ui.section, anchor: ui.anchor, scroll: ui.scroll, viewing: ui.viewing, surfaces: ui.surfaces.map(x => x.id), historyVersion: ui.historyVersion, group: ui.group, selectedFields: ui.selectedFields },
+      ui: { tab: ui.tab, section: ui.section, anchor: ui.anchor, scroll: ui.scroll, viewing: ui.viewing, surfaces: ui.surfaces.map(x => x.id), historyVersion: ui.historyVersion, group: ui.group, selectedFields: ui.selectedFields, selectedSteps: ui.selectedSteps },
     })
   }
 
@@ -911,7 +1077,9 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     set, setTab, setSection, rememberScroll, back, retry, notify, dismissNotice, dump,
     neighbourSection, stepSection, goToFields, openSide, closeSurface,
     formGroups, formGroup, selectGroup, fieldApprovalReason, fieldError, saveField, removeField, toggleField, selectionState, toggleAllFields,
-    clearFieldSelection, bulkFields, fillAliases, pasteFromScheme, saveGroup, removeGroup,
+    clearFieldSelection, bulkFields, fillAliases, pasteFromScheme, saveGroup, removeGroup, moveField,
+    processes, selectedSteps, toggleStep, processSelection, toggleProcessSteps, clearStepSelection, flagState, bulkFlag, bulkMethod, bulkDeleteSteps,
+    setStepKind, uploadHints, removeStep, removeProcess, moveStep, processStub, fillImages, pasteStep,
     undo, addReason, removeReason, toggleGroup, resetCosts, detectorsOn, detectorSetState, toggleDetectorSet, setDetector, saveTemplate, removeTemplate,
   }
 }

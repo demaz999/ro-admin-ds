@@ -2,7 +2,7 @@ import type { DiffAreaItem, DiffChangeItem, DiffGroupItem, DiffKind, DiffTone, D
 import type { SchemeConfig } from './model'
 import {
   ACCESS_GROUPS, ACCESS_ROLES, COMMENT_DICTIONARIES, DEADLINE_EVENTS, DETECTOR_GROUPS, FINISH_CLASSES, PDF_SIGNERS, PHOTO_RESOLUTIONS,
-  REGION_MATRICES, ROLE_LADDER, ROLES, SCHEME_TYPES, STATUS_DICTIONARIES, VIDEO_RESOLUTIONS,
+  REGION_MATRICES, ROLE_LADDER, ROLES, SCHEME_TYPES, STATUS_DICTIONARIES, STEP_FLAGS, STEP_KINDS, VIDEO_RESOLUTIONS,
 } from './catalogs'
 
 /**
@@ -179,6 +179,18 @@ export interface SchemeDiff {
   total: string
 }
 
+type StepLike = SchemeConfig['processes'][number]['steps'][number]
+/**
+ * «Было → стало» у шага: способ и подсказки — всегда (как до такта 70); тип шага и флаги — когда они сменились (такт 70:
+ * тип меняется в строке, флаги — панелью массовых действий).
+ */
+function stepChange(was: StepLike, st: StepLike): { before: string, after: string } {
+  const kind = (x: StepLike) => STEP_KINDS.find(k => k.value === x.kind)?.label ?? x.kind
+  const flags = (x: StepLike) => STEP_FLAGS.filter(f => x[f.key]).map(f => f.label.toLowerCase()).join(', ') || 'без флагов'
+  const text = (x: StepLike) => [x.method, `подсказок: ${x.hints}`, ...(was.kind !== st.kind ? [kind(x)] : []), ...(flags(was) !== flags(st) ? [`флаги: ${flags(x)}`] : [])].join(', ')
+  return { before: text(was), after: text(st) }
+}
+
 /** Дифф `from → to`: сводка по четырём областям, группы «Добавлено · Изменено · Удалено», «Требует внимания». */
 export function diffConfigs(from: SchemeConfig, to: SchemeConfig): SchemeDiff {
   const attention: string[] = []
@@ -212,6 +224,15 @@ export function diffConfigs(from: SchemeConfig, to: SchemeConfig): SchemeDiff {
   const ga = new Map(from.form.groups.map(x => [x.id, x]))
   const gb = new Map(to.form.groups.map(x => [x.id, x]))
   for (const [id, x] of gb) if (!ga.has(id)) form.push({ kind: 'added', unit: 'group', item: { label: `Группа «${x.title}»` } })
+  /* Перестановка полей ручкой строки (такт 70): порядок общих полей группы сменился. */
+  for (const [id, x] of gb) {
+    const old = ga.get(id)
+    if (!old) continue
+    const ids = new Set(old.fields.map(f => f.id))
+    const before = old.fields.filter(f => x.fields.some(y => y.id === f.id)).map(f => f.title)
+    const after = x.fields.filter(f => ids.has(f.id)).map(f => f.title)
+    if (before.join(' | ') !== after.join(' | ')) form.push({ kind: 'changed', unit: 'attr', item: { label: `Группа «${x.title}»: порядок полей`, before: before.join(', '), after: after.join(', ') } })
+  }
   for (const [id, x] of ga) if (!gb.has(id)) { form.push({ kind: 'removed', unit: 'group', item: { label: `Группа «${x.title}»` } }); attention.push(`Удалена группа полей «${x.title}»`) }
 
   /* ---------- Процессы и шаги ---------- */
@@ -228,8 +249,12 @@ export function diffConfigs(from: SchemeConfig, to: SchemeConfig): SchemeDiff {
     for (const [sid, st] of sb) {
       const was = sa.get(sid)
       if (!was) { processes.push({ kind: 'added', unit: 'step', item: { label: `Шаг «${st.title}»`, after: `процесс «${p.title}»` } }); continue }
-      if (!same(was, st)) processes.push({ kind: 'changed', unit: 'attr', item: { label: `Шаг «${st.title}»`, before: `${was.method}, подсказок: ${was.hints}`, after: `${st.method}, подсказок: ${st.hints}` } })
+      if (!same(was, st)) processes.push({ kind: 'changed', unit: 'attr', item: { label: `Шаг «${st.title}»`, ...stepChange(was, st) } })
     }
+    /* Перестановка шагов ручкой строки (такт 70): порядок общих шагов процесса сменился. */
+    const before = old.steps.filter(x => sb.has(x.id)).map(x => x.title)
+    const after = p.steps.filter(x => sa.has(x.id)).map(x => x.title)
+    if (before.join(' | ') !== after.join(' | ')) processes.push({ kind: 'changed', unit: 'attr', item: { label: `Процесс «${p.title}»: порядок шагов`, before: before.join(', '), after: after.join(', ') } })
     for (const [sid, st] of sa) if (!sb.has(sid)) { processes.push({ kind: 'removed', unit: 'step', item: { label: `Шаг «${st.title}»`, before: `процесс «${p.title}»` } }); attention.push(`Удалён шаг «${st.title}»`) }
   }
   for (const [id, p] of pa) if (!pb.has(id)) { processes.push({ kind: 'removed', unit: 'process', item: { label: `Процесс «${p.title}»` } }); attention.push(`Удалён процесс «${p.title}»`) }

@@ -143,6 +143,13 @@ const ROW_ACTIONS_EXAMPLE = `<TableRowActions
   @action="key => remove(row.id, key)"    <!-- вторичное действие: ключ из actions -->
 />`
 
+const IDENTITY_EXAMPLE = `<TableCellIdentity>
+  VIN под стеклом
+  <template #description>Сфотографируйте VIN-номер через лобовое стекло</template>   <!-- пояснение 13/16, не больше двух строк -->
+</TableCellIdentity>
+<TableCellIdentity icon="car">Легковой автомобиль</TableCellIdentity>                  <!-- без слота — прежний блок -->
+<TableCellText size="sm" class="w-full">Распознавание VIN</TableCellText>                <!-- строка списка в ячейке: 13/16, обрезка с подсказкой -->`
+
 const HEADING_EXAMPLE = `<Heading level="title" description="Базовые параметры схемы осмотра">Основное</Heading>   <!-- раздел страницы: 24/28, подпись 13/16 -->
 <Heading level="group">Экспертиза и проверка</Heading>                                        <!-- группа в карточке: 20/24 -->`
 
@@ -538,6 +545,53 @@ const FORMULA_EXAMPLE = `<Field label="Тема письма оповещени�
         </Field>
       </div>
       <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ FORMULA_EXAMPLE }}</pre>
+    </section>
+
+    <!-- ============================ Такт 70 ============================ -->
+    <section class="flex flex-col gap-4" data-matrix="table-cell-identity-description">
+      <Heading>TableCellIdentity — слот description: пояснение под именем (строка шага, макет 32765:6668); TableCellText size="sm" — строки 13/16</Heading>
+      <div class="flex max-w-settings flex-col">
+        <Table>
+          <TableRow>
+            <TableCell variant="slot" class="h-auto min-w-0 flex-1 items-start px-4 py-3 contain-inline-size" data-case="description">
+              <TableCellIdentity>
+                VIN под стеклом
+                <template #description>
+                  Сфотографируйте VIN-номер через лобовое стекло, номер должен быть чётко виден
+                </template>
+              </TableCellIdentity>
+            </TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell variant="slot" class="h-auto min-w-0 flex-1 items-start px-4 py-3 contain-inline-size" data-case="description-long">
+              <TableCellIdentity icon="car">
+                Передняя часть автомобиля
+                <template #description>
+                  Снимите переднюю часть автомобиля с расстояния 3–5 метров: номерной знак, фары и бампер целиком, без бликов на лобовом стекле и без посторонних предметов в кадре
+                </template>
+              </TableCellIdentity>
+            </TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell variant="slot" class="min-w-0 flex-1 px-4" data-case="plain">
+              <TableCellIdentity icon="car">
+                Без слота — прежний блок
+              </TableCellIdentity>
+            </TableCell>
+          </TableRow>
+          <TableRow>
+            <TableCell variant="slot" class="h-auto w-44 flex-col items-start gap-1 px-4 py-3" data-case="text-sm">
+              <TableCellText size="sm" class="w-full">
+                Распознавание VIN
+              </TableCellText>
+              <TableCellText size="sm" class="w-full">
+                Ракурсы авто · Правая сторона — длинное имя обрезается с подсказкой
+              </TableCellText>
+            </TableCell>
+          </TableRow>
+        </Table>
+      </div>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ IDENTITY_EXAMPLE }}</pre>
     </section>
 
     <!-- ============================ Такт 68 ============================ -->

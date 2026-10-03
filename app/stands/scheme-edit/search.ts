@@ -90,11 +90,15 @@ export interface SearchItem {
   via: 'label' | 'synonym' | 'description' | 'alias'
   /** Поле формы (такт 69): группа, в которой оно стоит; у настроек пусто. */
   group?: string
+  /** Шаг процесса (такт 70): процесс, в котором он стоит. */
+  process?: string
   /** Пояснение для строки выдачи: синоним либо описание, по которому найдено. */
   hint: string
 }
 /** Группа формы для индекса — заголовок, алиас и id полей. */
 export interface FormLike { id: string, title: string, fields: { id: string, title: string, alias: string }[] }
+/** Процесс для индекса — название и шаги (такт 70). */
+export interface ProcessLike { id: string, title: string, steps: { id: string, title: string, description?: string }[] }
 export interface SearchGroup { path: string, items: SearchItem[] }
 export interface SearchResult { query: string, groups: SearchGroup[], count: number }
 
@@ -113,7 +117,7 @@ const INDEX: Entry[] = SETTINGS
  * Поиск: буквальный матч по подписи, затем по синонимам, затем по описанию — сквозь все разделы. Выдача
  * сгруппирована по пути «Настройки → Раздел»; порядок групп — порядок разделов, внутри — порядок настроек.
  */
-export function searchSettings(query: string, form?: { groups: FormLike[] }): SearchResult {
+export function searchSettings(query: string, form?: { groups: FormLike[] }, processes: ProcessLike[] = []): SearchResult {
   const q = norm(query)
   if (!q) return { query, groups: [], count: 0 }
   const found: SearchItem[] = []
@@ -136,12 +140,23 @@ export function searchSettings(query: string, form?: { groups: FormLike[] }): Se
         hint: via === 'alias' ? `алиас ${f.alias}` : '' })
     }
   }
+  /* Шаги процессов (такт 70): название, затем описание; путь — «Процессы → Процесс», цель — строка шага. */
+  for (const p of processes) {
+    for (const st of p.steps) {
+      const via = norm(st.title).includes(q) ? 'label' : st.description && norm(st.description).includes(q) ? 'description' : null
+      if (!via) continue
+      found.push({ key: `step.${st.id}`, label: `Шаг «${st.title}»`, section: '', anchor: '', target: `step-${st.id}`, via, process: p.id,
+        hint: via === 'description' ? (st.description ?? '') : '' })
+    }
+  }
   const shown = found.slice(0, SEARCH_LIMIT)
   const groups: SearchGroup[] = []
   for (const item of shown) {
     const path = item.group
       ? `Форма → ${form?.groups.find(g => g.id === item.group)?.title ?? ''}`
-      : `Настройки → ${SECTION_LABELS[item.section] ?? item.section}`
+      : item.process
+        ? `Процессы → ${processes.find(p => p.id === item.process)?.title ?? ''}`
+        : `Настройки → ${SECTION_LABELS[item.section] ?? item.section}`
     let grp = groups.find(x => x.path === path)
     if (!grp) groups.push(grp = { path, items: [] })
     grp.items.push(item)

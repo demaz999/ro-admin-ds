@@ -16,4 +16,6 @@ export const SCHEME_COVERAGE_STATES = [
   /* Такт 69, П6: «Форма» — группа, выделение с панелью, сайд поля (тип с выбором и без), новое поле, сайд группы, просмотр версии. */
   'tab=form&group=g-body', 'group=g-car&selected=f-vin,f-plate', 'open=field', 'open=field&group=g-body&field=f-trim', 'open=new-field', 'open=group',
   'tab=form&view=v1',
+  /* Такт 70, П7 часть 1: «Процессы и шаги» — выделение шагов с панелью, инлайн-загрузчик фото-подсказки, просмотр версии. */
+  'steps=s-vin-glass,s-vin-metal,s-pts', 'upload=s-vin-metal', 'tab=processes&view=v1',
 ] as const
