@@ -18,4 +18,6 @@ export const SCHEME_COVERAGE_STATES = [
   'tab=form&view=v1',
   /* Такт 70, П7 часть 1: «Процессы и шаги» — выделение шагов с панелью, инлайн-загрузчик фото-подсказки, просмотр версии. */
   'steps=s-vin-glass,s-vin-metal,s-pts', 'upload=s-vin-metal', 'tab=processes&view=v1',
+  /* Такт 71, П7 часть 2: сайды процесса (правка и новый), сайд шага, нейросети выбранных шагов, оверлей — пустой, с шагом, стек «оверлей → сайд», на чтение. */
+  'open=process', 'open=new-process', 'open=step', 'open=networks', 'open=overlay', 'open=overlay-filled', 'open=overlay-step', 'view=v2&open=overlay',
 ] as const

@@ -80,7 +80,26 @@ const ro = ref({ name: 'КАСКО — осмотр', text: 'Осмотр авт
           </p>
         </div>
         <div data-example class="flex min-w-0 flex-col items-stretch gap-3">
-          <template v-if="c.id === 'frame-meta-stack'">
+          <template v-if="c.id === 'modal-card-full'">
+            <div class="relative h-100 overflow-hidden rounded-md border border-border-soft bg-background">
+              <ModalCard :open="true" :modal="false">
+                <ModalCardContent inline placement="full">
+                  <ModalCardHeader title="Осмотр повреждений" subtitle="Повторяемый процесс · форма и шаги вместе" />
+                  <ModalCardBody>
+                    <ModalCardText>Форма процесса и его шаги вместе; сайд шага открывается поверх слоя</ModalCardText>
+                  </ModalCardBody>
+                  <ModalCardFooter>
+                    <Button variant="secondary">
+                      Отмена
+                    </Button>
+                    <Button>Сохранить</Button>
+                  </ModalCardFooter>
+                </ModalCardContent>
+              </ModalCard>
+            </div>
+            <span class="text-xs text-muted-foreground">full — во всё окно; в рамке показан внутри родителя (inline)</span>
+          </template>
+          <template v-else-if="c.id === 'frame-meta-stack'">
             <div class="flex flex-wrap items-start gap-6">
               <div class="w-group-list">
                 <FrameMeta layout="stack" :rows="[{ label: 'Алиас', value: 'Body' }, { label: 'Экран создания', value: '2-й экран' }, { label: 'В мобильном', value: 'После создания' }, { label: 'Редактирование', value: 'Разрешено' }]" />

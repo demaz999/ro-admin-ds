@@ -5,11 +5,12 @@ import { tableRowActionsColumn, type TableRowActionItem } from '~/components/ui/
 import { plural } from '~/stands/scheme-edit/diff'
 import { QUICK_LINKS, type SearchItem } from '~/stands/scheme-edit/search'
 import {
-  ACCESS_GROUPS, ACCESS_ROLES, COMMENT_DICTIONARIES, createModel, CREATE_SCREENS, DEADLINE_EVENTS, DETECTOR_GROUPS, DETECTOR_IDS, FIELD_DEFAULTS, FIELD_TYPES,
-  FINISH_CLASSES, GROUP_DEFAULTS, HINT_CONFIGS, MOBILE_SHOW, OWNERS, PDF_PROGRAMS, PDF_SIGNERS, PDF_WHEN, PHOTO_RESOLUTIONS, REGION_MATRICES, ROLE_LADDER,
-  ROLES, SCHEME_TYPES, SECTION_ANCHORS, SECTIONS, STATUS_DICTIONARIES, STEP_FLAGS, STEP_KINDS, STEP_METHODS, suggestAlias, TABS, VIDEO_RESOLUTIONS,
-  type BehaviorSettings, type Dataset, type FieldDraft, type FormulaSettings, type GroupDraft, type PdfTemplate, type PdfTemplateDraft, type SaveState,
-  type SectionId, type TabId,
+  ACCESS_GROUPS, ACCESS_ROLES, COMMENT_DICTIONARIES, COORDS_MODES, createModel, CREATE_SCREENS, DEADLINE_EVENTS, DETECTOR_GROUPS, DETECTOR_IDS, DURATION_MODES,
+  FIELD_DEFAULTS, FIELD_TYPES, FINISH_CLASSES, GROUP_DEFAULTS, HINT_CONFIGS, MOBILE_SHOW, NETWORKS, OBJECT_TYPES, OWNERS, PDF_PROGRAMS, PDF_SIGNERS, PDF_WHEN,
+  PHOTO_RESOLUTIONS, PROCESS_DEFAULTS, REGION_MATRICES, ROLE_LADDER, ROLES, SCHEME_TYPES, SECTION_ANCHORS, SECTIONS, STATUS_DICTIONARIES, STEP_DEFAULTS,
+  STEP_FLAGS, STEP_KINDS, STEP_METHODS, suggestAlias, TABS, VIDEO_RESOLUTIONS,
+  type BehaviorSettings, type Dataset, type FieldDraft, type FormulaSettings, type GroupDraft, type NetworkState, type PdfTemplate, type PdfTemplateDraft,
+  type ProcessDraft, type SaveState, type SectionId, type StepDraft, type TabId,
 } from '~/stands/scheme-edit/model'
 import demo from '~/stands/scheme-edit/demo-data.json'
 import { useReorder } from '~/stands/scheme-edit/reorder'
@@ -54,7 +55,9 @@ import { useReorder } from '~/stands/scheme-edit/reorder'
  * процессов — `Card` с шапкой и `Table` шагов: ручка перестановки, выбор, номер, название с описанием и типом шага
  * (`Chip` со списком), способ, нейросети (`Chip neutral`), фото-подсказка с инлайн-загрузкой (`Badge`, `ButtonAction`,
  * `FileUpload`), действия строки. Ручка перестановки — и у таблицы полей «Формы» (`~/stands/scheme-edit/reorder.ts`).
- * Сайды процесса и шага, оверлей повторяемого — такт 71: кнопки дают уведомление-заглушку. Таб «Витрина» — порция П8:
+ * **П7, часть 2 (такт 71).** Сайд «Добавление / Редактирование процесса» (№ 48, 49) — три секции макетов `33245:5722`,
+ * `33245:6032`; сайд шага (№ 63) — шесть секций; сайд «Нейросети выбранных шагов» из панели; оверлей повторяемого процесса
+ * (№ 64) — `ModalCard placement="full"`: форма и шаги вместе, сайд шага ложится поверх. Таб «Витрина» — порция П8:
  * на его месте `Empty`.
  *
  * ## Поведение — модель `~/stands/scheme-edit/model.ts`
@@ -92,6 +95,10 @@ import { useReorder } from '~/stands/scheme-edit/reorder'
  * | `?open=group` · `new-group` | сайд группы: выбранная группа либо новая |
  * | `?steps=s-vin-glass,s-vin-metal` | таб «Процессы и шаги»: выделенные шаги и панель массовых действий (такт 70) |
  * | `?upload=s-vin-metal` | таб «Процессы и шаги»: инлайн-загрузчик фото-подсказки шага раскрыт (такт 70) |
+ * | `?open=process` · `new-process` | сайд процесса: `?process=p-docs` — этот процесс, без него — первый; `new-process` — «Добавление процесса» (такт 71) |
+ * | `?open=step` · `new-step` | сайд шага: `?step=s-front` — этот шаг, без него — первый шаг первого процесса; `new-step` — новый шаг первого процесса (такт 71) |
+ * | `?open=networks` | сайд «Нейросети выбранных шагов»; выделение — `?steps=` (без него — два шага «Осмотра автомобиля») (такт 71) |
+ * | `?open=overlay` · `overlay-filled` · `overlay-step` | оверлей повторяемого процесса: пустой; с шагом, добавленным в черновик оверлея; стек «оверлей → сайд нового шага» (такт 71) |
  */
 definePageMeta({ layout: 'admin' })
 useHead({ title: 'Редактирование схемы осмотра — стенд' })
@@ -102,7 +109,9 @@ const q = (k: string) => String(route.query[k] ?? '')
 const D = demo as unknown as Record<'main' | 'fresh', Dataset>
 /** Окна и выделение «Формы» открывают таб «Форма» (такт 69). */
 const FORM_OPEN = ['field', 'new-field', 'group', 'new-group']
-const tabAtLoad = FORM_OPEN.includes(q('open')) || q('selected') ? 'form' : q('steps') || q('upload') ? 'processes' : TABS.find(t => t.id === q('tab'))?.id
+/** Окна «Процессов и шагов» открывают свой таб (такт 71). */
+const PROCESS_OPEN = ['process', 'new-process', 'step', 'new-step', 'networks', 'overlay', 'overlay-filled', 'overlay-step']
+const tabAtLoad = FORM_OPEN.includes(q('open')) || q('selected') ? 'form' : q('steps') || q('upload') || PROCESS_OPEN.includes(q('open')) ? 'processes' : TABS.find(t => t.id === q('tab'))?.id
 const saveAtLoad = (['saving', 'error'] as SaveState[]).find(s => s === q('save'))
 const m = createModel(q('data') === 'new' ? D.fresh : D.main, {
   tab: tabAtLoad,
@@ -596,6 +605,165 @@ function dropFiles(event: DragEvent, processId: string, stepId: string) {
   upload(processId, stepId, event.dataTransfer?.files.length || 1)
 }
 const hintText = (n: number) => (n ? `${n} · Все установлены` : 'Не установлена')
+
+/* ------------------------------ сайды процесса и шага, оверлей — П7, часть 2, такт 71 ------------------------------ */
+const copy = <T>(x: T): T => JSON.parse(JSON.stringify(x))
+/**
+ * Поверхность в стеке как `v-model:open`: оверлей остаётся открытым, пока поверх него сайд шага (стек «оверлей → сайд»,
+ * r2 §7); закрытие снимает его, только когда он верхний.
+ */
+const stacked = (id: string) => computed({
+  get: () => m.ui.surfaces.some(x => x.id === id),
+  set: (v) => { if (!v && m.topSurface.value?.id === id) m.closeSurface() },
+})
+/** Иконка типа процесса на стенде — один демо-файл. */
+const ICON_FILE = 'process-icon.svg'
+const durationLabel = (v: string) => DURATION_MODES.find(x => x.value === v)?.label ?? v
+
+/** Сайд процесса — № 48, 49 (макеты `33245:5722`, `33245:6032`): черновик живёт здесь до «Сохранить». */
+const EMPTY_PROCESS: ProcessDraft = { id: '', title: '', alias: '', repeatable: false, steps: [], ...PROCESS_DEFAULTS, order: 1 }
+const pd = ref<ProcessDraft>(copy(EMPTY_PROCESS))
+const pdTitle = ref('')
+const pdError = ref<{ key: 'title' | 'alias', text: string } | null>(null)
+function openProcess(id: string) {
+  if (!m.canEdit()) return
+  const list = m.processes.value
+  const k = list.findIndex(x => x.id === id)
+  const p = list[k]
+  pd.value = p ? { ...copy(p), order: k + 1 } : { ...copy(EMPTY_PROCESS), order: list.length + 1 }
+  pdTitle.value = p?.title ?? ''
+  pdError.value = null
+  m.openSide('process')
+}
+const processOpen = surface('process')
+const processOrderMax = computed(() => m.processes.value.length + (pd.value.id ? 0 : 1))
+/** «Предложить по названию» — алиас процесса латиницей, занятые получают суффикс. */
+function suggestProcessAlias(d: ProcessDraft) {
+  d.alias = suggestAlias(d.title, m.processes.value.filter(x => x.id !== d.id).map(x => x.alias))
+}
+function saveProcessSide() {
+  pdError.value = m.processError(pd.value)
+  if (m.saveProcess(pd.value)) m.closeSurface()
+}
+
+/**
+ * Оверлей повторяемого процесса — № 64 (r2 §7): полноэкранный слой, форма процесса и его шаги вместе; черновик оверлея —
+ * копия процесса, «Сохранить» отдаёт его модели одной операцией вместе с шагами. В просмотре версии открывается на чтение.
+ */
+const od = ref<ProcessDraft>(copy(EMPTY_PROCESS))
+const odError = ref<{ key: 'title' | 'alias', text: string } | null>(null)
+function openOverlay(id: string) {
+  const list = m.processes.value
+  const k = list.findIndex(x => x.id === id)
+  const p = list[k]
+  if (!p) return
+  od.value = { ...copy(p), order: k + 1 }
+  odError.value = null
+  m.openOverlay()
+}
+const overlayOpen = stacked('process-overlay')
+function saveOverlay() {
+  odError.value = m.processError(od.value)
+  if (m.saveProcess(od.value, true)) m.closeSurface()
+}
+/** Удаление шага в оверлее — правка черновика оверлея: «Отмена» оверлея его вернёт. */
+function removeOverlayStep(id: string) { od.value.steps = od.value.steps.filter(x => x.id !== id) }
+const overlaySubtitle = computed(() => (ro.value ? 'Повторяемый процесс · только чтение' : 'Повторяемый процесс · форма и шаги вместе'))
+
+/**
+ * Сайд шага — № 63 (пробел макета): шесть секций аудита — «Основное», «Поведение», «Съёмка», «Нейросети», «Подсказки»,
+ * «Связи». Открывается с полотна (пишет в черновик схемы) либо поверх оверлея (пишет в черновик оверлея).
+ */
+const EMPTY_STEP: StepDraft = { id: '', title: '', kind: 'main', method: '1 фото', networks: [], hints: 0, ...copy(STEP_DEFAULTS), order: 1 }
+const sd = ref<StepDraft>(copy(EMPTY_STEP))
+const sdTitle = ref('')
+const sdInvalid = ref(false)
+const sdHost = ref({ process: '', overlay: false })
+const hostSteps = computed(() => (sdHost.value.overlay ? od.value.steps : m.processes.value.find(x => x.id === sdHost.value.process)?.steps ?? []))
+const hostTitle = computed(() => (sdHost.value.overlay ? od.value.title : m.processes.value.find(x => x.id === sdHost.value.process)?.title ?? ''))
+function openStep(processId: string, stepId: string, overlay = false, section = '') {
+  if (!overlay && !m.canEdit()) return
+  sdHost.value = { process: processId, overlay }
+  const steps = hostSteps.value
+  const k = steps.findIndex(x => x.id === stepId)
+  const st = steps[k]
+  sd.value = st ? { ...copy(st), order: k + 1 } : { ...copy(EMPTY_STEP), order: steps.length + 1 }
+  sdTitle.value = st?.title ?? ''
+  sdInvalid.value = false
+  m.openSide('step')
+  if (section) focusStepSection(section)
+}
+/** «Настроить нейросети» в строке шага — сайд шага с секцией «Нейросети» в окне и фокусом на первом флажке. */
+function focusStepSection(section: string) {
+  nextTick(() => setTimeout(() => {
+    const el = document.querySelector<HTMLElement>(`[data-side=step] [data-step-section=${section}]`)
+    el?.scrollIntoView({ block: 'start' })
+    el?.querySelector<HTMLElement>('[data-slot=choice-control]:not(:disabled)')?.focus({ preventScroll: true })
+  }, 80))
+}
+const stepOpen = surface('step')
+const stepOrderMax = computed(() => hostSteps.value.length + (sd.value.id ? 0 : 1))
+function toggleNetwork(name: string) {
+  const list = sd.value.networks
+  sd.value.networks = list.includes(name) ? list.filter(x => x !== name) : [...list, name]
+}
+/** Связи шага: поля формы — «Группа · Поле»; словарь комментариев шага — свой либо как в схеме. */
+const fieldLinkItems = computed(() => m.shown.value.form.groups.flatMap(g => g.fields.map(x => ({ value: x.id, label: `${g.title} · ${x.title}` }))))
+const stepComments = computed(() => [
+  { value: 'scheme', label: `Как в схеме — ${COMMENT_DICTIONARIES.find(d => d.value === general.value.dictionaries.comments)?.label ?? ''}` },
+  ...COMMENT_DICTIONARIES.map(({ value, label }) => ({ value, label })),
+])
+const sdComments = computed<string>({ get: () => sd.value.comments || 'scheme', set: (v) => { sd.value.comments = v === 'scheme' ? '' : v } })
+function saveStepSide() {
+  const error = m.stepError(sd.value)
+  sdInvalid.value = !!error
+  if (sdHost.value.overlay) {
+    if (error) { m.notify(error, 'err'); return }
+    od.value.steps = m.placeStep(od.value.steps, sd.value)
+    m.closeSurface()
+    return
+  }
+  if (m.saveStep(sdHost.value.process, sd.value)) m.closeSurface()
+}
+
+/** Сайд «Нейросети выбранных шагов» — «Настроить нейросети» панели массовых действий: флажки трёх состояний, как флаги. */
+const nd = ref<Record<string, NetworkState>>({})
+function openNetworks() {
+  if (!m.canEdit()) return
+  nd.value = Object.fromEntries(NETWORKS.filter(x => !x.denied).map(x => [x.value, m.networkState(x.value)]))
+  m.openSide('networks')
+}
+const networksOpen = surface('networks')
+/** Из «все» — снять у выбранных, иначе (часть, нет) — поставить всем. */
+function cycleNetwork(name: string) { nd.value[name] = nd.value[name] === 'all' ? 'none' : 'all' }
+function saveNetworksSide() {
+  m.bulkNetworks(nd.value)
+  m.closeSurface()
+}
+
+/* Оснастка приёмки (такт 71): сайды процесса и шага, нейросети выбранных шагов, оверлей. */
+{
+  const procs = m.processes.value
+  if (q('open') === 'process') openProcess(procs.some(x => x.id === q('process')) ? q('process') : (procs[0]?.id ?? ''))
+  if (q('open') === 'new-process') openProcess('')
+  if (q('open') === 'step') {
+    const owner = procs.find(x => x.steps.some(st => st.id === q('step'))) ?? procs.find(x => x.steps.length)
+    if (owner) openStep(owner.id, owner.steps.some(st => st.id === q('step')) ? q('step') : owner.steps[0]!.id)
+  }
+  if (q('open') === 'new-step' && procs[0]) openStep(procs[0].id, '')
+  if (q('open') === 'networks') {
+    if (!m.ui.selectedSteps.length) m.ui.selectedSteps.push('s-vin-glass', 's-vin-metal')
+    openNetworks()
+  }
+  const repeatable = procs.find(x => x.repeatable)
+  if (['overlay', 'overlay-filled', 'overlay-step'].includes(q('open')) && repeatable) {
+    openOverlay(repeatable.id)
+    if (q('open') === 'overlay-filled') {
+      od.value.steps = m.placeStep([], { ...copy(EMPTY_STEP), title: 'Повреждение — общий план', description: 'Снимите повреждённую деталь целиком с расстояния 1–2 метра', method: '2–7 фото', networks: ['Оценка повреждений'], required: true, order: 1 })
+    }
+    if (q('open') === 'overlay-step') openStep(repeatable.id, '', true)
+  }
+}
 
 /** Содержимое, которое соберёт следующая порция, — план `scheme-edit.md`, раздел 10. */
 const PENDING = { title: '«Витрина» — порция П8', description: 'Статус карточки, витринная карточка, «Зачем нужен осмотр», «Из схемы»' }
@@ -1859,7 +2027,7 @@ if (import.meta.client) {
         <div class="flex flex-col gap-3 pt-6" data-processes :data-readonly="ro || undefined">
           <!-- Действия таба — № 43 (`32765:6553`): «Заполнить изображения» — заглушка (r2 §9), «Вставить шаг из другой схемы» — № 70. -->
           <div :inert="ro" class="flex flex-wrap items-center gap-3" data-processes-actions>
-            <Button variant="outline" show-icon data-act="process-add" @click="m.processStub('add')">
+            <Button variant="outline" show-icon data-act="process-add" @click="openProcess('')">
               <template #icon>
                 <Icon name="add" :size="16" />
               </template>
@@ -1906,7 +2074,7 @@ if (import.meta.client) {
                     <Select :model-value="''" :items="STEP_METHODS" placeholder="Способ съёмки" :show-icon="false" :searchable="false" @update:model-value="m.bulkMethod(String($event))" />
                   </div>
                 </Field>
-                <Button variant="secondary" data-act="bulk-networks" @click="m.processStub('networks')">
+                <Button variant="secondary" data-act="bulk-networks" @click="openNetworks()">
                   Настроить нейросети
                 </Button>
                 <Button variant="outline" data-act="steps-clear" @click="m.clearStepSelection()">
@@ -1935,17 +2103,28 @@ if (import.meta.client) {
                 <Badge v-if="p.repeatable" variant="success" data-badge="repeatable">
                   Повторяемый
                 </Badge>
+                <!-- «Скрытый процесс» сайда (такт 71) виден меткой в шапке — прецедент флагов шага (строка 135). -->
+                <Badge v-if="p.hidden" variant="neutral" data-badge="hidden">
+                  Скрытый
+                </Badge>
               </div>
               <div class="flex shrink-0 items-center gap-3">
                 <!-- «Открыть процесс» — полноэкранный оверлей повторяемого (№ 64, такт 71); чтение, поэтому и в просмотре версии. -->
-                <Button v-if="p.repeatable" variant="outline" show-icon data-act="process-open" @click="m.processStub('open')">
+                <Button v-if="p.repeatable" variant="outline" show-icon data-act="process-open" @click="openOverlay(p.id)">
                   <template #icon>
                     <Icon name="article" :size="16" />
                   </template>
                   Открыть процесс
                 </Button>
                 <div :inert="ro" class="flex items-center gap-3">
-                  <Button variant="outline" show-icon data-act="process-edit" @click="m.processStub('edit')">
+                  <!-- «Добавить шаг» у обычного процесса — сайд нового шага (такт 71, строка 150); у повторяемого шаги правит оверлей. -->
+                  <Button v-if="!p.repeatable" variant="outline" show-icon data-act="step-add" @click="openStep(p.id, '')">
+                    <template #icon>
+                      <Icon name="add" :size="16" />
+                    </template>
+                    Добавить шаг
+                  </Button>
+                  <Button variant="outline" show-icon data-act="process-edit" @click="openProcess(p.id)">
                     <template #icon>
                       <Icon name="edit" :size="16" />
                     </template>
@@ -2053,7 +2232,7 @@ if (import.meta.client) {
                 <TableCell align="start" class="w-28 px-4" data-step-method>
                   {{ st.method }}
                 </TableCell>
-                <!-- Нейросети строками 13/16 (макет `32765:6684`): длинное имя обрезается с подсказкой; настройка — сайд шага, такт 71. -->
+                <!-- Нейросети строками 13/16 (макет `32765:6684`): длинное имя обрезается с подсказкой; «Настроить нейросети» — сайд шага, секция «Нейросети». -->
                 <TableCell variant="slot" class="h-auto w-44 flex-col items-start gap-1 px-4 pt-4.5 pb-3" data-step-networks>
                   <TableCellText v-for="n in st.networks" :key="n" size="sm" class="w-full">
                     {{ n }}
@@ -2062,7 +2241,7 @@ if (import.meta.client) {
                     Нейросети не выбраны
                   </ToolbarText>
                   <div :inert="ro" class="flex pt-1">
-                    <ButtonAction size="sm" :show-icon="false" data-act="step-networks" @click="m.processStub('networks')">
+                    <ButtonAction size="sm" :show-icon="false" data-act="step-networks" @click="openStep(p.id, st.id, false, 'networks')">
                       Настроить нейросети
                     </ButtonAction>
                   </div>
@@ -2095,7 +2274,7 @@ if (import.meta.client) {
                   </div>
                 </TableCell>
                 <TableCell variant="slot" align="start" :class="['justify-end px-4', STEP_ACTIONS_COLUMN]">
-                  <TableRowActions :inert="ro" :actions="STEP_ACTIONS" @edit="m.processStub('step')" @action="m.removeStep(p.id, st.id)" />
+                  <TableRowActions :inert="ro" :actions="STEP_ACTIONS" @edit="openStep(p.id, st.id)" @action="m.removeStep(p.id, st.id)" />
                 </TableCell>
               </TableRow>
             </Table>
@@ -2273,6 +2452,389 @@ if (import.meta.client) {
           </Button>
           <Button data-act="field-save" @click="saveFieldSide()">
             {{ fd.id ? 'Сохранить' : 'Добавить поле' }}
+          </Button>
+        </ModalCardFooter>
+      </ModalCardContent>
+    </ModalCard>
+
+    <!-- ============================ сайд процесса — № 48, 49: три секции макетов `33245:5722`, `33245:6032` ============================ -->
+    <ModalCard v-model:open="processOpen">
+      <ModalCardContent placement="edge" data-side="process">
+        <ModalCardHeader :title="pd.id ? `Редактирование процесса — ${pdTitle}` : 'Добавление процесса'" />
+        <ModalCardBody class="flex flex-col gap-6">
+          <FieldSet legend="Основное">
+            <Field label="Название" required :invalid="pdError?.key === 'title'" :hint="pdError?.key === 'title' ? pdError.text : ''">
+              <Input v-model="pd.title" placeholder="Например, Осмотр автомобиля" :show-icon="false" :invalid="pdError?.key === 'title'" data-field="pdTitle" />
+            </Field>
+            <!-- «?» у подписей макета — строкой подсказки `Field` (прецедент строки 117). -->
+            <Field label="Алиас" :invalid="pdError?.key === 'alias'" :hint="pdError?.key === 'alias' ? pdError.text : 'Латиницей без пробелов — ключ процесса в выгрузках · кнопка справа предложит по названию'">
+              <div class="flex items-center gap-2">
+                <Input v-model="pd.alias" placeholder="Например, auto_inspection" :show-icon="false" :invalid="pdError?.key === 'alias'" class="min-w-0 flex-1" data-field="pdAlias" />
+                <IconButton variant="secondary" size="lg" label="Предложить по названию" data-act="process-alias-suggest" @click="suggestProcessAlias(pd)">
+                  <Icon name="auto-fix" :size="20" />
+                </IconButton>
+              </div>
+            </Field>
+            <div data-formula="pdFormula">
+              <Field label="Формула наименования" hint="Имя объекта процесса в списках осмотра — текст и переменные {Группа:ключ}">
+                <FormulaInput v-model="pd.formula" :variables="m.variables.value" label="Формула наименования" placeholder="Текст и переменные" />
+              </Field>
+            </div>
+            <Field label="Порядковый номер" data-field="pdOrder">
+              <InputNumber v-model="pd.order" :min="1" :max="processOrderMax" />
+            </Field>
+            <Field label="Иконка типа процесса" hint="Показывается у процесса в мобильном приложении">
+              <button type="button" class="w-full" data-act="process-icon" @click="pd.icon = ICON_FILE">
+                <FileUpload>
+                  {{ pd.icon ? `Иконка загружена · ${pd.icon}` : 'Загрузить иконку' }}
+                  <template #hint>
+                    {{ pd.icon ? 'нажмите, чтобы заменить' : 'SVG или PNG · или перетащите файл сюда' }}
+                  </template>
+                </FileUpload>
+              </button>
+            </Field>
+          </FieldSet>
+
+          <FieldSet legend="Поведение">
+            <div class="flex flex-col gap-3" data-process-flags>
+              <Checkbox v-model="pd.hidden" data-field="pdHidden">
+                Скрытый процесс
+              </Checkbox>
+              <Checkbox v-model="pd.pickSteps" data-field="pdPickSteps">
+                Разрешать выбор шагов во время съёмки
+              </Checkbox>
+              <Checkbox v-model="pd.repeatable" data-field="pdRepeatable">
+                Повторяемый процесс
+              </Checkbox>
+            </div>
+            <Field label="Тип объекта съёмки" data-field="pdObjectType">
+              <Select v-model="pd.objectType" :items="OBJECT_TYPES" placeholder="Не выбран" :show-icon="false" :searchable="false" />
+            </Field>
+            <Field label="Получение координат" data-field="pdCoords">
+              <Select v-model="pd.coords" :items="COORDS_MODES" placeholder="Не выбрано" :show-icon="false" :searchable="false" />
+            </Field>
+          </FieldSet>
+
+          <FieldSet legend="Подсказки">
+            <Field label="Подсказка на экране подготовки" hint="Исполнитель видит её перед началом процесса">
+              <Textarea v-model="pd.prepHint" placeholder="Например, Убедитесь, что автомобиль стоит на открытом пространстве с хорошим освещением" data-field="pdPrepHint" />
+            </Field>
+            <Field label="Подсказка «Обычно занимает N минут»">
+              <RadioGroup v-model="pd.duration" data-radio="pdDuration">
+                <RadioGroupItem v-for="x in DURATION_MODES" :key="x.value" :value="x.value" :checked="pd.duration === x.value">
+                  {{ x.label }}
+                </RadioGroupItem>
+              </RadioGroup>
+            </Field>
+            <Field v-if="pd.duration === 'manual'" label="Минут" data-field="pdDurationMin">
+              <InputNumber v-model="pd.durationMin" :min="1" :max="120" />
+            </Field>
+          </FieldSet>
+        </ModalCardBody>
+        <ModalCardFooter>
+          <Button variant="secondary" data-act="process-cancel" @click="m.closeSurface()">
+            Отмена
+          </Button>
+          <Button data-act="process-save" @click="saveProcessSide()">
+            {{ pd.id ? 'Сохранить' : 'Добавить процесс' }}
+          </Button>
+        </ModalCardFooter>
+      </ModalCardContent>
+    </ModalCard>
+
+    <!--
+      ============================ оверлей повторяемого процесса — № 64: `ModalCard placement="full"` (r2 §7) ============================
+      Форма процесса и его шаги вместе; сайд шага ложится поверх (стек «оверлей → сайд»), Esc закрывает верхний слой. В просмотре
+      версии — чтение: поля «только для чтения», действия под `inert`, в подвале — «Закрыть».
+    -->
+    <ModalCard v-model:open="overlayOpen">
+      <ModalCardContent placement="full" data-overlay="process" :data-readonly="ro || undefined">
+        <ModalCardHeader :title="od.title" :subtitle="overlaySubtitle" />
+        <ModalCardBody class="flex items-start gap-6">
+          <div class="flex w-modal-narrow shrink-0 flex-col gap-6" data-overlay-form>
+            <FieldSet legend="Основное">
+              <Field :readonly="ro" label="Название" required :invalid="odError?.key === 'title'" :hint="odError?.key === 'title' ? odError.text : ''">
+                <Input v-model="od.title" placeholder="Например, Осмотр повреждений" :show-icon="false" :invalid="odError?.key === 'title'" data-field="odTitle" />
+              </Field>
+              <Field :readonly="ro" label="Алиас" :invalid="odError?.key === 'alias'" :hint="odError?.key === 'alias' ? odError.text : 'Латиницей без пробелов — ключ процесса в выгрузках'">
+                <div class="flex items-center gap-2">
+                  <Input v-model="od.alias" placeholder="Например, damage_inspection" :show-icon="false" :invalid="odError?.key === 'alias'" class="min-w-0 flex-1" data-field="odAlias" />
+                  <IconButton v-if="!ro" variant="secondary" size="lg" label="Предложить по названию" data-act="overlay-alias-suggest" @click="suggestProcessAlias(od)">
+                    <Icon name="auto-fix" :size="20" />
+                  </IconButton>
+                </div>
+              </Field>
+              <div data-formula="odFormula">
+                <Field :readonly="ro" label="Формула наименования" hint="Имя объекта процесса в списках осмотра — текст и переменные {Группа:ключ}">
+                  <FormulaInput v-model="od.formula" :variables="m.variables.value" label="Формула наименования" placeholder="Текст и переменные" />
+                </Field>
+              </div>
+              <Field :readonly="ro" label="Порядковый номер" data-field="odOrder">
+                <InputNumber v-model="od.order" :min="1" :max="m.processes.value.length" />
+              </Field>
+            </FieldSet>
+            <FieldSet legend="Поведение">
+              <div class="flex flex-col gap-3">
+                <Checkbox v-model="od.hidden" :readonly="ro" data-field="odHidden">
+                  Скрытый процесс
+                </Checkbox>
+                <Checkbox v-model="od.pickSteps" :readonly="ro" data-field="odPickSteps">
+                  Разрешать выбор шагов во время съёмки
+                </Checkbox>
+                <Checkbox v-model="od.repeatable" :readonly="ro" data-field="odRepeatable">
+                  Повторяемый процесс
+                </Checkbox>
+              </div>
+              <Field :readonly="ro" label="Тип объекта съёмки" data-field="odObjectType">
+                <Select v-model="od.objectType" :items="OBJECT_TYPES" placeholder="Не выбран" :show-icon="false" :searchable="false" />
+              </Field>
+              <Field :readonly="ro" label="Получение координат" data-field="odCoords">
+                <Select v-model="od.coords" :items="COORDS_MODES" placeholder="Не выбрано" :show-icon="false" :searchable="false" />
+              </Field>
+            </FieldSet>
+            <FieldSet legend="Подсказки">
+              <Field :readonly="ro" label="Подсказка на экране подготовки" hint="Исполнитель видит её перед началом каждого повторения">
+                <Textarea v-model="od.prepHint" placeholder="Например, Снимайте каждое повреждение отдельно" data-field="odPrepHint" />
+              </Field>
+              <Field :readonly="ro" label="Подсказка «Обычно занимает N минут»">
+                <RadioGroup v-model="od.duration" data-radio="odDuration">
+                  <RadioGroupItem v-for="x in DURATION_MODES" :key="x.value" :value="x.value" :checked="od.duration === x.value">
+                    {{ x.label }}
+                  </RadioGroupItem>
+                </RadioGroup>
+              </Field>
+            </FieldSet>
+          </div>
+
+          <div class="flex min-w-0 flex-1 flex-col gap-4" data-overlay-steps>
+            <div class="flex items-center gap-3">
+              <Heading data-overlay-steps-title>
+                Шаги
+                <template #meta>
+                  {{ stepsWord(od.steps.length) }}
+                </template>
+              </Heading>
+              <div :inert="ro" class="ml-auto flex">
+                <Button variant="outline" show-icon data-act="overlay-step-add" @click="openStep(od.id, '', true)">
+                  <template #icon>
+                    <Icon name="add" :size="16" />
+                  </template>
+                  Добавить шаг
+                </Button>
+              </div>
+            </div>
+            <Table v-if="od.steps.length" data-overlay-table>
+              <TableRow>
+                <TableHead variant="column" class="w-10 pl-4">
+                  №
+                </TableHead>
+                <TableHead variant="column" class="min-w-0 flex-1 px-4">
+                  Название · тип шага
+                </TableHead>
+                <TableHead variant="column" class="w-28 px-4">
+                  Способ
+                </TableHead>
+                <TableHead variant="column" class="w-44 px-4">
+                  Нейросети
+                </TableHead>
+                <TableHead variant="column" aria-label="Действия" :class="['justify-end px-4', STEP_ACTIONS_COLUMN]" />
+              </TableRow>
+              <TableRow v-for="(st, k) in od.steps" :key="st.id" :data-overlay-step="st.id">
+                <TableCell align="start" class="w-10 pl-4" data-row-number>
+                  {{ k + 1 }}
+                </TableCell>
+                <TableCell variant="slot" class="h-auto min-w-0 flex-1 flex-col items-start gap-2 px-4 pt-4.5 pb-3 contain-inline-size">
+                  <TableCellIdentity class="w-full flex-none">
+                    {{ st.title }}
+                    <template v-if="st.description" #description>
+                      {{ st.description }}
+                    </template>
+                  </TableCellIdentity>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <Chip variant="neutral">
+                      {{ kindLabel(st.kind) }}
+                    </Chip>
+                    <template v-for="x in STEP_FLAGS" :key="x.key">
+                      <Badge v-if="st[x.key]" size="sm" :variant="x.key === 'required' ? 'default' : 'neutral'" :data-badge="x.key">
+                        {{ x.label }}
+                      </Badge>
+                    </template>
+                  </div>
+                </TableCell>
+                <TableCell align="start" class="w-28 px-4">
+                  {{ st.method }}
+                </TableCell>
+                <TableCell variant="slot" class="h-auto w-44 flex-col items-start gap-1 px-4 pt-4.5 pb-3">
+                  <TableCellText v-for="n in st.networks" :key="n" size="sm" class="w-full">
+                    {{ n }}
+                  </TableCellText>
+                  <ToolbarText v-if="!st.networks.length">
+                    Нейросети не выбраны
+                  </ToolbarText>
+                </TableCell>
+                <TableCell variant="slot" align="start" :class="['justify-end px-4', STEP_ACTIONS_COLUMN]">
+                  <TableRowActions :inert="ro" :actions="STEP_ACTIONS" @edit="openStep(od.id, st.id, true)" @action="removeOverlayStep(st.id)" />
+                </TableCell>
+              </TableRow>
+            </Table>
+            <Card v-else tone="muted">
+              <Empty title="В процессе нет шагов" description="Шаги повторяемого процесса снимаются при каждом повторении — добавьте первый" data-overlay-empty />
+            </Card>
+          </div>
+        </ModalCardBody>
+        <ModalCardFooter>
+          <template v-if="ro">
+            <Button variant="secondary" data-act="overlay-close" @click="m.closeSurface()">
+              Закрыть
+            </Button>
+          </template>
+          <template v-else>
+            <Button variant="secondary" data-act="overlay-cancel" @click="m.closeSurface()">
+              Отмена
+            </Button>
+            <Button data-act="overlay-save" @click="saveOverlay()">
+              Сохранить
+            </Button>
+          </template>
+        </ModalCardFooter>
+      </ModalCardContent>
+    </ModalCard>
+
+    <!--
+      ============================ сайд шага — № 63: шесть секций аудита (пробел макета) ============================
+      «Принцип: всё редактирование сущности — в сайде»: Основное · Поведение · Съёмка · Нейросети («гасит» по компании) ·
+      Подсказки · Связи. Образец — сайд поля (№ 42). Поверх оверлея пишет в черновик оверлея.
+    -->
+    <ModalCard v-model:open="stepOpen">
+      <ModalCardContent placement="edge" data-side="step" :data-host="sdHost.overlay ? 'overlay' : 'page'">
+        <ModalCardHeader :title="sd.id ? `Редактирование шага — ${sdTitle}` : 'Новый шаг'" :subtitle="`Процесс «${hostTitle}»`" />
+        <ModalCardBody class="flex flex-col gap-6">
+          <FieldSet legend="Основное" data-step-section="main">
+            <Field label="Название" required :invalid="sdInvalid" :hint="sdInvalid ? 'Заполните название шага' : ''">
+              <Input v-model="sd.title" placeholder="Например, Передняя часть" :show-icon="false" :invalid="sdInvalid" data-field="sdTitle" />
+            </Field>
+            <Field label="Описание" hint="Исполнитель видит его на экране шага">
+              <Textarea v-model="sd.description" placeholder="Например, Снимите переднюю часть автомобиля с расстояния 3–5 метров" data-field="sdDescription" />
+            </Field>
+            <Field label="Тип шага" data-field="sdKind">
+              <Select v-model="sd.kind" :items="STEP_KINDS" placeholder="" :show-icon="false" :searchable="false" />
+            </Field>
+            <Field label="Порядковый номер" data-field="sdOrder">
+              <InputNumber v-model="sd.order" :min="1" :max="stepOrderMax" />
+            </Field>
+          </FieldSet>
+
+          <FieldSet legend="Поведение" data-step-section="behavior">
+            <div class="flex flex-col gap-3" data-step-flags>
+              <template v-for="x in STEP_FLAGS" :key="x.key">
+                <Checkbox v-if="x.key !== 'gallery' && x.key !== 'docScan'" v-model="sd[x.key]" :data-field="`sd-${x.key}`">
+                  {{ x.label }}
+                </Checkbox>
+              </template>
+            </div>
+          </FieldSet>
+
+          <FieldSet legend="Съёмка" data-step-section="shooting">
+            <Field label="Способ съёмки" data-field="sdMethod">
+              <Select v-model="sd.method" :items="STEP_METHODS" placeholder="" :show-icon="false" :searchable="false" />
+            </Field>
+            <div class="flex flex-col gap-3">
+              <Checkbox v-model="sd.gallery" data-field="sd-gallery">
+                Из галереи
+              </Checkbox>
+              <Checkbox v-model="sd.docScan" data-field="sd-docScan">
+                Скан документов
+              </Checkbox>
+            </div>
+          </FieldSet>
+
+          <!-- Нейросети: недоступная компании — «гасит» по компании (макет `32765:6702`): флажок выключен, причина строкой пояснения. -->
+          <FieldSet :legend="`Нейросети · выбрано ${sd.networks.length}`" data-step-section="networks">
+            <div class="flex flex-col gap-3" data-step-networks-list>
+              <Checkbox
+                v-for="x in NETWORKS"
+                :key="x.value"
+                :model-value="sd.networks.includes(x.value)"
+                :disabled="!!x.denied"
+                :subtitle="x.denied ?? ''"
+                :data-network="x.value"
+                @update:model-value="toggleNetwork(x.value)"
+              >
+                {{ x.value }}
+              </Checkbox>
+            </div>
+          </FieldSet>
+
+          <FieldSet legend="Подсказки" data-step-section="hints">
+            <Field label="Фото-подсказка">
+              <div class="flex w-full flex-col items-start gap-2">
+                <Badge :variant="sd.hints ? 'success' : 'warning'" data-step-hint-status>
+                  {{ hintText(sd.hints) }}
+                </Badge>
+                <button type="button" class="w-full" data-act="step-hint-upload" @click="sd.hints += 1">
+                  <FileUpload>
+                    {{ sd.hints ? 'Добавить подсказку' : 'Загрузить подсказку' }}
+                    <template #hint>
+                      или перетащите файл сюда
+                    </template>
+                  </FileUpload>
+                </button>
+              </div>
+            </Field>
+            <Field label="Текстовая подсказка" hint="Строка над видоискателем на экране съёмки">
+              <Textarea v-model="sd.tip" placeholder="Например, Держите телефон горизонтально" data-field="sdTip" />
+            </Field>
+          </FieldSet>
+
+          <FieldSet legend="Связи" data-step-section="links">
+            <Field label="Поля формы, которые заполняет шаг" hint="Значения приходят из распознавания нейросетей шага" data-field="sdLinks">
+              <Select v-model:values="sd.links" multiple :items="fieldLinkItems" placeholder="Выберите поля" />
+            </Field>
+            <Field label="Словарь комментариев шага" data-field="sdComments">
+              <Select v-model="sdComments" :items="stepComments" placeholder="" :show-icon="false" :searchable="false" />
+            </Field>
+          </FieldSet>
+        </ModalCardBody>
+        <ModalCardFooter>
+          <Button variant="secondary" data-act="step-cancel" @click="m.closeSurface()">
+            Отмена
+          </Button>
+          <Button data-act="step-save" @click="saveStepSide()">
+            {{ sd.id ? 'Сохранить' : 'Добавить шаг' }}
+          </Button>
+        </ModalCardFooter>
+      </ModalCardContent>
+    </ModalCard>
+
+    <!-- ============================ сайд «Нейросети выбранных шагов» — «Настроить нейросети» панели (№ 44) ============================ -->
+    <ModalCard v-model:open="networksOpen">
+      <ModalCardContent placement="edge" data-side="networks">
+        <ModalCardHeader title="Нейросети выбранных шагов" :subtitle="stepsText" />
+        <ModalCardBody class="flex flex-col gap-6">
+          <ModalCardText>
+            «−» — нейросеть у части выбранных шагов: если её не трогать, у каждого шага останется как было
+          </ModalCardText>
+          <div class="flex flex-col gap-3" data-networks-list>
+            <Checkbox
+              v-for="x in NETWORKS"
+              :key="x.value"
+              :model-value="nd[x.value] === 'all'"
+              :indeterminate="nd[x.value] === 'some'"
+              :disabled="!!x.denied"
+              :subtitle="x.denied ?? ''"
+              :data-network="x.value"
+              @update:model-value="cycleNetwork(x.value)"
+            >
+              {{ x.value }}
+            </Checkbox>
+          </div>
+        </ModalCardBody>
+        <ModalCardFooter>
+          <Button variant="secondary" data-act="networks-cancel" @click="m.closeSurface()">
+            Отмена
+          </Button>
+          <Button data-act="networks-save" @click="saveNetworksSide()">
+            Сохранить
           </Button>
         </ModalCardFooter>
       </ModalCardContent>

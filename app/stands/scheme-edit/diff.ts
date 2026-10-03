@@ -3,6 +3,7 @@ import type { SchemeConfig } from './model'
 import {
   ACCESS_GROUPS, ACCESS_ROLES, COMMENT_DICTIONARIES, DEADLINE_EVENTS, DETECTOR_GROUPS, FINISH_CLASSES, PDF_SIGNERS, PHOTO_RESOLUTIONS,
   REGION_MATRICES, ROLE_LADDER, ROLES, SCHEME_TYPES, STATUS_DICTIONARIES, STEP_FLAGS, STEP_KINDS, VIDEO_RESOLUTIONS,
+  COORDS_MODES, DURATION_MODES, OBJECT_TYPES,
 } from './catalogs'
 
 /**
@@ -180,6 +181,13 @@ export interface SchemeDiff {
 }
 
 type StepLike = SchemeConfig['processes'][number]['steps'][number]
+type ProcessLike = SchemeConfig['processes'][number]
+/** Атрибуты сайда процесса (такт 71) для диффа: название и «повторяемый» идут своими строками; у выбора — подпись значения. */
+type ChoiceItems = readonly { value: string, label: string }[]
+const PROCESS_ATTRS: [keyof ProcessLike, string, ChoiceItems?][] = [
+  ['alias', 'алиас'], ['formula', 'формула наименования'], ['icon', 'иконка'], ['hidden', 'скрытый'], ['pickSteps', 'выбор шагов во время съёмки'],
+  ['objectType', 'тип объекта', OBJECT_TYPES], ['coords', 'координаты', COORDS_MODES], ['prepHint', 'подсказка подготовки'], ['duration', 'время прохождения', DURATION_MODES], ['durationMin', 'минут'],
+]
 /**
  * «Было → стало» у шага: способ и подсказки — всегда (как до такта 70); тип шага и флаги — когда они сменились (такт 70:
  * тип меняется в строке, флаги — панелью массовых действий).
@@ -187,7 +195,10 @@ type StepLike = SchemeConfig['processes'][number]['steps'][number]
 function stepChange(was: StepLike, st: StepLike): { before: string, after: string } {
   const kind = (x: StepLike) => STEP_KINDS.find(k => k.value === x.kind)?.label ?? x.kind
   const flags = (x: StepLike) => STEP_FLAGS.filter(f => x[f.key]).map(f => f.label.toLowerCase()).join(', ') || 'без флагов'
-  const text = (x: StepLike) => [x.method, `подсказок: ${x.hints}`, ...(was.kind !== st.kind ? [kind(x)] : []), ...(flags(was) !== flags(st) ? [`флаги: ${flags(x)}`] : [])].join(', ')
+  const nets = (x: StepLike) => x.networks.join(', ') || 'без нейросетей'
+  /* Такт 71: сайд шага меняет и нейросети — они в «было → стало», когда сменились. */
+  const text = (x: StepLike) => [x.method, `подсказок: ${x.hints}`, ...(was.kind !== st.kind ? [kind(x)] : []), ...(flags(was) !== flags(st) ? [`флаги: ${flags(x)}`] : []),
+    ...(nets(was) !== nets(st) ? [`нейросети: ${nets(x)}`] : [])].join(', ')
   return { before: text(was), after: text(st) }
 }
 
@@ -244,6 +255,12 @@ export function diffConfigs(from: SchemeConfig, to: SchemeConfig): SchemeDiff {
     if (!old) { processes.push({ kind: 'added', unit: 'process', item: { label: `Процесс «${p.title}»`, after: `${p.steps.length} ${plural(p.steps.length, 'шаг', 'шага', 'шагов')}` } }); continue }
     if (old.title !== p.title) processes.push({ kind: 'changed', unit: 'attr', item: { label: `Процесс «${old.title}»: название`, before: old.title, after: p.title } })
     if (old.repeatable !== p.repeatable) processes.push({ kind: 'changed', unit: 'attr', item: { label: `Процесс «${p.title}»: повторяемый`, before: fieldValue(old.repeatable), after: fieldValue(p.repeatable) } })
+    /* Такт 71: прочие атрибуты сайда процесса — одной строкой «настройки процесса», списком сменившихся. */
+    const changedAttrs = PROCESS_ATTRS.filter(([key]) => !same(old[key], p[key]))
+    if (changedAttrs.length) {
+      const list = (x: typeof p) => changedAttrs.map(([key, label, items]) => `${label}: ${items?.find(i => i.value === x[key])?.label ?? fieldValue(x[key])}`).join(', ')
+      processes.push({ kind: 'changed', unit: 'attr', item: { label: `Процесс «${p.title}»: настройки процесса`, before: list(old), after: list(p) } })
+    }
     const sa = new Map(old.steps.map(x => [x.id, x]))
     const sb = new Map(p.steps.map(x => [x.id, x]))
     for (const [sid, st] of sb) {
@@ -258,6 +275,10 @@ export function diffConfigs(from: SchemeConfig, to: SchemeConfig): SchemeDiff {
     for (const [sid, st] of sa) if (!sb.has(sid)) { processes.push({ kind: 'removed', unit: 'step', item: { label: `Шаг «${st.title}»`, before: `процесс «${p.title}»` } }); attention.push(`Удалён шаг «${st.title}»`) }
   }
   for (const [id, p] of pa) if (!pb.has(id)) { processes.push({ kind: 'removed', unit: 'process', item: { label: `Процесс «${p.title}»` } }); attention.push(`Удалён процесс «${p.title}»`) }
+  /* Такт 71: порядковый номер в сайде процесса переставляет процессы. */
+  const pBefore = from.processes.filter(x => pb.has(x.id)).map(x => x.title)
+  const pAfter = to.processes.filter(x => pa.has(x.id)).map(x => x.title)
+  if (pBefore.join(' | ') !== pAfter.join(' | ')) processes.push({ kind: 'changed', unit: 'attr', item: { label: 'Порядок процессов', before: pBefore.join(', '), after: pAfter.join(', ') } })
 
   /* ---------- Витрина ---------- */
   const showcase: Raw[] = []

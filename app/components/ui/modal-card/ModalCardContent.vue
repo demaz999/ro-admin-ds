@@ -16,7 +16,7 @@ defineOptions({ inheritAttrs: false })
 
 const props = withDefaults(defineProps<DialogContentProps & {
   placement?: ModalCardPlacement
-  /** Ширина центрального окна: `md` 600, `sm` 440. У `edge` ширина одна — 642. */
+  /** Ширина центрального окна: `md` 600, `sm` 440. У `edge` ширина одна — 642; `full` — во всё окно. */
   size?: 'md' | 'sm'
   /** `false` — закрыть можно только кнопками окна: без крестика, Esc и клика мимо (§12.5). */
   closable?: boolean
@@ -78,7 +78,10 @@ const position = computed(() => (props.inline ? 'absolute' : 'fixed'))
         position,
         props.placement === 'edge'
           ? 'inset-y-0 right-0 w-modal-edge rounded-tl-4xl'
-          : cn('top-1/2 left-1/2 max-h-[88vh] rounded-md -translate-x-1/2 -translate-y-1/2', props.size === 'sm' ? 'w-modal-narrow' : 'w-modal'),
+          : props.placement === 'full'
+            /* Полноэкранный слой (такт 71): во всё окно, без скругления; паддинги и зазоры — прежние. */
+            ? 'inset-0'
+            : cn('top-1/2 left-1/2 max-h-[88vh] rounded-md -translate-x-1/2 -translate-y-1/2', props.size === 'sm' ? 'w-modal-narrow' : 'w-modal'),
         props.class,
       )"
       tabindex="-1"

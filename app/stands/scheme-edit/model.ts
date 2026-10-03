@@ -40,7 +40,9 @@ export * from './catalogs'
  * таб «Процессы и шаги» — массовый выбор шагов сквозь процессы (`toggleStep`, `toggleProcessSteps`), флаги в трёх
  * состояниях (`flagState`, `bulkFlag`), способ съёмки и удаление выделенных, тип шага в строке, инлайн-загрузка
  * фото-подсказок (`uploadHints`), удаление шага и процесса с отменой, перестановка шагов и полей (`moveStep`,
- * `moveField`); сайды процесса и шага — заглушки до такта 71; шаги входят в поиск. Дифф, валидация,
+ * `moveField`); шаги входят в поиск. **П7, часть 2 (такт 71):** сайд процесса (`saveProcess`), сайд шага (`saveStep`, шесть
+ * секций), нейросети выбранных шагов (`bulkNetworks`), оверлей повторяемого процесса (`openOverlay`) — стек «оверлей →
+ * сайд». Дифф, валидация,
  * поиск, публикация, сброс черновика, просмотр снимка, операции формы, процессов и витрины — по своим порциям
  * (`scheme-edit.md`, раздел 10).
  */
@@ -276,11 +278,46 @@ export interface ProcessStep extends Record<StepFlag, boolean> {
   networks: string[]
   /** Фото-подсказок загружено: 0 — «Не установлена». */
   hints: number
+  /** Сайд шага (такт 71): текстовая подсказка на экране шага, связанные поля формы (id), словарь комментариев шага. */
+  tip: string
+  links: string[]
+  comments: string
 }
 export const STEP_DEFAULTS: Omit<ProcessStep, 'id' | 'title' | 'kind' | 'method' | 'networks' | 'hints'> = {
   description: '', required: false, hidden: false, gallery: false, web: false, noConfidential: false, docScan: false,
+  tip: '', links: [], comments: '',
 }
-export interface Process { id: string, title: string, alias: string, repeatable: boolean, steps: ProcessStep[] }
+/**
+ * Процесс — шапка карточки (такт 70) и сайд «Добавление / Редактирование процесса» (такт 71, макеты `33245:5722`,
+ * `33245:6032`): «Основное» — название, алиас, формула наименования, иконка типа процесса; «Поведение» — скрытый, выбор
+ * шагов во время съёмки, повторяемый, тип объекта съёмки, получение координат; «Подсказки» — подсказка на экране
+ * подготовки и «Обычно занимает N минут». Порядковый номер — место в списке процессов.
+ */
+export interface Process {
+  id: string
+  title: string
+  alias: string
+  repeatable: boolean
+  steps: ProcessStep[]
+  formula: string
+  icon: string
+  hidden: boolean
+  pickSteps: boolean
+  objectType: string
+  coords: string
+  prepHint: string
+  duration: 'auto' | 'manual' | 'off'
+  durationMin: number
+}
+export const PROCESS_DEFAULTS: Omit<Process, 'id' | 'title' | 'alias' | 'repeatable' | 'steps'> = {
+  formula: '', icon: '', hidden: false, pickSteps: false, objectType: '', coords: '', prepHint: '', duration: 'auto', durationMin: 10,
+}
+/** Черновик сайда процесса и оверлея: `id` пуст у нового; порядковый номер — `order`; шаги правит только оверлей. */
+export type ProcessDraft = Process & { order: number }
+/** Черновик сайда шага: `id` пуст у нового; порядковый номер — место в процессе. */
+export type StepDraft = ProcessStep & { order: number }
+/** Нейросеть у выделенных шагов — флажок трёх состояний сайда «Нейросети выбранных шагов». */
+export type NetworkState = 'all' | 'some' | 'none'
 export interface Showcase {
   /** Жизненный цикл карточки — аудит, «Структура таба»: требует украшения → черновик → опубликована. */
   status: 'needs' | 'draft' | 'published'
@@ -366,8 +403,8 @@ function withFormDefaults(config: SchemeConfig): SchemeConfig {
       return { ...x, dependent: !!x.dependsOn || x.dependent }
     }),
   }))
-  /* Шаги процессов (такт 70): недостающие атрибуты и флаги — из значений по умолчанию. */
-  config.processes = config.processes.map(p => ({ ...p, steps: p.steps.map(st => ({ ...STEP_DEFAULTS, ...st })) }))
+  /* Процессы и шаги (такты 70–71): недостающие атрибуты и флаги — из значений по умолчанию. */
+  config.processes = config.processes.map(p => ({ ...PROCESS_DEFAULTS, ...p, steps: p.steps.map(st => ({ ...clone(STEP_DEFAULTS), ...st })) }))
   return config
 }
 
@@ -918,14 +955,87 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     p.steps.splice(at, 0, p.steps.splice(k, 1)[0]!)
     return writeProcesses(list)
   }
+  /* ------------------------------ сайды процесса и шага, оверлей — П7, часть 2, такт 71 ------------------------------ */
   /**
-   * Заглушки такта 70 (решение 2 оркестратора): сайды процесса и шага, оверлей повторяемого процесса — такт 71;
-   * «Заполнить изображения» и «Вставить шаг из другой схемы» — вне стенда (r2 §8, §9).
+   * Сайд — атомарная транзакция (аудит, «Принцип: сайд = атомарная транзакция поверх автосейв-страницы»): черновик
+   * сущности живёт на странице, «Сохранить» отдаёт его одной операцией, «Отмена» отбрасывает. Оверлей повторяемого
+   * процесса (r2 §7) — та же транзакция для процесса целиком: форма и шаги вместе; сайд шага поверх оверлея правит
+   * черновик оверлея; черновик схемы получает процесс целиком по «Сохранить» оверлея.
    */
-  function processStub(what: 'add' | 'edit' | 'open' | 'step' | 'networks') {
-    if (ui.viewing && what !== 'open') { notify('Прошлая версия открыта только для чтения', 'err'); return }
-    notify(what === 'networks' ? 'Настройка нейросетей — сайд шага, такт 71' : 'Сайд — такт 71')
+  /** Проверка черновика процесса: название обязательно, алиас — латиницей и не повторяется среди процессов. */
+  function processError(d: ProcessDraft): { key: 'title' | 'alias', text: string } | null {
+    if (!d.title.trim()) return { key: 'title', text: 'Заполните название процесса' }
+    const alias = d.alias.trim()
+    if (alias && !ALIAS_RE.test(alias)) return { key: 'alias', text: 'Алиас — латиницей без пробелов, первая — буква' }
+    if (alias && draft.config.processes.some(x => x.id !== d.id && x.alias === alias)) return { key: 'alias', text: `Алиас «${alias}» уже есть у другого процесса` }
+    return null
   }
+  let processSeq = 0
+  /**
+   * «Сохранить» сайда процесса и оверлея: новый процесс встаёт на свой порядковый номер, правка — на месте либо на новом
+   * номере. Шаги черновика берутся, когда `withSteps` (оверлей); сайд шагов не трогает.
+   */
+  function saveProcess(d: ProcessDraft, withSteps = false): boolean {
+    const error = processError(d)
+    if (error) { notify(error.text, 'err'); return false }
+    const list = processesCopy()
+    const k = list.findIndex(x => x.id === d.id)
+    const { order, ...rest } = clone(d)
+    const item: Process = { ...rest, id: d.id || `p-new-${++processSeq}`, title: d.title.trim(), alias: d.alias.trim(), steps: withSteps || k < 0 ? rest.steps : list[k]!.steps }
+    if (k >= 0) list.splice(k, 1)
+    const at = Math.min(Math.max(1, Math.round(order) || list.length + 1), list.length + 1) - 1
+    list.splice(at, 0, item)
+    writeProcesses(list)
+    return true
+  }
+  /** Проверка черновика шага: название обязательно. */
+  function stepError(d: StepDraft): string { return d.title.trim() ? '' : 'Заполните название шага' }
+  let stepSeq = 0
+  /** Шаг из черновика сайда — в список шагов: на своё место по порядковому номеру. Общая часть для полотна и оверлея. */
+  function placeStep(steps: ProcessStep[], d: StepDraft): ProcessStep[] {
+    const { order, ...rest } = clone(d)
+    const item: ProcessStep = { ...rest, id: d.id || `s-new-${++stepSeq}`, title: d.title.trim() }
+    const next = steps.filter(x => x.id !== item.id)
+    const at = Math.min(Math.max(1, Math.round(order) || next.length + 1), next.length + 1) - 1
+    next.splice(at, 0, item)
+    return next
+  }
+  /** «Сохранить» сайда шага на полотне: одна запись автосохранением. */
+  function saveStep(processId: string, d: StepDraft): boolean {
+    const error = stepError(d)
+    if (error) { notify(error, 'err'); return false }
+    const list = processesCopy()
+    const p = list.find(x => x.id === processId)
+    if (!p) return false
+    p.steps = placeStep(p.steps, d)
+    writeProcesses(list)
+    return true
+  }
+  /** Нейросеть у выделенных шагов: у всех, у части, ни у одного. */
+  function networkState(name: string): NetworkState {
+    const list = selectedSteps.value
+    const n = list.filter(st => st.networks.includes(name)).length
+    return n === 0 ? 'none' : n === list.length ? 'all' : 'some'
+  }
+  /**
+   * «Сохранить» сайда «Нейросети выбранных шагов»: «все» — нейросеть у каждого выбранного, «нет» — ни у одного, «часть» —
+   * как было у каждого. Одна запись, уведомление «Применено к N шагам» с «Отменить» — как флаги панели.
+   */
+  function bulkNetworks(states: Record<string, NetworkState>): boolean {
+    const on = Object.entries(states).filter(([, v]) => v === 'all').map(([k]) => k)
+    const off = Object.entries(states).filter(([, v]) => v === 'none').map(([k]) => k)
+    return bulkSteps((st) => {
+      st.networks = [...st.networks.filter(n => !off.includes(n)), ...on.filter(n => !st.networks.includes(n))]
+    })
+  }
+  /** Оверлей повторяемого процесса — полноэкранный слой (r2 §7); открытие — чтение, поэтому и в просмотре версии. */
+  function openOverlay() { ui.surfaces.push({ kind: 'overlay', id: 'process-overlay' }) }
+  /** Отказ правки в просмотре версии — для открытия сайдов правки. */
+  function canEdit(): boolean {
+    if (ui.viewing) { notify('Прошлая версия открыта только для чтения', 'err'); return false }
+    return true
+  }
+  /** «Заполнить изображения» и «Вставить шаг из другой схемы» — вне стенда (r2 §8, §9). */
   function fillImages() { notify('Массовая заливка изображений — вне стенда') }
   function pasteStep() { notify('Выбор шага из другой схемы — вне стенда') }
 
@@ -1079,7 +1189,8 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     formGroups, formGroup, selectGroup, fieldApprovalReason, fieldError, saveField, removeField, toggleField, selectionState, toggleAllFields,
     clearFieldSelection, bulkFields, fillAliases, pasteFromScheme, saveGroup, removeGroup, moveField,
     processes, selectedSteps, toggleStep, processSelection, toggleProcessSteps, clearStepSelection, flagState, bulkFlag, bulkMethod, bulkDeleteSteps,
-    setStepKind, uploadHints, removeStep, removeProcess, moveStep, processStub, fillImages, pasteStep,
+    setStepKind, uploadHints, removeStep, removeProcess, moveStep, fillImages, pasteStep,
+    processError, saveProcess, stepError, placeStep, saveStep, networkState, bulkNetworks, openOverlay, canEdit,
     undo, addReason, removeReason, toggleGroup, resetCosts, detectorsOn, detectorSetState, toggleDetectorSet, setDetector, saveTemplate, removeTemplate,
   }
 }

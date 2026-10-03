@@ -339,6 +339,11 @@ function kit(page) {
       await page.evaluate(`(document.querySelector('[data-reorder-handle="${id}"]').focus(), 1)`)
       await page.key(key, key, { modifiers: 1 })
     },
+    /* ---------- П7, часть 2, такт 71: сайды процесса и шага, оверлей ---------- */
+    /** Флажок нейросети в сайде шага либо в сайде «Нейросети выбранных шагов». */
+    net: (side, name) => page.click(`document.querySelector('[data-side=${side}] [data-network="${name}"] [data-slot=choice-control], [data-side=${side}] [data-network="${name}"][data-slot=choice] [data-slot=choice-control]')`),
+    stepAct: (id, act) => page.click(`document.querySelector('[data-step-row="${id}"] [data-act=${act}]')`),
+    overlayStepEdit: id => page.click(`document.querySelector('[data-overlay-step="${id}"] [data-slot=table-row-action]')`),
     /* ---------- такт 68: только чтение ---------- */
     selectText: sel => page.selectText(sel),
     /** Поле ввода: клик в середину значения и набор знака — в «только чтении» значение прежнее. */
@@ -662,6 +667,65 @@ function kit(page) {
               rowActsInert: [...el.querySelectorAll('[data-slot=table-row-actions]')].every(x => !!x.closest('[inert]')) } })(),
           focusStep: document.activeElement?.closest?.('[data-step-row]')?.dataset.stepRow ?? null,
           focusHandle: document.activeElement?.dataset?.reorderHandle ?? null,
+          /* ---------- П7, часть 2, такт 71: сайды процесса и шага, оверлей, стек слоёв ---------- */
+          surfaces: M.ui.surfaces.map(x => x.id),
+          /* Слой, в котором фокус: сайд по data-side либо оверлей. */
+          focusIn: document.activeElement?.closest?.('[data-side]')?.dataset.side ?? (document.activeElement?.closest?.('[data-overlay]') ? 'overlay' : null),
+          procHidden: [...document.querySelectorAll('[data-process]')].filter(c => c.querySelector('[data-badge=hidden]')).map(c => c.dataset.process),
+          procSide: (() => { const el = document.querySelector('[data-side=process]'); if (!el) return null
+            const val = k => { const x = el.querySelector('[data-field=' + k + ']'); return (x?.matches('input, textarea') ? x : x?.querySelector('input, textarea'))?.value ?? null }
+            return {
+              title: t(el.querySelector('[data-slot=modal-card-title]')?.textContent),
+              legends: [...el.querySelectorAll('[data-slot=field-set-legend]')].map(x => t(x.textContent)),
+              name: val('pdTitle'), alias: val('pdAlias'),
+              order: Number(t(el.querySelector('[data-field=pdOrder] [data-slot=stepper-value]')?.textContent)),
+              flags: [...el.querySelectorAll('[data-process-flags] [data-slot=choice]')].filter(c => c.querySelector('[data-slot=choice-control]').getAttribute('aria-checked') === 'true').map(c => c.dataset.field),
+              objectType: t(el.querySelector('[data-field=pdObjectType] [data-slot=field-input]')?.textContent) || null,
+              icon: t(el.querySelector('[data-act=process-icon]')?.textContent),
+              duration: t(el.querySelector('[data-radio=pdDuration] [data-slot=choice-control][data-state=checked]')?.closest('[data-slot=choice]')?.textContent) || null,
+            } })(),
+          stepSide: (() => { const el = document.querySelector('[data-side=step]'); if (!el) return null
+            const val = k => { const x = el.querySelector('[data-field=' + k + ']'); return (x?.matches('input, textarea') ? x : x?.querySelector('input, textarea'))?.value ?? null }
+            const nets = [...el.querySelectorAll('[data-step-networks-list] [data-network]')]
+            const ctl = c => c.matches('[data-slot=choice-control]') ? c : c.querySelector('[data-slot=choice-control]')
+            return {
+              title: t(el.querySelector('[data-slot=modal-card-title]')?.textContent), sub: t(el.querySelector('[data-slot=modal-card-subtitle]')?.textContent),
+              host: el.dataset.host,
+              legends: [...el.querySelectorAll('[data-slot=field-set-legend]')].map(x => t(x.textContent)),
+              name: val('sdTitle'),
+              order: Number(t(el.querySelector('[data-field=sdOrder] [data-slot=stepper-value]')?.textContent)),
+              flags: [...el.querySelectorAll('[data-step-section] [data-slot=choice][data-field]')].filter(c => ctl(c).getAttribute('aria-checked') === 'true').map(c => c.dataset.field),
+              networks: nets.filter(c => ctl(c).getAttribute('aria-checked') === 'true').map(c => c.dataset.network),
+              denied: nets.filter(c => ctl(c).disabled).map(c => c.dataset.network + ' | ' + t(c.querySelector('[data-slot=choice-subtitle]')?.textContent)),
+              hint: t(el.querySelector('[data-step-hint-status]')?.textContent),
+              links: [...el.querySelectorAll('[data-field=sdLinks] [data-slot=select-chip]')].map(c => t(c.textContent)),
+              /* Секция «Нейросети» в окне сайда: верх секции виден. */
+              networksInView: (() => { const sec = el.querySelector('[data-step-section=networks]'); const body = el.querySelector('[data-slot=modal-card-body]'); if (!sec || !body) return null
+                const a = sec.getBoundingClientRect(); const b = body.getBoundingClientRect(); return a.top >= b.top - 1 && a.top < b.bottom })(),
+            } })(),
+          focusNetwork: document.activeElement?.closest?.('[data-network]')?.dataset.network ?? null,
+          netSide: (() => { const el = document.querySelector('[data-side=networks]'); if (!el) return null
+            return { sub: t(el.querySelector('[data-slot=modal-card-subtitle]')?.textContent),
+              states: Object.fromEntries([...el.querySelectorAll('[data-networks-list] [data-network]')].map(c => [c.dataset.network,
+                (c.matches('[data-slot=choice-control]') ? c : c.querySelector('[data-slot=choice-control]')).disabled ? 'off' : (c.matches('[data-slot=choice-control]') ? c : c.querySelector('[data-slot=choice-control]')).getAttribute('aria-checked')])) } })(),
+          overlay: (() => { const el = document.querySelector('[data-overlay=process]'); if (!el) return null
+            const live = x => !x.closest('[inert]')
+            return {
+              title: t(el.querySelector('[data-slot=modal-card-title]')?.textContent), sub: t(el.querySelector('[data-slot=modal-card-subtitle]')?.textContent),
+              placement: el.dataset.placement,
+              name: el.querySelector('[data-field=odTitle] input, input[data-field=odTitle]')?.value ?? null,
+              alias: el.querySelector('[data-field=odAlias] input, input[data-field=odAlias]')?.value ?? null,
+              steps: [...el.querySelectorAll('[data-overlay-step]')].map(r => [t(r.querySelector('[data-row-number]').textContent), t(r.querySelector('[data-slot=table-cell-identity] [data-slot=table-cell-text]')?.textContent ?? r.querySelector('[data-slot=table-cell-identity]').textContent)].join(' · ')),
+              empty: t(el.querySelector('[data-overlay-empty] [data-slot=empty-title]')?.textContent) || null,
+              acts: [...el.querySelectorAll('[data-act]')].filter(live).map(b => b.dataset.act),
+              ro: !!el.dataset.readonly,
+              /* Только чтение: поля формы оверлея несут ось, флажки — aria-readonly. */
+              fieldsRo: [...el.querySelectorAll('[data-overlay-form] [data-slot=field-wrapper]')].every(x => 'readonly' in x.dataset)
+                && [...el.querySelectorAll('[data-overlay-form] [data-slot=choice-control]')].every(x => x.getAttribute('aria-readonly') === 'true'),
+              /* Полноэкранный слой: карточка во всё окно. */
+              full: (() => { const r = el.getBoundingClientRect(); return Math.round(r.left) === 0 && Math.round(r.top) === 0 && Math.round(r.width) === innerWidth && Math.round(r.height) === innerHeight })(),
+            } })(),
+          focusOverlayStep: document.activeElement?.closest?.('[data-overlay-step]')?.dataset.overlayStep ?? null,
         })
       })()`)
       return JSON.parse(s)
@@ -1128,6 +1192,12 @@ const SCENARIOS = {
       { surface: '', 'form.title': 'Заявка · 3 поля', writes: 0, focusAct: 'field-add' }],
     ['сайд группы: карандаш, Esc — фокус на карандаше', async (K) => { await K.act('group-edit'); await K.typeInto('gdTitle', ' плюс'); await K.key('Escape') },
       { surface: '', 'form.groups.0': 'Заявка', writes: 0, focusAct: 'group-edit' }],
+    ['сайд процесса (такт 71): «Изменить процесс», Tab по кругу — фокус в сайде', async (K) => { await K.tab('processes'); await K.processAct('p-auto', 'process-edit'); await K.tabs(30) },
+      { surface: 'process', focusIn: 'process' }],
+    ['название, Esc — процесс прежний, фокус на «Изменить процесс»', async (K) => { await K.typeInto('pdTitle', ' плюс'); await K.key('Escape') },
+      { surface: '', 'proc.cards.0': 'Осмотр автомобиля · 4 шага · auto_inspection', writes: 0, focusAct: 'process-edit' }],
+    ['сайд шага: карандаш строки, Tab по кругу, Esc — фокус на строке шага', async (K) => { await K.stepEdit('s-vin-metal'); await K.tabs(40); await K.key('Escape') },
+      { surface: '', focusStep: 's-vin-metal', writes: 0 }],
   ], { query: 'section=pdf' }],
   'СС-59': ['сайд словаря комментариев: привязка словаря к схеме, «Сохранить» меняет значение в «Словарях»; «Отмена» и Esc отбрасывают (r2 §4, §7; аудит, «Финальная карта подсекций „Общих“», п. 4)', [
     ['открыть сайд', K => K.act('open-comments'), { surface: 'comments', sideTitle: 'Словарь комментариев', sideDict: 'Комментарии к осмотру транспорта', sideComments: 4 }],
@@ -1225,14 +1295,31 @@ const SCENARIOS = {
       { notices: ['Выбор шага из другой схемы — вне стенда'], surface: '', 'proc.cards.0': 'Осмотр автомобиля · 4 шага · auto_inspection', writes: 0 }],
   ], { query: 'tab=form' }],
   /* ============================ П7, часть 1, такт 70 ============================ */
-  'СС-38': ['процессы (часть 1): карточки процессов, у повторяемого — метка и «Открыть процесс»; сайды процесса — такт 71, до него заглушка (r2 §6; решение 2 оркестратора 2026-10-03)', [
+  'СС-38': ['процессы: карточки процессов; добавить и изменить процесс в сайде — три секции макета, «Сохранить» одной записью, «Отмена» отбрасывает; «Открыть процесс» у повторяемого — оверлей (r2 §6, §7; макеты `33245:5722`, `33245:6032`)', [
     ['старт: три процесса, шаги таблицами', null, { 'proc.cards': ['Осмотр автомобиля · 4 шага · auto_inspection', 'Осмотр документов · 1 шаг · docs_inspection',
       'Осмотр повреждений · 0 шагов · damage_inspection · повторяемый · открыть'], 'proc.rows': { 'p-auto': ["1 · VIN под стеклом · Основной · 1 фото · Распознавание VIN, Распознавание шильдиков · 5 · Все установлены · Обязательный","2 · VIN на металле · Основной · 1 фото · Распознавание VIN · Не установлена · Обязательный","3 · Передняя часть · Основной · 2–7 фото · Ракурсы авто · Передняя, Оценка повреждений · 8 · Все установлены · Обязательный","4 · Вид справа · Основной · 2–7 фото · Ракурсы авто · Правая сторона · Не установлена"], 'p-docs': ["1 · Паспорт ТС (ПТС) · Техническое фото · 2 фото · Сканер документов · Не установлена · Из галереи, Скан документов"], 'p-damage': [] },
       'proc.bar': null, writes: 0 }],
-    ['«Добавить процесс» — заглушка до такта 71', K => K.act('process-add'), { notices: ['Сайд — такт 71'], surface: '', writes: 0 }],
-    ['«Изменить процесс»', K => K.processAct('p-auto', 'process-edit'), { notices: ['Сайд — такт 71'], surface: '', writes: 0 }],
-    ['«Открыть процесс» у повторяемого', K => K.processAct('p-damage', 'process-open'), { notices: ['Сайд — такт 71'], surface: '', writes: 0 }],
-    ['«Заполнить изображения» — вне стенда (r2 §9)', K => K.act('fill-images'), { notices: ['Массовая заливка изображений — вне стенда'], writes: 0 }],
+    ['«Добавить процесс» — сайд «Добавление процесса»: «Основное», «Поведение», «Подсказки»; номер — следующий', K => K.act('process-add'),
+      { surface: 'process', focusIn: 'process', procSide: { title: 'Добавление процесса', legends: ['Основное', 'Поведение', 'Подсказки'], name: '', alias: '', order: 4, flags: [], objectType: 'Не выбран', icon: 'Загрузить иконку SVG или PNG · или перетащите файл сюда', duration: 'Автоматически' }, writes: 0 }],
+    ['пустое название — отказ, сайд открыт', K => K.act('process-save'), { notices: ['Заполните название процесса'], surface: 'process', writes: 0 }],
+    ['«Осмотр салона», алиас по названию, повторяемый, иконка — «Добавить процесс»', async (K) => {
+      await K.typeInto('pdTitle', 'Осмотр салона'); await K.act('process-alias-suggest'); await K.check('pdRepeatable'); await K.act('process-icon'); await K.act('process-save'); await K.settled() },
+      { surface: '', notices: [], 'proc.cards.3': 'Осмотр салона · 0 шагов · osmotr_salona · повторяемый · открыть', saveLog: ['saving', 'saved'], writes: 1, focusAct: 'process-add' }],
+    ['«Изменить процесс» у «Осмотра документов» — сайд «Редактирование процесса — …» со значениями процесса', K => K.processAct('p-docs', 'process-edit'),
+      { surface: 'process', 'procSide.title': 'Редактирование процесса — Осмотр документов', 'procSide.name': 'Осмотр документов', 'procSide.alias': 'docs_inspection', 'procSide.order': 2, 'procSide.flags': [], writes: 1 }],
+    ['правки и «Отмена» — полотно прежнее, фокус на «Изменить процесс»', async (K) => { await K.typeInto('pdTitle', ' ТС'); await K.check('pdHidden'); await K.act('process-cancel') },
+      { surface: '', 'proc.cards.1': 'Осмотр документов · 1 шаг · docs_inspection', procHidden: [], writes: 1, focusAct: 'process-edit' }],
+    ['снова: название, «Скрытый процесс», тип объекта, номер 1 — «Сохранить» одной записью', async (K) => {
+      await K.processAct('p-docs', 'process-edit'); await K.typeInto('pdTitle', ' ТС'); await K.check('pdHidden'); await K.select('pdObjectType', 'Документ'); await K.stepper('pdOrder', 'Уменьшить'); await K.act('process-save'); await K.settled() },
+      { surface: '', 'proc.cards.0': 'Осмотр документов ТС · 1 шаг · docs_inspection', 'proc.cards.1': 'Осмотр автомобиля · 4 шага · auto_inspection', procHidden: ['p-docs'], saveLog: ['saving', 'saved'], writes: 2 }],
+    ['дифф публикации: название, настройки процесса, порядок процессов, новый процесс', async (K) => { await K.publish(); await K.area('processes') },
+      { surface: 'publish', 'diff.open.0.groups': [
+        { kind: 'added', title: 'Добавлено · 1', items: ['Процесс «Осмотр салона» | 0 шагов'] },
+        { kind: 'changed', title: 'Изменено · 3', items: ['Процесс «Осмотр документов»: название | Осмотр документов → Осмотр документов ТС', 'Процесс «Осмотр документов ТС»: настройки процесса | скрытый: нет, тип объекта: пусто → скрытый: да, тип объекта: Документ', 'Порядок процессов | Осмотр автомобиля, Осмотр документов, Осмотр повреждений → Осмотр документов ТС, Осмотр автомобиля, Осмотр повреждений'] },
+        { kind: 'removed', title: 'Удалено · 1', items: ['Шаг «Страховой полис» | процесс «Осмотр документов ТС»'] }] }],
+    ['«Открыть процесс» у повторяемого — полноэкранный оверлей', async (K) => { await K.act('publish-cancel'); await K.processAct('p-damage', 'process-open') },
+      { surface: 'process-overlay', surfaces: ['process-overlay'], 'overlay.title': 'Осмотр повреждений', 'overlay.full': true, 'overlay.placement': 'full', writes: 2 }],
+    ['«Заполнить изображения» — вне стенда (r2 §9)', async (K) => { await K.key('Escape'); await K.act('fill-images') }, { surface: '', notices: ['Массовая заливка изображений — вне стенда'], writes: 2 }],
   ], { query: 'tab=processes' }],
   'СС-39': ['процессы: массовый выбор шагов сквозь процессы, флаги в трёх состояниях, фото, нейросети; toast «Применено к N · Отменить» (r2 §6; аудит, «Отмена при автосейве»)', [
     ['выбрать два шага «Осмотра автомобиля» и ПТС — панель «Выбрано: 3 шага», флаги трёх состояний', async (K) => { await K.stepCheck('s-vin-glass'); await K.stepCheck('s-vin-metal'); await K.stepCheck('s-pts') },
@@ -1246,14 +1333,24 @@ const SCENARIOS = {
       { notices: ['Применено к 3 шагам', 'Применено к 3 шагам'], 'proc.flags.hidden': 'false', 'proc.rows.p-auto.1': "2 · VIN на металле · Основной · 1 фото · Распознавание VIN · Не установлена · Обязательный", writes: 4 }],
     ['«Фото» — способ съёмки «2 фото» у выбранных', async (K) => { await K.select('bulkMethod', '2 фото'); await K.settled() },
       { notices: ['Применено к 3 шагам'], 'proc.rows.p-auto.0': "1 · VIN под стеклом · Основной · 2 фото · Распознавание VIN, Распознавание шильдиков · 5 · Все установлены · Обязательный", 'proc.rows.p-auto.2': "3 · Передняя часть · Основной · 2–7 фото · Ракурсы авто · Передняя, Оценка повреждений · 8 · Все установлены · Обязательный", writes: 5 }],
-    ['«Настроить нейросети» — заглушка до такта 71', K => K.act('bulk-networks'), { notices: ['Настройка нейросетей — сайд шага, такт 71'], writes: 5 }],
+    /* Уведомления прежних шагов живут 3 с: «Отменить» ниже должно попасть в уведомление этого действия. */
+    ['«Настроить нейросети» — сайд нейросетей выбранных шагов, флажки трёх состояний; недоступные компании выключены', async (K) => { await sleep(3200); await K.act('bulk-networks') },
+      { surface: 'networks', 'netSide.sub': 'Выбрано: 3 шага', 'netSide.states': { 'Распознавание VIN': 'mixed', 'Распознавание шильдиков': 'mixed', 'Распознавание госномера': 'false',
+        'Ракурсы авто · Передняя': 'false', 'Ракурсы авто · Правая сторона': 'false', 'Ракурсы авто · Левая сторона': 'false', 'Оценка повреждений': 'false', 'Сканер документов': 'mixed',
+        'Детектор подмены снимка': 'off', 'Оценка износа шин': 'off' }, writes: 5 }],
+    ['«Распознавание VIN» из «−» — всем; «Сохранить» — уведомление «Применено к 3 шагам»', async (K) => { await K.net('networks', 'Распознавание VIN'); await K.act('networks-save'); await K.settled() },
+      { surface: '', notices: ['Применено к 3 шагам'], 'proc.rows.p-docs.0': '1 · Паспорт ТС (ПТС) · Техническое фото · 2 фото · Сканер документов, Распознавание VIN · Не установлена · Из галереи, Скан документов', writes: 6 }],
+    ['«Отменить» — нейросети как были', async (K) => { await K.undo(); await K.settled() },
+      { 'proc.rows.p-docs.0': '1 · Паспорт ТС (ПТС) · Техническое фото · 2 фото · Сканер документов · Не установлена · Из галереи, Скан документов', writes: 7 }],
+    ['снова: «Отмена» сайда — записи нет', async (K) => { await K.act('bulk-networks'); await K.net('networks', 'Оценка повреждений'); await K.act('networks-cancel') },
+      { surface: '', notices: [], saveLog: [], writes: 7 }],
     ['флажок шапки «Осмотра автомобиля» — выбраны все его шаги', K => K.stepsAll('p-auto'), { 'proc.bar': 'Выбрано: 5 шагов', 'proc.all.p-auto': 'true', 'proc.selected': 5 }],
     ['«Удалить выбранные» — уведомление с «Отменить»', async (K) => { await K.act('steps-delete'); await K.settled() },
       { notices: ['Удалено 5 шагов'], 'proc.cards': ['Осмотр автомобиля · 0 шагов · auto_inspection', 'Осмотр документов · 0 шагов · docs_inspection',
-        'Осмотр повреждений · 0 шагов · damage_inspection · повторяемый · открыть'], 'proc.bar': null, writes: 6 }],
+        'Осмотр повреждений · 0 шагов · damage_inspection · повторяемый · открыть'], 'proc.bar': null, writes: 8 }],
     ['«Отменить» — шаги на месте, выделения нет', async (K) => { await K.undo(); await K.settled() },
-      { 'proc.cards.0': 'Осмотр автомобиля · 4 шага · auto_inspection', 'proc.cards.1': 'Осмотр документов · 1 шаг · docs_inspection', 'proc.selected': 0, 'proc.bar': null, writes: 7 }],
-    ['«Снять выделение»', async (K) => { await K.stepCheck('s-front'); await K.act('steps-clear') }, { 'proc.bar': null, 'proc.selected': 0, writes: 7 }],
+      { 'proc.cards.0': 'Осмотр автомобиля · 4 шага · auto_inspection', 'proc.cards.1': 'Осмотр документов · 1 шаг · docs_inspection', 'proc.selected': 0, 'proc.bar': null, writes: 9 }],
+    ['«Снять выделение»', async (K) => { await K.stepCheck('s-front'); await K.act('steps-clear') }, { 'proc.bar': null, 'proc.selected': 0, writes: 9 }],
   ], { query: 'tab=processes' }],
   'СС-40': ['фото-подсказка: инлайн-загрузка в ячейке, статус меняется на месте; тип шага — по месту (r2 §6; аудит, «Принцип: атрибут — инлайн по месту»)', [
     ['старт: «VIN на металле» — «Не установлена»', null, { 'proc.rows.p-auto.1': "2 · VIN на металле · Основной · 1 фото · Распознавание VIN · Не установлена · Обязательный", 'proc.upload': null }],
@@ -1273,8 +1370,59 @@ const SCENARIOS = {
     ['удалить процесс «Осмотр документов» корзиной в шапке', async (K) => { await K.processAct('p-docs', 'process-delete'); await K.settled() },
       { notices: ['Процесс «Осмотр документов» удалён'], 'proc.cards.length': 2, writes: 3 }],
     ['«Отменить» — процесс на месте', async (K) => { await K.undo(); await K.settled() }, { 'proc.cards.1': 'Осмотр документов · 1 шаг · docs_inspection', writes: 4 }],
-    ['карандаш строки — сайд шага, такт 71: заглушка', K => K.stepEdit('s-front'), { notices: ['Сайд — такт 71'], surface: '', writes: 4 }],
+    ['карандаш строки — сайд шага (такт 71)', K => K.stepEdit('s-front'), { surface: 'step', 'stepSide.title': 'Редактирование шага — Передняя часть', notices: [], writes: 4 }],
   ], { query: 'tab=processes' }],
+  'СС-52': ['сайд шага: шесть секций — «Основное», «Поведение», «Съёмка», «Нейросети» с недоступными компании, «Подсказки», «Связи»; «Сохранить» одной записью, «Отмена» отбрасывает (r2 §6, §8; аудит, «Принцип: всё редактирование сущности — в сайде»)', [
+    ['карандаш «Передней части» — сайд шага, шесть секций, значения шага', K => K.stepEdit('s-front'),
+      { surface: 'step', focusIn: 'step', stepSide: { title: 'Редактирование шага — Передняя часть', sub: 'Процесс «Осмотр автомобиля»', host: 'page',
+        legends: ['Основное', 'Поведение', 'Съёмка', 'Нейросети · выбрано 2', 'Подсказки', 'Связи'], name: 'Передняя часть', order: 3, flags: ['sd-required'],
+        networks: ['Ракурсы авто · Передняя', 'Оценка повреждений'],
+        denied: ['Детектор подмены снимка | Недоступна компании «Демо Страхование» — подключается через менеджера', 'Оценка износа шин | Недоступна компании «Демо Страхование» — подключается через менеджера'],
+        hint: '8 · Все установлены', links: [], networksInView: false }, writes: 0 }],
+    ['правки и «Отмена» — строка прежняя, фокус на карандаше строки', async (K) => { await K.typeInto('sdTitle', ' авто'); await K.check('sd-web'); await K.act('step-cancel') },
+      { surface: '', 'proc.rows.p-auto.2': '3 · Передняя часть · Основной · 2–7 фото · Ракурсы авто · Передняя, Оценка повреждений · 8 · Все установлены · Обязательный', focusStep: 's-front', writes: 0 }],
+    ['снова: название, «Можно в web», нейросеть, подсказка, поле формы — «Сохранить» одной записью', async (K) => {
+      await K.stepEdit('s-front'); await K.typeInto('sdTitle', ' авто'); await K.check('sd-web'); await K.net('step', 'Распознавание госномера'); await K.act('step-hint-upload')
+      await K.pick('sdLinks', 'Автомобиль · Госномер'); await K.act('step-save'); await K.settled() },
+      { surface: '', notices: [], 'proc.rows.p-auto.2': '3 · Передняя часть авто · Основной · 2–7 фото · Ракурсы авто · Передняя, Оценка повреждений, Распознавание госномера · 9 · Все установлены · Обязательный, Можно в web', saveLog: ['saving', 'saved'], writes: 1 }],
+    ['«Настроить нейросети» в строке «Вида справа» — сайд шага, секция «Нейросети» в окне, фокус на первом флажке', K => K.stepAct('s-right', 'step-networks'),
+      { surface: 'step', 'stepSide.title': 'Редактирование шага — Вид справа', 'stepSide.networksInView': true, focusNetwork: 'Распознавание VIN', writes: 1 }],
+    ['нажатие на недоступную компании нейросеть — не выбирается', K => K.net('step', 'Детектор подмены снимка'), { 'stepSide.networks': ['Ракурсы авто · Правая сторона'], writes: 1 }, { blind: true }],
+    ['Esc — сайд закрыт, фокус на «Настроить нейросети» строки', K => K.key('Escape'), { surface: '', focusAct: 'step-networks', focusStep: 's-right', writes: 1 }],
+    ['«Добавить шаг» у «Осмотра документов» — «Новый шаг», номер следующий; пустое название — отказ', async (K) => { await K.processAct('p-docs', 'step-add'); await K.act('step-save') },
+      { surface: 'step', notices: ['Заполните название шага'], 'stepSide.title': 'Новый шаг', 'stepSide.order': 2, 'stepSide.flags': [], writes: 1 }],
+    ['«Свидетельство о регистрации», «2 фото» — «Добавить шаг»: строка в конце процесса', async (K) => { await K.typeInto('sdTitle', 'Свидетельство о регистрации'); await K.select('sdMethod', '2 фото'); await K.act('step-save'); await K.settled() },
+      { surface: '', 'proc.cards.1': 'Осмотр документов · 2 шага · docs_inspection', 'proc.rows.p-docs.1': '2 · Свидетельство о регистрации · Основной · 2 фото · Нейросети не выбраны · Не установлена', writes: 2 }],
+  ], { query: 'tab=processes' }],
+  'СС-53': ['оверлей повторяемого процесса: форма и шаги вместе; стек «оверлей → сайд», Esc закрывает верхний слой, фокус возвращается к триггеру своего слоя; «Сохранить» оверлея — одной записью (r2 §7; аудит, «Клавиатура и фокус»)', [
+    ['«Открыть процесс» — оверлей во всё окно: форма процесса и шаги, шагов нет', K => K.processAct('p-damage', 'process-open'),
+      { surface: 'process-overlay', focusIn: 'overlay', overlay: { title: 'Осмотр повреждений', sub: 'Повторяемый процесс · форма и шаги вместе', placement: 'full', name: 'Осмотр повреждений', alias: 'damage_inspection',
+        steps: [], empty: 'В процессе нет шагов', acts: ['overlay-alias-suggest', 'overlay-step-add', 'overlay-cancel', 'overlay-save'], ro: false, fieldsRo: false, full: true }, writes: 0 }],
+    ['Tab по кругу — фокус остаётся в оверлее', K => K.tabs(30), { surface: 'process-overlay', focusIn: 'overlay' }],
+    ['«Добавить шаг» — сайд шага поверх оверлея: стек из двух слоёв, фокус в сайде', K => K.act('overlay-step-add'),
+      { surface: 'step', surfaces: ['process-overlay', 'step'], focusIn: 'step', 'stepSide.title': 'Новый шаг', 'stepSide.sub': 'Процесс «Осмотр повреждений»', 'stepSide.host': 'overlay', 'overlay.title': 'Осмотр повреждений' }],
+    ['Tab по кругу — фокус остаётся в сайде', K => K.tabs(40), { surface: 'step', focusIn: 'step' }],
+    ['название, Esc — закрыт только сайд, оверлей открыт, фокус на «Добавить шаг» оверлея', async (K) => { await K.typeInto('sdTitle', 'Черновик шага'); await K.key('Escape') },
+      { surface: 'process-overlay', surfaces: ['process-overlay'], focusIn: 'overlay', focusAct: 'overlay-step-add', 'overlay.steps': [], writes: 0 }],
+    ['«Добавить шаг», название — «Добавить шаг»: шаг в черновике оверлея, полотно прежнее', async (K) => { await K.act('overlay-step-add'); await K.typeInto('sdTitle', 'Общий план повреждения'); await K.act('step-save') },
+      { surface: 'process-overlay', 'overlay.steps': ['1 · Общий план повреждения'], 'overlay.empty': null, 'proc.cards.2': 'Осмотр повреждений · 0 шагов · damage_inspection · повторяемый · открыть', writes: 0 }],
+    ['карандаш шага оверлея — сайд правки поверх; «Отмена» — фокус на карандаше строки оверлея', async (K) => { await K.overlayStepEdit('s-new-1'); await K.act('step-cancel') },
+      { surface: 'process-overlay', focusOverlayStep: 's-new-1', 'overlay.steps': ['1 · Общий план повреждения'] }],
+    ['Esc в оверлее — оверлей закрыт без записи, фокус на «Открыть процесс»', K => K.key('Escape'),
+      { surface: '', surfaces: [], focusAct: 'process-open', 'proc.rows.p-damage': [], writes: 0 }],
+    ['снова — черновик оверлея сброшен; шаг, название процесса, «Сохранить» — одна запись', async (K) => {
+      await K.processAct('p-damage', 'process-open'); await K.act('overlay-step-add'); await K.typeInto('sdTitle', 'Деталь крупным планом'); await K.act('step-save')
+      await K.typeInto('odTitle', ' кузова'); await K.act('overlay-save'); await K.settled() },
+      { surface: '', 'proc.cards.2': 'Осмотр повреждений кузова · 1 шаг · damage_inspection · повторяемый · открыть',
+        'proc.rows.p-damage': ['1 · Деталь крупным планом · Основной · 1 фото · Нейросети не выбраны · Не установлена'], saveLog: ['saving', 'saved'], writes: 1 }],
+  ], { query: 'tab=processes' }],
+  'СС-53/просмотр': ['оверлей в просмотре версии — чтение: поля только для чтения, «Добавить шаг» и действия под inert, в подвале «Закрыть»; сайды правки не открываются (r2 §2, состояние 7; строки 108, 138 реестра)', [
+    ['просмотр текущей версии: «Открыть процесс» у повторяемого — оверлей на чтение', K => K.processAct('p-damage', 'process-open'),
+      { viewing: 'v2', surface: 'process-overlay', 'overlay.sub': 'Повторяемый процесс · только чтение', 'overlay.ro': true, 'overlay.fieldsRo': true, 'overlay.acts': ['overlay-close'], writes: 0 }],
+    ['«Закрыть» — фокус на «Открыть процесс»', K => K.act('overlay-close'), { surface: '', focusAct: 'process-open', writes: 0 }],
+    ['«Изменить процесс» и «Добавить процесс» под inert — сайды не открываются', async (K) => { await K.processAct('p-auto', 'process-edit'); await K.act('process-add') },
+      { surface: '', procRo: { checks: true, actsInert: true, handlesInert: true, kindInert: true, rowActsInert: true }, writes: 0 }, { blind: true }],
+  ], { query: 'view=v2&tab=processes' }],
   'СС-63': ['перестановка строк ручкой: шаги — мышью и с клавиатуры, номер «№» пересчитан, запись автосохранением; дифф показывает порядок (решение 3 оркестратора 2026-10-03; макет `32765:6653`)', [
     ['протяжка «VIN под стеклом» ниже «VIN на металле»', async (K) => { await K.dragRow('s-vin-glass', 's-vin-metal', 12); await K.settled() },
       { 'proc.rows.p-auto': ["1 · VIN на металле · Основной · 1 фото · Распознавание VIN · Не установлена · Обязательный","2 · VIN под стеклом · Основной · 1 фото · Распознавание VIN, Распознавание шильдиков · 5 · Все установлены · Обязательный","3 · Передняя часть · Основной · 2–7 фото · Ракурсы авто · Передняя, Оценка повреждений · 8 · Все установлены · Обязательный","4 · Вид справа · Основной · 2–7 фото · Ракурсы авто · Правая сторона · Не установлена"], 'proc.dragging': null, saveLog: ['saving', 'saved'], writes: 1 }],

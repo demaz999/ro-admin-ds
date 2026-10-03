@@ -384,7 +384,7 @@ const MC_PROGRESS = [
 ]
 /** Длинное тело — прокручивается только оно: строки «Истории изменений» условно, текстом. */
 const MC_LONG = Array.from({ length: 30 }, (_, k) => `${String(10 + (k % 12)).padStart(2, '0')}.06.2026 · Инспектор ${k + 1} изменил статус осмотра: «Назначен» → «В работе»`)
-const mcLive = ref<'' | 'center' | 'edge' | 'locked'>('')
+const mcLive = ref<'' | 'center' | 'edge' | 'locked' | 'full' | 'full-side'>('')
 
 /* ------------------------------ окно формы повтора, такт 36 ------------------------------ */
 /** Живая форма стенда: зависимые поля показываются и скрываются по родителю (§14.4). */
@@ -398,7 +398,7 @@ const RF_DEP = [
 ]
 const RF_USE = ['Эксплуатируется', 'Не эксплуатируется', 'Консервация']
 
-const MODAL_CARD_EXAMPLE = `<!-- центральное окно, 600; у края — placement="edge" (642, это Sheet) -->
+const MODAL_CARD_EXAMPLE = `<!-- центральное окно, 600; у края — placement="edge" (642, это Sheet); во всё окно — placement="full" (такт 71) -->
 <ModalCard v-model:open="open">
   <ModalCardContent>                        <!-- placement="center" size="md" по умолчанию -->
     <ModalCardHeader title="Горячие клавиши" subtitle="Разбор ленты с клавиатуры" />
@@ -425,6 +425,21 @@ const MODAL_CARD_EXAMPLE = `<!-- центральное окно, 600; у кра
       <Button variant="secondary" @click="abort()">Прервать</Button>   <!-- §12.6 — страница -->
     </ModalCardFooter>
   </ModalCardContent>
+</ModalCard>
+
+<!-- полноэкранный слой и сайд поверх: Esc закрывает верхний, фокус — к открывателю своего слоя -->
+<ModalCard v-model:open="overlay">
+  <ModalCardContent placement="full">
+    <ModalCardHeader title="Осмотр повреждений" subtitle="Повторяемый процесс · форма и шаги вместе" />
+    <ModalCardBody class="flex items-start gap-6">…форма и таблица шагов…</ModalCardBody>
+    <ModalCardFooter>
+      <Button variant="secondary" @click="overlay = false">Отмена</Button>
+      <Button @click="save()">Сохранить</Button>
+    </ModalCardFooter>
+  </ModalCardContent>
+</ModalCard>
+<ModalCard v-model:open="stepSide">          <!-- открыт из слоя — ложится сверху -->
+  <ModalCardContent placement="edge">…</ModalCardContent>
 </ModalCard>`
 
 
@@ -1245,6 +1260,7 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
         <p class="flex flex-wrap items-center gap-3 pt-2">
           <Button variant="secondary" data-live="center" @click="mcLive = 'center'">Открыть по центру</Button>
           <Button variant="secondary" data-live="edge" @click="mcLive = 'edge'">Открыть у края</Button>
+          <Button variant="secondary" data-live="full" @click="mcLive = 'full'">Открыть во всё окно — стек «оверлей → сайд»</Button>
           <Button variant="secondary" data-live="locked" @click="mcLive = 'locked'">Открыть прогресс — закрытие заблокировано</Button>
         </p>
       </div>
@@ -1313,6 +1329,39 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
         </div>
       </div>
 
+      <div data-subsection="modal-card-full" class="space-y-1">
+        <p class="text-2xs text-muted-foreground">
+          full — полноэкранный слой (такт 71, r2 §7; макета нет): карточка во всё окно без скругления, шапка, тело и подвал прежние;
+          раскладку тела задаёт содержимое. Окно, открытое из него, ложится сверху: Esc закрывает верхний слой
+        </p>
+        <div class="relative h-180 overflow-hidden rounded-md border border-border-soft bg-background">
+          <ModalCard :open="true" :modal="false">
+            <ModalCardContent inline placement="full" data-case="full">
+              <ModalCardHeader title="Осмотр повреждений" subtitle="Повторяемый процесс · форма и шаги вместе" />
+              <ModalCardBody class="flex items-start gap-6">
+                <div class="flex w-modal-narrow shrink-0 flex-col gap-4">
+                  <Field label="Название">
+                    <Input model-value="Осмотр повреждений" placeholder="" :show-icon="false" />
+                  </Field>
+                  <Checkbox :model-value="true">
+                    Повторяемый процесс
+                  </Checkbox>
+                </div>
+                <div class="flex min-w-0 flex-1 flex-col gap-2">
+                  <p v-for="line in MC_LONG.slice(0, 6)" :key="line" class="m-0 border-b border-border-soft pb-2 text-sm">
+                    {{ line }}
+                  </p>
+                </div>
+              </ModalCardBody>
+              <ModalCardFooter>
+                <Button variant="secondary">Отмена</Button>
+                <Button>Сохранить</Button>
+              </ModalCardFooter>
+            </ModalCardContent>
+          </ModalCard>
+        </div>
+      </div>
+
       <!-- Живые окна: портал, модальность, ловушка фокуса, Esc и клик мимо. -->
       <ModalCard :open="mcLive === 'center'" @update:open="mcLive = $event ? 'center' : ''">
         <ModalCardContent>
@@ -1336,6 +1385,31 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
           </ModalCardBody>
           <ModalCardFooter>
             <Button @click="mcLive = ''">Готово</Button>
+          </ModalCardFooter>
+        </ModalCardContent>
+      </ModalCard>
+      <!-- Живой полноэкранный слой и сайд поверх него: Esc в сайде закрывает только сайд, фокус — на кнопке слоя. -->
+      <ModalCard :open="mcLive === 'full' || mcLive === 'full-side'" @update:open="mcLive = $event ? mcLive : ''">
+        <ModalCardContent placement="full" data-live-window="full">
+          <ModalCardHeader title="Осмотр повреждений" subtitle="Повторяемый процесс · форма и шаги вместе" />
+          <ModalCardBody class="flex flex-col items-start gap-4">
+            <ModalCardText>Сайд шага открывается поверх этого слоя</ModalCardText>
+            <Button variant="outline" data-live="full-side" @click="mcLive = 'full-side'">Открыть сайд поверх</Button>
+          </ModalCardBody>
+          <ModalCardFooter>
+            <Button variant="secondary" @click="mcLive = ''">Отмена</Button>
+            <Button @click="mcLive = ''">Сохранить</Button>
+          </ModalCardFooter>
+        </ModalCardContent>
+      </ModalCard>
+      <ModalCard :open="mcLive === 'full-side'" @update:open="mcLive = $event ? 'full-side' : 'full'">
+        <ModalCardContent placement="edge" data-live-window="full-side">
+          <ModalCardHeader title="Новый шаг" subtitle="Процесс «Осмотр повреждений»" />
+          <ModalCardBody>
+            <ModalCardText>Esc закрывает только этот слой</ModalCardText>
+          </ModalCardBody>
+          <ModalCardFooter>
+            <Button variant="secondary" @click="mcLive = 'full'">Отмена</Button>
           </ModalCardFooter>
         </ModalCardContent>
       </ModalCard>
