@@ -24,14 +24,36 @@ export { default as Card } from './Card.vue'
  *
  * Состояний у поверхности нет: наведения, нажатия и фокуса блок настроек не несёт.
  */
-export const cardVariants = cva('rounded-2xl p-6', {
+export const cardVariants = cva('', {
   variants: {
+    /**
+     * Размер — такт 78: `sm` — плитка внутри блока, радиус 8 (`--radius-md`) и поля 16; макет страницы тарификации
+     * `31767:8590`, `30875:127821`, `31099:5334` (файл `U829JoK7KMZV8do3KNkWBh`). `md` — прежний блок, 24 и 24.
+     */
+    size: {
+      md: 'rounded-2xl p-6',
+      sm: 'rounded-md p-4',
+    },
     tone: {
       default: 'border border-border bg-card text-card-foreground',
       muted: 'bg-accent text-accent-foreground',
     },
   },
-  defaultVariants: { tone: 'default' },
+  defaultVariants: { tone: 'default', size: 'md' },
 })
 
 export type CardVariants = VariantProps<typeof cardVariants>
+
+/**
+ * ## Изменения после передачи
+ *
+ * Правило 23 `docs/chat-protocol.md`: каждое изменение переданного компонента маркируется здесь, в `CHANGELOG.md` и в
+ * «Передано фронтам»; живые примеры — стенд `/kit-changes`. `Card` фронтам ещё не передан: он входит в черновик следующей
+ * версии (такт 62, раздел «Составные компоненты»), строка черновика дополнена осью размера.
+ *
+ * ### Черновик следующей версии — относительно `handover-2026-10-02`
+ *
+ * - **Добавлено.** Проп `size="sm"` — плитка внутри блока: радиус 8 (`--radius-md`), поля 16; тон — любой (`muted` —
+ *   тонированная плитка). Макет тарификации `31767:8590`, `30875:127821`, `31099:5334`. Без пропа (`md`) поверхность
+ *   прежняя: радиус 24, поля 24. Такт 78.
+ */

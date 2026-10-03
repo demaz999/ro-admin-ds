@@ -120,7 +120,8 @@ async function openPage(width = 1440) {
       const VK = { Backspace: 8, Tab: 9, Enter: 13, Escape: 27, End: 35, Home: 36, ArrowLeft: 37, ArrowUp: 38, ArrowRight: 39, ArrowDown: 40, Delete: 46 }
       const vk = VK[key] ? { windowsVirtualKeyCode: VK[key], nativeVirtualKeyCode: VK[key] } : {}
       await send('Page.bringToFront')
-      await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', key, code, ...vk, ...extra })
+      /* Клавиша с текстом (Enter, пробел) — `keyDown`: только он нажимает нативную кнопку; служебные — `rawKeyDown`. */
+      await send('Input.dispatchKeyEvent', { type: extra.text ? 'keyDown' : 'rawKeyDown', key, code, ...vk, ...extra })
       await send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, ...vk, ...extra })
       await sleep(150)
     },
@@ -167,6 +168,21 @@ const Q = {
   tab: id => `document.querySelector('[data-tab-trigger=${id}]')`,
   minInput: `(document.querySelector('[data-field=min-payment]')?.matches('input') ? document.querySelector('[data-field=min-payment]') : document.querySelector('[data-field=min-payment] input'))`,
   retry: `document.querySelector('[data-slot=app-bar-status-retry]')`,
+  /* Такт 78, П2: пара базовой цены, рубильник и шкала, учёт прогресса, подсказка. */
+  pairClient: `document.querySelector('[data-field=base-price] [data-slot=price-pair-client] input')`,
+  pairNonClient: `document.querySelector('[data-field=base-price] [data-slot=price-pair-non-client] input')`,
+  pairLock: `document.querySelector('[data-field=base-price] [data-pair-lock]')`,
+  scaleSwitch: `document.querySelector('[data-field=scale-switch] [data-slot=choice-control]')`,
+  step: k => `document.querySelectorAll('[data-field=base-scale] [data-slot=regress-scale-step]')[${k}]`,
+  stepTo: k => `document.querySelectorAll('[data-field=base-scale] [data-slot=regress-scale-step]')[${k}]?.querySelector('[data-slot=regress-scale-to] input')`,
+  stepPrice: k => `document.querySelectorAll('[data-field=base-scale] [data-slot=regress-scale-step]')[${k}]?.querySelector('[data-slot=regress-scale-price] input, [data-slot=price-pair-client] input')`,
+  stepNonClient: k => `document.querySelectorAll('[data-field=base-scale] [data-slot=regress-scale-step]')[${k}]?.querySelector('[data-slot=price-pair-non-client] input')`,
+  stepLock: k => `document.querySelectorAll('[data-field=base-scale] [data-slot=regress-scale-step]')[${k}]?.querySelector('[data-pair-lock]')`,
+  stepRemove: k => `document.querySelectorAll('[data-field=base-scale] [data-slot=regress-scale-step]')[${k}]?.querySelector('[data-step-remove]')`,
+  scaleForm: f => `document.querySelector('[data-field=base-scale] [data-scale-form=${f}]')`,
+  counter: v => `document.querySelector('[data-counter=${v}] [data-slot=choice-control]')`,
+  help: `document.querySelector('[data-act=help]')`,
+  undo: `[...document.querySelectorAll('[data-slot=toast] button')].find(b => b.textContent.replace(/\\s+/g, ' ').trim() === 'Отменить')`,
 }
 
 function kit(page) {
@@ -191,6 +207,20 @@ function kit(page) {
       else await page.key('Delete')
     },
     retry: () => page.click(Q.retry),
+    /** Поле: нажать, выделить всё и набрать текст реальным вводом; пустая строка — Delete. */
+    async fill(sel, text) {
+      await page.click(sel)
+      await page.evaluate(`(${sel}.select(), 1)`)
+      if (text) await page.type(text)
+      else await page.key('Delete')
+    },
+    click: sel => page.click(sel),
+    /** Клавиши фокуса и нажатия: Tab, Enter с текстом `\r` (ловушка «Синтетический Enter»), пробел с текстом. */
+    tabKey: () => page.key('Tab'),
+    enter: () => page.key('Enter', 'Enter', { text: '\r', unmodifiedText: '\r' }),
+    space: () => page.key(' ', 'Space', { text: ' ', unmodifiedText: ' ', windowsVirtualKeyCode: 32, nativeVirtualKeyCode: 32 }),
+    escape: () => page.key('Escape'),
+    undo: () => page.click(Q.undo),
     /** Дождаться конца записи черновика: статус ушёл из «Сохранение…». */
     settled: () => until(page, `${Q.root}.dataset.save !== 'saving'`),
     /** Дождаться конца применения правок. */
@@ -207,6 +237,29 @@ function kit(page) {
         const applyLog = window.__applyLog.splice(0)
         const statusCopy = status?.cloneNode(true); statusCopy?.querySelectorAll('button').forEach(b => b.remove())
         const counter = id => t(document.querySelector('[data-tab-trigger=' + id + '] [data-slot=tabs-counter]')?.textContent) || null
+        const pairEl = document.querySelector('[data-field=base-price]')
+        const pinput = (root, part) => root?.querySelector('[data-slot=price-pair-' + part + '] input')
+        const lock = pairEl?.querySelector('[data-pair-lock]')
+        const hint = document.querySelector('[data-field=base-price-field] [data-slot=field-hint]')
+        const scaleEl = document.querySelector('[data-field=base-scale]')
+        const stepEls = [...(scaleEl?.querySelectorAll('[data-slot=regress-scale-step]') ?? [])]
+        const val = el => (el ? t(el.value) : null)
+        const help = document.querySelector('[data-help]')
+        const base = M.view.value.base
+        /* Где фокус: поле пары, замок, часть ступени шкалы, кнопка подсказки. */
+        const where = (() => {
+          const a = document.activeElement
+          if (!a || a === document.body) return null
+          if (a.closest('[data-act=help]')) return 'help'
+          const st = a.closest('[data-slot=regress-scale-step]')
+          const pre = st ? 'step' + st.dataset.step : a.closest('[data-field=base-price]') ? 'base-price' : null
+          if (!pre) return a.closest('[data-field]')?.dataset.field ?? a.tagName.toLowerCase()
+          const part = a.closest('[data-pair-lock]') ? 'lock' : a.closest('[data-step-remove]') ? 'remove'
+            : a.closest('[data-slot=price-pair-non-client]') ? 'non-client' : a.closest('[data-slot=price-pair-client]') ? 'client'
+            : a.closest('[data-slot=regress-scale-from]') ? 'from' : a.closest('[data-slot=regress-scale-to]') ? 'to'
+            : a.closest('[data-slot=regress-scale-price]') ? 'price' : '?'
+          return pre + ':' + part
+        })()
         return JSON.stringify({
           title: t(document.querySelector('[data-tariffs-title]')?.textContent),
           tab: root.dataset.tab,
@@ -227,12 +280,50 @@ function kit(page) {
           applyLoading: btn?.getAttribute('aria-busy') === 'true',
           apply: root.dataset.apply,
           dirty: root.dataset.dirty === '1',
-          minPayment: ${Q.minInput}?.value ?? null,
+          minPayment: ${Q.minInput} ? t(${Q.minInput}.value) : null,
           viewMin: M.view.value.base.minPayment,
           appliedMin: M.selected.value.settings.base.minPayment,
           writes: M.save.writes,
           applied: M.apply.count,
           pending: t(document.querySelector('[data-slot=tabs-content][data-state=active] [data-slot=empty-title]')?.textContent) || null,
+          minUnit: t(document.querySelector('[data-field=min-payment] [data-slot=field-unit]')?.textContent) || null,
+          pair: pairEl ? {
+            client: val(pinput(pairEl, 'client')),
+            nonClient: val(pinput(pairEl, 'non-client')),
+            linked: pairEl.hasAttribute('data-linked'),
+            disabled: !!pinput(pairEl, 'client')?.disabled,
+            nonClientDisabled: !!pinput(pairEl, 'non-client')?.disabled,
+            lock: lock ? lock.getAttribute('aria-label') + (lock.getAttribute('aria-pressed') === 'true' ? ' | нажат' : '') + (lock.disabled ? ' | выкл' : '') : null,
+            units: [...pairEl.querySelectorAll('[data-slot=field-unit]')].map(u => t(u.textContent)),
+          } : null,
+          modelPrice: base.price,
+          pairHint: hint ? t(hint.textContent) + ' | ' + (hint.dataset.tone ?? 'default') : null,
+          scale: root.dataset.scale,
+          scaleSwitch: document.querySelector('[data-field=scale-switch] [data-slot=choice-control]')?.getAttribute('data-state') ?? null,
+          scaleForm: scaleEl?.dataset.form ?? null,
+          scaleHead: scaleEl ? [...scaleEl.querySelectorAll('[data-slot=regress-scale-head] span:not(:has(span))')].map(s => t(s.textContent)).filter(Boolean) : null,
+          steps: scaleEl ? stepEls.map((s) => {
+            const from = s.querySelector('[data-slot=regress-scale-from] input')
+            const x = { from: val(from), fromReadonly: !!from?.readOnly, to: val(s.querySelector('[data-slot=regress-scale-to] input')) }
+            const single = s.querySelector('[data-slot=regress-scale-price] input')
+            if (single) x.price = val(single)
+            else {
+              const pp = s.querySelector('[data-slot=price-pair]')
+              x.client = val(pinput(pp, 'client')); x.nonClient = val(pinput(pp, 'non-client')); x.linked = pp.hasAttribute('data-linked')
+            }
+            x.error = t(s.querySelector('[data-slot=field-error]')?.textContent) || null
+            x.removable = !!s.querySelector('[data-step-remove]')
+            return x
+          }) : null,
+          modelScale: { on: base.scale.on, form: base.scale.form, steps: base.scale.steps.map(s => [s.from, s.to, s.price.client, s.price.nonClient, s.price.linked]) },
+          counterChecked: document.querySelector('[data-counter] [data-slot=choice-control][data-state=checked]')?.closest('[data-counter]')?.dataset.counter ?? null,
+          modelCounter: base.counter,
+          help: help ? {
+            title: t(help.querySelector('[data-slot=heading]')?.textContent),
+            steps: [...help.querySelectorAll('[data-help-step]')].map(r => t(r.innerText)),
+          } : null,
+          helpOpen: root.dataset.open === 'help',
+          focus: where,
           notices,
         })
       })()`)
@@ -253,12 +344,12 @@ const SCENARIOS = {
     ['«Назад»', K => K.back(), { notices: ['Карточка компании — вне стенда'], tab: 'base', save: 'saved', writes: 0, dirty: false }],
   ]],
   'ТФ-02': ['три вкладки; правки между вкладками не теряются; счётчики по данным (§11)', [
-    ['старт', null, { tabs: TABS, tab: 'base', tabActive: ['base'], tabIcons: [true, true, true], counts: { base: null, types: '3', schemes: '7' }, minPayment: '20000' }],
+    ['старт', null, { tabs: TABS, tab: 'base', tabActive: ['base'], tabIcons: [true, true, true], counts: { base: null, types: '3', schemes: '7' }, minPayment: '20 000' }],
     ['правка на «Базовых»: минимальная сумма 25000', async (K) => { await K.setMin('25000'); await K.settled() },
-      { minPayment: '25000', viewMin: 25000, saveLog: ['saving', 'saved'], writes: 1, dirty: true }],
+      { minPayment: '25 000', viewMin: 25000, saveLog: ['saving', 'saved'], writes: 1, dirty: true }],
     ['вкладка «Схемы осмотра»', K => K.tab('schemes'), { tab: 'schemes', tabActive: ['schemes'], pending: '«Схемы осмотра» — порция П4', dirty: true }],
     ['вкладка «Типы объектов»', K => K.tab('types'), { tab: 'types', tabActive: ['types'], pending: '«Типы объектов» — порция П3', dirty: true }],
-    ['назад на «Базовые» — правка на месте', K => K.tab('base'), { tab: 'base', tabActive: ['base'], minPayment: '25000', viewMin: 25000, dirty: true, saveLog: [], writes: 1, pending: '«Базовые настройки» — порция П2' }],
+    ['назад на «Базовые» — правка на месте', K => K.tab('base'), { tab: 'base', tabActive: ['base'], minPayment: '25 000', viewMin: 25000, dirty: true, saveLog: [], writes: 1, pending: null }],
     ['набор без типов объектов и с пустой группой — счётчики следуют', K => K.start('data=empty'), { counts: { base: null, types: '0', schemes: '5' }, tab: 'base' }],
   ]],
   'ТФ-03': ['автосохранение: «Сохранение…» → «Все изменения сохранены»; ошибка — с «Повторить» (§8)', [
@@ -285,7 +376,129 @@ const SCENARIOS = {
       { dirty: true, applyDisabled: false }],
     ['«Сохранить изменения» — загрузка, затем применено', async (K) => { await K.apply(); await K.applied() },
       { applyLog: [{ state: 'applying', busy: true, disabled: true, spinner: true, sameWidth: true }, { state: 'idle', busy: false, disabled: true, spinner: false, sameWidth: true }],
-        notices: ['Изменения применены'], dirty: false, applyDisabled: true, applyLoading: false, appliedMin: 24000, viewMin: 24000, minPayment: '24000', applied: 1 }],
+        notices: ['Изменения применены'], dirty: false, applyDisabled: true, applyLoading: false, appliedMin: 24000, viewMin: 24000, minPayment: '24 000', applied: 1 }],
+  ]],
+
+  /* ------------------------------ П2 — такт 78: «Базовые настройки», пара цен, регресс-шкала ------------------------------ */
+  'ТФ-05': ['минимальная сумма: только цифры, разряды при показе; пустое — минималка не применяется (§7, §11; scope п. 7)', [
+    ['старт', null, { minPayment: '20 000', minUnit: '₽', viewMin: 20000 }],
+    ['ввести буквы и цифры «12ab34»', async (K) => { await K.fill(Q.minInput, '12ab34'); await K.settled() },
+      { minPayment: '1 234', viewMin: 1234, saveLog: ['saving', 'saved'], dirty: true }],
+    ['набрать «7» в конец — разряды переставлены', async (K) => { await K.click(Q.minInput); await K.page.evaluate(`(e => (e.setSelectionRange(e.value.length, e.value.length), 1))(${Q.minInput})`); await K.page.type('7'); await K.settled() },
+      { minPayment: '12 347', viewMin: 12347 }],
+    ['очистить — пустое, минималка не применяется', async (K) => { await K.fill(Q.minInput, ''); await K.settled() },
+      { minPayment: '', viewMin: null, saveLog: ['saving', 'saved'] }],
+    ['ввести «0» — ноль допустим', async (K) => { await K.fill(Q.minInput, '0'); await K.settled() },
+      { minPayment: '0', viewMin: 0 }],
+  ]],
+  'ТФ-06': ['пара «клиент / не клиент»: связь замком (§1; scope п. 7; 6.3)', [
+    ['старт — пара развязана', null, { pair: { client: '500', nonClient: '700', linked: false, disabled: false, nonClientDisabled: false, lock: 'Связать цены', units: ['₽', '₽'] } }],
+    ['связать — «Не клиент» принимает «Клиент» и выключен', K => K.click(Q.pairLock),
+      { pair: { client: '500', nonClient: '500', linked: true, disabled: false, nonClientDisabled: true, lock: 'Развязать цены | нажат', units: ['₽', '₽'] }, modelPrice: { client: 500, nonClient: 500, linked: true }, dirty: true }],
+    ['изменить «Клиент» — «Не клиент» повторяет', async (K) => { await K.fill(Q.pairClient, '6000'); await K.settled() },
+      { pair: { client: '6 000', nonClient: '6 000', linked: true, disabled: false, nonClientDisabled: true, lock: 'Развязать цены | нажат', units: ['₽', '₽'] }, modelPrice: { client: 6000, nonClient: 6000, linked: true } }],
+    ['развязать — значение «Не клиент» прежнее, поле доступно', K => K.click(Q.pairLock),
+      { pair: { client: '6 000', nonClient: '6 000', linked: false, disabled: false, nonClientDisabled: false, lock: 'Связать цены', units: ['₽', '₽'] }, modelPrice: { client: 6000, nonClient: 6000, linked: false } }],
+    ['изменить «Не клиент» отдельно', async (K) => { await K.fill(Q.pairNonClient, '8000'); await K.settled() },
+      { pair: { client: '6 000', nonClient: '8 000', linked: false, disabled: false, nonClientDisabled: false, lock: 'Связать цены', units: ['₽', '₽'] }, modelPrice: { client: 6000, nonClient: 8000, linked: false } }],
+    ['связать снова — «Не клиент» равен «Клиент»', K => K.click(Q.pairLock),
+      { pair: { client: '6 000', nonClient: '6 000', linked: true, disabled: false, nonClientDisabled: true, lock: 'Развязать цены | нажат', units: ['₽', '₽'] }, modelPrice: { client: 6000, nonClient: 6000, linked: true } }],
+  ]],
+  'ТФ-07': ['общая шкала и фиксированная цена взаимоисключающие (§5)', [
+    ['старт — шкала выключена, пара доступна', null, {
+      scale: 'off', scaleSwitch: 'unchecked', steps: null, pair: { client: '500', nonClient: '700', linked: false, disabled: false, nonClientDisabled: false, lock: 'Связать цены', units: ['₽', '₽'] },
+      pairHint: 'Применяется к схеме осмотра по умолчанию, если не заданы индивидуальная цена, регресс-шкала или стоимость по типу объекта. | default' }],
+    ['включить шкалу — пара выключена, подсказка тоном предупреждения', async (K) => { await K.click(Q.scaleSwitch); await K.settled() }, {
+      scale: 'on', scaleSwitch: 'checked', scaleForm: 'single', dirty: true, saveLog: ['saving', 'saved'],
+      pair: { client: '500', nonClient: '700', linked: false, disabled: true, nonClientDisabled: true, lock: 'Связать цены | выкл', units: ['₽', '₽'] },
+      pairHint: 'Не применяется при включённой регресс-шкале. Выключите общую регресс-шкалу для переключения на базовую стоимость | warning',
+      steps: [{ from: '1', fromReadonly: true, to: '1 000', price: '500', error: null, removable: true }, { from: '1 001', fromReadonly: true, to: '', price: '400', error: null, removable: true }] }],
+    ['выключить — пара доступна, шкала скрыта', async (K) => { await K.click(Q.scaleSwitch); await K.settled() }, {
+      scale: 'off', scaleSwitch: 'unchecked', steps: null, dirty: false,
+      pair: { client: '500', nonClient: '700', linked: false, disabled: false, nonClientDisabled: false, lock: 'Связать цены', units: ['₽', '₽'] },
+      pairHint: 'Применяется к схеме осмотра по умолчанию, если не заданы индивидуальная цена, регресс-шкала или стоимость по типу объекта. | default' }],
+  ]],
+  'ТФ-08': ['ступени: рождение по «До» последней, удаление с «Отменить» (§5; стр. 03, 52)', [
+    ['старт — две ступени, «До» последней пустое', null, {
+      steps: [{ from: '1', fromReadonly: true, to: '1 000', price: '500', error: null, removable: true }, { from: '1 001', fromReadonly: true, to: '', price: '400', error: null, removable: true }],
+      modelScale: { on: true, form: 'single', steps: [[1, 1000, 500, 500, true], [1001, null, 400, 400, true]] } }],
+    ['заполнить «До» последней — новая ступень с «От» = «До» + 1, пустыми «До» и ценой', async (K) => { await K.fill(Q.stepTo(1), '5000'); await K.settled() }, {
+      steps: [
+        { from: '1', fromReadonly: true, to: '1 000', price: '500', error: null, removable: true },
+        { from: '1 001', fromReadonly: true, to: '5 000', price: '400', error: null, removable: true },
+        { from: '5 001', fromReadonly: true, to: '', price: '', error: null, removable: true }],
+      modelScale: { on: true, form: 'single', steps: [[1, 1000, 500, 500, true], [1001, 5000, 400, 400, true], [5001, null, null, null, true]] }, dirty: true }],
+    ['цена новой ступени', async (K) => { await K.fill(Q.stepPrice(2), '300'); await K.settled() },
+      { modelScale: { on: true, form: 'single', steps: [[1, 1000, 500, 500, true], [1001, 5000, 400, 400, true], [5001, null, 300, 300, true]] } }],
+    ['удалить среднюю — «От» следующей пересчитано, уведомление с «Отменить»', async (K) => { await K.click(Q.stepRemove(1)); await K.settled() }, {
+      steps: [{ from: '1', fromReadonly: true, to: '1 000', price: '500', error: null, removable: true }, { from: '1 001', fromReadonly: true, to: '', price: '300', error: null, removable: true }],
+      notices: ['Ступень удалена'] }],
+    ['«Отменить» — ступени до удаления', async (K) => { await K.undo(); await K.settled() },
+      { modelScale: { on: true, form: 'single', steps: [[1, 1000, 500, 500, true], [1001, 5000, 400, 400, true], [5001, null, 300, 300, true]] } }],
+    ['удалить последнюю — «До» предыдущей очищено', async (K) => { await K.click(Q.stepRemove(2)); await K.settled() }, {
+      steps: [{ from: '1', fromReadonly: true, to: '1 000', price: '500', error: null, removable: true }, { from: '1 001', fromReadonly: true, to: '', price: '400', error: null, removable: true }],
+      notices: ['Ступень удалена'] }],
+    ['удалить вторую — у единственной ступени удаления нет', async (K) => { await K.click(Q.stepRemove(1)); await K.settled() }, {
+      steps: [{ from: '1', fromReadonly: true, to: '', price: '500', error: null, removable: false }],
+      modelScale: { on: true, form: 'single', steps: [[1, null, 500, 500, true]] }, notices: ['Ступень удалена'] }],
+  ], { query: 'scale=on' }],
+  'ТФ-09': ['форма шкалы «Единая цена» ↔ «По ролям»: колонки и перенос цен (§5; 6.2, стр. 09)', [
+    ['старт — «Единая цена»', null, { scaleForm: 'single', scaleHead: ['От', 'До', 'Цена'] }],
+    ['«По ролям» — пара связана, обе цены равны цене ступени', async (K) => { await K.click(Q.scaleForm('roles')); await K.settled() }, {
+      scaleForm: 'roles', scaleHead: ['От', 'До', 'Клиент', 'Не клиент'],
+      steps: [
+        { from: '1', fromReadonly: true, to: '1 000', client: '500', nonClient: '500', linked: true, error: null, removable: true },
+        { from: '1 001', fromReadonly: true, to: '', client: '400', nonClient: '400', linked: true, error: null, removable: true }],
+      modelScale: { on: true, form: 'roles', steps: [[1, 1000, 500, 500, true], [1001, null, 400, 400, true]] } }],
+    ['развязать первую ступень и ввести «Не клиент» 450', async (K) => { await K.click(Q.stepLock(0)); await K.fill(Q.stepNonClient(0), '450'); await K.settled() },
+      { modelScale: { on: true, form: 'roles', steps: [[1, 1000, 500, 450, false], [1001, null, 400, 400, true]] } }],
+    ['«Единая цена» — берётся цена клиента', async (K) => { await K.click(Q.scaleForm('single')); await K.settled() }, {
+      scaleForm: 'single', scaleHead: ['От', 'До', 'Цена'],
+      steps: [{ from: '1', fromReadonly: true, to: '1 000', price: '500', error: null, removable: true }, { from: '1 001', fromReadonly: true, to: '', price: '400', error: null, removable: true }],
+      modelScale: { on: true, form: 'single', steps: [[1, 1000, 500, 500, true], [1001, null, 400, 400, true]] } }],
+  ], { query: 'scale=on' }],
+  'ТФ-10': ['«До» меньше «От» — ошибка поля (§5; стр. 50)', [
+    ['ввести «До» последней 500 при «От» 1 001', async (K) => { await K.fill(Q.stepTo(1), '500'); await K.settled() }, {
+      steps: [
+        { from: '1', fromReadonly: true, to: '1 000', price: '500', error: null, removable: true },
+        { from: '1 001', fromReadonly: true, to: '500', price: '400', error: 'Не меньше 1 001', removable: true },
+        { from: '501', fromReadonly: true, to: '', price: '', error: null, removable: true }] }],
+    ['исправить на 2 000 — ошибки нет, «От» следующей пересчитано', async (K) => { await K.fill(Q.stepTo(1), '2000'); await K.settled() }, {
+      steps: [
+        { from: '1', fromReadonly: true, to: '1 000', price: '500', error: null, removable: true },
+        { from: '1 001', fromReadonly: true, to: '2 000', price: '400', error: null, removable: true },
+        { from: '2 001', fromReadonly: true, to: '', price: '', error: null, removable: true }] }],
+  ], { query: 'scale=on' }],
+  'ТФ-11': ['учёт прогресса: сквозной по умолчанию, выбор меняется (§5, §11)', [
+    ['старт — сквозной', null, { counterChecked: 'global', modelCounter: 'global', dirty: false }],
+    ['«Раздельный учет»', async (K) => { await K.click(Q.counter('individual')); await K.settled() },
+      { counterChecked: 'individual', modelCounter: 'individual', dirty: true, saveLog: ['saving', 'saved'] }],
+    ['снова «Сквозной учет» — правок нет', async (K) => { await K.click(Q.counter('global')); await K.settled() },
+      { counterChecked: 'global', modelCounter: 'global', dirty: false }],
+  ]],
+  'ТФ-12': ['«Как считается стоимость»: порядок поиска цены §4; Esc закрывает (§3, §4)', [
+    ['старт — подсказка закрыта', null, { helpOpen: false, help: null }],
+    ['открыть', K => K.click(Q.help), {
+      helpOpen: true,
+      help: { title: 'Приоритет выбора цены', steps: [
+        '1 Цена типа объекта в схеме Максимум по этапам — панель схемы',
+        '2 Индивидуальная цена схемы Панель схемы, «Ценообразование»',
+        '3 Цена группы схем Панель «Настройка группы»',
+        '4 Цена типа объекта Максимум по этапам — вкладка «Типы»',
+        '5 Базовая цена компании Вкладка «Базовые настройки»'] } }],
+    ['Esc — закрыта, фокус на кнопке', K => K.escape(), { helpOpen: false, help: null, focus: 'help' }],
+  ]],
+  'ТФ-36': ['клавиатура: Tab по паре и замку, Enter и пробел на замке, Tab по ступеням (§5; scope п. 7)', [
+    ['фокус в «Клиент»', K => K.click(Q.pairClient), { focus: 'base-price:client' }],
+    ['Tab — замок', K => K.tabKey(), { focus: 'base-price:lock' }],
+    ['Enter — связано', async (K) => { await K.enter(); await K.settled() }, { focus: 'base-price:lock', pair: { client: '500', nonClient: '500', linked: true, disabled: false, nonClientDisabled: true, lock: 'Развязать цены | нажат', units: ['₽', '₽'] } }],
+    ['пробел — развязано', async (K) => { await K.space(); await K.settled() }, { focus: 'base-price:lock', pair: { client: '500', nonClient: '500', linked: false, disabled: false, nonClientDisabled: false, lock: 'Связать цены', units: ['₽', '₽'] } }],
+    ['Tab — «Не клиент»', K => K.tabKey(), { focus: 'base-price:non-client' }],
+    ['шкала: фокус в «До» первой ступени', async (K) => { await K.start('scale=on'); await K.click(Q.stepTo(0)) }, { focus: 'step1:to' }],
+    ['Tab — цена', K => K.tabKey(), { focus: 'step1:price' }],
+    ['Tab — удаление', K => K.tabKey(), { focus: 'step1:remove' }],
+    ['Tab — «От» второй ступени', K => K.tabKey(), { focus: 'step2:from' }],
+    ['Tab — «До» второй ступени', K => K.tabKey(), { focus: 'step2:to' }],
   ]],
 }
 

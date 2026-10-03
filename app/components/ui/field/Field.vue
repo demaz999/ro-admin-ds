@@ -38,6 +38,11 @@ const props = withDefaults(defineProps<{
   required?: boolean
   /** Только чтение: ось уходит вложенному контролу через контекст. Такт 68; разбор — `index.ts`, «Ось readonly». */
   readonly?: boolean
+  /**
+   * Тон подсказки — такт 78: `warning` — `--warning-strong`, предупреждение о том, что настройка сейчас не действует
+   * (макет страницы тарификации `31767:8639`). Ошибка и выключенность сильнее тона.
+   */
+  hintTone?: 'default' | 'warning'
 }>(), {
   label: '',
   orientation: 'top',
@@ -49,6 +54,7 @@ const props = withDefaults(defineProps<{
   labelWidth: 'content',
   required: false,
   readonly: false,
+  hintTone: 'default',
 })
 
 /** Контекст оси `readonly` для контрола внутри: `useReadonly` в каждом из десяти контролов. */
@@ -67,10 +73,54 @@ const state = computed(() => {
 
 /** Строка подсказки рисуется, только если есть хотя бы одна из двух её частей. */
 const hasHintRow = computed(() => Boolean(props.hint || props.counter))
+
+/** Тон подсказки — такт 78; ошибка и выключенность перекрашивают её через `group-data` поверх тона. */
+const hintClass = computed(() => [
+  'min-w-0 flex-1 text-xs group-data-[state=error]/field:text-destructive group-data-[state=disabled]/field:text-foreground-disabled',
+  props.hintTone === 'warning' ? 'text-warning-strong' : 'text-muted-foreground',
+])
 </script>
 
 <template>
+  <!--
+    Раскладка `split` — такт 78 (плитки страницы тарификации, макет `31767:8590`, `31649:3835`): подпись слева занимает
+    свободную ширину и переносится, контрол прижат к правому краю, подсказка — строкой во всю ширину под ними и
+    переносится; в блоке выше содержимого подсказка прижата к низу. Подпись стоит по центру поля: строка выровнена по
+    низу, высота подписи — не меньше высоты поля (подписи над полями пары не тянут её вверх).
+  -->
   <div
+    v-if="props.orientation === 'split'"
+    data-slot="field-wrapper"
+    :data-state="state"
+    :data-readonly="readonly && !props.disabled ? '' : undefined"
+    :class="fieldVariants({ orientation: props.orientation })"
+  >
+    <div class="flex items-end gap-4">
+      <label
+        v-if="props.label"
+        :class="fieldLabelVariants({ orientation: props.orientation })"
+        :style="{ minHeight: `${props.controlHeight}px` }"
+      >
+        <span>{{ props.label }}<span v-if="props.required" class="text-destructive"> *</span></span>
+      </label>
+      <div class="flex min-w-0 shrink-0 flex-col">
+        <slot />
+      </div>
+    </div>
+    <div v-if="hasHintRow" class="mt-auto flex min-h-4 items-start gap-2">
+      <span v-if="props.hint" data-slot="field-hint" :data-tone="props.hintTone" :class="hintClass">{{ props.hint }}</span>
+      <span
+        v-if="props.counter"
+        data-slot="field-counter"
+        class="ml-auto shrink-0 text-xs font-bold text-muted-foreground group-data-[state=error]/field:text-destructive group-data-[state=disabled]/field:text-foreground-disabled"
+      >
+        {{ props.counter }}
+      </span>
+    </div>
+  </div>
+
+  <div
+    v-else
     data-slot="field-wrapper"
     :data-state="state"
     :data-readonly="readonly && !props.disabled ? '' : undefined"
@@ -94,7 +144,8 @@ const hasHintRow = computed(() => Boolean(props.hint || props.counter))
         <span
           v-if="props.hint"
           data-slot="field-hint"
-          class="min-w-0 flex-1 text-xs text-muted-foreground group-data-[state=error]/field:text-destructive group-data-[state=disabled]/field:text-foreground-disabled"
+          :data-tone="props.hintTone === 'default' ? undefined : props.hintTone"
+          :class="hintClass"
         >
           {{ props.hint }}
         </span>

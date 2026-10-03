@@ -11,15 +11,17 @@ import { cardVariants } from '.'
 const props = withDefaults(defineProps<{
   /** `default` — белая поверхность с рамкой; `muted` — приглушённая подложка вложенной формы. */
   tone?: NonNullable<CardVariants['tone']>
+  /** Размер: `md` — блок (радиус 24, поля 24), `sm` — плитка внутри блока (радиус 8, поля 16). Такт 78. */
+  size?: NonNullable<CardVariants['size']>
   /** Тег корня: `section` — когда у блока есть заголовок раздела. */
   as?: string
   /** Класс снаружи — слиянием: раскладка содержимого. */
   class?: string
-}>(), { tone: 'default', as: 'div' })
+}>(), { tone: 'default', size: 'md', as: 'div' })
 </script>
 
 <template>
-  <component :is="props.as" data-slot="card" :data-tone="props.tone" :class="cn(cardVariants({ tone: props.tone }), props.class)">
+  <component :is="props.as" data-slot="card" :data-tone="props.tone" :data-size="props.size === 'md' ? undefined : props.size" :class="cn(cardVariants({ tone: props.tone, size: props.size }), props.class)">
     <slot />
   </component>
 </template>

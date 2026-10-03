@@ -87,6 +87,8 @@ export const fieldVariants = cva('group/field flex gap-2', {
     orientation: {
       top: 'flex-col',
       left: 'flex-row items-start',
+      /* Такт 78: строка «подпись — контрол» и подсказка во всю ширину под ней; разбор — Field.vue. */
+      split: 'flex-col',
     },
   },
   defaultVariants: { orientation: 'top' },
@@ -104,6 +106,8 @@ export const fieldLabelVariants = cva(
       orientation: {
         top: 'block',
         left: 'flex shrink-0 items-center',
+        /* Такт 78: подпись занимает свободную ширину строки и переносится. */
+        split: 'flex min-w-0 flex-1 items-center',
       },
       /**
        * Ширина подписи в раскладке `left`. `content` — по содержимому, как у мастера.
@@ -183,4 +187,10 @@ export type FieldLabelVariants = VariantProps<typeof fieldLabelVariants>
  *   `Autocomplete`, `InputNumber`, `FormulaInput`, `Checkbox`, `Switch`, `RadioGroup`). Значение видно полным контрастом,
  *   выделяется и копируется, правки нет; вид отличается от выключенного. Подпись и подсказка прежние. Без пропа вид и поведение
  *   прежние. Такт 68.
+ * - **Добавлено.** Раскладка `orientation="split"` — плитка «подпись — контрол»: подпись слева занимает свободную ширину и
+ *   переносится, стоит по центру поля; контрол прижат к правому краю; подсказка — строкой во всю ширину под ними,
+ *   переносится, в блоке выше содержимого прижата к низу. Макет тарификации `31767:8590`, `31649:3835`. Раскладки `top` и
+ *   `left` прежние. Такт 78.
+ * - **Добавлено.** Проп `hintTone="warning"` — подсказка тоном предупреждения `--warning-strong`: настройка сейчас не
+ *   действует (макет `31767:8639`). Ошибка и выключенность сильнее тона. Без пропа подсказка прежняя. Такт 78.
  */

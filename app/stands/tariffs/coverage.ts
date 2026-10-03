@@ -6,4 +6,6 @@
 export const TARIFFS_COVERAGE_STATES = [
   /* Такт 77, П1: шапка, вкладки, статус сохранения; набор без типов и с пустой группой. */
   '', 'tab=types', 'tab=schemes', 'save=saving', 'save=error', 'data=empty',
+  /* Такт 78, П2: общая шкала включена; открыта подсказка «Как считается стоимость». */
+  'scale=on', 'open=help',
 ] as const

@@ -26,6 +26,16 @@ const props = withDefaults(defineProps<{
   disabled?: boolean
   /** Только чтение — своё либо от `Field readonly`. Такт 68; разбор — `ui/field/index.ts`, «Ось readonly». */
   readonly?: boolean
+  /**
+   * Единица справа внутри поля — «₽», «шт»: всегда видна, тоном плейсхолдера, отступ справа — поле 16. Такт 78; мастер
+   * кита 1 `input` `720:11753`, свойство `right_icon`; макет страницы тарификации `31767:8594`.
+   */
+  unit?: string
+  /**
+   * Числовой ввод — такт 78 (поля цены, `scope.md` п. 7): только цифры, разряды при показе — неразрывным пробелом
+   * («50 000», макет `31767:8594`). Модель — строка цифр без пробелов; `inputmode="numeric"` у поля.
+   */
+  numeric?: boolean
 }>(), {
   variant: 'filled',
   size: 'md',
@@ -36,12 +46,52 @@ const props = withDefaults(defineProps<{
   errorText: '',
   disabled: false,
   readonly: false,
+  unit: '',
+  numeric: false,
 })
 
 /** Только чтение: значение выделяется и копируется, правки нет; крестика и слота `end` нет, наведения нет. */
 const ro = useReadonly(() => props.readonly, () => props.disabled)
 
 const model = defineModel<string>({ default: '' })
+
+/** Разделитель разрядов числового ввода — неразрывный пробел. */
+const GROUP = ' '
+const onlyDigits = (s: string) => s.replace(/\D/g, '')
+const grouped = (d: string) => d.replace(/\B(?=(\d{3})+(?!\d))/g, GROUP)
+
+/** Значение в поле: у числового — разряды при показе, в модель уходят только цифры. */
+const shown = computed({
+  get: () => (props.numeric ? grouped(model.value) : model.value),
+  set: (v: string) => { model.value = props.numeric ? onlyDigits(v) : v },
+})
+
+/**
+ * Числовой ввод: после записи в модель поле переписывается видом с разрядами, курсор встаёт за тем же числом цифр.
+ * Буква в модель не попадает — значение не меняется, и поле возвращается к прежнему виду без перерисовки.
+ */
+function onNumericInput(event: Event) {
+  if (!props.numeric) return
+  const el = event.target as HTMLInputElement
+  const pos = el.selectionStart ?? el.value.length
+  const before = onlyDigits(el.value.slice(0, pos)).length
+  const next = grouped(onlyDigits(el.value))
+  if (el.value === next) return
+  el.value = next
+  let i = 0
+  for (let k = 0; i < next.length && k < before; i++) if (next[i] !== GROUP) k++
+  el.setSelectionRange(i, i)
+}
+
+/** Стирание через разделитель разрядов стирает цифру за ним: курсор перешагивает пробел до удаления. */
+function onNumericBeforeInput(event: InputEvent) {
+  if (!props.numeric) return
+  const el = event.target as HTMLInputElement
+  const pos = el.selectionStart ?? 0
+  if (pos !== el.selectionEnd) return
+  if (event.inputType === 'deleteContentBackward' && el.value[pos - 1] === GROUP) el.setSelectionRange(pos - 1, pos - 1)
+  if (event.inputType === 'deleteContentForward' && el.value[pos] === GROUP) el.setSelectionRange(pos + 1, pos + 1)
+}
 
 /**
  * Фокус отслеживается вручную, потому что от него зависит не только цвет, но и
@@ -144,9 +194,10 @@ function onBoxDown(event: MouseEvent) {
           </span>
           <input
             ref="inputEl"
-            v-model="model"
+            v-model="shown"
             data-slot="field-input"
             type="text"
+            :inputmode="props.numeric ? 'numeric' : undefined"
             :placeholder="isFloating ? undefined : props.placeholder"
             :disabled="props.disabled"
             :readonly="ro"
@@ -155,6 +206,8 @@ function onBoxDown(event: MouseEvent) {
             :class="ro ? 'text-foreground' : 'text-field-foreground group-hover/field:text-field-foreground-hover group-hover/field:placeholder:text-field-placeholder-hover group-focus-within/field:text-field-foreground-hover'"
             @focus="focused = true"
             @blur="focused = false"
+            @input="onNumericInput"
+            @beforeinput="onNumericBeforeInput"
           >
         </div>
       </div>
@@ -176,6 +229,9 @@ function onBoxDown(event: MouseEvent) {
       >
         <Icon name="close" :size="8" />
       </button>
+
+      <!-- Единица — такт 78: справа всегда, после крестика очистки; тон плейсхолдера, кегль значения. -->
+      <span v-if="props.unit" data-slot="field-unit" class="shrink-0 text-sm font-medium text-field-placeholder">{{ props.unit }}</span>
     </div>
 
     <!--

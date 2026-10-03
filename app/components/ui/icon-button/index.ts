@@ -115,6 +115,11 @@ export const iconButtonVariants = cva(
          * ровно как соседний пункт меню.
          */
         sidebar: 'bg-transparent text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+        /**
+         * Удаление строки — такт 78: фона нет, глиф `--destructive`, наведение и нажатие — `--destructive-surface`.
+         * Локальный компонент макета страницы тарификации `btn_delete` `21816:77497` (`service/error-surface`).
+         */
+        destructive: 'bg-transparent text-destructive hover:bg-destructive-surface active:bg-destructive-surface',
       },
       size: {
         lg: 'size-10',
@@ -146,6 +151,7 @@ export const iconButtonVariants = cva(
       { variant: 'service', class: 'disabled:opacity-[var(--opacity-disabled)]' },
       { variant: 'service', class: 'disabled:opacity-[var(--opacity-disabled)]' },
       { variant: 'sidebar', class: 'disabled:opacity-[var(--opacity-disabled)]' },
+      { variant: 'destructive', class: 'disabled:opacity-[var(--opacity-disabled)]' },
     ],
     defaultVariants: {
       variant: 'default',
@@ -168,4 +174,10 @@ export type IconButtonVariants = VariantProps<typeof iconButtonVariants>
  * Версия выпущена тактом 57 по закрытию экрана «Свободная съёмка»: git-метка `handover-2026-10-01`.
  *
  * - **Меняет существующее.** У варианта `default` кольцо фокуса с клавиатуры отступает от кнопки на 2 цветом фона. Остальные варианты и покой — прежние.
+ *
+ * ### Черновик следующей версии — относительно `handover-2026-10-02`
+ *
+ * - **Добавлено.** Вариант `destructive` — удаление строки: фона нет, глиф `--destructive`; наведение и нажатие —
+ *   подложка `--destructive-surface`; выключенная — прозрачность 0.48; кольцо фокуса — как у прочих. Локальный компонент
+ *   макета тарификации `btn_delete` `21816:77497`. Прочие варианты прежние. Такт 78.
  */

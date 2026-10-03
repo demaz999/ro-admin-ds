@@ -1,4 +1,5 @@
 import { computed, reactive } from 'vue'
+import { chainSteps, stepErrors } from '~/components/ui/regress-scale/rules'
 
 /**
  * Модель состояния страницы «Тарификация» (Биллинг 2.0, VA-14629) — такт 77, порция П1.
@@ -19,6 +20,12 @@ import { computed, reactive } from 'vue'
  * очередь уведомлений. Операции — сценарии П1: ТФ-01 (`back`), ТФ-02 (`setTab`), ТФ-03 (`set`, `retry`), ТФ-04
  * (`applyChanges` — применение правок выбранного периода без окон очереди, загрузка кнопки `applying`). Остальные операции
  * — заготовки `pendingPortion` по плану порций (`tariffs.md`, раздел 10): уведомление с названием порции.
+ *
+ * ## Что добавлено в П2 — такт 78
+ *
+ * Пара и замок — `setPrice` (`pairWith`, 6.3); шкала — `setScale` (цепочка «От» правилами `ui/regress-scale/rules.ts`, 6.2),
+ * удаление ступени с «Отменить» — `stepRemoved` и `undo`; ошибки «До» — `scaleErrors`; подсказка «Как считается
+ * стоимость» — `setOpen('help')`; оснастка `?scale=on`, `?open=help`. Сценарии ТФ-05–ТФ-12, ТФ-36.
  */
 
 /* ------------------------------ данные ------------------------------ */
@@ -114,6 +121,10 @@ export interface ModelOptions {
   save?: SaveState
   /** Часы модели `ГГГГ-ММ` — оснастка `?now=`; без неё — месяц сегодняшней даты. */
   now?: string
+  /** Общая шкала включена при загрузке — оснастка `?scale=on` (такт 78): во всех периодах, как данные: правка не пишется. */
+  scale?: boolean
+  /** Открытая поверхность при загрузке — оснастка `?open=` (такт 78: `help`). */
+  open?: string
 }
 
 /** Сколько длится запись черновика на стенде. */
@@ -161,11 +172,19 @@ function getPath(root: unknown, path: string): unknown {
   return node
 }
 
-/* ------------------------------ шкала — 6.2, чистые функции ------------------------------ */
+/* ------------------------------ шкала и пара — 6.2, 6.3, чистые функции ------------------------------ */
 
-/** «От» каждой ступени: первая — 1, следующие — предыдущее «До» + 1 (§5). */
-export function chainSteps(steps: ScaleStep[]): ScaleStep[] {
-  return steps.map((s, k) => ({ ...s, from: k === 0 ? 1 : (steps[k - 1]!.to ?? steps[k - 1]!.from) + 1 }))
+/**
+ * Правила ступеней §5 — общий модуль `ui/regress-scale/rules.ts` (такт 78): ими пользуются и компонент `RegressScale`, и
+ * модель — цепочка «От» при записи, ошибки «До» в состоянии. Чистые функции без DOM.
+ */
+export { chainSteps, stepErrors }
+
+/** Пара с замком — 6.3: связано — «Не клиент» повторяет «Клиент»; связать снова — «Не клиент» принимает «Клиент». */
+export function pairWith(price: Price, patch: Partial<Price>): Price {
+  const next = { ...price, ...patch }
+  if (next.linked) next.nonClient = next.client
+  return next
 }
 
 /* ------------------------------ модель ------------------------------ */
@@ -180,6 +199,7 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     base.objectTypes = clone(data.empty.objectTypes)
     base.schemes = base.schemes.filter(s => !data.empty.emptyGroups.includes(s.groupId))
   }
+  if (opts.scale) base.base.scale.on = true
   const fromOf = (f: FromSpec) => 'ahead' in f ? addMonths(now, f.ahead) : ym(parseYm(now).y + f.year, f.month)
   const periods = reactive<Period[]>(data.periods.map((p) => {
     const settings = clone(base)
@@ -251,8 +271,8 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   /* ------------------------------ состояние интерфейса ------------------------------ */
   const ui = reactive({
     tab: (opts.tab ?? 'base') as TabId,
-    /** Открытая поверхность — порции П2–П6.2: подсказка, список периодов, окна, панели (6.9, `?open=`). */
-    open: '' as string,
+    /** Открытая поверхность — порции П2–П6.2: подсказка (`help`, такт 78), список периодов, окна, панели (6.9, `?open=`). */
+    open: (opts.open ?? '') as string,
     /** Открытая панель группы или схемы — порции П4, П5. */
     panel: null as null | { kind: 'group' | 'scheme', id: string, tab: 'pricing' | 'types' },
     /** Раскрытые строки типов — порция П3. */
@@ -262,13 +282,24 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   /* ------------------------------ уведомления ------------------------------ */
   const notices = reactive<Notice[]>([])
   let noticeSeq = 0
-  function notify(text: string, kind: 'ok' | 'err' = 'ok', undo = false) {
-    while (notices.length > 2) notices.shift()
-    notices.push({ id: ++noticeSeq, text, kind, undo })
+  /** Отмена по уведомлению — такт 78 (строка 52 реестра): действие «Отменить» у уведомления с этим номером. */
+  const undos = new Map<number, () => void>()
+  function notify(text: string, kind: 'ok' | 'err' = 'ok', undo?: () => void) {
+    while (notices.length > 2) undos.delete(notices.shift()!.id)
+    const id = ++noticeSeq
+    if (undo) undos.set(id, undo)
+    notices.push({ id, text, kind, undo: !!undo })
   }
   function dismissNotice(id: number) {
     const k = notices.findIndex(n => n.id === id)
     if (k >= 0) notices.splice(k, 1)
+    undos.delete(id)
+  }
+  /** «Отменить» у уведомления: действие выполняется один раз, уведомление уходит. */
+  function undo(id: number) {
+    const act = undos.get(id)
+    dismissNotice(id)
+    act?.()
   }
 
   /* ------------------------------ операции П1 ------------------------------ */
@@ -292,6 +323,36 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   /** Заготовка операции следующей порции — `tariffs.md`, раздел 10. */
   function pendingPortion(what: string, portion: string) { notify(`${what} — порция ${portion}`) }
 
+  /* ------------------------------ операции П2 — такт 78 ------------------------------ */
+  /**
+   * Пара цен уровня (6.3): правка поля или замка. `path` — путь пары, например `base.price`. Замок: связано — «Не
+   * клиент» повторяет «Клиент»; связать снова — «Не клиент» принимает «Клиент»; развязать — значение прежнее.
+   */
+  function setPrice(path: string, patch: Partial<Price>): boolean {
+    const cur = get(path) as Price | undefined
+    if (!cur) return false
+    return set(path, pairWith(cur, patch))
+  }
+  /**
+   * Шкала уровня (6.2): включение, форма, ступени. Ступени пишутся с цепочкой «От» (§5) — какими бы их ни прислали.
+   * Включённая шкала исключает фиксированную цену уровня: пара выключается на странице (§5, «взаимоисключающие»).
+   */
+  function setScale(path: string, patch: Partial<Scale>): boolean {
+    const cur = get(path) as Scale | undefined
+    if (!cur) return false
+    const next = { ...clone(cur), ...clone(patch) }
+    next.steps = chainSteps(next.steps)
+    return set(path, next)
+  }
+  /** Ступень удалена (стр. 52): уведомление с «Отменить» — возврат ступеней до удаления. */
+  function stepRemoved(path: string, previous: ScaleStep[]) {
+    notify('Ступень удалена', 'ok', () => { setScale(path, { steps: previous }) })
+  }
+  /** Открыть или закрыть поверхность — подсказку «Как считается стоимость» (№ 9) и следующие порции. */
+  function setOpen(what: string) { ui.open = what }
+  /** Ошибки «До» ступеней шкалы уровня — §5, стр. 50. */
+  const scaleErrors = (path: string) => stepErrors((get(path) as Scale).steps)
+
   /* ------------------------------ вычисления для страницы ------------------------------ */
   /** Счётчики вкладок (№ 8): типов объектов и схем выбранного периода. */
   const counts = computed(() => ({ types: view.value.objectTypes.length, schemes: view.value.schemes.length }))
@@ -301,12 +362,14 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     return JSON.stringify({
       now, selected: selectedId.id, periods: periods.map(p => ({ id: p.id, status: p.status, from: p.from, to: p.to, dirty: !!p.pending })),
       view: view.value, save: save.state, writes: save.writes, apply: apply.state, applied: apply.count, ui: { tab: ui.tab, open: ui.open },
+      errors: { base: scaleErrors('base.scale') },
     })
   }
 
   return {
     company: data.company, catalog: data.catalog, now, periods, selected, selectedId, view, dirty, readonly, save, apply, ui, notices, counts,
-    set, get, setTab, back, retry, applyChanges, pendingPortion, notify, dismissNotice, dump,
+    set, get, setTab, back, retry, applyChanges, pendingPortion, notify, dismissNotice, undo, dump,
+    setPrice, setScale, stepRemoved, setOpen, scaleErrors,
   }
 }
 

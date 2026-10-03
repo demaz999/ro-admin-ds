@@ -44,6 +44,8 @@ const DRAFT_ROLES = ['Администратор', 'Эксперт', 'Опера
 const draftRoles = ref(['Администратор', 'Эксперт'])
 /* Слот end у Input — такт 67. */
 const draftSearch = ref('')
+/* Числовой ввод у Input — такт 78. */
+const draftPrice = ref('50000')
 /** Такт 72: пример закрываемой плашки — закрытие помнит страница. */
 const calloutClosed = ref(false)
 /* Ось readonly — такт 68: обычное, только чтение, выключено рядом. */
@@ -109,6 +111,64 @@ const ro = ref({ name: 'КАСКО — осмотр', text: 'Осмотр авт
               </Button>
             </div>
             <span class="text-xs text-muted-foreground">покой и загрузка той же кнопки — ширина одна; матрица — /tariffs/states</span>
+          </template>
+          <template v-else-if="c.id === 'input-unit'">
+            <div class="flex flex-wrap items-start gap-3">
+              <div class="w-price-input">
+                <Input model-value="20000" unit="₽" placeholder="" :show-icon="false" />
+              </div>
+              <div class="w-price-input">
+                <Input model-value="" unit="₽" placeholder="" :show-icon="false" />
+              </div>
+              <div class="w-scale-bound">
+                <Input model-value="1001" unit="шт" placeholder="" :show-icon="false" readonly />
+              </div>
+            </div>
+            <span class="text-xs text-muted-foreground">заполненное, пустое, «только чтение» — единица видна всегда; матрица — /tariffs/states</span>
+          </template>
+          <template v-else-if="c.id === 'input-numeric'">
+            <div class="flex items-center gap-3">
+              <div class="w-price-input">
+                <Input v-model="draftPrice" numeric unit="₽" placeholder="" :show-icon="false" />
+              </div>
+              <code class="text-xs">v-model: «{{ draftPrice }}»</code>
+            </div>
+            <span class="text-xs text-muted-foreground">наберите буквы — не вводятся; разряды — при показе</span>
+          </template>
+          <template v-else-if="c.id === 'field-split'">
+            <Card tone="muted" size="sm" class="flex flex-col">
+              <Field orientation="split" class="flex-1" label="Минимальная сумма списания за один расчётный период" hint="Если итоговая сумма за период оказывается ниже этого порога — выставляется минимальная сумма">
+                <div class="w-price-input">
+                  <Input model-value="20000" numeric unit="₽" variant="elevated" placeholder="" :show-icon="false" />
+                </div>
+              </Field>
+            </Card>
+          </template>
+          <template v-else-if="c.id === 'field-hint-tone'">
+            <Field label="Базовая стоимость" hint="Не применяется при включённой регресс-шкале" hint-tone="warning">
+              <Input model-value="500" numeric unit="₽" placeholder="" :show-icon="false" disabled />
+            </Field>
+          </template>
+          <template v-else-if="c.id === 'icon-button-destructive'">
+            <div class="flex items-center gap-4">
+              <IconButton variant="destructive" size="sm" label="Удалить ступень">
+                <Icon name="delete" :size="16" />
+              </IconButton>
+              <IconButton variant="destructive" size="sm" disabled label="Удалить ступень">
+                <Icon name="delete" :size="16" />
+              </IconButton>
+              <span class="text-xs text-muted-foreground">покой и выключено; наведение — подложка `--destructive-surface`</span>
+            </div>
+          </template>
+          <template v-else-if="c.id === 'card-size'">
+            <div class="grid grid-cols-2 gap-3">
+              <Card size="sm">
+                <span class="text-xs">size="sm", tone="default"</span>
+              </Card>
+              <Card tone="muted" size="sm">
+                <span class="text-xs">size="sm", tone="muted"</span>
+              </Card>
+            </div>
           </template>
           <template v-else-if="c.id === 'icon-save'">
             <span class="flex items-center gap-4 text-xs">

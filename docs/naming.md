@@ -651,6 +651,40 @@ License), 800×600, 4:3 — кроп на стороне Unsplash; файлы и
 | **`disabled` сильнее `readonly`** | выключенное поле не получает вид «только чтения» |
 | **Текст значения внутри кнопки мышью не выделяется** — у `Select` в «только чтении» корень — блок `role="combobox"` | строка 110 раздела 11 |
 
+### Такт 78: страница «Тарификация», П2 — базовые настройки, пара цен, регресс-шкала
+
+Итог — `tariffs.md`, раздел 14. Компоненты по воротам оркестратора 2026-10-04 (карточки 1 и 2, `tariffs.md`, раздел 8);
+оси — решения агента по правилу 21 (раздел 9, строки 60–68 реестра). Добавления к переданным `Input`, `Field`,
+`IconButton` и к `Card` из черновика версии — с метками правила 23б: раздел «Изменения после передачи» в `index.ts`,
+`CHANGELOG.md`, «Передано фронтам» в `chat-protocol.md`; примеры — `/kit-changes`, матрицы — `/tariffs/states`.
+
+| Имя в коде | Папка | API | Правило употребления |
+|---|---|---|---|
+| `PricePair` | `ui/price-pair/` | `v-model:client`, `v-model:non-client` (`number \| null`), `v-model:linked` (по умолчанию `true`); `labels`, `clientLabel`, `nonClientLabel`, `stretch`, `variant` (у `Input`), `unit` (`₽`), `disabled`, `readonly` | **любая цена с ролью исполнителя** — `PricePair`: замок связи и общая доступность пары живут в компоненте. На тонированной плитке и в ступени — `variant="elevated"`; в строке во всю ширину — `stretch`; уровень с включённой шкалой — `disabled`; архив — `readonly` |
+| `RegressScale`, часть `RegressScaleStep` | `ui/regress-scale/` | `v-model:steps` (`{ from, to, price: { client, nonClient, linked } }[]`), `v-model:form` (`single` · `roles`), `label`, `hint`, `variant`, `disabled`, `readonly`; событие `remove-step` (`{ index, previous }`) | **ступенчатая цена по объёму** — только через компонент: правила §5 (цепочка «От», рождение ступени по «До» последней, удаление, смена формы, ошибки «До») — в `rules.ts`, потребитель хранит итоговые ступени. Удаление ступени — уведомление с «Отменить» у потребителя по `remove-step`. `RegressScaleStep` отдельно не ставится |
+| `rules.ts` — `chainSteps`, `setStepTo`, `removeStep`, `setStepPrice`, `changeForm`, `stepErrors`, `groupDigits` | `ui/regress-scale/rules.ts` | чистые функции без Vue | модель страницы берёт правила отсюда — одна редакция правил на компонент и модель |
+| `Input` — пропы `unit`, `numeric` | `ui/input/` | `unit="₽"` · `"шт"`; `numeric` — модель строкой цифр | **поле цены и количества** — `numeric` с `unit`; разряды — неразрывный пробел при показе, в модель не идут |
+| `Field` — `orientation="split"`, проп `hintTone` | `ui/field/` | `split` — подпись слева во всю свободную ширину, контрол справа, подсказка во всю ширину снизу; `hintTone="warning"` | **плитка настройки** «подпись — поле — пояснение» — `split` в `Card size="sm"`; предупреждение «настройка сейчас не действует» — `hintTone="warning"`; ошибка ввода — `invalid` |
+| `Card` — проп `size="sm"` | `ui/card/` | `md` (24 / 24) · `sm` (радиус 8, поля 16) | **плитка внутри блока** — `Card tone="muted" size="sm"`; блок страницы — `Card` |
+| `IconButton` — `variant="destructive"` | `ui/icon-button/` | глиф `--destructive`, наведение `--destructive-surface` | **удаление строки или ступени** одной кнопкой; меню действий строки — `TableRowActions` |
+| слот `header` каркаса | `layouts/admin.vue` | `<NuxtLayout name="admin"><template #header>…` | **закреплённая шапка страницы** (§11 тарификации): липнет к верху окна, подложка — фон рабочей зоны; страница ставит `definePageMeta({ layout: false })` |
+| `--container-price-input` 160, утилита `w-price-input` | `app/assets/css/tailwind.css` | — | поле цены (Figma `31767:8594`, `31649:3846`) |
+| `--container-scale-bound` 99, утилита `w-scale-bound` | `app/assets/css/tailwind.css` | — | поля «От» и «До» ступени (Figma `30961:27356`) |
+
+| Правило | Почему |
+|---|---|
+| **«Как считается стоимость» — `ButtonAction variant="muted"` с глифом `info` справа от вкладок, `Popover` с `Heading` и `ListRow type="number"`** | композиция плана (`tariffs.md`, раздел 5, № 9); порядок пунктов — §4 сводки (строка 11) |
+| **Включённая шкала уровня выключает его пару цен**; на «Базовых настройках» подсказка пары — `hintTone="warning"` | §5 сводки: шкала и фиксированная цена взаимоисключающие |
+| **Якоря прогона П2** — `data-field` (`min-payment`, `base-price`, `base-price-field`, `scale-switch`, `base-scale`, `counter`), `data-counter`, `data-act="help"`, `data-help`, `data-help-step`, `data-block`; у компонентов — `data-pair-lock`, `data-step-remove`, `data-scale-form`, `data-step` | адаптер прогона ищет элементы по ним; `data-slot` ставят компоненты |
+| **Пометка «ждут людей» на странице — `data-awaiting="N"`** у элемента с текстом по более свежему источнику (п. 2 — итог с процессами, п. 3 — сброс счётчика) | строки 14, 15 реестра: текст без служебных пометок на экране, пометка проверяется по DOM |
+
+**Оснастка приёмки `/tariffs` — такт 78:**
+
+| Параметр | Значения | С такта | Что показывает |
+|---|---|---|---|
+| `?scale=` | `on` | 78 | общая регресс-шкала включена во всех периодах — как данные, правок нет |
+| `?open=` | `help` | 78 | открыта подсказка «Как считается стоимость» |
+
 ### Такт 77: страница «Тарификация», П1 — модель и прогон
 
 Источник — макеты Figma и сводка (`docs/sources/tariffs/`): вид и структура — `figma-nodes.md`, поведение и тексты —
