@@ -4,7 +4,7 @@
 -->
 <script setup lang="ts">
 import { computed, ref, useSlots } from 'vue'
-import { useReadonly } from '../field'
+import { READONLY_SURFACE, useReadonly } from '../field'
 import { Icon } from '../icon'
 import { inputVariants, type InputVariants } from '.'
 
@@ -89,7 +89,7 @@ const showClear = computed(() => props.clearable && isActive.value && !showEnd.v
     <div
       data-slot="field"
       :data-readonly="ro ? '' : undefined"
-      :class="inputVariants({ variant, size, invalid: invalid && !ro, floating: isFloating, disabled, readonly: ro })"
+      :class="[inputVariants({ variant, size, invalid: invalid && !ro, floating: isFloating, disabled, readonly: ro }), ro ? READONLY_SURFACE : '']"
     >
       <div
         class="flex min-w-0 flex-1 items-center gap-2"

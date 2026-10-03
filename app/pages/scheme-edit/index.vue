@@ -2,12 +2,14 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { formulaPreview } from '~/components/ui/formula-input'
 import { tableRowActionsColumn, type TableRowActionItem } from '~/components/ui/table'
+import { plural } from '~/stands/scheme-edit/diff'
 import { QUICK_LINKS, type SearchItem } from '~/stands/scheme-edit/search'
 import {
-  ACCESS_GROUPS, ACCESS_ROLES, COMMENT_DICTIONARIES, createModel, DEADLINE_EVENTS, DETECTOR_GROUPS, DETECTOR_IDS, FINISH_CLASSES, OWNERS,
-  PDF_PROGRAMS, PDF_SIGNERS, PDF_WHEN, PHOTO_RESOLUTIONS, REGION_MATRICES, ROLE_LADDER, ROLES, SCHEME_TYPES, SECTION_ANCHORS, SECTIONS,
-  STATUS_DICTIONARIES, TABS, VIDEO_RESOLUTIONS,
-  type BehaviorSettings, type Dataset, type FormulaSettings, type PdfTemplate, type PdfTemplateDraft, type SaveState, type SectionId, type TabId,
+  ACCESS_GROUPS, ACCESS_ROLES, COMMENT_DICTIONARIES, createModel, CREATE_SCREENS, DEADLINE_EVENTS, DETECTOR_GROUPS, DETECTOR_IDS, FIELD_DEFAULTS, FIELD_TYPES,
+  FINISH_CLASSES, GROUP_DEFAULTS, HINT_CONFIGS, MOBILE_SHOW, OWNERS, PDF_PROGRAMS, PDF_SIGNERS, PDF_WHEN, PHOTO_RESOLUTIONS, REGION_MATRICES, ROLE_LADDER,
+  ROLES, SCHEME_TYPES, SECTION_ANCHORS, SECTIONS, STATUS_DICTIONARIES, suggestAlias, TABS, VIDEO_RESOLUTIONS,
+  type BehaviorSettings, type Dataset, type FieldDraft, type FormulaSettings, type GroupDraft, type PdfTemplate, type PdfTemplateDraft, type SaveState,
+  type SectionId, type TabId,
 } from '~/stands/scheme-edit/model'
 import demo from '~/stands/scheme-edit/demo-data.json'
 
@@ -42,7 +44,11 @@ import demo from '~/stands/scheme-edit/demo-data.json'
  * пути «Настройки → Раздел» (№ 10); пустая выдача с «Быстрым переходом» (№ 11); переход к месту и подсветка
  * найденного — ось `highlighted` у `SettingRow` (№ 12). Клавиатура: `/` — фокус в поиск, стрелки — по выдаче, Enter —
  * переход, Esc — очистить и снять выдачу.
- * Табы «Форма», «Процессы и шаги», «Витрина» — порциями П6–П8: на их месте `Empty`.
+ * **П6 (такт 69).** Таб «Форма» (№ 39–42, 62, 68, 70): список групп — `Card` с `RadioGroupItem variant="card"` и настройками
+ * группы только для чтения, «Добавить группу»; панель полей — заголовок группы со счётом, «Добавить поле», «Вставить из
+ * другой схемы» (заглушка), «Заполнить алиасы автоматически»; поля — `Table` с выбором строк, признаком «зависимое» и
+ * действиями строки; массовые действия — `ActionBar layout="panel"`; сайды поля (четыре секции) и группы — `ModalCard edge`.
+ * Табы «Процессы и шаги», «Витрина» — порциями П7–П8: на их месте `Empty`.
  *
  * ## Поведение — модель `~/stands/scheme-edit/model.ts`
  *
@@ -73,6 +79,10 @@ import demo from '~/stands/scheme-edit/demo-data.json'
  * | `?save=saving` | статус «Сохранение…» без завершения записи |
  * | `?save=error` | статус «Ошибка сохранения» с «Повторить» |
  * | `?save=fail` | следующая запись черновика завершается ошибкой (СС-49) |
+ * | `?group=g-body` | таб «Форма»: выбранная группа при загрузке (с `?tab=form`) |
+ * | `?selected=f-vin,f-plate` | таб «Форма»: выделенные поля и панель массовых действий |
+ * | `?open=field` · `new-field` | сайд поля: `?field=f-trim` — это поле, без него — первое поле группы; `new-field` — новое поле |
+ * | `?open=group` · `new-group` | сайд группы: выбранная группа либо новая |
  */
 definePageMeta({ layout: 'admin' })
 useHead({ title: 'Редактирование схемы осмотра — стенд' })
@@ -81,7 +91,9 @@ const route = useRoute()
 const q = (k: string) => String(route.query[k] ?? '')
 
 const D = demo as unknown as Record<'main' | 'fresh', Dataset>
-const tabAtLoad = TABS.find(t => t.id === q('tab'))?.id
+/** Окна и выделение «Формы» открывают таб «Форма» (такт 69). */
+const FORM_OPEN = ['field', 'new-field', 'group', 'new-group']
+const tabAtLoad = FORM_OPEN.includes(q('open')) || q('selected') ? 'form' : TABS.find(t => t.id === q('tab'))?.id
 const saveAtLoad = (['saving', 'error'] as SaveState[]).find(s => s === q('save'))
 const m = createModel(q('data') === 'new' ? D.fresh : D.main, {
   tab: tabAtLoad,
@@ -90,6 +102,8 @@ const m = createModel(q('data') === 'new' ? D.fresh : D.main, {
   editing: q('presence') === '1' ? 'Игорь Петров' : q('presence'),
   viewing: q('view'),
   now: q('now') ? () => q('now') : undefined,
+  group: q('group'),
+  selectedFields: q('selected') ? q('selected').split(',') : [],
 })
 const sectionAtLoad = SECTIONS.find(s => s.id === q('section'))?.id
 if (sectionAtLoad) m.setSection(sectionAtLoad)
@@ -390,6 +404,9 @@ const hl = (key: string) => (flashed.value.target === key && flashed.value.n ? f
 function findTarget(target: string): HTMLElement | null {
   const cost = target.match(/^cost-(\w+)$/)
   if (cost) return document.querySelector(`[data-cost="${cost[1]}"]`)
+  /* Поле формы (такт 69): строка таблицы полей; фокус встаёт на её флажок выбора. */
+  const row = target.match(/^row-(.+)$/)
+  if (row) return document.querySelector(`[data-form-row="${row[1]}"]`)
   return document.querySelector(`[data-setting="${target}"], [data-field="${target}"], [data-radio="${target}"], [data-formula="${target}"], [data-act="${target}"]`)
 }
 /**
@@ -446,9 +463,84 @@ if (q('open') === 'reset') m.openReset()
 if (q('open') === 'delete') m.menu('delete')
 if (q('open') === 'history') { m.openHistory(); if (q('version')) m.openVersion(q('version')) }
 
+/* ------------------------------ «Форма» — П6, такт 69 ------------------------------ */
+const fg = computed(() => m.formGroup.value)
+/** Выбор группы — радио-карточки списка; смена группы снимает выделение полей. */
+const groupValue = computed<string>({ get: () => fg.value?.id ?? '', set: v => m.selectGroup(v) })
+const typeLabel = (t: string) => FIELD_TYPES.find(x => x.value === t)?.label ?? t
+const label = (list: { value: string, label: string }[], v: string) => list.find(x => x.value === v)?.label ?? v
+const fieldsTitle = computed(() => (fg.value ? `${fg.value.title} · ${fg.value.fields.length} ${plural(fg.value.fields.length, 'поле', 'поля', 'полей')}` : ''))
+const selectedCount = computed(() => m.ui.selectedFields.length)
+const selectedText = computed(() => `Выбрано: ${selectedCount.value} ${plural(selectedCount.value, 'поле', 'поля', 'полей')}`)
+const FIELD_ACTIONS: TableRowActionItem[] = [{ key: 'delete', label: 'Удалить', icon: 'delete', destructive: true }]
+const FIELD_ACTIONS_COLUMN = tableRowActionsColumn(FIELD_ACTIONS)
+
+/** Сайд поля — № 42: черновик живёт здесь до «Сохранить» (r2 §7); порядковый номер — место в группе. */
+const EMPTY_FIELD: FieldDraft = { id: '', title: '', alias: '', type: 'text', ...FIELD_DEFAULTS, order: 1 }
+const fd = ref<FieldDraft>({ ...EMPTY_FIELD })
+const fdTitle = ref('')
+const fdError = ref<{ key: 'title' | 'alias', text: string } | null>(null)
+function openField(id: string) {
+  const g = fg.value
+  if (!g) return
+  const k = g.fields.findIndex(x => x.id === id)
+  const f = g.fields[k]
+  fd.value = f ? { ...JSON.parse(JSON.stringify(f)), order: k + 1 } : { ...EMPTY_FIELD, order: g.fields.length + 1 }
+  fdTitle.value = f?.title ?? ''
+  fdError.value = null
+  m.openSide('field')
+}
+const fieldOpen = surface('field')
+const fieldOrderMax = computed(() => (fg.value?.fields.length ?? 0) + (fd.value.id ? 0 : 1))
+/** «Предложить по названию» — алиас латиницей по заголовку, занятые в группе получают суффикс. */
+function suggestFieldAlias() {
+  fd.value.alias = suggestAlias(fd.value.title, fg.value?.fields.filter(x => x.id !== fd.value.id).map(x => x.alias) ?? [])
+}
+/** Зависимое поле — поле с выбором той же группы; «Не зависит» — пустое значение. */
+const dependOptions = computed(() => [
+  { value: 'none', label: 'Не зависит' },
+  ...(fg.value?.fields.filter(x => x.id !== fd.value.id && x.type === 'choice').map(x => ({ value: x.id, label: x.title })) ?? []),
+])
+const fdDepends = computed<string>({ get: () => fd.value.dependsOn || 'none', set: (v) => { fd.value.dependsOn = v === 'none' ? '' : v } })
+function saveFieldSide() {
+  const g = fg.value
+  if (!g) return
+  fdError.value = m.fieldError(g.id, fd.value)
+  if (m.saveField(g.id, fd.value)) m.closeSurface()
+}
+
+/** Сайд группы — № 68: поля по блоку «Настройки группы» `33179:4467`. */
+const EMPTY_GROUP: GroupDraft = { id: '', title: '', alias: '', ...GROUP_DEFAULTS }
+const gd = ref<GroupDraft>({ ...EMPTY_GROUP })
+const gdTitle = ref('')
+const gdInvalid = ref(false)
+function openGroup(id: string) {
+  const g = m.formGroups.value.find(x => x.id === id)
+  gd.value = g ? { id: g.id, title: g.title, alias: g.alias, createScreen: g.createScreen, mobile: g.mobile, editable: g.editable } : { ...EMPTY_GROUP }
+  gdTitle.value = g?.title ?? ''
+  gdInvalid.value = false
+  m.openSide('group')
+}
+const groupOpen = surface('group')
+/** Алиас группы — с заглавной, как у групп набора данных (`Lead`, `Car`). */
+function suggestGroupAlias() {
+  const alias = suggestAlias(gd.value.title, m.formGroups.value.filter(x => x.id !== gd.value.id).map(x => x.alias.toLowerCase()))
+  gd.value.alias = alias.charAt(0).toUpperCase() + alias.slice(1)
+}
+function saveGroupSide() {
+  gdInvalid.value = !gd.value.title.trim()
+  if (m.saveGroup(gd.value)) m.closeSurface()
+}
+if (q('open') === 'field') {
+  const id = fg.value?.fields.some(x => x.id === q('field')) ? q('field') : (fg.value?.fields[0]?.id ?? '')
+  openField(id)
+}
+if (q('open') === 'new-field') openField('')
+if (q('open') === 'group') openGroup(fg.value?.id ?? '')
+if (q('open') === 'new-group') openGroup('')
+
 /** Содержимое, которое соберут следующие порции, — план `scheme-edit.md`, раздел 10. */
-const PENDING: Record<Exclude<TabId, 'settings'>, { title: string, description: string }> = {
-  form: { title: '«Форма» — порция П6', description: 'Группы, поля, сайды поля и группы, массовый выбор' },
+const PENDING: Record<'processes' | 'showcase', { title: string, description: string }> = {
   processes: { title: '«Процессы и шаги» — порция П7', description: 'Процессы, таблицы шагов, массовые действия, сайды и оверлей' },
   showcase: { title: '«Витрина» — порция П8', description: 'Статус карточки, витринная карточка, «Зачем нужен осмотр», «Из схемы»' },
 }
@@ -1517,9 +1609,188 @@ if (import.meta.client) {
         </div>
       </TabsContent>
 
-      <TabsContent v-for="t in TABS.slice(1)" :key="t.id" :value="t.id">
+      <!-- ============================ «Форма» — № 39–42, 62, 70: группы слева, поля выбранной группы справа (r2 §5; макет `32765:5584`) ============================ -->
+      <TabsContent value="form">
+        <!-- Просмотр прошлой версии (такт 68, решение 3 такта 69): поля — «только чтение», действия — под `inert`; выбор группы работает. -->
+        <div class="flex items-start gap-2 pt-6" data-form :data-readonly="ro || undefined">
+          <!-- Список групп — № 39: панель 192 (`32765:5586`), карандаш открывает сайд группы — № 68. -->
+          <div class="flex w-group-list shrink-0 flex-col gap-2">
+            <Card class="flex flex-col gap-1 p-1" data-groups>
+              <div class="flex h-12 items-center justify-between gap-2 pr-2 pl-4">
+                <Heading>Группы</Heading>
+                <div v-if="fg" :inert="ro" class="flex items-center gap-1">
+                  <IconButton variant="ghost" size="md" label="Настройки группы" data-act="group-edit" @click="openGroup(fg.id)">
+                    <Icon name="edit" :size="20" />
+                  </IconButton>
+                  <IconButton variant="ghost" size="md" label="Удалить группу" data-act="group-delete" @click="m.removeGroup(fg.id)">
+                    <Icon name="delete" :size="20" />
+                  </IconButton>
+                </div>
+              </div>
+              <RadioGroup v-if="m.formGroups.value.length" v-model="groupValue" class="flex flex-col gap-0.5" data-radio="formGroup">
+                <RadioGroupItem v-for="g in m.formGroups.value" :key="g.id" variant="card" :value="g.id" :checked="groupValue === g.id" :data-form-group="g.id">
+                  {{ g.title }}
+                  <template #description>
+                    {{ g.alias || 'Алиас не задан' }}
+                  </template>
+                </RadioGroupItem>
+              </RadioGroup>
+              <!-- Настройки группы — блок `33179:4467`: значения только для чтения, правка — в сайде группы. -->
+              <FieldSet v-if="fg" legend="Настройки группы" class="px-3 pt-3 pb-3" data-group-settings>
+                <Field readonly label="Алиас" data-field="groupAlias">
+                  <Input :model-value="fg.alias" readonly :show-icon="false" placeholder="" />
+                </Field>
+                <Field readonly label="Экран создания" data-field="groupScreen">
+                  <Input :model-value="label(CREATE_SCREENS, fg.createScreen)" readonly placeholder="" :show-icon="false" />
+                </Field>
+                <Field readonly label="В мобильном" data-field="groupMobile">
+                  <Input :model-value="label(MOBILE_SHOW, fg.mobile)" readonly placeholder="" :show-icon="false" />
+                </Field>
+                <Field readonly label="Редактирование" data-field="groupEditable">
+                  <Input :model-value="fg.editable ? 'Разрешено' : 'Запрещено'" readonly placeholder="" :show-icon="false" />
+                </Field>
+              </FieldSet>
+            </Card>
+            <Button :inert="ro" variant="outline" class="w-full" data-act="group-add" @click="openGroup('')">
+              Добавить группу
+            </Button>
+          </div>
+
+          <!-- Панель полей — № 40, 41: заголовок группы со счётом, действия, таблица полей (`32765:5628`). -->
+          <Card class="flex min-w-0 flex-1 flex-col gap-4" data-fields-panel>
+            <template v-if="fg">
+              <Heading level="group" data-fields-title>
+                {{ fieldsTitle }}
+              </Heading>
+              <div :inert="ro" class="flex flex-wrap items-start gap-2" data-fields-actions>
+                <Button show-icon data-act="field-add" @click="openField('')">
+                  <template #icon>
+                    <Icon name="add" :size="16" />
+                  </template>
+                  Добавить поле
+                </Button>
+                <!-- «Вставить из другой схемы» — № 70: заглушка кнопкой (r2 §8). -->
+                <Field hint="Алиас переносится целиком с группой">
+                  <Button variant="outline" show-icon data-act="field-paste" @click="m.pasteFromScheme()">
+                    <template #icon>
+                      <Icon name="copy" :size="16" />
+                    </template>
+                    Вставить из другой схемы
+                  </Button>
+                </Field>
+                <Field hint="Только для пустых полей, не трогая заданные">
+                  <Button variant="outline" show-icon data-act="fill-aliases" @click="m.fillAliases()">
+                    <template #icon>
+                      <Icon name="auto-fix" :size="16" />
+                    </template>
+                    Заполнить алиасы автоматически
+                  </Button>
+                </Field>
+              </div>
+
+              <!-- Массовый выбор — № 62: панель в потоке над таблицей, действия с «Отменить» в уведомлении. -->
+              <ActionBar layout="panel" :open="selectedCount > 0" :count="selectedText" :inert="ro" data-fields-bar>
+                <Button variant="secondary" data-act="bulk-required" @click="m.bulkFields('required')">
+                  Сделать обязательными
+                </Button>
+                <Button variant="secondary" data-act="bulk-optional" @click="m.bulkFields('optional')">
+                  Сделать необязательными
+                </Button>
+                <Button variant="secondary" data-act="bulk-web" @click="m.bulkFields('web')">
+                  Только для web
+                </Button>
+                <Button variant="secondary" data-act="bulk-all-platforms" @click="m.bulkFields('all-platforms')">
+                  Web и мобильное
+                </Button>
+                <Button variant="outline" data-act="bulk-clear" @click="m.clearFieldSelection()">
+                  Снять выделение
+                </Button>
+                <Button variant="destructive" class="ml-auto" data-act="bulk-delete" @click="m.bulkFields('delete')">
+                  Удалить
+                </Button>
+              </ActionBar>
+
+              <Table v-if="fg.fields.length" data-fields-table>
+                <TableRow>
+                  <TableHead variant="column" class="w-14 justify-center px-4" aria-label="Выбор полей группы">
+                    <Checkbox
+                      :readonly="ro"
+                      :model-value="m.selectionState.value === 'all'"
+                      :indeterminate="m.selectionState.value === 'some'"
+                      data-fields-all
+                      @update:model-value="m.toggleAllFields()"
+                    />
+                  </TableHead>
+                  <TableHead variant="column" class="w-12 px-2">
+                    №
+                  </TableHead>
+                  <TableHead variant="column" class="min-w-0 flex-1 px-4">
+                    Поле
+                  </TableHead>
+                  <TableHead variant="column" class="w-36 px-4">
+                    Алиас
+                  </TableHead>
+                  <TableHead variant="column" class="w-28 px-4">
+                    Тип
+                  </TableHead>
+                  <TableHead variant="column" aria-label="Действия" :class="['justify-end px-4', FIELD_ACTIONS_COLUMN]" />
+                </TableRow>
+                <TableRow
+                  v-for="(f, k) in fg.fields"
+                  :key="f.id"
+                  :state="m.ui.selectedFields.includes(f.id) ? 'selected' : 'default'"
+                  :data-form-row="f.id"
+                >
+                  <TableCell variant="slot" class="w-14 justify-center px-4">
+                    <Checkbox :readonly="ro" :model-value="m.ui.selectedFields.includes(f.id)" :aria-label="f.title" @update:model-value="m.toggleField(f.id)" />
+                  </TableCell>
+                  <TableCell class="w-12 px-2">
+                    {{ k + 1 }}
+                  </TableCell>
+                  <!--
+                    Метаданные строки — метками у названия: обязательность, «только web», согласование; признак «зависимое»
+                    возвращён в строку поля (r2 §1, строка 17 реестра).
+                  -->
+                  <TableCell variant="slot" class="min-w-0 flex-1 gap-2 px-4">
+                    <TableCellIdentity class="flex-initial">
+                      {{ f.title }}
+                    </TableCellIdentity>
+                    <Badge v-if="f.required" size="sm" data-badge="required">
+                      Обязательное
+                    </Badge>
+                    <Badge v-if="f.webOnly" size="sm" variant="neutral" data-badge="web">
+                      Только web
+                    </Badge>
+                    <Badge v-if="f.approval" size="sm" variant="neutral" data-badge="approval">
+                      Согласование
+                    </Badge>
+                    <Badge v-if="f.dependent" size="sm" variant="neutral" data-badge="dependent">
+                      Зависимое
+                    </Badge>
+                  </TableCell>
+                  <TableCell class="w-36 px-4" data-field-alias>
+                    {{ f.alias || 'не задан' }}
+                  </TableCell>
+                  <TableCell variant="slot" class="w-28 px-4">
+                    <Chip variant="neutral">
+                      {{ typeLabel(f.type) }}
+                    </Chip>
+                  </TableCell>
+                  <TableCell variant="slot" :class="['justify-end px-4', FIELD_ACTIONS_COLUMN]">
+                    <TableRowActions :inert="ro" :actions="FIELD_ACTIONS" @edit="openField(f.id)" @action="m.removeField(fg.id, f.id)" />
+                  </TableCell>
+                </TableRow>
+              </Table>
+              <Empty v-else title="В группе нет полей" description="Добавьте первое поле группы" data-fields-empty />
+            </template>
+            <Empty v-else title="В форме нет групп" description="Добавьте первую группу — поля формы живут в группах" data-groups-empty />
+          </Card>
+        </div>
+      </TabsContent>
+
+      <TabsContent v-for="t in TABS.slice(2)" :key="t.id" :value="t.id">
         <div class="flex flex-col pt-6">
-          <Empty :title="PENDING[t.id as Exclude<TabId, 'settings'>].title" :description="PENDING[t.id as Exclude<TabId, 'settings'>].description" />
+          <Empty :title="PENDING[t.id as 'processes' | 'showcase'].title" :description="PENDING[t.id as 'processes' | 'showcase'].description" />
         </div>
       </TabsContent>
     </Tabs>
@@ -1582,6 +1853,139 @@ if (import.meta.client) {
           </Button>
           <Button data-act="template-save" @click="saveTemplate()">
             {{ tpl.id ? 'Сохранить' : 'Добавить шаблон' }}
+          </Button>
+        </ModalCardFooter>
+      </ModalCardContent>
+    </ModalCard>
+
+    <!-- ============================ сайд поля — № 42: четыре секции (аудит, «Сайд „Редактирование поля“ — эталон»; макет `32936:16381`) ============================ -->
+    <ModalCard v-model:open="fieldOpen">
+      <ModalCardContent placement="edge" data-side="field">
+        <ModalCardHeader :title="fd.id ? `Редактирование поля — ${fdTitle}` : 'Новое поле'" />
+        <ModalCardBody class="flex flex-col gap-6">
+          <FieldSet legend="Основное">
+            <Field label="Заголовок" required :invalid="fdError?.key === 'title'" :hint="fdError?.key === 'title' ? fdError.text : ''">
+              <Input v-model="fd.title" placeholder="Например, Госномер" :show-icon="false" :invalid="fdError?.key === 'title'" data-field="fdTitle" />
+            </Field>
+            <Field
+              label="Алиас"
+              :invalid="fdError?.key === 'alias'"
+              :hint="fdError?.key === 'alias' ? fdError.text : 'Латиницей без пробелов · кнопка справа предложит по названию'"
+            >
+              <div class="flex items-center gap-2">
+                <Input v-model="fd.alias" placeholder="Например, regnum" :show-icon="false" :invalid="fdError?.key === 'alias'" class="min-w-0 flex-1" data-field="fdAlias" />
+                <IconButton variant="secondary" size="lg" label="Предложить по названию" data-act="alias-suggest" @click="suggestFieldAlias()">
+                  <Icon name="auto-fix" :size="20" />
+                </IconButton>
+              </div>
+            </Field>
+            <Field label="Тип поля" data-field="fdType">
+              <Select v-model="fd.type" :items="FIELD_TYPES" placeholder="" :show-icon="false" :searchable="false" />
+            </Field>
+            <Field label="Порядковый номер" data-field="fdOrder">
+              <InputNumber v-model="fd.order" :min="1" :max="fieldOrderMax" />
+            </Field>
+            <Field label="Текст заполнителя (placeholder)">
+              <Input v-model="fd.placeholder" placeholder="Например, Введите номер" :show-icon="false" data-field="fdPlaceholder" />
+            </Field>
+          </FieldSet>
+
+          <FieldSet legend="Поведение и видимость">
+            <SettingRow data-setting="fdRequired">
+              <Checkbox v-model="fd.required">
+                Обязательное заполнение
+              </Checkbox>
+            </SettingRow>
+            <SettingRow data-setting="fdWebOnly">
+              <Checkbox v-model="fd.webOnly">
+                Только для web (скрыто в мобильном)
+              </Checkbox>
+            </SettingRow>
+            <SettingRow data-setting="fdMobile">
+              <Checkbox v-model="fd.mobileAfterCreate">
+                Отображается в мобильном после создания осмотра
+              </Checkbox>
+            </SettingRow>
+            <!-- «гасит»: согласование выключено в «Настройках» — причина под строкой (аудит, сайд поля). -->
+            <SettingRow v-slot="{ disabled }" data-setting="fdApproval" :reason="m.fieldApprovalReason.value">
+              <Checkbox v-model="fd.approval" :disabled="disabled">
+                Отправлять на согласование
+              </Checkbox>
+            </SettingRow>
+            <SettingRow data-setting="fdNoConfidential" help="Значение поля можно передавать в отчёты и выгрузки без маскирования">
+              <Checkbox v-model="fd.noConfidential">
+                Поле не содержит конфиденциальных данных
+              </Checkbox>
+            </SettingRow>
+            <SettingRow data-setting="fdHighlight">
+              <Checkbox v-model="fd.highlight">
+                Подсвечивать поле
+              </Checkbox>
+            </SettingRow>
+          </FieldSet>
+
+          <!-- Условная секция: только у типа с выбором (аудит: «не висят серыми всегда»). -->
+          <FieldSet v-if="fd.type === 'choice'" legend="Варианты выбора" data-field-choices>
+            <Field label="Варианты" hint="Каждый вариант с новой строки: ключ|значение">
+              <Textarea v-model="fd.options" placeholder="ключ|значение" data-field="fdOptions" />
+            </Field>
+            <Field label="Зависимое поле" hint="Варианты фильтруются по значению выбранного поля" data-field="fdDepends">
+              <Select v-model="fdDepends" :items="dependOptions" placeholder="" :show-icon="false" :searchable="false" />
+            </Field>
+          </FieldSet>
+
+          <FieldSet legend="Валидация и подсказки">
+            <Field label="Валидация регулярным выражением" hint="Например, ^[0-9]{4}$ — ровно четыре цифры">
+              <Input v-model="fd.regexp" placeholder="^[0-9]{4}$" :show-icon="false" data-field="fdRegexp" />
+            </Field>
+            <Field label="Конфигурация подсказок" hint="Настройка содержимого подсказок — в отдельном разделе" data-field="fdHints">
+              <Select v-model="fd.hints" :items="HINT_CONFIGS" placeholder="" :show-icon="false" :searchable="false" />
+            </Field>
+          </FieldSet>
+        </ModalCardBody>
+        <ModalCardFooter>
+          <Button variant="secondary" data-act="field-cancel" @click="m.closeSurface()">
+            Отмена
+          </Button>
+          <Button data-act="field-save" @click="saveFieldSide()">
+            {{ fd.id ? 'Сохранить' : 'Добавить поле' }}
+          </Button>
+        </ModalCardFooter>
+      </ModalCardContent>
+    </ModalCard>
+
+    <!-- ============================ сайд группы — № 68: поля по блоку «Настройки группы» `33179:4467` ============================ -->
+    <ModalCard v-model:open="groupOpen">
+      <ModalCardContent placement="edge" data-side="group">
+        <ModalCardHeader :title="gd.id ? `Настройки группы — ${gdTitle}` : 'Новая группа'" />
+        <ModalCardBody class="flex flex-col gap-4">
+          <Field label="Название" required :invalid="gdInvalid" :hint="gdInvalid ? 'Заполните название группы' : ''">
+            <Input v-model="gd.title" placeholder="Например, Документы" :show-icon="false" :invalid="gdInvalid" data-field="gdTitle" />
+          </Field>
+          <Field label="Алиас" hint="Латиницей без пробелов — первая часть переменной формулы {Алиас:поле}">
+            <div class="flex items-center gap-2">
+              <Input v-model="gd.alias" placeholder="Например, Docs" :show-icon="false" class="min-w-0 flex-1" data-field="gdAlias" />
+              <IconButton variant="secondary" size="lg" label="Предложить по названию" data-act="group-alias-suggest" @click="suggestGroupAlias()">
+                <Icon name="auto-fix" :size="20" />
+              </IconButton>
+            </div>
+          </Field>
+          <Field label="Экран создания" data-field="gdScreen">
+            <Select v-model="gd.createScreen" :items="CREATE_SCREENS" placeholder="" :show-icon="false" :searchable="false" />
+          </Field>
+          <Field label="В мобильном" data-field="gdMobile">
+            <Select v-model="gd.mobile" :items="MOBILE_SHOW" placeholder="" :show-icon="false" :searchable="false" />
+          </Field>
+          <Checkbox v-model="gd.editable" subtitle="Поля группы можно править после создания осмотра" data-field="gdEditable">
+            Разрешить редактирование
+          </Checkbox>
+        </ModalCardBody>
+        <ModalCardFooter>
+          <Button variant="secondary" data-act="group-cancel" @click="m.closeSurface()">
+            Отмена
+          </Button>
+          <Button data-act="group-save" @click="saveGroupSide()">
+            {{ gd.id ? 'Сохранить' : 'Добавить группу' }}
           </Button>
         </ModalCardFooter>
       </ModalCardContent>

@@ -543,7 +543,14 @@ const NOTES_EXAMPLE = `<!-- заметка ленты: во всю ширину 
 <!-- этап нового повтора в поповере: название и число повторов -->
 <AssignOption type="stage" :value="\`stage|\${s.id}\`" :name="s.title" :frames="count" @select="create(s.id)" />`
 
-const ACTION_BAR_EXAMPLE = `<!-- панель выделения, §10.2: по центру ленты (x считает страница), закрытая уезжает вниз -->
+const ACTION_BAR_EXAMPLE = `<!-- такт 69: панель массовых действий в потоке страницы — во всю ширину контейнера, действия с переносом строк -->
+<ActionBar layout="panel" :open="selected.length > 0" :count="\`Выбрано: \${n} \${plural(n, 'поле', 'поля', 'полей')}\`">
+  <Button variant="secondary" @click="bulk('required')">Сделать обязательными</Button>
+  <Button variant="outline" @click="clearSelection()">Снять выделение</Button>
+  <Button variant="destructive" class="ml-auto" @click="bulk('delete')">Удалить</Button>
+</ActionBar>
+
+<!-- панель выделения, §10.2: по центру ленты (x считает страница), закрытая уезжает вниз -->
 <ActionBar :open="selected.size > 0" :count="plural(n, 'кадр выбран', 'кадра выбрано', 'кадров выбрано')" :sub="sub" :x="feedCenter">
   <Popover v-model:open="assignOpen">
     <PopoverTrigger as-child><Button>Назначить на шаг</Button></PopoverTrigger>
@@ -1728,6 +1735,30 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
             <Button>Назначить на шаг</Button>
             <ActionBarSeparator />
             <Button variant="secondary">Снять</Button>
+          </ActionBar>
+        </div>
+      </div>
+
+      <!-- Такт 69: раскладка panel — панель массовых действий в потоке страницы (страница схемы, № 44, 62; макет 32765:6576). -->
+      <div data-subsection="action-bar-panel" data-matrix="action-bar-panel" class="grid max-w-6xl grid-cols-[repeat(2,minmax(0,1fr))] items-start gap-6">
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">ActionBar layout="panel" — счёт, действия с переносом строк, удаление справа</p>
+          <ActionBar layout="panel" count="Выбрано: 2 поля">
+            <Button variant="secondary">Сделать обязательными</Button>
+            <Button variant="secondary">Сделать необязательными</Button>
+            <Button variant="secondary">Только для web</Button>
+            <Button variant="outline">Снять выделение</Button>
+            <Button variant="destructive" class="ml-auto">Удалить</Button>
+          </ActionBar>
+        </div>
+        <div class="space-y-1">
+          <p class="text-2xs text-muted-foreground">ActionBar layout="panel" — с подписью; закрытая (open=false) не рисуется</p>
+          <ActionBar layout="panel" count="Выбрано: 3 шага" sub="2 обязательных · 1 скрытый">
+            <Button variant="secondary">Обязательный</Button>
+            <Button variant="secondary">Скрытый</Button>
+          </ActionBar>
+          <ActionBar layout="panel" count="Выбрано: 0" :open="false">
+            <Button variant="secondary">Не видна</Button>
           </ActionBar>
         </div>
       </div>

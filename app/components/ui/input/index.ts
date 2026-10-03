@@ -1,6 +1,5 @@
 import type { VariantProps } from 'class-variance-authority'
 import { cva } from 'class-variance-authority'
-import { READONLY_SURFACE } from '../field'
 
 export { default as Input } from './Input.vue'
 
@@ -96,9 +95,13 @@ export const inputVariants = cva(
         true: 'pointer-events-none opacity-[var(--opacity-disabled)]',
         false: '',
       },
-      /** Только чтение — такт 68: поверхность без заливки с рамкой `--input`, наведения нет (`ui/field/index.ts`). */
+      /**
+       * Только чтение — такт 68: поверхность без заливки с рамкой `--input`, наведения нет (`ui/field/index.ts`). Сама
+       * поверхность `READONLY_SURFACE` ставится в `Input.vue` при отрисовке (такт 69): при загрузке модуля на сервере
+       * константа ещё не определена, и серверная разметка расходилась с клиентской — «Hydration class mismatch».
+       */
       readonly: {
-        true: READONLY_SURFACE,
+        true: '',
         false: '',
       },
     },
@@ -160,5 +163,7 @@ export type InputVariants = VariantProps<typeof inputVariants>
  * - **Добавлено.** Проп `readonly` — «только чтение» (такт 68): значение полным контрастом `--foreground`, выделяется и
  *   копируется, правки нет (атрибут `readonly` у поля); заливки нет — рамка 1 `--input`, наведения нет, фокус с клавиатуры —
  *   кольцо 2 `--ring`; крестик очистки и слот `end` не рисуются. Внутри `Field readonly` включается сам. Без пропа вид и
- *   поведение прежние.
+ *   поведение прежние. Такт 69: поверхность «только чтения» ставится при отрисовке — серверная разметка совпадает с
+ *   клиентской (до такта 69 сервер отдавал поле без поверхности, клиент её дорисовывал с предупреждением гидратации);
+ *   вид и поведение прежние, строка черновика не меняется.
  */

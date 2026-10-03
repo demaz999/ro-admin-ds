@@ -130,3 +130,47 @@ export const SYSTEM_VARIABLES = [
   { value: 'Scheme:type', label: 'Тип схемы', group: 'Схема', sample: 'Осмотр транспорта' },
 ]
 export const FIELD_SAMPLES: Record<string, string> = { policy_number: 'К-0001024', vin: 'DEMO0000000001024', regnum: 'А000АА00', mileage: '48 200' }
+
+/* ------------------------------ «Форма» — такт 69, П6 ------------------------------ */
+/** Типы поля формы; `choice` — тип с выбором: у него секция «Варианты выбора» (аудит, «Сайд „Редактирование поля“ — эталон»). */
+export const FIELD_TYPES = [
+  { value: 'text', label: 'Текст' },
+  { value: 'number', label: 'Число' },
+  { value: 'date', label: 'Дата' },
+  { value: 'checkbox', label: 'Чекбокс' },
+  { value: 'choice', label: 'Выбор' },
+]
+/** Настройки группы — блок «Настройки группы» макета `33179:4467`: экран создания, показ в мобильном, редактирование. */
+export const CREATE_SCREENS = [
+  { value: '1', label: '1-й экран' },
+  { value: '2', label: '2-й экран' },
+  { value: 'none', label: 'Не показывать при создании' },
+]
+export const MOBILE_SHOW = [
+  { value: 'after-create', label: 'После создания' },
+  { value: 'always', label: 'Всегда' },
+  { value: 'never', label: 'Не показывать' },
+]
+/** «Конфигурация подсказок» сайда поля: содержимое подсказок — в отдельном разделе (макет `32936:16570`). */
+export const HINT_CONFIGS = [
+  { value: 'none', label: 'Без подсказок' },
+  { value: 'standard', label: 'Стандартные подсказки' },
+  { value: 'photo', label: 'Подсказки с фото-примером' },
+]
+
+const LATIN: Record<string, string> = {
+  а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p',
+  р: 'r', с: 's', т: 't', у: 'u', ф: 'f', х: 'h', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sch', ъ: '', ы: 'y', ь: '', э: 'e', ю: 'yu', я: 'ya',
+}
+/**
+ * Алиас по названию — «предложить по названию» сайда поля и «Заполнить алиасы автоматически»: транслитерация латиницей,
+ * слова через подчёркивание, без пробелов (подсказка макета `32936:16479`). Занятые алиасы получают суффикс `_2`, `_3`.
+ */
+export function suggestAlias(title: string, taken: readonly string[] = []): string {
+  const base = [...title.toLowerCase()].map(c => LATIN[c] ?? c).join('').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '') || 'field'
+  let alias = base
+  for (let k = 2; taken.includes(alias); k++) alias = `${base}_${k}`
+  return alias
+}
+/** Алиас — латиница, цифры и подчёркивание, без пробелов; первая — буква. */
+export const ALIAS_RE = /^[A-Za-z][A-Za-z0-9_]*$/

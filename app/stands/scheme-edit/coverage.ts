@@ -13,4 +13,7 @@ export const SCHEME_COVERAGE_STATES = [
   'open=publish', 'data=new&open=first-publish', 'open=reset', 'open=delete', 'open=menu', 'open=history', 'open=history&version=v2', 'view=v1', 'presence=1',
   /* Такт 65, П5: выдача поиска, пустая выдача, подсветка найденного. */
   'q=подпис', 'q=фаыфа', 'found=cadastreMap',
+  /* Такт 69, П6: «Форма» — группа, выделение с панелью, сайд поля (тип с выбором и без), новое поле, сайд группы, просмотр версии. */
+  'tab=form&group=g-body', 'group=g-car&selected=f-vin,f-plate', 'open=field', 'open=field&group=g-body&field=f-trim', 'open=new-field', 'open=group',
+  'tab=form&view=v1',
 ] as const

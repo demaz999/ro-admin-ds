@@ -22,11 +22,19 @@
           "form": {
             "groups": [
               { "id": "g-lead", "title": "Заявка", "alias": "Lead", "fields": [
-                { "id": "f-number", "title": "Номер полиса", "alias": "policy_number", "type": "text", "required": true, "webOnly": false, "dependent": false }
+                { "id": "f-number", "title": "Номер полиса", "alias": "policy_number", "type": "text", "required": true, "webOnly": false, "dependent": false },
+                { "id": "f-insurer", "title": "Страхователь", "alias": "insurer", "type": "text", "required": true, "webOnly": false, "dependent": false, "placeholder": "ФИО или название организации" },
+                { "id": "f-start", "title": "Дата начала полиса", "alias": "policy_start", "type": "date", "required": false, "webOnly": true, "dependent": false }
               ] },
-              { "id": "g-car", "title": "Автомобиль", "alias": "Car", "fields": [
+              { "id": "g-car", "title": "Автомобиль", "alias": "Car", "mobile": "always", "fields": [
                 { "id": "f-vin", "title": "VIN", "alias": "vin", "type": "text", "required": true, "webOnly": false, "dependent": false },
                 { "id": "f-mileage", "title": "Пробег", "alias": "mileage", "type": "number", "required": false, "webOnly": false, "dependent": false }
+              ] },
+              { "id": "g-body", "title": "Кузов и комплектация", "alias": "Body", "createScreen": "2", "fields": [
+                { "id": "f-body-type", "title": "Тип кузова", "alias": "body_type", "type": "choice", "required": true, "webOnly": false, "dependent": false, "options": "sedan|Седан\nhatchback|Хэтчбек\nwagon|Универсал\nsuv|Внедорожник" },
+                { "id": "f-trim", "title": "Комплектация", "alias": "trim", "type": "choice", "required": false, "webOnly": false, "dependent": true, "dependsOn": "f-body-type", "options": "base|Базовая\ncomfort|Комфорт\nlux|Люкс" },
+                { "id": "f-damage", "title": "Повреждения кузова", "alias": "has_damage", "type": "checkbox", "required": false, "webOnly": false, "dependent": false, "highlight": true },
+                { "id": "f-year", "title": "Год выпуска", "alias": "year", "type": "number", "required": false, "webOnly": false, "dependent": false, "placeholder": "Например, 2021", "regexp": "^[0-9]{4}$", "hints": "none" }
               ] }
             ]
           },
@@ -60,12 +68,20 @@
           "form": {
             "groups": [
               { "id": "g-lead", "title": "Заявка", "alias": "Lead", "fields": [
-                { "id": "f-number", "title": "Номер полиса", "alias": "policy_number", "type": "text", "required": true, "webOnly": false, "dependent": false }
+                { "id": "f-number", "title": "Номер полиса", "alias": "policy_number", "type": "text", "required": true, "webOnly": false, "dependent": false },
+                { "id": "f-insurer", "title": "Страхователь", "alias": "insurer", "type": "text", "required": true, "webOnly": false, "dependent": false, "placeholder": "ФИО или название организации" },
+                { "id": "f-start", "title": "Дата начала полиса", "alias": "policy_start", "type": "date", "required": false, "webOnly": true, "dependent": false }
               ] },
-              { "id": "g-car", "title": "Автомобиль", "alias": "Car", "fields": [
+              { "id": "g-car", "title": "Автомобиль", "alias": "Car", "mobile": "always", "fields": [
                 { "id": "f-vin", "title": "VIN", "alias": "vin", "type": "text", "required": true, "webOnly": false, "dependent": false, "approval": true },
                 { "id": "f-plate", "title": "Госномер", "alias": "regnum", "type": "text", "required": true, "webOnly": false, "dependent": false, "approval": true },
                 { "id": "f-mileage", "title": "Пробег", "alias": "mileage", "type": "number", "required": false, "webOnly": false, "dependent": false }
+              ] },
+              { "id": "g-body", "title": "Кузов и комплектация", "alias": "Body", "createScreen": "2", "fields": [
+                { "id": "f-body-type", "title": "Тип кузова", "alias": "body_type", "type": "choice", "required": true, "webOnly": false, "dependent": false, "options": "sedan|Седан\nhatchback|Хэтчбек\nwagon|Универсал\nsuv|Внедорожник" },
+                { "id": "f-trim", "title": "Комплектация", "alias": "trim", "type": "choice", "required": false, "webOnly": false, "dependent": true, "dependsOn": "f-body-type", "options": "base|Базовая\ncomfort|Комфорт\nlux|Люкс" },
+                { "id": "f-damage", "title": "Повреждения кузова", "alias": "has_damage", "type": "checkbox", "required": false, "webOnly": false, "dependent": false, "highlight": true },
+                { "id": "f-year", "title": "Год выпуска", "alias": "year", "type": "number", "required": false, "webOnly": false, "dependent": false, "placeholder": "Например, 2021", "regexp": "^[0-9]{4}$", "hints": "none" }
               ] }
             ]
           },

@@ -80,7 +80,21 @@ const ro = ref({ name: 'КАСКО — осмотр', text: 'Осмотр авт
           </p>
         </div>
         <div data-example class="flex min-w-0 flex-col items-stretch gap-3">
-          <template v-if="c.id === 'input-end'">
+          <template v-if="c.id === 'action-bar-panel'">
+            <ActionBar layout="panel" count="Выбрано: 2 поля">
+              <Button variant="secondary">
+                Сделать обязательными
+              </Button>
+              <Button variant="outline">
+                Снять выделение
+              </Button>
+              <Button variant="destructive" class="ml-auto">
+                Удалить
+              </Button>
+            </ActionBar>
+            <span class="text-xs text-muted-foreground">панель в потоке; плавающая полоса — layout="float", прежняя</span>
+          </template>
+          <template v-else-if="c.id === 'input-end'">
             <Input v-model="draftSearch" placeholder="Поиск по настройкам схемы" clearable>
               <template #end>
                 <Kbd surface="card">

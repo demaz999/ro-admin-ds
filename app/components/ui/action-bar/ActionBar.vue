@@ -2,7 +2,7 @@
 import { cn } from '@/lib/utils'
 
 /**
- * Плавающая полоса действий над лентой — разбор и таблица «кит | прототип» в `index.ts`.
+ * Полоса действий над выделением — разбор и таблица «кит | прототип» в `index.ts`.
  * Что делают действия — страница; полоса только держит счёт, подпись и слот.
  */
 const props = withDefaults(defineProps<{
@@ -10,7 +10,7 @@ const props = withDefaults(defineProps<{
   count: string
   /** Подпись под счётом: «1 видео · 2 уже распределено». */
   sub?: string
-  /** Закрытая полоса уезжает за нижний край и не принимает фокус. */
+  /** Закрытая полоса уезжает за нижний край и не принимает фокус; у панели — не рисуется. */
   open?: boolean
   /** Центр полосы по горизонтали — CSS-значение `left`, по умолчанию центр окна. */
   x?: string
@@ -19,17 +19,43 @@ const props = withDefaults(defineProps<{
    * Закрытая в этом размещении скрыта целиком. Без `y` — прибита к низу окна.
    */
   y?: string
+  /**
+   * Раскладка (такт 69): `float` — плавающая полоса в одну строку (прежняя, по умолчанию); `panel` — панель в потоке
+   * страницы во всю ширину контейнера: строка счёта сверху, действия ниже с переносом строк (Figma `32765:6576`).
+   * У панели `x` и `y` не действуют.
+   */
+  layout?: 'float' | 'panel'
   class?: string
 }>(), {
   sub: '',
   open: true,
   x: '50%',
   y: undefined,
+  layout: 'float',
 })
 </script>
 
 <template>
   <div
+    v-if="props.layout === 'panel'"
+    v-show="props.open"
+    data-slot="action-bar"
+    data-layout="panel"
+    :data-state="props.open ? 'open' : 'closed'"
+    role="toolbar"
+    :aria-label="props.count"
+    :class="cn('flex w-full min-w-0 flex-col gap-3 rounded-lg border border-border bg-card px-4 py-3 text-card-foreground', props.class)"
+  >
+    <div class="flex min-w-0 items-baseline gap-3">
+      <span data-slot="action-bar-count" class="text-sm font-bold">{{ props.count }}</span>
+      <span v-if="props.sub" data-slot="action-bar-sub" class="min-w-0 truncate text-2xs text-muted-foreground">{{ props.sub }}</span>
+    </div>
+    <div data-slot="action-bar-actions" class="flex min-w-0 flex-wrap items-center gap-2">
+      <slot />
+    </div>
+  </div>
+  <div
+    v-else
     data-slot="action-bar"
     :data-state="props.open ? 'open' : 'closed'"
     role="toolbar"

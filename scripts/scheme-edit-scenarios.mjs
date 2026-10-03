@@ -278,6 +278,23 @@ function kit(page) {
       await page.click(`document.querySelector('[data-template=${id}] [data-slot=table-row-actions-secondary] button')`)
       await page.click(`document.querySelector('[data-menu=row-actions] [data-action=delete]')`)
     },
+    /* ---------- П6, такт 69: «Форма» ---------- */
+    rowEdit: id => page.click(`document.querySelector('[data-form-row="${id}"] [data-slot=table-row-action]')`),
+    async rowDelete(id) {
+      await page.click(`document.querySelector('[data-form-row="${id}"] [data-slot=table-row-actions-secondary] button')`)
+      await page.click(`document.querySelector('[data-menu=row-actions] [data-action=delete]')`)
+    },
+    group: id => page.click(`document.querySelector('[data-form-group="${id}"] [data-slot=choice-control]')`),
+    rowCheck: id => page.click(`document.querySelector('[data-form-row="${id}"] [data-slot=choice-control]')`),
+    fieldsAll: () => page.click(`document.querySelector('[data-fields-all] [data-slot=choice-control], [data-fields-all][data-slot=choice-control]')`),
+    /** Новое поле через сайд: «Добавить поле», заголовок, тип, «Добавить поле» в подвале; дождаться записи. */
+    async addField(title, type) {
+      await this.act('field-add')
+      await this.typeInto('fdTitle', title)
+      if (type) await this.select('fdType', type)
+      await this.act('field-save')
+      await this.settled()
+    },
     /* ---------- такт 68: только чтение ---------- */
     selectText: sel => page.selectText(sel),
     /** Поле ввода: клик в середину значения и набор знака — в «только чтении» значение прежнее. */
@@ -525,6 +542,38 @@ function kit(page) {
           sideComments: document.querySelectorAll('[data-side-comments] [data-slot=chip]').length,
           commentDict: t(document.querySelector('[data-act=open-comments]')?.textContent) || null,
           focusAct: document.activeElement?.dataset?.act ?? null,
+          /* ---------- П6, такт 69: «Форма» ---------- */
+          form: (() => { const el = document.querySelector('[data-form]'); if (!el) return null
+            const bar = el.querySelector('[data-fields-bar]')
+            return {
+              groups: [...el.querySelectorAll('[data-form-group]')].map(g => t(g.querySelector('[data-slot=choice-title]').textContent)),
+              group: t(el.querySelector('[data-form-group] [data-slot=choice-control][data-state=checked]')?.closest('[data-form-group]')?.querySelector('[data-slot=choice-title]').textContent) || null,
+              settings: ['groupAlias', 'groupScreen', 'groupMobile', 'groupEditable'].map(k => el.querySelector('[data-field=' + k + '] input')?.value ?? null),
+              title: t(el.querySelector('[data-fields-title]')?.textContent) || null,
+              rows: [...el.querySelectorAll('[data-form-row]')].map(r => { const c = r.querySelectorAll('[data-slot=table-cell]')
+                return [t(c[1].textContent), t(r.querySelector('[data-slot=table-cell-identity]').textContent), t(c[3].textContent), t(c[4].textContent),
+                  [...r.querySelectorAll('[data-badge]')].map(b => t(b.textContent)).join(', ')].filter(Boolean).join(' · ') }),
+              selected: el.querySelectorAll('[data-form-row][data-state=selected]').length,
+              all: el.querySelector('[data-fields-all] [data-slot=choice-control], [data-fields-all][data-slot=choice-control]')?.getAttribute('aria-checked') ?? null,
+              bar: bar && bar.dataset.state === 'open' && getComputedStyle(bar).display !== 'none' ? t(bar.querySelector('[data-slot=action-bar-count]').textContent) : null,
+              empty: t(el.querySelector('[data-slot=empty-title]')?.textContent) || null,
+            } })(),
+          /* Просмотр версии на «Форме»: поля группы — «только чтение», флажки строк — aria-readonly, действия — под inert. */
+          formRo: (() => { const el = document.querySelector('[data-form]'); if (!el) return null
+            const fields = [...el.querySelectorAll('[data-slot=field-wrapper]')].filter(x => x.querySelector('input'))
+            const checks = [...el.querySelectorAll('[data-fields-table] [data-slot=choice-control]')]
+            const acts = [...el.querySelectorAll('[data-act]')]
+            return { fields: fields.length > 0 && fields.every(x => 'readonly' in x.dataset), checks: checks.length > 0 && checks.every(x => x.getAttribute('aria-readonly') === 'true'),
+              actsInert: acts.length > 0 && acts.every(x => !!x.closest('[inert]')), rowActsInert: [...el.querySelectorAll('[data-slot=table-row-actions]')].every(x => !!x.closest('[inert]')) } })(),
+          fieldSide: (() => { const el = document.querySelector('[data-side=field]'); if (!el) return null
+            return {
+              legends: [...el.querySelectorAll('[data-slot=field-set-legend]')].map(x => t(x.textContent)),
+              title: el.querySelector('[data-field=fdTitle] input, input[data-field=fdTitle]')?.value ?? null,
+              alias: el.querySelector('[data-field=fdAlias] input, input[data-field=fdAlias]')?.value ?? null,
+              type: t(el.querySelector('[data-field=fdType] [data-slot=field-input]')?.textContent) || null,
+              choices: !!el.querySelector('[data-field-choices]'),
+            } })(),
+          focusRow: document.activeElement?.closest?.('[data-form-row]')?.dataset.formRow ?? null,
         })
       })()`)
       return JSON.parse(s)
@@ -534,7 +583,7 @@ function kit(page) {
 
 /* ------------------------------ сценарии ------------------------------ */
 /**
- * Сценарии П1–П5 — `docs/scheme-edit.md`, 6.1. Шаг — [название, действие, ожидание из спеки, опции].
+ * Сценарии П1–П6 — `docs/scheme-edit.md`, 6.1. Шаг — [название, действие, ожидание из спеки, опции].
  * Ожидание — подмножество слепка; источник — в названии сценария.
  */
 const NAME = 'КАСКО — осмотр легкового автомобиля'
@@ -546,7 +595,7 @@ const SCENARIOS = {
   'СС-13': ['табы: переключение сохраняет раздел и прокрутку таба (r2 §3; аудит, «Верхний уровень: табы по сущностям»)', [
     ['старт', null, { tabs: ['Настройки', 'Форма', 'Процессы и шаги', 'Витрина'], tab: 'settings', tabActive: ['settings'], section: 'general', scrollY: 0 }],
     ['прокрутить «Настройки» на 120', K => K.scrollBy(120), { tab: 'settings', scrollY: 120 }],
-    ['таб «Форма»', K => K.tab('form'), { tab: 'form', tabActive: ['form'], section: 'general', scrollY: 0, pending: '«Форма» — порция П6' }],
+    ['таб «Форма»', K => K.tab('form'), { tab: 'form', tabActive: ['form'], section: 'general', scrollY: 0, pending: null, 'form.title': 'Заявка · 3 поля' }],
     ['таб «Процессы и шаги»', K => K.tab('processes'), { tab: 'processes', tabActive: ['processes'], pending: '«Процессы и шаги» — порция П7' }],
     ['таб «Витрина»', K => K.tab('showcase'), { tab: 'showcase', tabActive: ['showcase'], pending: '«Витрина» — порция П8', scrollY: 0 }],
     ['назад в «Настройки»', K => K.tab('settings'), { tab: 'settings', tabActive: ['settings'], section: 'general', scrollY: 120, save: 'saved', writes: 0 }],
@@ -597,7 +646,7 @@ const SCENARIOS = {
     ['старт: согласование выключено — счётчика нет', null, { 'rows.approval.checked': false, 'rows.approval.meta': '', 'rows.approval.help': true }],
     ['включить согласование — счётчик полей', async (K) => { await K.toggle('approval'); await K.settled() },
       { 'rows.approval.meta': 'Отмечено 2 поля на согласование', 'rows.approval.tone': 'default', 'g.behavior.approval': true, writes: 1 }],
-    ['«Перейти к полям»', async (K) => { await K.mark(); await K.act('go-fields') }, { tab: 'form', tabActive: ['form'], pending: '«Форма» — порция П6', writes: 1, scrollY: 0 }],
+    ['«Перейти к полям»', async (K) => { await K.mark(); await K.act('go-fields') }, { tab: 'form', tabActive: ['form'], pending: null, 'form.group': 'Заявка', writes: 1, scrollY: 0 }],
     ['назад в «Настройки» — на прежнем месте', K => K.tab('settings'), { tab: 'settings', section: 'general', atMark: true, 'rows.approval.meta': 'Отмечено 2 поля на согласование' }],
   ]],
   'СС-19/ноль': ['«вооружает» при нуле: предупреждение и точка «требует внимания» у раздела (аудит, «Паттерны кросс-таб зависимостей», «Единая система статус-индикаторов»)', [
@@ -695,6 +744,8 @@ const SCENARIOS = {
     ['по описанию: «промежуточного экрана»', K => K.fill('[data-field=search]', 'промежуточного экрана'),
       { results: [{ path: 'Настройки → Мобильное приложение', items: ['Запустить осмотр сразу после создания | Пользователь сразу переходит к выполнению без промежуточного экрана'] }] }],
     ['длинная выдача обрезается с подсказкой: «детектор»', K => K.fill('[data-field=search]', 'детектор'), { searchMore: 'Показаны первые 12 из 15 — уточните запрос', 'results.0.path': 'Настройки → Аномалии', 'results.0.items.0': 'Отображать блок аномалий | Детекторы подозрительной активности при проведении осмотра' }],
+    ['поле формы по алиасу (такт 69): «regnum» — путь «Форма → Автомобиль»', K => K.fill('[data-field=search]', 'regnum'),
+      { results: [{ path: 'Форма → Автомобиль', items: ['Поле «Госномер» | алиас regnum'] }] }],
     ['поиск работает с любого таба', async (K) => { await K.key('Escape'); await K.tab('showcase'); await K.slash(); await K.type('дедлайн') },
       { tab: 'showcase', searchOpen: true, 'results.0.path': 'Настройки → Общие', 'results.0.items.0': 'Дедлайн проверки' }],
   ]],
@@ -709,6 +760,8 @@ const SCENARIOS = {
       { section: 'general', anchor: 'main', focusField: 'name', flash: [], foundVisible: true, writes: 0 }],
     ['настройка, скрытая под выключенным родителем, — подсвечен родитель: «кто подписывает»', async (K) => { await K.searchClick(); await K.type('кто подписывает'); await K.key('Enter') },
       { section: 'pdf', flash: ['pdfSign'], foundVisible: true, 'rows.pdfSign.children': false }],
+    ['поле формы (такт 69): «госномер», Enter — таб «Форма», группа «Автомобиль», фокус на строке поля', async (K) => { await K.searchClick(); await K.type('госномер'); await K.key('Enter') },
+      { tab: 'form', 'form.group': 'Автомобиль', focusRow: 'f-plate', searchOpen: false, query: '', writes: 0 }],
   ]],
   'СС-11/просмотр': ['поиск работает в просмотре прошлой версии: переход и подсветка есть, правки нет (r2 §2, состояние 7)', [
     ['«/», «пропускать», Enter', async (K) => { await K.slash(); await K.type('пропускать'); await K.key('Enter') },
@@ -804,7 +857,11 @@ const SCENARIOS = {
         shownDescription: 'Осмотр автомобиля перед оформлением полиса', title: 'КАСКО — осмотр легкового автомобиля' }],
     ['нажатие по настройке — правки нет: клик доходит до флажка только для чтения', K => K.toggle('skipExpertise'), { 'g.behavior.skipExpertise': false, writes: 0, saveLog: [], dirty: true, focusRo: true, inertOnFields: false }],
     ['навигатор работает: раздел «PDF»', K => K.section('pdf'), { section: 'pdf', viewing: 'v1', readonly: true, 'templates.length': 2 }],
-    ['табы работают', async (K) => { await K.tab('form'); await K.tab('settings') }, { tab: 'settings', viewing: 'v1' }],
+    ['таб «Форма»: поля группы только для чтения, действия под inert, выбор группы работает', async (K) => { await K.tab('form'); await K.group('g-car') },
+      { tab: 'form', viewing: 'v1', 'form.group': 'Автомобиль', 'form.title': 'Автомобиль · 2 поля', 'form.settings': ['Car', '1-й экран', 'Всегда', 'Разрешено'],
+        formRo: { fields: true, checks: true, actsInert: true, rowActsInert: true }, writes: 0 }],
+    ['«Форма»: клик по флажку строки — выделения нет, фокус на флажке', K => K.rowCheck('f-vin'), { 'form.selected': 0, 'form.bar': null, focusRo: true, focusRow: 'f-vin', writes: 0 }],
+    ['табы работают', async (K) => { await K.tab('settings') }, { tab: 'settings', viewing: 'v1' }],
     ['«Сделать копию»', K => K.act('view-copy'), { notices: ['Копия схемы — вне стенда'], viewing: 'v1' }],
     ['«Перейти к текущей версии» — снова черновик', K => K.act('view-leave'), { viewing: '', readonly: false, banner7: null, 'status.state': 'draft', headerActs: ['history', 'preview', 'publish', 'menu'] }],
   ]],
@@ -967,6 +1024,11 @@ const SCENARIOS = {
       { surface: '', 's.pdf.templates.length': 2, writes: 0, focusAct: 'template-add' }],
     ['сайд словаря комментариев: Tab по кругу и Esc', async (K) => { await K.section('general'); await K.act('open-comments'); await K.tabs(8) }, { surface: 'comments', focusInSide: true }],
     ['Esc — сайд словаря закрыт, фокус на строке словаря', K => K.key('Escape'), { surface: '', focusAct: 'open-comments', writes: 0 }],
+    ['сайд поля (такт 69): «Добавить поле», Tab по кругу — фокус в сайде', async (K) => { await K.tab('form'); await K.act('field-add'); await K.tabs(30) }, { surface: 'field', focusInSide: true }],
+    ['заголовок введён, Esc — поле не добавлено, фокус на «Добавить поле»', async (K) => { await K.typeInto('fdTitle', 'Черновик поля'); await K.key('Escape') },
+      { surface: '', 'form.title': 'Заявка · 3 поля', writes: 0, focusAct: 'field-add' }],
+    ['сайд группы: карандаш, Esc — фокус на карандаше', async (K) => { await K.act('group-edit'); await K.typeInto('gdTitle', ' плюс'); await K.key('Escape') },
+      { surface: '', 'form.groups.0': 'Заявка', writes: 0, focusAct: 'group-edit' }],
   ], { query: 'section=pdf' }],
   'СС-59': ['сайд словаря комментариев: привязка словаря к схеме, «Сохранить» меняет значение в «Словарях»; «Отмена» и Esc отбрасывают (r2 §4, §7; аудит, «Финальная карта подсекций „Общих“», п. 4)', [
     ['открыть сайд', K => K.act('open-comments'), { surface: 'comments', sideTitle: 'Словарь комментариев', sideDict: 'Комментарии к осмотру транспорта', sideComments: 4 }],
@@ -978,6 +1040,88 @@ const SCENARIOS = {
     ['открыть, выбрать, «Сохранить»', async (K) => { await K.act('open-comments'); await K.select('sideDict', 'Общий словарь комментариев'); await K.act('side-save'); await K.settled() },
       { surface: '', 'g.dictionaries.comments': 'common', commentDict: 'Общий словарь комментариев Комментариев: 3', saveLog: ['saving', 'saved'], writes: 1 }],
   ]],
+  /* ============================ П6, такт 69: «Форма» ============================ */
+  'СС-34': ['форма: выбор группы, настройки группы, «Добавить группу» (r2 §5; макет `32765:5584`, блок `33179:4467`)', [
+    ['старт: группы, выбрана первая, настройки группы только для чтения', null, { tab: 'form', 'form.groups': ['Заявка', 'Автомобиль', 'Кузов и комплектация'], 'form.group': 'Заявка',
+      'form.settings': ['Lead', '1-й экран', 'После создания', 'Разрешено'], 'form.title': 'Заявка · 3 поля', 'form.rows.length': 3, 'form.bar': null }],
+    ['выбрать «Кузов и комплектация» — поля и настройки группы', K => K.group('g-body'),
+      { 'form.group': 'Кузов и комплектация', 'form.settings': ['Body', '2-й экран', 'После создания', 'Разрешено'], 'form.title': 'Кузов и комплектация · 4 поля',
+        'form.rows': ['1 · Тип кузова · body_type · Выбор · Обязательное', '2 · Комплектация · trim · Выбор · Зависимое', '3 · Повреждения кузова · has_damage · Чекбокс', '4 · Год выпуска · year · Число'], writes: 0 }],
+    ['«Добавить группу» — сайд новой группы', K => K.act('group-add'), { surface: 'group', sideTitle: 'Новая группа', writes: 0 }],
+    ['пустое название — отказ, сайд открыт', K => K.act('group-save'), { notices: ['Заполните название группы'], surface: 'group', 'form.groups.length': 3, writes: 0 }],
+    ['название «Документы», алиас по названию, экран создания — добавить', async (K) => { await K.typeInto('gdTitle', 'Документы'); await K.act('group-alias-suggest'); await K.select('gdScreen', 'Не показывать при создании'); await K.act('group-save'); await K.settled() },
+      { surface: '', 'form.groups': ['Заявка', 'Автомобиль', 'Кузов и комплектация', 'Документы'], 'form.group': 'Документы', 'form.settings': ['Dokumenty', 'Не показывать при создании', 'После создания', 'Разрешено'],
+        'form.title': 'Документы · 0 полей', 'form.empty': 'В группе нет полей', saveLog: ['saving', 'saved'], writes: 1 }],
+    ['удалить группу «Документы» — уведомление с «Отменить», выбрана соседняя', async (K) => { await K.act('group-delete'); await K.settled() },
+      { notices: ['Группа «Документы» удалена'], 'form.groups.length': 3, 'form.group': 'Кузов и комплектация', writes: 2 }],
+    ['«Отменить» возвращает группу', async (K) => { await K.undo(); await K.settled() }, { 'form.groups.length': 4, 'form.group': 'Документы', writes: 3 }],
+  ], { query: 'tab=form' }],
+  'СС-35': ['форма: добавить поле; удалить поле — toast с «Отменить» (r2 §5; аудит, «Отмена при автосейве»)', [
+    ['старт: группа «Автомобиль»', null, { 'form.group': 'Автомобиль', 'form.title': 'Автомобиль · 4 поля' }],
+    ['«Добавить поле» — сайд нового поля, номер — следующий', K => K.act('field-add'), { surface: 'field', sideTitle: 'Новое поле', 'steppers.fdOrder': 5, 'fieldSide.choices': false, writes: 0 }],
+    ['пустой заголовок — отказ, сайд открыт', K => K.act('field-save'), { notices: ['Заполните заголовок поля'], surface: 'field', 'form.title': 'Автомобиль · 4 поля', writes: 0 }],
+    ['заголовок и тип «Выбор» — появилась секция вариантов', async (K) => { await K.typeInto('fdTitle', 'Цвет салона'); await K.select('fdType', 'Выбор') },
+      { 'fieldSide.choices': true, 'fieldSide.legends': ['Основное', 'Поведение и видимость', 'Варианты выбора', 'Валидация и подсказки'], writes: 0 }],
+    ['«Добавить поле» — строка в конце группы, алиас пуст', async (K) => { await K.act('field-save'); await K.settled() },
+      { surface: '', 'form.title': 'Автомобиль · 5 полей', 'form.rows.4': '5 · Цвет салона · не задан · Выбор', saveLog: ['saving', 'saved'], writes: 1 }],
+    ['удалить «Цвет салона» из меню строки — уведомление с «Отменить»', async (K) => { await K.rowDelete('f-new-1'); await K.settled() },
+      { notices: ['Поле «Цвет салона» удалено'], 'form.title': 'Автомобиль · 4 поля', writes: 2 }],
+    ['«Отменить» возвращает поле на место', async (K) => { await K.undo(); await K.settled() }, { 'form.title': 'Автомобиль · 5 полей', 'form.rows.4': '5 · Цвет салона · не задан · Выбор', writes: 3 }],
+  ], { query: 'tab=form&group=g-car' }],
+  'СС-36': ['форма: массовый выбор полей и панель действий; «Заполнить алиасы автоматически» трогает только пустые; toast «Применено к N · Отменить» (r2 §5, §8; аудит, «Отмена при автосейве»)', [
+    ['два поля без алиаса', async (K) => { await K.addField('Цвет салона'); await K.addField('Тип топлива') },
+      { 'form.rows.4': '5 · Цвет салона · не задан · Текст', 'form.rows.5': '6 · Тип топлива · не задан · Текст', writes: 2 }],
+    ['«Заполнить алиасы автоматически» — только пустые', async (K) => { await K.act('fill-aliases'); await K.settled() },
+      { notices: ['Применено к 2 полям'], 'form.rows': ['1 · VIN · vin · Текст · Обязательное, Согласование', '2 · Госномер · regnum · Текст · Обязательное, Согласование', '3 · Пробег · mileage · Число · Обязательное',
+        '4 · Цвет кузова · body_color · Текст', '5 · Цвет салона · tsvet_salona · Текст', '6 · Тип топлива · tip_topliva · Текст'], writes: 3 }],
+    ['«Отменить» — алиасы снова пусты, заданные прежние', async (K) => { await K.undo(); await K.settled() },
+      { 'form.rows.3': '4 · Цвет кузова · body_color · Текст', 'form.rows.4': '5 · Цвет салона · не задан · Текст', 'form.rows.5': '6 · Тип топлива · не задан · Текст', writes: 4 }],
+    ['заполнить ещё раз, затем повторно — пустых нет', async (K) => { await K.act('fill-aliases'); await K.settled(); await K.act('fill-aliases') },
+      { notices: ['Применено к 2 полям', 'Пустых алиасов нет: заданные не меняются'], 'form.rows.5': '6 · Тип топлива · tip_topliva · Текст', writes: 5 }],
+    ['выбрать VIN и «Пробег» — панель массовых действий', async (K) => { await K.rowCheck('f-vin'); await K.rowCheck('f-mileage') },
+      { 'form.bar': 'Выбрано: 2 поля', 'form.selected': 2, 'form.all': 'mixed', writes: 5 }],
+    ['«Сделать необязательными» — уведомление «Применено к 2 полям»', async (K) => { await K.act('bulk-optional'); await K.settled() },
+      { notices: ['Применено к 2 полям'], 'form.rows.0': '1 · VIN · vin · Текст · Согласование', 'form.rows.2': '3 · Пробег · mileage · Число', 'form.bar': 'Выбрано: 2 поля', writes: 6 }],
+    ['«Отменить» — обязательность вернулась', async (K) => { await K.undo(); await K.settled() },
+      { 'form.rows.0': '1 · VIN · vin · Текст · Обязательное, Согласование', 'form.rows.2': '3 · Пробег · mileage · Число · Обязательное', writes: 7 }],
+    ['«Только для web» — метка у выбранных', async (K) => { await K.act('bulk-web'); await K.settled() },
+      { notices: ['Применено к 2 полям'], 'form.rows.2': '3 · Пробег · mileage · Число · Обязательное, Только web', writes: 8 }],
+    ['флажок «все» — выбраны все шесть', K => K.fieldsAll(), { 'form.bar': 'Выбрано: 6 полей', 'form.selected': 6, 'form.all': 'true' }],
+    ['«Удалить» — все поля группы, уведомление с «Отменить»', async (K) => { await K.act('bulk-delete'); await K.settled() },
+      { notices: ['Удалено 6 полей'], 'form.title': 'Автомобиль · 0 полей', 'form.empty': 'В группе нет полей', 'form.bar': null, writes: 9 }],
+    ['«Отменить» — поля на месте', async (K) => { await K.undo(); await K.settled() }, { 'form.title': 'Автомобиль · 6 полей', 'form.selected': 0, 'form.bar': null, writes: 10 }],
+    ['«Снять выделение»', async (K) => { await K.rowCheck('f-plate'); await K.act('bulk-clear') }, { 'form.bar': null, 'form.selected': 0 }],
+  ], { query: 'tab=form&group=g-car' }],
+  'СС-37': ['сайд поля: четыре секции; «Варианты выбора» — только у типа с выбором; «Отправлять на согласование» выключено с причиной; «Сохранить» применяет, признак «зависимое» виден в строке (r2 §5; аудит, «Сайд „Редактирование поля“ — эталон»)', [
+    ['карандаш у «Года выпуска» — сайд с тремя секциями: тип без выбора', K => K.rowEdit('f-year'),
+      { surface: 'field', sideTitle: 'Редактирование поля — Год выпуска', 'fieldSide.legends': ['Основное', 'Поведение и видимость', 'Валидация и подсказки'],
+        'fieldSide.title': 'Год выпуска', 'fieldSide.alias': 'year', 'fieldSide.type': 'Число', 'steppers.fdOrder': 4,
+        'rows.fdApproval': { checked: false, off: true, reason: 'Сначала включите согласование в разделе Настройки', meta: '', tone: '', help: false, children: false }, 'rows.fdNoConfidential.help': true }],
+    ['тип «Выбор» — четыре секции', K => K.select('fdType', 'Выбор'), { 'fieldSide.legends': ['Основное', 'Поведение и видимость', 'Варианты выбора', 'Валидация и подсказки'], 'fieldSide.choices': true }],
+    ['тип «Число», «Отмена» — полотно прежнее', async (K) => { await K.select('fdType', 'Число'); await K.act('field-cancel') },
+      { surface: '', fieldSide: null, 'form.rows.3': '4 · Год выпуска · year · Число', writes: 0 }],
+    ['«Повреждения кузова»: тип «Выбор», зависит от «Тип кузова», номер 1 — «Сохранить»: признак «зависимое» в строке', async (K) => { await K.rowEdit('f-damage'); await K.select('fdType', 'Выбор'); await K.typeInto('fdOptions', 'none|Нет\nlight|Лёгкие'); await K.select('fdDepends', 'Тип кузова'); await K.stepper('fdOrder', 'Уменьшить'); await K.stepper('fdOrder', 'Уменьшить'); await K.act('field-save'); await K.settled() },
+      { surface: '', 'form.rows': ['1 · Повреждения кузова · has_damage · Выбор · Зависимое', '2 · Тип кузова · body_type · Выбор · Обязательное', '3 · Комплектация · trim · Выбор · Зависимое', '4 · Год выпуска · year · Число'],
+        saveLog: ['saving', 'saved'], writes: 1 }],
+    ['алиас кириллицей — отказ с ошибкой поля', async (K) => { await K.rowEdit('f-body-type'); await K.fill('[data-field=fdAlias]', 'тип кузова'); await K.act('field-save') },
+      { notices: ['Алиас — латиницей без пробелов, первая — буква'], surface: 'field', writes: 1 }],
+    ['«Предложить по названию» и «Сохранить»', async (K) => { await K.act('alias-suggest'); await K.act('field-save'); await K.settled() },
+      { surface: '', 'form.rows.1': '2 · Тип кузова · tip_kuzova · Выбор · Обязательное', writes: 2 }],
+    ['согласование включено в «Настройках» — у поля флажок доступен; отметить и сохранить', async (K) => { await K.tab('settings'); await K.toggle('approval'); await K.settled(); await K.tab('form'); await K.rowEdit('f-year'); await K.toggle('fdApproval'); await K.act('field-save'); await K.settled() },
+      { surface: '', 'form.rows.3': '4 · Год выпуска · year · Число · Согласование', 'g.behavior.approval': true, writes: 4 }],
+  ], { query: 'tab=form&group=g-body' }],
+  'СС-58': ['сайд группы: открывается карандашом у списка групп; «Сохранить» меняет настройки группы в панели (r2 §5; аудит, «Принцип: всё редактирование сущности — в сайде»)', [
+    ['карандаш — сайд группы «Автомобиль»', K => K.act('group-edit'), { surface: 'group', sideTitle: 'Настройки группы — Автомобиль', writes: 0 }],
+    ['правки и «Отмена» — настройки прежние', async (K) => { await K.select('gdScreen', '2-й экран'); await K.select('gdMobile', 'Не показывать'); await K.check('gdEditable'); await K.act('group-cancel') },
+      { surface: '', 'form.settings': ['Car', '1-й экран', 'Всегда', 'Разрешено'], writes: 0, saveLog: [] }],
+    ['правки и «Сохранить» — настройки в панели', async (K) => { await K.act('group-edit'); await K.select('gdScreen', '2-й экран'); await K.select('gdMobile', 'Не показывать'); await K.check('gdEditable'); await K.act('group-save'); await K.settled() },
+      { surface: '', 'form.settings': ['Car', '2-й экран', 'Не показывать', 'Запрещено'], 'form.group': 'Автомобиль', saveLog: ['saving', 'saved'], writes: 1 }],
+    ['переименовать группу — название в списке и в заголовке панели', async (K) => { await K.act('group-edit'); await K.fill('[data-field=gdTitle]', 'Транспортное средство'); await K.act('group-save'); await K.settled() },
+      { 'form.groups': ['Заявка', 'Транспортное средство', 'Кузов и комплектация'], 'form.title': 'Транспортное средство · 4 поля', writes: 2 }],
+  ], { query: 'tab=form&group=g-car' }],
+  'СС-60': ['«Вставить из другой схемы»: кнопка даёт уведомление-заглушку (r2 §8; аудит, «„Вставить поле из другой схемы“ → типовой паттерн „выбор из справочника“»)', [
+    ['«Вставить из другой схемы»', K => K.act('field-paste'), { notices: ['Выбор поля из другой схемы — вне стенда'], surface: '', 'form.title': 'Заявка · 3 поля', writes: 0 }],
+  ], { query: 'tab=form' }],
   'СС-20': ['«Основное»: правка поля уходит автосохранением, «Схема активна» переключается (r2 §2, §4)', [
     ['старт', null, { name: NAME, title: NAME, active: true, save: 'saved', writes: 0, dirty: true, publish: 'draft', versions: 2 }],
     ['наименование: новый текст', async (K) => { await K.rename('КАСКО — осмотр автомобиля'); await K.settled() },

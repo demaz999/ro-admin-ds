@@ -1,5 +1,5 @@
 import { computed, reactive } from 'vue'
-import { DETECTOR_IDS, DETECTORS_ON, FIELD_SAMPLES, FINISH_CLASSES, SYSTEM_VARIABLES } from './catalogs'
+import { ALIAS_RE, DETECTOR_IDS, DETECTORS_ON, FIELD_SAMPLES, FINISH_CLASSES, suggestAlias, SYSTEM_VARIABLES } from './catalogs'
 import { diffConfigs, formatDate, plural, summarize, validateConfig } from './diff'
 import { QUICK_LINKS, searchSettings, type SearchItem } from './search'
 
@@ -33,7 +33,10 @@ export * from './catalogs'
  * версии (`history`, `versionDiff`), просмотр снимка (`view`, `leaveView` — правка отказывает), сброс черновика
  * (`openReset`, `confirmReset`), меню схемы (`menu`), presence. Расчёт диффа и валидации — `diff.ts`. **П5 (такт 65):**
  * поиск по настройкам — `setQuery`, `results`, `goTo` (таб → раздел → якорь → цель для прокрутки и подсветки), `quick`;
- * индекс и словарь синонимов — `search.ts`. Дифф, валидация,
+ * индекс и словарь синонимов — `search.ts`. **П6 (такт 69):** таб «Форма» — выбор группы (`selectGroup`), сайд поля
+ * (`saveField`, четыре секции, «зависимое» — `dependsOn`) и сайд группы (`saveGroup`), удаление поля и группы с отменой,
+ * массовый выбор и действия (`toggleField`, `toggleAllFields`, `bulkFields`), «Заполнить алиасы автоматически» — только
+ * пустые (`fillAliases`), «Вставить из другой схемы» — заглушка; поля формы входят в поиск. Дифф, валидация,
  * поиск, публикация, сброс черновика, просмотр снимка, операции формы, процессов и витрины — по своим порциям
  * (`scheme-edit.md`, раздел 10).
  */
@@ -212,8 +215,49 @@ export const SECTION_DEFAULTS: { mobile: MobileSettings, web: WebSettings, acces
   },
 }
 
-export interface FormField { id: string, title: string, alias: string, type: string, required: boolean, webOnly: boolean, dependent: boolean, approval?: boolean }
-export interface FormGroup { id: string, title: string, alias: string, fields: FormField[] }
+/**
+ * Поле формы — четыре секции сайда «Редактирование поля» (аудит, «Сайд „Редактирование поля“ — эталон»): основное,
+ * поведение и видимость, варианты выбора, валидация и подсказки. Набор данных хранит только отличия от
+ * `FIELD_DEFAULTS`. Признак «зависимое» (`dependent`) — связь поле → поле: выставлен, когда задано `dependsOn`.
+ */
+export interface FormField {
+  id: string
+  title: string
+  alias: string
+  type: string
+  required: boolean
+  webOnly: boolean
+  dependent: boolean
+  approval?: boolean
+  placeholder: string
+  mobileAfterCreate: boolean
+  noConfidential: boolean
+  highlight: boolean
+  /** Варианты выбора строками «ключ|значение» — только у типа `choice`. */
+  options: string
+  /** Поле, от значения которого зависят варианты, — id поля той же группы. */
+  dependsOn: string
+  regexp: string
+  hints: string
+}
+export interface FormGroup {
+  id: string
+  title: string
+  alias: string
+  fields: FormField[]
+  /** Настройки группы — блок `33179:4467`: экран создания, показ в мобильном, редактирование после создания. */
+  createScreen: string
+  mobile: string
+  editable: boolean
+}
+export const FIELD_DEFAULTS: Omit<FormField, 'id' | 'title' | 'alias' | 'type'> = {
+  required: false, webOnly: false, dependent: false, approval: false, placeholder: '', mobileAfterCreate: true, noConfidential: false,
+  highlight: false, options: '', dependsOn: '', regexp: '', hints: 'standard',
+}
+export const GROUP_DEFAULTS: Pick<FormGroup, 'createScreen' | 'mobile' | 'editable'> = { createScreen: '1', mobile: 'after-create', editable: true }
+/** Черновик сайда поля и сайда группы: `id` пуст у новой сущности; порядковый номер поля — `order`. */
+export type FieldDraft = FormField & { order: number }
+export type GroupDraft = Omit<FormGroup, 'fields'>
 export interface ProcessStep { id: string, title: string, kind: string, method: string, networks: string[], hints: number }
 export interface Process { id: string, title: string, alias: string, repeatable: boolean, steps: ProcessStep[] }
 export interface Showcase {
@@ -272,6 +316,9 @@ export interface ModelOptions {
   editing?: string
   /** Открытый на просмотр снимок — оснастка `?view=`. */
   viewing?: string
+  /** Выбранная группа «Формы» и выделенные поля — оснастка `?group=`, `?selected=` (такт 69). */
+  group?: string
+  selectedFields?: string[]
 }
 
 /** Сколько длится запись черновика на стенде. */
@@ -285,6 +332,17 @@ function withDefaults(config: SchemeConfig): SchemeConfig {
   for (const [key, def] of Object.entries(GENERAL_DEFAULTS)) g[key] = { ...clone(def), ...(g[key] as object | undefined) }
   const all = config.settings as unknown as Record<string, object | undefined>
   for (const [key, def] of Object.entries(SECTION_DEFAULTS)) all[key] = { ...clone(def), ...all[key] }
+  return withFormDefaults(config)
+}
+/** Группы и поля формы: недостающие атрибуты — из значений по умолчанию (такт 69); «зависимое» следует за `dependsOn`. */
+function withFormDefaults(config: SchemeConfig): SchemeConfig {
+  config.form.groups = config.form.groups.map(g => ({
+    ...GROUP_DEFAULTS, ...g,
+    fields: g.fields.map((f) => {
+      const x = { ...FIELD_DEFAULTS, ...f }
+      return { ...x, dependent: !!x.dependsOn || x.dependent }
+    }),
+  }))
   return config
 }
 
@@ -312,6 +370,7 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
 
   const startConfig = data.draft.config ? withDefaults(clone(data.draft.config)) : clone(snapshots[snapshots.length - 1]!.config)
   for (const [path, value] of data.draft.patch ?? []) setPath(startConfig, path, value)
+  withFormDefaults(startConfig)
   const draft = reactive<Draft>({ config: startConfig, author: data.draft.author, editedAt: data.draft.editedAt })
 
   /** Черновик отличается от current: есть неопубликованные изменения. */
@@ -345,7 +404,9 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     /** Прокрутка каждого таба — СС-13: переключение возвращает на прежнее место. */
     scroll: { settings: 0, form: 0, processes: 0, showcase: 0 } as Record<TabId, number>,
     surfaces: [] as Surface[],
-    selectedFields: [] as string[],
+    /** Выбранная группа таба «Форма» — такт 69; пусто — первая группа. */
+    group: (opts.group ?? '') as string,
+    selectedFields: [...(opts.selectedFields ?? [])] as string[],
     selectedSteps: [] as string[],
     query: '',
     /** Плашка «Сохранение теперь автоматическое» закрыта — СС-56. */
@@ -545,17 +606,185 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     notify(`Шаблон «${gone.title}» удалён`, 'ok', true, () => set('settings.pdf.templates', before))
   }
 
+  /* ------------------------------ «Форма» — П6, такт 69 ------------------------------ */
+  /**
+   * Таб «Форма» — r2 §5: слева группы, справа поля выбранной группы. Полотно пишет в черновик сразу (`set('form.groups')`
+   * — тот же отказ в просмотре версии); поле и группа правятся в сайде — «Сохранить» отдаёт черновик сайда одной
+   * операцией (`saveField`, `saveGroup`). Удаление и массовые действия — с «Отменить» в уведомлении (аудит, «Отмена при
+   * автосейве»).
+   */
+  const formGroups = computed(() => shown.value.form.groups)
+  /** Выбранная группа: заданная в интерфейсе, иначе первая. */
+  const formGroup = computed<FormGroup | null>(() => formGroups.value.find(g => g.id === ui.group) ?? formGroups.value[0] ?? null)
+  function selectGroup(id: string) {
+    if (ui.group === id) return
+    ui.group = id
+    ui.selectedFields.splice(0)
+  }
+  const groupsCopy = () => clone(draft.config.form.groups)
+  const writeGroups = (groups: FormGroup[]) => set('form.groups', groups)
+  const fieldsWord = (n: number) => plural(n, 'поле', 'поля', 'полей')
+  const fieldsDative = (n: number) => plural(n, 'полю', 'полям', 'полям')
+
+  /** «Отправлять на согласование» у поля — «гасит»: доступно при включённом согласовании в «Настройках» (аудит, сайд поля). */
+  const fieldApprovalReason = computed(() => (shown.value.settings.general.behavior.approval ? '' : 'Сначала включите согласование в разделе Настройки'))
+
+  /** Проверка черновика поля: заголовок обязателен, алиас — латиницей без пробелов и не повторяется в группе. */
+  function fieldError(groupId: string, f: FieldDraft): { key: 'title' | 'alias', text: string } | null {
+    if (!f.title.trim()) return { key: 'title', text: 'Заполните заголовок поля' }
+    const alias = f.alias.trim()
+    if (alias && !ALIAS_RE.test(alias)) return { key: 'alias', text: 'Алиас — латиницей без пробелов, первая — буква' }
+    const g = draft.config.form.groups.find(x => x.id === groupId)
+    if (alias && g?.fields.some(x => x.id !== f.id && x.alias === alias)) return { key: 'alias', text: `Алиас «${alias}» уже есть в группе` }
+    return null
+  }
+  let fieldSeq = 0
+  /** «Сохранить» сайда поля: новое поле встаёт на свой порядковый номер, правка — на месте или на новом номере. */
+  function saveField(groupId: string, f: FieldDraft): boolean {
+    const error = fieldError(groupId, f)
+    if (error) { notify(error.text, 'err'); return false }
+    const groups = groupsCopy()
+    const g = groups.find(x => x.id === groupId)
+    if (!g) return false
+    const { order, ...rest } = f
+    const item: FormField = {
+      ...rest, id: f.id || `f-new-${++fieldSeq}`, title: f.title.trim(), alias: f.alias.trim(),
+      options: f.type === 'choice' ? f.options : '', dependsOn: f.type === 'choice' ? f.dependsOn : '',
+    }
+    item.dependent = !!item.dependsOn
+    const k = g.fields.findIndex(x => x.id === item.id)
+    if (k >= 0) g.fields.splice(k, 1)
+    const at = Math.min(Math.max(1, Math.round(order) || g.fields.length + 1), g.fields.length + 1) - 1
+    g.fields.splice(at, 0, item)
+    return writeGroups(groups)
+  }
+  /** Удаление поля в строке — уведомление с «Отменить» вместо модалки-подтверждения (аудит, «Отмена при автосейве»). */
+  function removeField(groupId: string, fieldId: string) {
+    const before = groupsCopy()
+    const groups = groupsCopy()
+    const g = groups.find(x => x.id === groupId)
+    const gone = g?.fields.find(x => x.id === fieldId)
+    if (!g || !gone) return
+    g.fields = g.fields.filter(x => x.id !== fieldId)
+    for (const x of g.fields) if (x.dependsOn === fieldId) { x.dependsOn = ''; x.dependent = false }
+    if (!writeGroups(groups)) return
+    ui.selectedFields = ui.selectedFields.filter(id => id !== fieldId)
+    notify(`Поле «${gone.title}» удалено`, 'ok', true, () => writeGroups(before))
+  }
+
+  /* Массовый выбор полей — r2 §5, §8: выделение живёт в выбранной группе. */
+  function toggleField(id: string) {
+    const k = ui.selectedFields.indexOf(id)
+    if (k >= 0) ui.selectedFields.splice(k, 1)
+    else ui.selectedFields.push(id)
+  }
+  /** Флажок «все» в шапке таблицы: из «все» — снять, иначе — выбрать все поля группы. */
+  const selectionState = computed<'all' | 'some' | 'none'>(() => {
+    const ids = formGroup.value?.fields.map(x => x.id) ?? []
+    const n = ids.filter(id => ui.selectedFields.includes(id)).length
+    return n === 0 ? 'none' : n === ids.length ? 'all' : 'some'
+  })
+  function toggleAllFields() {
+    const ids = formGroup.value?.fields.map(x => x.id) ?? []
+    ui.selectedFields = selectionState.value === 'all' ? [] : [...ids]
+  }
+  function clearFieldSelection() { ui.selectedFields.splice(0) }
+  /**
+   * Действие панели над выделенными полями — toast «Применено к N · Отменить» (аудит, «Отмена при автосейве»: bulk-операции —
+   * обязательный toast с отменой). Удаление выделенных — тот же toast с «Отменить».
+   */
+  function bulkFields(action: 'required' | 'optional' | 'web' | 'all-platforms' | 'delete') {
+    const g0 = formGroup.value
+    if (!g0) return
+    const ids = ui.selectedFields.filter(id => g0.fields.some(x => x.id === id))
+    if (!ids.length) return
+    const before = groupsCopy()
+    const groups = groupsCopy()
+    const g = groups.find(x => x.id === g0.id)!
+    if (action === 'delete') {
+      g.fields = g.fields.filter(x => !ids.includes(x.id))
+      for (const x of g.fields) if (ids.includes(x.dependsOn)) { x.dependsOn = ''; x.dependent = false }
+    }
+    else {
+      for (const x of g.fields) {
+        if (!ids.includes(x.id)) continue
+        if (action === 'required' || action === 'optional') x.required = action === 'required'
+        else x.webOnly = action === 'web'
+      }
+    }
+    if (!writeGroups(groups)) { notify(`Выбранные поля уже в этом состоянии`); return }
+    if (action === 'delete') {
+      ui.selectedFields.splice(0)
+      notify(`Удалено ${ids.length} ${fieldsWord(ids.length)}`, 'ok', true, () => writeGroups(before))
+    }
+    else notify(`Применено к ${ids.length} ${fieldsDative(ids.length)}`, 'ok', true, () => writeGroups(before))
+  }
+  /**
+   * «Заполнить алиасы автоматически» — только пустые, не трогая заданные (r2 §5; аудит, «Фидбек заказчика»: автозаполнение
+   * только пустых). Алиас — по названию поля, занятые получают суффикс.
+   */
+  function fillAliases() {
+    const g0 = formGroup.value
+    if (!g0) return
+    const before = groupsCopy()
+    const groups = groupsCopy()
+    const g = groups.find(x => x.id === g0.id)!
+    const empty = g.fields.filter(x => !x.alias.trim())
+    if (!empty.length) { notify('Пустых алиасов нет: заданные не меняются'); return }
+    for (const x of empty) x.alias = suggestAlias(x.title, g.fields.map(y => y.alias))
+    if (!writeGroups(groups)) return
+    notify(`Применено к ${empty.length} ${fieldsDative(empty.length)}`, 'ok', true, () => writeGroups(before))
+  }
+  /** «Вставить из другой схемы» — заглушка кнопкой (r2 §8; аудит, «„Вставить поле из другой схемы“»). */
+  function pasteFromScheme() { notify('Выбор поля из другой схемы — вне стенда') }
+
+  let groupSeq = 0
+  /** «Сохранить» сайда группы: название обязательно, алиас — латиницей и не повторяется среди групп. */
+  function saveGroup(d: GroupDraft): boolean {
+    if (!d.title.trim()) { notify('Заполните название группы', 'err'); return false }
+    const alias = d.alias.trim()
+    if (alias && !ALIAS_RE.test(alias)) { notify('Алиас — латиницей без пробелов, первая — буква', 'err'); return false }
+    const groups = groupsCopy()
+    if (alias && groups.some(x => x.id !== d.id && x.alias === alias)) { notify(`Алиас «${alias}» уже есть у другой группы`, 'err'); return false }
+    const k = groups.findIndex(x => x.id === d.id)
+    const item: FormGroup = { ...(k >= 0 ? groups[k]! : { fields: [] }), ...d, id: d.id || `g-new-${++groupSeq}`, title: d.title.trim(), alias }
+    if (k >= 0) groups[k] = item
+    else groups.push(item)
+    if (!writeGroups(groups)) return k >= 0
+    selectGroup(item.id)
+    return true
+  }
+  /** Удаление выбранной группы — с «Отменить»; выбор уходит на соседнюю. */
+  function removeGroup(id: string) {
+    const before = groupsCopy()
+    const k = before.findIndex(x => x.id === id)
+    const gone = before[k]
+    if (!gone) return
+    if (!writeGroups(before.filter(x => x.id !== id))) return
+    const next = draft.config.form.groups[Math.min(k, draft.config.form.groups.length - 1)]
+    ui.group = next?.id ?? ''
+    ui.selectedFields.splice(0)
+    notify(`Группа «${gone.title}» удалена`, 'ok', true, () => { writeGroups(before); ui.group = id })
+  }
+
   /* ------------------------------ поиск — П5 ------------------------------ */
-  /** Выдача по текущему запросу: группы по пути «Настройки → Раздел». */
-  const results = computed(() => searchSettings(ui.query))
+  /** Выдача по текущему запросу: группы по пути «Настройки → Раздел», поля формы — «Форма → Группа» (такт 69). */
+  const results = computed(() => searchSettings(ui.query, shown.value.form))
   function setQuery(q: string) { ui.query = q }
   /**
    * Переход к найденному — `spec-audit.md`, «Требования к поиску»: таб → раздел → якорь; цель для прокрутки и
    * подсветки страница берёт из `ui.found`. Запрос очищается, выдача снимается.
    */
   function goTo(item: SearchItem) {
-    ui.tab = 'settings'
-    setSection(item.section as SectionId, item.anchor)
+    if (item.group) {
+      /* Поле формы (такт 69): таб «Форма», его группа; цель — строка поля. */
+      ui.tab = 'form'
+      selectGroup(item.group)
+    }
+    else {
+      ui.tab = 'settings'
+      setSection(item.section as SectionId, item.anchor)
+    }
     ui.found = { target: item.target, n: ui.found.n + 1 }
     ui.query = ''
   }
@@ -669,7 +898,7 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     return JSON.stringify({
       draft: draft.config, author: draft.author, versions: snapshots.map(s => s.id), current: current.value?.id ?? null,
       publish: publishState.value, save: save.state, writes: save.writes,
-      ui: { tab: ui.tab, section: ui.section, anchor: ui.anchor, scroll: ui.scroll, viewing: ui.viewing, surfaces: ui.surfaces.map(x => x.id), historyVersion: ui.historyVersion },
+      ui: { tab: ui.tab, section: ui.section, anchor: ui.anchor, scroll: ui.scroll, viewing: ui.viewing, surfaces: ui.surfaces.map(x => x.id), historyVersion: ui.historyVersion, group: ui.group, selectedFields: ui.selectedFields },
     })
   }
 
@@ -681,6 +910,8 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     openPublish, confirmPublish, openReset, confirmReset, copy, preview, menu, confirmDelete, openHistory, openVersion, closeVersion, view, leaveView,
     set, setTab, setSection, rememberScroll, back, retry, notify, dismissNotice, dump,
     neighbourSection, stepSection, goToFields, openSide, closeSurface,
+    formGroups, formGroup, selectGroup, fieldApprovalReason, fieldError, saveField, removeField, toggleField, selectionState, toggleAllFields,
+    clearFieldSelection, bulkFields, fillAliases, pasteFromScheme, saveGroup, removeGroup,
     undo, addReason, removeReason, toggleGroup, resetCosts, detectorsOn, detectorSetState, toggleDetectorSet, setDetector, saveTemplate, removeTemplate,
   }
 }

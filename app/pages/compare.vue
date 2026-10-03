@@ -1856,6 +1856,11 @@ const textareaVariants = [
           <ActionBarSeparator />
           <Button variant="secondary">Снять</Button>
         </ActionBar>
+        <!-- Такт 69: раскладка panel — панель массовых действий в потоке (страница схемы, № 44, 62); мастера нет, наложения нет. -->
+        <ActionBar layout="panel" count="Выбрано: 2 поля" sub="1 обязательное">
+          <Button variant="secondary">Сделать обязательными</Button>
+          <Button variant="destructive" class="ml-auto">Удалить</Button>
+        </ActionBar>
         <div class="relative h-24 overflow-hidden rounded-md border border-border-soft bg-background">
           <SelectionMarquee :rect="{ x: 16, y: 16, width: 200, height: 56 }" class="absolute" />
         </div>

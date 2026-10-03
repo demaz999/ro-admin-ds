@@ -11,8 +11,9 @@ import { SETTINGS, type SettingMeta } from './diff'
  *
  * Чистые функции: DOM и реактивности модуль не знает.
  *
- * **Что в индексе.** Настройки собранных разделов таба «Настройки» — порции П2–П3. Поля формы, процессы, шаги и
- * витрина входят в индекс своими порциями П6–П8 (строка реестра расхождений).
+ * **Что в индексе.** Настройки собранных разделов таба «Настройки» — порции П2–П3; поля формы — такт 69 (П6): по
+ * заголовку и по алиасу, путь «Форма → Группа». Процессы, шаги и витрина входят в индекс своими порциями П7–П8 (строка
+ * 102 реестра расхождений).
  */
 
 /**
@@ -85,11 +86,15 @@ export interface SearchItem {
   anchor: string
   /** Цель на странице — значение `data-setting`, `data-field`, `data-radio` либо `data-formula`. */
   target: string
-  /** Чем найдено: подписью, синонимом или описанием. */
-  via: 'label' | 'synonym' | 'description'
+  /** Чем найдено: подписью, синонимом, описанием или алиасом поля формы. */
+  via: 'label' | 'synonym' | 'description' | 'alias'
+  /** Поле формы (такт 69): группа, в которой оно стоит; у настроек пусто. */
+  group?: string
   /** Пояснение для строки выдачи: синоним либо описание, по которому найдено. */
   hint: string
 }
+/** Группа формы для индекса — заголовок, алиас и id полей. */
+export interface FormLike { id: string, title: string, fields: { id: string, title: string, alias: string }[] }
 export interface SearchGroup { path: string, items: SearchItem[] }
 export interface SearchResult { query: string, groups: SearchGroup[], count: number }
 
@@ -108,7 +113,7 @@ const INDEX: Entry[] = SETTINGS
  * Поиск: буквальный матч по подписи, затем по синонимам, затем по описанию — сквозь все разделы. Выдача
  * сгруппирована по пути «Настройки → Раздел»; порядок групп — порядок разделов, внутри — порядок настроек.
  */
-export function searchSettings(query: string): SearchResult {
+export function searchSettings(query: string, form?: { groups: FormLike[] }): SearchResult {
   const q = norm(query)
   if (!q) return { query, groups: [], count: 0 }
   const found: SearchItem[] = []
@@ -122,10 +127,21 @@ export function searchSettings(query: string): SearchResult {
       hint: via === 'synonym' ? `по запросу «${original}»` : via === 'description' ? (DESCRIPTIONS[e.meta.path] ?? '') : '',
     })
   }
+  /* Поля формы: заголовок, затем алиас; путь — «Форма → Группа», цель — строка поля. */
+  for (const g of form?.groups ?? []) {
+    for (const f of g.fields) {
+      const via = norm(f.title).includes(q) ? 'label' : f.alias && norm(f.alias).includes(q) ? 'alias' : null
+      if (!via) continue
+      found.push({ key: `form.${f.id}`, label: `Поле «${f.title}»`, section: '', anchor: '', target: `row-${f.id}`, via, group: g.id,
+        hint: via === 'alias' ? `алиас ${f.alias}` : '' })
+    }
+  }
   const shown = found.slice(0, SEARCH_LIMIT)
   const groups: SearchGroup[] = []
   for (const item of shown) {
-    const path = `Настройки → ${SECTION_LABELS[item.section] ?? item.section}`
+    const path = item.group
+      ? `Форма → ${form?.groups.find(g => g.id === item.group)?.title ?? ''}`
+      : `Настройки → ${SECTION_LABELS[item.section] ?? item.section}`
     let grp = groups.find(x => x.path === path)
     if (!grp) groups.push(grp = { path, items: [] })
     grp.items.push(item)
