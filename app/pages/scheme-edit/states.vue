@@ -80,7 +80,13 @@ const DIFF_WARNINGS = [
 const PUBLISH_STATUS_EXAMPLE = `<PublishStatus state="draft" author="Игорь Петров" date="01.10.2026, 11:40" @open="openDiff" />   <!-- кнопка: открывает дифф -->
 <PublishStatus state="published" />
 <PublishStatus state="never" />
-<PublishStatus state="draft" author="Анна Смирнова" date="03.10.2026, 09:00" editing="Игорь Петров" />   <!-- presence -->`
+<PublishStatus state="draft" author="Анна Смирнова" date="03.10.2026, 09:00" editing="Игорь Петров" />   <!-- presence -->
+
+<!-- в узкой строке шапки — ужимается многоточием, полный текст в подсказке (такт 67) -->
+<div class="flex min-w-0 flex-1 items-center gap-4">
+  <PublishStatus state="draft" :author="draft.author" :date="draftDate" :editing="editing" />
+  <div class="flex shrink-0 items-center gap-4">…история, статус сохранения…</div>
+</div>`
 
 const DIFF_EXAMPLE = `<!-- готовый результат сравнения: области, опасное, предупреждения, итог -->
 <Diff :areas="diff.areas" :attention="diff.attention" :warnings="warnings" :total="diff.total" />
@@ -366,6 +372,12 @@ const FORMULA_EXAMPLE = `<Field label="Тема письма оповещени�
         <PublishStatus state="published" data-case="published" />
         <PublishStatus state="draft" author="Анна Смирнова" date="03.10.2026, 09:00" editing="Игорь Петров" data-case="editing" />
         <PublishStatus state="published" editing="Игорь Петров" data-case="published-editing" />
+      </div>
+      <!-- Узкий контейнер — такт 67: текст ужимается многоточием, полный — в подсказке; у первой строки подсказка открыта оснасткой. -->
+      <div class="flex w-60 flex-col items-stretch gap-6 pt-8">
+        <PublishStatus state="draft" author="Игорь Петров" date="01.10.2026, 11:40" tooltip-open data-case="narrow-draft" />
+        <PublishStatus state="draft" author="Анна Смирнова" date="03.10.2026, 09:00" editing="Константин Константинопольский-Преображенский" data-case="narrow-editing" />
+        <PublishStatus state="never" data-case="narrow-never" />
       </div>
       <ToolbarText>
         Событие индикатора черновика: {{ statusLog }}

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, useSlots } from 'vue'
 import { Icon } from '../icon'
 import { inputVariants, type InputVariants } from '.'
 
@@ -51,6 +51,16 @@ const isActive = computed(() => focused.value || model.value.length > 0)
  * 2026-09-30 (довесок 2 к такту 36). С непустым плейсхолдером поведение прежнее.
  */
 const isFloating = computed(() => isActive.value && props.placeholder !== '')
+
+/**
+ * Слот `end` — содержимое справа внутри поля, по центру по вертикали (подсказка хоткея, единица). Рисуется только у
+ * пустого поля: при непустом значении его место занимает крестик очистки. У пустого поля в фокусе крестик при слоте
+ * не рисуется — место держит слот. Без слота разметка и поведение прежние. Такт 67, `docs/scheme-edit.md`, строка 98.
+ */
+const slots = useSlots()
+const hasEnd = computed(() => !!slots.end)
+const showEnd = computed(() => hasEnd.value && model.value === '')
+const showClear = computed(() => props.clearable && isActive.value && !showEnd.value)
 </script>
 
 <template>
@@ -102,8 +112,12 @@ const isFloating = computed(() => isActive.value && props.placeholder !== '')
         </div>
       </div>
 
+      <span v-if="showEnd" data-slot="field-end" class="flex shrink-0 items-center">
+        <slot name="end" />
+      </span>
+
       <button
-        v-if="props.clearable && isActive"
+        v-else-if="showClear"
         data-slot="field-clear"
         type="button"
         :disabled="props.disabled"

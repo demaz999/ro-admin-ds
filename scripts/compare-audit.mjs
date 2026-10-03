@@ -14,6 +14,9 @@
  *   node scripts/compare-audit.mjs --only=/scheme-edit — покрытие одного экрана
  *   node scripts/compare-audit.mjs --states        — покрытие с таблицей по состояниям
  *
+ * Счёт шрифтов и иконок берётся, когда два замера подряд дали одно и то же ненулевое число (такт 67): ноль до обхода
+ * итогом не считается; не устоялся за 120 с — выход с кодом 2 и строкой «СЧЁТ НЕ УСТОЯЛСЯ».
+ *
  * Chrome ищется на CDP-порту `CDP_PORT` (по умолчанию 9335); если его нет — запускается headless.
  */
 import { spawn } from 'node:child_process'
@@ -66,12 +69,27 @@ await send('Page.navigate', { url: URL_ })
 await send('Page.bringToFront')
 
 const T = `(s => (s ?? '').replace(/\\s+/g, ' ').trim())`
-/* Автопроверки шрифтов и иконок считают после правила снимка — ждём их итог. */
-for (let k = 0; k < 120; k++) {
-  await sleep(500)
-  if (await evaluate(`/Проверено текстовых узлов внутри компонентов: \\d+/.test(document.body?.innerText ?? '') && /Проверено иконок: \\d+/.test(document.body.innerText)`).catch(() => false)) break
+/*
+ * Автопроверки шрифтов и иконок считают после правила снимка — ждём их итог. До обхода счётчики стоят на нуле: ожидание
+ * текста «Проверено иконок: N» принимало этот ноль, и холодный старт печатал «иконки: 0» (такт 67, решение оркестратора
+ * 2026-10-03). Ноль итогом не считается: ждём двух одинаковых ненулевых счётов подряд с интервалом 1 с; потолок — 120 с,
+ * по нему — ошибка, а не печать нуля.
+ */
+const COUNTS = `JSON.stringify([Number(document.querySelector('[data-icon-audit-count]')?.textContent), Number(document.querySelector('[data-font-audit-count]')?.textContent)])`
+let prev = null
+let counts = null
+for (const t0 = Date.now(); Date.now() - t0 < 120_000;) {
+  await sleep(1000)
+  const c = await evaluate(COUNTS).catch(() => null)
+  if (c && JSON.parse(c).every(n => n > 0) && c === prev) { counts = JSON.parse(c); break }
+  prev = c
 }
-await sleep(1500)
+if (!counts) {
+  console.log(`СЧЁТ НЕ УСТОЯЛСЯ за 120 с: иконки и текстовые узлы — ${prev}`)
+  ws.close()
+  await fetch(`http://127.0.0.1:${PORT}/json/close/${t.id}`)
+  process.exit(2)
+}
 const head = await evaluate(`(() => { const t = ${T}; const text = document.body.innerText
   const ps = [...document.querySelectorAll('p')].map(p => t(p.textContent))
   return JSON.stringify({
@@ -80,10 +98,13 @@ const head = await evaluate(`(() => { const t = ${T}; const text = document.body
     markup: [...document.querySelectorAll('[data-markup-audit]')].map(a => ({ screen: a.dataset.screen, total: t(a.querySelector('[data-markup-total]').textContent), control: t(a.querySelector('[data-markup-control]').textContent) })),
   }) })()`)
 const H = JSON.parse(head)
+/* Напечатанный счёт обязан совпасть с устоявшимся счётом страницы. */
+const drift = H.icons !== counts[0] || H.fonts !== counts[1]
+if (drift) console.log(`СЧЁТ ИЗМЕНИЛСЯ после ожидания: ${counts} → ${[H.icons, H.fonts]}`)
 console.log(`иконки: ${H.icons}, ${H.iconsOk ? 'провалов нет' : 'ЕСТЬ ПРОВАЛЫ'}`)
 console.log(`текстовые узлы: ${H.fonts}, ${H.fontsOk ? 'провалов нет' : 'ЕСТЬ ПРОВАЛЫ'}`)
 for (const m of H.markup) console.log(`разметка /${m.screen}: ${m.total} ${m.control}`)
-let bad = !H.iconsOk || !H.fontsOk || H.markup.some(m => !/Нарушений: 0\./.test(m.total) || !/не слепая/.test(m.control))
+let bad = drift || !H.iconsOk || !H.fontsOk || H.markup.some(m => !/Нарушений: 0\./.test(m.total) || !/не слепая/.test(m.control))
 
 if (!args.includes('--no-coverage')) {
   const paths = JSON.parse(await evaluate(`JSON.stringify([...document.querySelectorAll('[data-coverage-audit]')].map(a => a.dataset.path))`)).filter(p => !only || p === only)

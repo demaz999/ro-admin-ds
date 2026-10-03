@@ -14,6 +14,7 @@
  *   node scripts/scheme-edit-scenarios.mjs                    — все сценарии
  *   node scripts/scheme-edit-scenarios.mjs СС-20 СС-49        — выбранные
  *   node scripts/scheme-edit-scenarios.mjs --update-baseline  — записать эталон
+ *   node scripts/scheme-edit-scenarios.mjs СС-33 --repeat=10  — сценарий десять раз подряд
  *
  * Защита от пустой зелени: клик, не попавший в цель, — провал шага (намеренный клик по выключенному — опция `blind`);
  * уведомления и смены статуса сохранения пишут наблюдатели в странице — слепок их забирает. Статус «Сохранение…» живёт
@@ -419,6 +420,10 @@ function kit(page) {
           quickLinks: [...document.querySelectorAll('[data-search-results] [data-quick]')].map(b => t(b.textContent)),
           searchMore: t(document.querySelector('[data-search-more]')?.textContent) || null,
           hotkey: t(document.querySelector('[data-search-hotkey]')?.textContent) || null,
+          /* Такт 67: подсказка хоткея — слот end поля; при значении на её месте крестик. Высота строки шапки — 44 всегда. */
+          searchClear: !!document.querySelector('[data-field=search] [data-slot=field-clear]'),
+          hotkeyInField: !!document.querySelector('[data-field=search] [data-slot=field] [data-search-hotkey]'),
+          headerH: Math.round(document.querySelector('[data-header-row]')?.getBoundingClientRect().height ?? 0),
           flash: [...document.querySelectorAll('[data-setting][data-flash]')].map(r => r.dataset.setting),
           /* Найденное в окне: цель перехода видна целиком. */
           foundVisible: (() => { const key = M.ui.found.target; if (!key) return null
@@ -611,13 +616,13 @@ const SCENARIOS = {
   ]],
   /* ============================ П5, такт 65 ============================ */
   'СС-09': ['поиск: хоткей `/` ставит фокус, Esc очищает и снимает выдачу (r2 §3; аудит, «Клавиатура и фокус»)', [
-    ['старт: поиск под шапкой, подсказка хоткея', null, { query: '', searchFocus: false, searchOpen: false, hotkey: '/' }],
-    ['«/» — фокус в поиске, знак не напечатан', K => K.slash(), { searchFocus: true, query: '', searchOpen: false }],
-    ['набор «согл» — выдача открыта, фокус в поле', K => K.type('согл'), { query: 'согл', searchFocus: true, searchOpen: true,
+    ['старт: поиск под шапкой, подсказка хоткея внутри поля', null, { query: '', searchFocus: false, searchOpen: false, hotkey: '/', hotkeyInField: true, searchClear: false, headerH: 44 }],
+    ['«/» — фокус в поиске, знак не напечатан; у пустого поля подсказка, крестика нет', K => K.slash(), { searchFocus: true, query: '', searchOpen: false, hotkey: '/', searchClear: false }],
+    ['набор «согл» — выдача открыта, фокус в поле; на месте подсказки крестик', K => K.type('согл'), { query: 'согл', searchFocus: true, searchOpen: true, hotkey: null, searchClear: true,
       results: [{ path: 'Настройки → Общие', items: ['Отправлять поля на согласование согласующему лицу', 'Обязательное согласование осмотра после экспертизы'] },
         { path: 'Настройки → PDF', items: ['Запрашивать подписание документа после успешной экспертизы | по запросу «согласование с клиентом»'] }],
       resultActive: 'Отправлять поля на согласование согласующему лицу' }],
-    ['Esc — запрос очищен, выдача снята', K => K.key('Escape'), { query: '', searchOpen: false, writes: 0 }],
+    ['Esc — запрос очищен, выдача снята, подсказка вернулась', K => K.key('Escape'), { query: '', searchOpen: false, writes: 0, hotkey: '/', searchClear: false }],
     ['«/» при наборе в поле — знак печатается в поле', async (K) => { await K.typeInto('confirmHint', 'Да'); await K.slash(); await K.settled() },
       { 'g.confirm.hint': 'Да/', searchFocus: false, focusField: 'confirmHint' }],
   ]],
@@ -868,8 +873,9 @@ const SCENARIOS = {
     ['включить подписание — параметры родителя', async (K) => { await K.toggle('pdfSign'); await K.settled() }, { 's.pdf.sign': true, 'rows.pdfSign.children': true, 'rows.showSigned.checked': true, 'rows.mailSigned.checked': false, writes: 1 }],
     ['кто подписывает и отправка на почту', async (K) => { await K.select('signer', 'Исполнитель осмотра'); await K.toggle('mailSigned'); await K.settled() }, { 's.pdf.signer': 'executor', 's.pdf.mailSigned': true }],
     ['PDF без подписи — на почту', async (K) => { await K.toggle('unsignedMail'); await K.settled() }, { 's.pdf.unsignedMail': true, 's.pdf.unsignedShow': true }],
-    ['формула имени файла: переменная «Номер осмотра»', async (K) => { await K.formulaEnd('pdfFileName'); await K.type(' '); await K.settled(); await K.addVariable('pdfFileName', 'Inspection:number'); await K.settled() },
-      { 's.pdf.fileName': 'Лист осмотра {Car:vin} {Inspection:number}', 'formulas.pdfFileName': { chips: ['VIN', 'Номер осмотра'], preview: 'Лист осмотра DEMO0000000001024 № 1024' } }],
+    /* Без ожидания конца записи (такт 67): клик по списку приходится на смену статуса сохранения — строка шапки не меняет высоту. */
+    ['формула имени файла: переменная «Номер осмотра»', async (K) => { await K.formulaEnd('pdfFileName'); await K.type(' '); await K.addVariable('pdfFileName', 'Inspection:number'); await K.settled() },
+      { 's.pdf.fileName': 'Лист осмотра {Car:vin} {Inspection:number}', 'formulas.pdfFileName': { chips: ['VIN', 'Номер осмотра'], preview: 'Лист осмотра DEMO0000000001024 № 1024' }, headerH: 44 }],
     ['вложения из дополнительных файлов', async (K) => { await K.toggle('attachExtra'); await K.settled() }, { 's.pdf.attachExtra': true }],
     ['выключить подписание — параметры скрыты, значения целы', async (K) => { await K.toggle('pdfSign'); await K.settled() }, { 's.pdf.sign': false, 'rows.pdfSign.children': false, 's.pdf.signer': 'executor', 's.pdf.mailSigned': true }],
   ], { query: 'section=pdf' }],
@@ -981,7 +987,9 @@ async function run(id) {
 const args = process.argv.slice(2)
 const UPDATE = args.includes('--update-baseline')
 const pick = args.filter(a => !a.startsWith('--'))
-const ids = pick.length ? pick : Object.keys(SCENARIOS)
+/* `--repeat=N` — каждый выбранный сценарий N раз подряд: проверка редкого провала (такт 67, СС-33). */
+const repeat = Math.max(1, Number(args.find(a => a.startsWith('--repeat='))?.slice(9) ?? 1) || 1)
+const ids = (pick.length ? pick : Object.keys(SCENARIOS)).flatMap(id => Array.from({ length: repeat }, () => id))
 await ensureChrome()
 const started = Date.now()
 let failed = 0

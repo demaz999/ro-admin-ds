@@ -66,7 +66,7 @@ import demo from '~/stands/scheme-edit/demo-data.json'
  * | `?open=publish` · `first-publish` · `reset` · `delete` · `menu` | модалка-гейт публикации (у новой схемы — первая публикация), «Сбросить черновик?», «Удалить схему?», меню «⋯» |
  * | `?open=history`, `?version=v2` | сайд истории версий; с `version` — второй слой, дифф версии |
  * | `?view=v1` | просмотр прошлой версии |
- * | `?presence=1` | другой редактор в схеме: «Сейчас редактирует …» |
+ * | `?presence=1` | другой редактор в схеме: «Сейчас редактирует …»; `?presence=Имя` — с этим именем (длинное имя — замер шапки, такт 67) |
  * | `?now=2026-10-03T09:00:00` | неподвижные часы стенда: дата правок и публикаций для прогона |
  * | `?q=подпис` | запрос в поиске и открытая выдача; `?q=фаыфа` — пустая выдача с «Быстрым переходом» |
  * | `?found=cadastreMap` | подсветка найденного: цель — значение `data-setting` |
@@ -87,7 +87,7 @@ const m = createModel(q('data') === 'new' ? D.fresh : D.main, {
   tab: tabAtLoad,
   save: saveAtLoad,
   failNext: q('save') === 'fail',
-  editing: q('presence') ? 'Игорь Петров' : '',
+  editing: q('presence') === '1' ? 'Игорь Петров' : q('presence'),
   viewing: q('view'),
   now: q('now') ? () => q('now') : undefined,
 })
@@ -481,9 +481,14 @@ if (import.meta.client) {
         {{ general.name }}
       </Heading>
 
-      <!-- Строка состояния и действий: слева — индикатор публикации, история и статус автосохранения, справа — действия. -->
-      <div class="flex min-h-10 flex-wrap items-center justify-between gap-x-6 gap-y-2" data-header-row>
-        <div class="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
+      <!--
+        Строка состояния и действий — одна строка высотой 44 (`scheme-edit.md`, 3.2; такт 67): слева — индикатор
+        публикации, история и статус автосохранения, справа — действия. Ужимается только индикатор — многоточием,
+        полный текст в подсказке; история, статус и кнопки ширину держат. Перенос строки сдвигал страницу под шапкой
+        на 28 при каждой смене статуса сохранения — причина промаха клика в списке переменных (`scheme-edit.md`, 19.4).
+      -->
+      <div class="flex h-11 items-center gap-6" data-header-row>
+        <div class="flex min-w-0 flex-1 items-center gap-4">
           <PublishStatus
             v-if="!ro"
             :state="m.publishState.value"
@@ -492,14 +497,16 @@ if (import.meta.client) {
             :editing="m.ui.editing"
             @open="m.openPublish()"
           />
-          <ButtonAction size="sm" :show-icon="false" data-act="history" @click="m.openHistory()">
-            История версий
-          </ButtonAction>
-          <AppBarStatus v-if="!ro" surface="light" retryable :state="m.save.state" @retry="m.retry()" />
+          <div class="flex shrink-0 items-center gap-4">
+            <ButtonAction size="sm" :show-icon="false" data-act="history" @click="m.openHistory()">
+              История версий
+            </ButtonAction>
+            <AppBarStatus v-if="!ro" surface="light" retryable :state="m.save.state" @retry="m.retry()" />
+          </div>
         </div>
 
         <!-- Просмотр прошлой версии: индикатора черновика и «Опубликовать схему» нет (r2 §2, состояние 7). -->
-        <div v-if="ro" class="ml-auto flex items-center gap-3">
+        <div v-if="ro" class="ml-auto flex shrink-0 items-center gap-3">
           <Button variant="outline" data-act="view-copy" @click="m.copy()">
             Сделать копию
           </Button>
@@ -507,7 +514,7 @@ if (import.meta.client) {
             Перейти к текущей версии
           </Button>
         </div>
-        <div v-else class="ml-auto flex items-center gap-3">
+        <div v-else class="ml-auto flex shrink-0 items-center gap-3">
           <Button variant="outline" show-icon data-act="preview" @click="m.preview()">
             <template #icon>
               <Icon name="visibility" :size="20" />
@@ -548,13 +555,17 @@ if (import.meta.client) {
     <!-- ============================ поиск — № 9–11: строкой под шапкой, над табами, на всех табах ============================ -->
     <Popover :open="searchOpen">
       <PopoverAnchor as-child>
-        <div class="flex max-w-settings items-center gap-3" data-search>
-          <div class="min-w-0 flex-1" data-field="search" @keydown="onSearchKeydown" @focusin="searchFocused = true" @focusout="searchFocused = false">
-            <Input v-model="query" placeholder="Поиск по настройкам схемы" clearable />
+        <div class="max-w-settings" data-search>
+          <div data-field="search" @keydown="onSearchKeydown" @focusin="searchFocused = true" @focusout="searchFocused = false">
+            <!-- Подсказка хоткея — внутри поля справа, слотом `end` (такт 67, строка 98): при непустом значении её место занимает крестик. -->
+            <Input v-model="query" placeholder="Поиск по настройкам схемы" clearable>
+              <template #end>
+                <Kbd surface="card" data-search-hotkey>
+                  /
+                </Kbd>
+              </template>
+            </Input>
           </div>
-          <Kbd data-search-hotkey>
-            /
-          </Kbd>
         </div>
       </PopoverAnchor>
       <!-- Фокус остаётся в поле: выдача его не забирает; клик по выдаче не снимает фокус с поля до перехода. -->

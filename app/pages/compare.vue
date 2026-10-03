@@ -449,6 +449,41 @@ const textareaVariants = [
       >
         <Input invalid />
       </CompareFrame>
+
+      <!-- Слот end — такт 67: мастера у слота нет, строка без наложения. Источник — шапка поиска страницы схемы. -->
+      <div class="space-y-2" data-matrix="input-end">
+        <p class="max-w-3xl text-sm text-muted-foreground">
+          <strong>Слот <code>end</code></strong> (такт 67) — содержимое справа внутри поля, по центру по вертикали, отступ
+          справа — как у крестика очистки. Рисуется у пустого поля; при непустом значении на его месте крестик. Мастера у
+          слота нет — строка без наложения.
+        </p>
+        <div class="flex flex-wrap gap-6">
+          <div class="w-80 space-y-1" data-case="end-empty">
+            <p class="text-xs text-muted-foreground">
+              пусто — слот
+            </p>
+            <Input placeholder="Поиск по настройкам схемы" clearable>
+              <template #end>
+                <Kbd surface="card">
+                  /
+                </Kbd>
+              </template>
+            </Input>
+          </div>
+          <div class="w-80 space-y-1" data-case="end-filled">
+            <p class="text-xs text-muted-foreground">
+              значение — крестик на месте слота
+            </p>
+            <Input model-value="подпис" placeholder="Поиск по настройкам схемы" clearable>
+              <template #end>
+                <Kbd surface="card">
+                  /
+                </Kbd>
+              </template>
+            </Input>
+          </div>
+        </div>
+      </div>
     </section>
 
     <section class="space-y-2">

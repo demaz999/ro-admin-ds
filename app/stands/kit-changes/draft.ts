@@ -9,6 +9,7 @@ import type { KitChange } from './handover-2026-10-01'
 export const DRAFT_BASE = 'handover-2026-10-02'
 
 export const DRAFT: KitChange[] = [
+  { id: 'input-end', component: 'Input', cls: 'added', text: 'Слот `end` — содержимое справа внутри поля (подсказка клавиши, единица), по центру по вертикали, отступ справа 16 — как у крестика очистки. Рисуется у пустого поля; при непустом значении на его месте крестик очистки (`clearable`), у пустого поля в фокусе крестика при слоте нет. Без слота разметка и вид прежние. Такт 67.' },
   { id: 'icon-arrow-back', component: 'Icon', cls: 'added', text: 'Глиф `arrow-back` (стрелка «назад») — Material Symbols `keyboard_backspace`, официальная выгрузка `default/24px`, границы 720×480. Такт 64.' },
   { id: 'button-outline', component: 'Button', cls: 'added', text: 'Вариант `variant="outline"` — контурная кнопка по мастеру кита 1 `btn_outline` `1990:226`: рамка 1 и текст `--primary`, наведение `--primary-hover`, нажатие `--primary-pressed`, выключено `--primary-disabled`; фона нет. Прочие варианты прежние. Такт 63.' },
   { id: 'select-multiple', component: 'Select', cls: 'added', text: 'Ось `multiple` — набор значений чипами «текст ×» по мастеру кита 1 `multiselect` `251:16816`: значение — `v-model:values` (массив строк), тело растёт с переносом чипов, список остаётся открытым при выборе, у выбранной строки — галочка. Без `multiple` вызовы прежние. Такт 62.' },

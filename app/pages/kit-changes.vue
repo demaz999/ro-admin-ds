@@ -37,6 +37,8 @@ const mutedClicks = ref(0)
 /* Черновик следующей версии — такт 62. */
 const DRAFT_ROLES = ['Администратор', 'Эксперт', 'Оператор', 'Агент'].map(x => ({ value: x, label: x }))
 const draftRoles = ref(['Администратор', 'Эксперт'])
+/* Слот end у Input — такт 67. */
+const draftSearch = ref('')
 </script>
 
 <template>
@@ -71,7 +73,24 @@ const draftRoles = ref(['Администратор', 'Эксперт'])
           </p>
         </div>
         <div data-example class="flex min-w-0 flex-col items-stretch gap-3">
-          <template v-if="c.id === 'icon-arrow-back'">
+          <template v-if="c.id === 'input-end'">
+            <Input v-model="draftSearch" placeholder="Поиск по настройкам схемы" clearable>
+              <template #end>
+                <Kbd surface="card">
+                  /
+                </Kbd>
+              </template>
+            </Input>
+            <Input model-value="подпис" placeholder="Поиск по настройкам схемы" clearable>
+              <template #end>
+                <Kbd surface="card">
+                  /
+                </Kbd>
+              </template>
+            </Input>
+            <span class="text-xs text-muted-foreground">пустое поле — слот; значение — крестик на месте слота</span>
+          </template>
+          <template v-else-if="c.id === 'icon-arrow-back'">
             <span class="flex items-center gap-2 text-xs">
               <Icon name="arrow-back" :size="24" />
               <code>arrow-back</code>
