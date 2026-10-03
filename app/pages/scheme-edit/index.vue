@@ -408,7 +408,8 @@ watch(() => m.ui.found.n, async (n) => {
   const top = el.getBoundingClientRect().top + window.scrollY - Math.round(window.innerHeight / 3)
   window.scrollTo({ top: Math.max(0, top), behavior: 'instant' })
   flashed.value = { target, n }
-  if (!el.matches('[data-setting]') && !ro.value) el.querySelector<HTMLElement>('input, textarea, button, [contenteditable=true]')?.focus({ preventScroll: true })
+  /* В просмотре версии (такт 68) поле — «только чтение»: фокус встаёт и на нём — значение читается и выделяется. */
+  if (!el.matches('[data-setting]')) el.querySelector<HTMLElement>('input, textarea, button, [contenteditable=true], [tabindex="0"]')?.focus({ preventScroll: true })
 })
 if (q('q')) m.setQuery(q('q'))
 onMounted(() => {
@@ -620,8 +621,8 @@ if (import.meta.client) {
         <!-- Каркас «Настроек»: колонка содержимого 846 и правый навигатор 266, зазор 24 — макет `33346:5470`. -->
         <div class="flex items-start gap-6 pt-6">
           <div ref="column" class="flex max-w-settings min-w-0 flex-1 flex-col gap-8" data-settings-column>
-            <!-- Просмотр прошлой версии: содержимое разделов недоступно для правки; навигатор, табы и «Назад / Далее» работают. -->
-            <div class="contents" :inert="ro" :data-readonly="ro || undefined">
+            <!-- Просмотр прошлой версии (такт 68): поля — «только чтение» осью `readonly` у `Field` и контролов, значения выделяются; действия разделов закрыты `inert`; навигатор, табы и «Назад / Далее» работают. -->
+            <div class="contents" :data-readonly="ro || undefined">
             <template v-if="m.ui.section === 'general'">
               <!-- ============================ Основное — № 16, 17, 19 ============================ -->
               <section id="anchor-main" data-anchor-section="main" class="flex flex-col gap-4">
@@ -630,25 +631,25 @@ if (import.meta.client) {
                     Основное
                   </Heading>
                   <Card class="px-6 py-3.5">
-                    <Switch v-model="active" data-field="active">
+                    <Switch :readonly="ro" v-model="active" data-field="active">
                       Схема активна
                     </Switch>
                   </Card>
                 </div>
                 <Card class="flex flex-col gap-4">
-                  <Field label="Наименование">
+                  <Field :readonly="ro" label="Наименование">
                     <Input v-model="name" placeholder="" :show-icon="false" data-field="name" />
                   </Field>
-                  <Field label="Описание" hint="Описание поможет различать схемы в общем списке и даст понимание ИИ, какую схему применять в конкретном случае">
+                  <Field :readonly="ro" label="Описание" hint="Описание поможет различать схемы в общем списке и даст понимание ИИ, какую схему применять в конкретном случае">
                     <Textarea v-model="description" placeholder="Введите описание схемы осмотра" data-field="description" />
                   </Field>
-                  <Field label="Тип схемы осмотра" hint="Определяет структуру и набор полей формы осмотра" data-field="schemeType">
+                  <Field :readonly="ro" label="Тип схемы осмотра" hint="Определяет структуру и набор полей формы осмотра" data-field="schemeType">
                     <Select v-model="schemeType" :items="SCHEME_TYPES" placeholder="" :show-icon="false" :searchable="false" />
                   </Field>
-                  <Field label="Компания-владелец" data-field="owner">
+                  <Field :readonly="ro" label="Компания-владелец" data-field="owner">
                     <Autocomplete v-model="owner" :items="OWNERS" placeholder="Найти компанию" />
                   </Field>
-                  <Field label="Тип осмотра" hint="Мультиосмотр объединяет несколько объектов в одном осмотре">
+                  <Field :readonly="ro" label="Тип осмотра" hint="Мультиосмотр объединяет несколько объектов в одном осмотре">
                     <RadioGroup v-model="inspectionType" class="grid grid-cols-3" data-radio="inspectionType">
                       <RadioGroupItem variant="card" value="regular" :checked="inspectionType === 'regular'">
                         Обычный
@@ -658,7 +659,7 @@ if (import.meta.client) {
                       </RadioGroupItem>
                     </RadioGroup>
                   </Field>
-                  <Field label="Назначение схемы" hint="От назначения зависит доступность части настроек">
+                  <Field :readonly="ro" label="Назначение схемы" hint="От назначения зависит доступность части настроек">
                     <RadioGroup v-model="purpose" class="grid grid-cols-3" data-radio="purpose">
                       <RadioGroupItem variant="card" value="standard" :checked="purpose === 'standard'">
                         Стандартная
@@ -685,32 +686,32 @@ if (import.meta.client) {
                       Экспертиза и проверка
                     </Heading>
                     <SettingRow data-setting="skipExpertise" :highlighted="hl('skipExpertise')">
-                      <Checkbox :model-value="beh.skipExpertise" subtitle="Осмотр будет сразу передан на проверку без этапа экспертизы" @update:model-value="setB('skipExpertise', $event)">
+                      <Checkbox :readonly="ro" :model-value="beh.skipExpertise" subtitle="Осмотр будет сразу передан на проверку без этапа экспертизы" @update:model-value="setB('skipExpertise', $event)">
                         Пропускать экспертизу
                       </Checkbox>
                     </SettingRow>
                     <SettingRow data-setting="lockOnReview" :highlighted="hl('lockOnReview')" :collapsed="!beh.lockOnReview">
-                      <Checkbox :model-value="beh.lockOnReview" subtitle="Запрещает редактирование осмотра другими пользователями во время проверки" @update:model-value="setB('lockOnReview', $event)">
+                      <Checkbox :readonly="ro" :model-value="beh.lockOnReview" subtitle="Запрещает редактирование осмотра другими пользователями во время проверки" @update:model-value="setB('lockOnReview', $event)">
                         Блокировать осмотр при проверке
                       </Checkbox>
                       <template #children>
-                        <Field label="Разблокировать при неактивности через, минут" orientation="left" :control-height="32" data-field="unlockMinutes">
+                        <Field :readonly="ro" label="Разблокировать при неактивности через, минут" orientation="left" :control-height="32" data-field="unlockMinutes">
                           <InputNumber v-model="unlockMinutes" :min="5" :max="120" :step="5" />
                         </Field>
                       </template>
                     </SettingRow>
                     <SettingRow v-slot="{ disabled }" data-setting="quickAccept" :highlighted="hl('quickAccept')" :reason="m.rule('quickAccept').reason">
-                      <Checkbox :model-value="beh.quickAccept" :disabled="disabled" subtitle="Проверяющий сможет утвердить осмотр без поэтапного прохождения всех шагов" @update:model-value="setB('quickAccept', $event)">
+                      <Checkbox :readonly="ro" :model-value="beh.quickAccept" :disabled="disabled" subtitle="Проверяющий сможет утвердить осмотр без поэтапного прохождения всех шагов" @update:model-value="setB('quickAccept', $event)">
                         Разрешить принимать осмотр одной кнопкой
                       </Checkbox>
                     </SettingRow>
                     <SettingRow data-setting="requireAllSteps" :highlighted="hl('requireAllSteps')">
-                      <Checkbox :model-value="beh.requireAllSteps" subtitle="Возврат на доработку возможен только после вынесения решения по каждому шагу" @update:model-value="setB('requireAllSteps', $event)">
+                      <Checkbox :readonly="ro" :model-value="beh.requireAllSteps" subtitle="Возврат на доработку возможен только после вынесения решения по каждому шагу" @update:model-value="setB('requireAllSteps', $event)">
                         Требовать решения во всех шагах для возврата на доработку
                       </Checkbox>
                     </SettingRow>
                     <SettingRow data-setting="lowRolesReturn" :highlighted="hl('lowRolesReturn')">
-                      <Checkbox :model-value="beh.lowRolesReturn" subtitle="Агенты и операторы смогут инициировать возврат осмотра на доработку" @update:model-value="setB('lowRolesReturn', $event)">
+                      <Checkbox :readonly="ro" :model-value="beh.lowRolesReturn" subtitle="Агенты и операторы смогут инициировать возврат осмотра на доработку" @update:model-value="setB('lowRolesReturn', $event)">
                         Разрешить низким ролям возвращать осмотр на доработку
                       </Checkbox>
                     </SettingRow>
@@ -721,18 +722,18 @@ if (import.meta.client) {
                       Отказ от осмотра
                     </Heading>
                     <SettingRow data-setting="refuse" :highlighted="hl('refuse')" help="Исполнитель сможет завершить осмотр без съёмки, указав причину">
-                      <Checkbox :model-value="beh.refuse" @update:model-value="setB('refuse', $event)">
+                      <Checkbox :readonly="ro" :model-value="beh.refuse" @update:model-value="setB('refuse', $event)">
                         Разрешить отказываться с отметкой «Осмотр невозможен»
                       </Checkbox>
                       <template #children>
                         <SettingRow v-slot="{ disabled }" data-setting="refuseRepeatable" :highlighted="hl('refuseRepeatable')" :reason="m.rule('refuseRepeatable').reason">
-                          <Checkbox :model-value="beh.refuseRepeatable" :disabled="disabled" @update:model-value="setB('refuseRepeatable', $event)">
+                          <Checkbox :readonly="ro" :model-value="beh.refuseRepeatable" :disabled="disabled" @update:model-value="setB('refuseRepeatable', $event)">
                             Разрешить отказываться от повторяемых процессов с той же отметкой
                           </Checkbox>
                         </SettingRow>
                       </template>
                     </SettingRow>
-                    <Field label="Видимость комментария к отказу" hint="Кто увидит комментарий исполнителя к отказу">
+                    <Field :readonly="ro" label="Видимость комментария к отказу" hint="Кто увидит комментарий исполнителя к отказу">
                       <RadioGroup v-model="refuseVisibility" class="grid grid-cols-3" data-radio="refuseCommentVisibility">
                         <RadioGroupItem variant="card" value="all" :checked="refuseVisibility === 'all'">
                           Все роли
@@ -758,17 +759,17 @@ if (import.meta.client) {
                       :meta="m.rule('approval').meta"
                       :meta-tone="m.rule('approval').metaTone"
                     >
-                      <Checkbox :model-value="beh.approval" @update:model-value="setB('approval', $event)">
+                      <Checkbox :readonly="ro" :model-value="beh.approval" @update:model-value="setB('approval', $event)">
                         Отправлять поля на согласование согласующему лицу
                       </Checkbox>
                       <template v-if="beh.approval" #action>
-                        <ButtonAction size="sm" :show-icon="false" data-act="go-fields" @click="goFields()">
+                        <ButtonAction :inert="ro" size="sm" :show-icon="false" data-act="go-fields" @click="goFields()">
                           Перейти к полям
                         </ButtonAction>
                       </template>
                     </SettingRow>
                     <SettingRow data-setting="approvalRequired" :highlighted="hl('approvalRequired')">
-                      <Checkbox :model-value="beh.approvalRequired" subtitle="Осмотр не будет принят, пока не пройдёт согласование" @update:model-value="setB('approvalRequired', $event)">
+                      <Checkbox :readonly="ro" :model-value="beh.approvalRequired" subtitle="Осмотр не будет принят, пока не пройдёт согласование" @update:model-value="setB('approvalRequired', $event)">
                         Обязательное согласование осмотра после экспертизы
                       </Checkbox>
                     </SettingRow>
@@ -779,12 +780,12 @@ if (import.meta.client) {
                       Расширенное
                     </Heading>
                     <SettingRow data-setting="cadastreMap" :highlighted="hl('cadastreMap')">
-                      <Checkbox :model-value="beh.cadastreMap" subtitle="Отображает геолокацию объекта на карте по кадастровому номеру" @update:model-value="setB('cadastreMap', $event)">
+                      <Checkbox :readonly="ro" :model-value="beh.cadastreMap" subtitle="Отображает геолокацию объекта на карте по кадастровому номеру" @update:model-value="setB('cadastreMap', $event)">
                         Показывать координаты на кадастровой карте
                       </Checkbox>
                     </SettingRow>
                     <SettingRow data-setting="forbidExtraFiles" :highlighted="hl('forbidExtraFiles')">
-                      <Checkbox :model-value="beh.forbidExtraFiles" subtitle="Пользователь не сможет прикрепить файлы за пределами обязательных полей" @update:model-value="setB('forbidExtraFiles', $event)">
+                      <Checkbox :readonly="ro" :model-value="beh.forbidExtraFiles" subtitle="Пользователь не сможет прикрепить файлы за пределами обязательных полей" @update:model-value="setB('forbidExtraFiles', $event)">
                         Запретить использовать блок дополнительных файлов
                       </Checkbox>
                     </SettingRow>
@@ -799,7 +800,7 @@ if (import.meta.client) {
                 </Heading>
                 <Card class="flex flex-col gap-8">
                   <div v-for="f in FORMULAS" :key="f.key" class="flex flex-col gap-2" :data-formula="f.key">
-                    <Field :label="f.label" :hint="f.hint">
+                    <Field :readonly="ro" :label="f.label" :hint="f.hint">
                       <FormulaInput
                         :model-value="general.formulas[f.key]"
                         :variables="m.variables.value"
@@ -819,11 +820,11 @@ if (import.meta.client) {
                   Словари
                 </Heading>
                 <Card class="grid grid-cols-2 items-start gap-6">
-                  <Field label="Словарь статусов" data-field="statusDict">
+                  <Field :readonly="ro" label="Словарь статусов" data-field="statusDict">
                     <Select v-model="statusDict" :items="STATUS_DICTIONARIES" placeholder="" :show-icon="false" :searchable="false" />
                   </Field>
-                  <Field label="Словарь комментариев" data-field="commentDict">
-                    <ListRow data-act="open-comments" @click="m.openSide('comments')">
+                  <Field :readonly="ro" label="Словарь комментариев" data-field="commentDict">
+                    <ListRow :inert="ro" data-act="open-comments" @click="m.openSide('comments')">
                       {{ commentDict?.label ?? 'Словарь не привязан' }}
                       <template #secondary>
                         {{ commentDict ? `Комментариев: ${commentDict.comments.length}` : 'Привязать словарь' }}
@@ -843,7 +844,7 @@ if (import.meta.client) {
                     <Heading level="group">
                       Дедлайн проверки
                     </Heading>
-                    <RadioGroup v-model="deadlineMode" class="grid grid-cols-3" data-radio="deadlineMode">
+                    <RadioGroup :readonly="ro" v-model="deadlineMode" class="grid grid-cols-3" data-radio="deadlineMode">
                       <RadioGroupItem variant="card" value="none" :checked="deadlineMode === 'none'">
                         Не устанавливать автоматически
                       </RadioGroupItem>
@@ -855,14 +856,14 @@ if (import.meta.client) {
                       </RadioGroupItem>
                     </RadioGroup>
                     <div v-if="deadlineMode !== 'none'" class="flex flex-wrap items-start gap-6">
-                      <Field v-if="deadlineMode === 'hours'" label="Часов" orientation="left" :control-height="32" data-field="deadlineHours">
+                      <Field v-if="deadlineMode === 'hours'" :readonly="ro" label="Часов" orientation="left" :control-height="32" data-field="deadlineHours">
                         <InputNumber v-model="deadlineHours" :min="1" :max="240" />
                       </Field>
-                      <Field v-else label="Дней" orientation="left" :control-height="32" data-field="deadlineDays">
+                      <Field v-else :readonly="ro" label="Дней" orientation="left" :control-height="32" data-field="deadlineDays">
                         <InputNumber v-model="deadlineDays" :min="1" :max="90" />
                       </Field>
                     </div>
-                    <Field label="Событие отсчёта" :disabled="deadlineMode === 'none'" data-field="deadlineFrom">
+                    <Field :readonly="ro" label="Событие отсчёта" :disabled="deadlineMode === 'none'" data-field="deadlineFrom">
                       <Select v-model="deadlineFrom" :items="DEADLINE_EVENTS" placeholder="" :show-icon="false" :searchable="false" :disabled="deadlineMode === 'none'" />
                     </Field>
                   </div>
@@ -870,9 +871,9 @@ if (import.meta.client) {
                     <Heading level="group">
                       Кто может редактировать дедлайн
                     </Heading>
-                    <Select v-model:values="deadlineEditors" multiple :items="ROLES" placeholder="Выберите роли" data-field="deadlineEditors" />
+                    <Select :readonly="ro" v-model:values="deadlineEditors" multiple :items="ROLES" placeholder="Выберите роли" data-field="deadlineEditors" />
                   </div>
-                  <Field label="Кто может делиться осмотром">
+                  <Field :readonly="ro" label="Кто может делиться осмотром">
                     <RadioGroup v-model="share" class="grid grid-cols-4" data-radio="share">
                       <RadioGroupItem variant="card" value="anyone" :checked="share === 'anyone'">
                         Любой, с кем поделились
@@ -888,7 +889,7 @@ if (import.meta.client) {
                       </RadioGroupItem>
                     </RadioGroup>
                   </Field>
-                  <Field label="Кто может задавать координату вручную">
+                  <Field :readonly="ro" label="Кто может задавать координату вручную">
                     <Select v-model:values="manualCoordinate" multiple :items="ROLES" placeholder="Выберите роли" data-field="manualCoordinate" />
                   </Field>
                 </Card>
@@ -900,10 +901,10 @@ if (import.meta.client) {
                   Экран подтверждения
                 </Heading>
                 <Card class="grid grid-cols-2 items-start gap-6">
-                  <Field label="Подсказка клиенту" hint="Текст подсказки на экране подтверждения">
+                  <Field :readonly="ro" label="Подсказка клиенту" hint="Текст подсказки на экране подтверждения">
                     <Input v-model="confirmHint" placeholder="Введите подсказку для экрана подтверждения" :show-icon="false" data-field="confirmHint" />
                   </Field>
-                  <Field label="Текст галочки" hint="Текст рядом с чекбоксом подтверждения">
+                  <Field :readonly="ro" label="Текст галочки" hint="Текст рядом с чекбоксом подтверждения">
                     <Input v-model="confirmCheckbox" placeholder="Информация напротив галочки подтверждения" :show-icon="false" data-field="confirmCheckbox" />
                   </Field>
                 </Card>
@@ -917,7 +918,7 @@ if (import.meta.client) {
                   Параметры съёмки
                 </Heading>
                 <Card class="flex flex-col gap-4">
-                  <Field label="Режим выполнения">
+                  <Field :readonly="ro" label="Режим выполнения">
                     <RadioGroup v-model="mobileMode" class="grid grid-cols-2" data-radio="mobileMode">
                       <RadioGroupItem variant="card" value="regular" :checked="mobileMode === 'regular'">
                         Обычный
@@ -933,19 +934,19 @@ if (import.meta.client) {
                       </RadioGroupItem>
                     </RadioGroup>
                   </Field>
-                  <Field label="Разрешение фото" data-field="photo">
+                  <Field :readonly="ro" label="Разрешение фото" data-field="photo">
                     <Select v-model="mobilePhoto" :items="PHOTO_RESOLUTIONS" placeholder="" :show-icon="false" :searchable="false" />
                   </Field>
-                  <Field label="Разрешение видео" data-field="video">
+                  <Field :readonly="ro" label="Разрешение видео" data-field="video">
                     <Select v-model="mobileVideo" :items="VIDEO_RESOLUTIONS" placeholder="" :show-icon="false" :searchable="false" />
                   </Field>
-                  <Field label="Телефон для звонка" hint="Номер, на который будет совершён звонок из мобильного приложения">
+                  <Field :readonly="ro" label="Телефон для звонка" hint="Номер, на который будет совершён звонок из мобильного приложения">
                     <Input v-model="mobilePhone" placeholder="+7 900 000 00 00" :show-icon="false" data-field="phone" />
                   </Field>
-                  <Field label="Название телефона" hint="Отображаемое имя контакта, которое увидит пользователь при звонке">
+                  <Field :readonly="ro" label="Название телефона" hint="Отображаемое имя контакта, которое увидит пользователь при звонке">
                     <Input v-model="mobilePhoneName" placeholder="Например, «Служба поддержки»" :show-icon="false" data-field="phoneName" />
                   </Field>
-                  <Field label="Запрос подтверждения звонка" hint="Сообщение, показываемое пользователю перед началом звонка для подтверждения">
+                  <Field :readonly="ro" label="Запрос подтверждения звонка" hint="Сообщение, показываемое пользователю перед началом звонка для подтверждения">
                     <Input v-model="mobileCallConfirm" placeholder="Текст перед набором номера" :show-icon="false" data-field="callConfirm" />
                   </Field>
                 </Card>
@@ -957,17 +958,17 @@ if (import.meta.client) {
                     Поведение в мобильном приложении
                   </Heading>
                   <SettingRow data-setting="startAfterCreate" :highlighted="hl('startAfterCreate')">
-                    <Checkbox :model-value="mob.startAfterCreate" subtitle="Пользователь сразу переходит к выполнению без промежуточного экрана" @update:model-value="setS('mobile.startAfterCreate', $event)">
+                    <Checkbox :readonly="ro" :model-value="mob.startAfterCreate" subtitle="Пользователь сразу переходит к выполнению без промежуточного экрана" @update:model-value="setS('mobile.startAfterCreate', $event)">
                       Запустить осмотр сразу после создания
                     </Checkbox>
                   </SettingRow>
                   <SettingRow data-setting="hideHints" :highlighted="hl('hideHints')">
-                    <Checkbox :model-value="mob.hideHints" subtitle="Опытные пользователи — те, кто проходил осмотр минимум три раза по данной схеме" @update:model-value="setS('mobile.hideHints', $event)">
+                    <Checkbox :readonly="ro" :model-value="mob.hideHints" subtitle="Опытные пользователи — те, кто проходил осмотр минимум три раза по данной схеме" @update:model-value="setS('mobile.hideHints', $event)">
                       Разрешать опытным пользователям скрывать подсказки к шагам
                     </Checkbox>
                   </SettingRow>
                   <SettingRow data-setting="skipConfirm" :highlighted="hl('skipConfirm')">
-                    <Checkbox :model-value="mob.skipConfirm" subtitle="Опытные пользователи — те, кто проходил осмотр минимум три раза по данной схеме" @update:model-value="setS('mobile.skipConfirm', $event)">
+                    <Checkbox :readonly="ro" :model-value="mob.skipConfirm" subtitle="Опытные пользователи — те, кто проходил осмотр минимум три раза по данной схеме" @update:model-value="setS('mobile.skipConfirm', $event)">
                       Разрешать опытным пользователям пропускать подтверждение после шага
                     </Checkbox>
                   </SettingRow>
@@ -987,7 +988,7 @@ if (import.meta.client) {
                       Обоснования
                     </Heading>
                     <SettingRow data-setting="feedback" :highlighted="hl('feedback')">
-                      <Checkbox :model-value="web.feedback" subtitle="Позволяет экспертам оставлять комментарии и оценки по результатам проверки" @update:model-value="setS('web.feedback', $event)">
+                      <Checkbox :readonly="ro" :model-value="web.feedback" subtitle="Позволяет экспертам оставлять комментарии и оценки по результатам проверки" @update:model-value="setS('web.feedback', $event)">
                         Блок обратной связи на странице экспертизы
                       </Checkbox>
                     </SettingRow>
@@ -1001,32 +1002,32 @@ if (import.meta.client) {
                     </Callout>
                     <!-- Вариант — «название — ключ»; крестик снимает вариант, уведомление предлагает отмену. -->
                     <div v-if="web.reasons.length" class="flex flex-wrap gap-2">
-                      <Chip v-for="r in web.reasons" :key="r.key" :trailing="web.feedback ? 'remove' : 'none'" :data-reason="r.key" @remove="m.removeReason(r.key)">
+                      <Chip v-for="r in web.reasons" :key="r.key" :trailing="web.feedback && !ro ? 'remove' : 'none'" :data-reason="r.key" @remove="m.removeReason(r.key)">
                         {{ r.title }} — {{ r.key }}
                       </Chip>
                     </div>
                     <Card v-if="reasonForm && web.feedback" tone="muted" class="flex flex-col gap-4" data-reason-form>
                       <FieldSet legend="Новое обоснование">
                         <div class="grid grid-cols-2 items-start gap-4">
-                          <Field label="Ключ">
+                          <Field :readonly="ro" label="Ключ">
                             <Input v-model="reasonKey" placeholder="Например, geo" variant="elevated" :show-icon="false" data-field="reasonKey" />
                           </Field>
-                          <Field label="Название">
+                          <Field :readonly="ro" label="Название">
                             <Input v-model="reasonTitle" placeholder="Например, «Координаты»" variant="elevated" :show-icon="false" data-field="reasonTitle" />
                           </Field>
                         </div>
                       </FieldSet>
                       <div class="flex items-center gap-2">
-                        <Button data-act="reason-create" @click="createReason()">
+                        <Button :inert="ro" data-act="reason-create" @click="createReason()">
                           Создать обоснование
                         </Button>
-                        <Button variant="outline" data-act="reason-cancel" @click="closeReasonForm()">
+                        <Button :inert="ro" variant="outline" data-act="reason-cancel" @click="closeReasonForm()">
                           Отменить
                         </Button>
                       </div>
                     </Card>
                     <div v-else class="flex">
-                      <Button variant="outline" show-icon :disabled="!web.feedback" data-act="reason-add" @click="reasonForm = true">
+                      <Button :inert="ro" variant="outline" show-icon :disabled="!web.feedback" data-act="reason-add" @click="reasonForm = true">
                         <template #icon>
                           <Icon name="add" :size="16" />
                         </template>
@@ -1040,17 +1041,17 @@ if (import.meta.client) {
                     Если не заполнен блок обратной связи
                   </Heading>
                   <SettingRow data-setting="blockRepeat" :highlighted="hl('blockRepeat')">
-                    <Checkbox :model-value="web.blockRepeat" :disabled="!web.feedback" @update:model-value="setS('web.blockRepeat', $event)">
+                    <Checkbox :readonly="ro" :model-value="web.blockRepeat" :disabled="!web.feedback" @update:model-value="setS('web.blockRepeat', $event)">
                       Запретить переход в «Повтор»
                     </Checkbox>
                   </SettingRow>
                   <SettingRow data-setting="blockRefuse" :highlighted="hl('blockRefuse')">
-                    <Checkbox :model-value="web.blockRefuse" :disabled="!web.feedback" @update:model-value="setS('web.blockRefuse', $event)">
+                    <Checkbox :readonly="ro" :model-value="web.blockRefuse" :disabled="!web.feedback" @update:model-value="setS('web.blockRefuse', $event)">
                       Запретить переход в «Отказ»
                     </Checkbox>
                   </SettingRow>
                   <SettingRow data-setting="blockContract" :highlighted="hl('blockContract')">
-                    <Checkbox :model-value="web.blockContract" :disabled="!web.feedback" @update:model-value="setS('web.blockContract', $event)">
+                    <Checkbox :readonly="ro" :model-value="web.blockContract" :disabled="!web.feedback" @update:model-value="setS('web.blockContract', $event)">
                       Запретить переход в «Подписание» или «Контракт»
                     </Checkbox>
                   </SettingRow>
@@ -1065,10 +1066,10 @@ if (import.meta.client) {
                   Выполнение осмотра
                 </Heading>
                 <Card class="flex flex-col gap-6">
-                  <Field label="Кто может выполнять осмотр">
+                  <Field :readonly="ro" label="Кто может выполнять осмотр">
                     <Select v-model:values="executors" multiple :items="ACCESS_ROLES" placeholder="Выберите роли" data-field="executors" />
                   </Field>
-                  <Field label="Кто может управлять выполнением осмотра">
+                  <Field :readonly="ro" label="Кто может управлять выполнением осмотра">
                     <RadioGroup v-model="accessManage" class="grid grid-cols-3" data-radio="manage">
                       <RadioGroupItem variant="card" value="all" :checked="accessManage === 'all'">
                         Все роли
@@ -1089,7 +1090,7 @@ if (import.meta.client) {
                   Создание и проверка осмотров
                 </Heading>
                 <Card class="flex flex-col gap-6">
-                  <Field label="Кто может управлять созданием осмотра">
+                  <Field :readonly="ro" label="Кто может управлять созданием осмотра">
                     <RadioGroup v-model="createMode" class="gap-2" data-radio="createMode">
                       <RadioGroupItem variant="card" value="groups" :checked="createMode === 'groups'">
                         Учитывать роль и группы доступа
@@ -1111,7 +1112,7 @@ if (import.meta.client) {
                       </RadioGroupItem>
                     </RadioGroup>
                   </Field>
-                  <Field label="Необходимая роль для создания" :disabled="createMode === 'open'" :hint="createMode === 'open' ? 'При открытом создании роль не проверяется' : ''">
+                  <Field :readonly="ro" label="Необходимая роль для создания" :disabled="createMode === 'open'" :hint="createMode === 'open' ? 'При открытом создании роль не проверяется' : ''">
                     <Select v-model:values="createRoles" multiple :items="ACCESS_ROLES" placeholder="Выберите роли" :disabled="createMode === 'open'" data-field="createRoles" />
                   </Field>
                 </Card>
@@ -1123,7 +1124,7 @@ if (import.meta.client) {
                 </Heading>
                 <!-- Канон страницы-таблицы (`naming.md`, «Такт 20»): шапка, таблица, подвал с пагинацией. -->
                 <div class="flex min-w-0 flex-col" data-groups-table>
-                  <TableToolbar class="items-center gap-3">
+                  <TableToolbar :inert="ro" class="items-center gap-3">
                     <Input v-model="groupQuery" variant="elevated" placeholder="Поиск по названию группы и компании" class="max-w-110 min-w-0" data-field="groupQuery" />
                     <div class="w-56 shrink-0" data-field="groupFilter">
                       <Select v-model="groupFilter" variant="elevated" :items="GROUP_FILTERS" placeholder="" :show-icon="false" :searchable="false" />
@@ -1135,7 +1136,7 @@ if (import.meta.client) {
                   <Table attached-top :attached="groupTotal > 0">
                     <TableRow>
                       <TableHead variant="column" class="w-16 justify-center px-6" aria-label="Выбор групп на странице">
-                        <Checkbox
+                        <Checkbox :readonly="ro"
                           :model-value="pageGroupsState === 'all'"
                           :indeterminate="pageGroupsState === 'some'"
                           :disabled="!groupRows.length"
@@ -1150,10 +1151,10 @@ if (import.meta.client) {
                         Компания-владелец
                       </TableHead>
                     </TableRow>
-                    <TableEmptySearch v-if="groupTotal === 0" @reset="resetGroupSearch()" />
+                    <TableEmptySearch v-if="groupTotal === 0" :inert="ro" @reset="resetGroupSearch()" />
                     <TableRow v-for="g in groupRows" v-else :key="g.id" :state="access.groups.includes(g.id) ? 'selected' : 'default'" :data-group="g.id">
                       <TableCell variant="slot" class="w-16 justify-center px-6">
-                        <Checkbox :model-value="access.groups.includes(g.id)" :aria-label="g.name" @update:model-value="m.toggleGroup(g.id)" />
+                        <Checkbox :readonly="ro" :model-value="access.groups.includes(g.id)" :aria-label="g.name" @update:model-value="m.toggleGroup(g.id)" />
                       </TableCell>
                       <TableCell variant="slot" class="w-90 px-4">
                         <TableCellIdentity>
@@ -1165,7 +1166,7 @@ if (import.meta.client) {
                       </TableCell>
                     </TableRow>
                   </Table>
-                  <TableFooter
+                  <TableFooter :inert="ro"
                     v-if="groupTotal"
                     v-model:page="groupPage"
                     v-model:page-size="groupPageSize"
@@ -1196,10 +1197,10 @@ if (import.meta.client) {
                     Поля для расчётов
                   </Heading>
                   <div class="grid grid-cols-2 items-start gap-6">
-                    <Field label="Алиас для «Общая площадь объекта»" hint="Системное имя поля. Формат: namespace:fieldname" :disabled="finishOff">
+                    <Field :readonly="ro" label="Алиас для «Общая площадь объекта»" hint="Системное имя поля. Формат: namespace:fieldname" :disabled="finishOff">
                       <Input v-model="aliasTotal" placeholder="" :show-icon="false" :disabled="finishOff" data-field="aliasTotal" />
                     </Field>
-                    <Field label="Алиас для «Площадь отдельного помещения»" hint="Системное имя поля. Формат: namespace:fieldname" :disabled="finishOff">
+                    <Field :readonly="ro" label="Алиас для «Площадь отдельного помещения»" hint="Системное имя поля. Формат: namespace:fieldname" :disabled="finishOff">
                       <Input v-model="aliasRoom" placeholder="" :show-icon="false" :disabled="finishOff" data-field="aliasRoom" />
                     </Field>
                   </div>
@@ -1212,7 +1213,7 @@ if (import.meta.client) {
                 </Heading>
                 <div class="flex min-w-0 flex-col" data-costs-table>
                   <TableToolbar class="items-center justify-end gap-3">
-                    <Button variant="outline" :disabled="finishOff" data-act="costs-reset" @click="m.resetCosts()">
+                    <Button :inert="ro" variant="outline" :disabled="finishOff" data-act="costs-reset" @click="m.resetCosts()">
                       Сбросить к значениям по умолчанию
                     </Button>
                   </TableToolbar>
@@ -1238,7 +1239,7 @@ if (import.meta.client) {
                         {{ c.title }}
                       </TableCell>
                       <TableCell variant="slot" class="w-60 px-4">
-                        <Input
+                        <Input :readonly="ro"
                           :model-value="String(ai.costs[c.code] ?? 0)"
                           placeholder=""
                           :show-icon="false"
@@ -1257,7 +1258,7 @@ if (import.meta.client) {
                   Матрица регионов
                 </Heading>
                 <Card class="flex flex-col gap-4">
-                  <Field label="Матрица корректировок" :disabled="finishOff" data-field="regionMatrix">
+                  <Field :readonly="ro" label="Матрица корректировок" :disabled="finishOff" data-field="regionMatrix">
                     <Select v-model="regionMatrix" :items="REGION_MATRICES" placeholder="" :show-icon="false" :searchable="false" :disabled="finishOff" />
                   </Field>
                   <!-- Раздел матриц — другая страница: ссылка открывается в новой вкладке, контекст правки схемы сохраняется. -->
@@ -1278,17 +1279,17 @@ if (import.meta.client) {
                     {{ m.rule('autoModules').reason }}. Тип схемы задаётся в разделе «Общие → Основное»
                   </Callout>
                   <SettingRow data-setting="damage" :highlighted="hl('damage')">
-                    <Checkbox :model-value="ai.damage" :disabled="autoOff" subtitle="Находит повреждения кузова на фотографиях" @update:model-value="setS('ai.damage', $event)">
+                    <Checkbox :readonly="ro" :model-value="ai.damage" :disabled="autoOff" subtitle="Находит повреждения кузова на фотографиях" @update:model-value="setS('ai.damage', $event)">
                       Распознавание повреждений
                     </Checkbox>
                   </SettingRow>
                   <SettingRow data-setting="vinRecognition" :highlighted="hl('vinRecognition')">
-                    <Checkbox :model-value="ai.vinRecognition" :disabled="autoOff" subtitle="Читает VIN с фотографии и сверяет с полем формы" @update:model-value="setS('ai.vinRecognition', $event)">
+                    <Checkbox :readonly="ro" :model-value="ai.vinRecognition" :disabled="autoOff" subtitle="Читает VIN с фотографии и сверяет с полем формы" @update:model-value="setS('ai.vinRecognition', $event)">
                       Распознавание VIN
                     </Checkbox>
                   </SettingRow>
                   <SettingRow data-setting="damageCost" :highlighted="hl('damageCost')">
-                    <Checkbox :model-value="ai.damageCost" :disabled="autoOff" subtitle="Оценивает стоимость ремонта найденных повреждений" @update:model-value="setS('ai.damageCost', $event)">
+                    <Checkbox :readonly="ro" :model-value="ai.damageCost" :disabled="autoOff" subtitle="Оценивает стоимость ремонта найденных повреждений" @update:model-value="setS('ai.damageCost', $event)">
                       Оценка ущерба
                     </Checkbox>
                   </SettingRow>
@@ -1301,7 +1302,7 @@ if (import.meta.client) {
               <section class="flex flex-col gap-4" data-anomalies>
                 <Card class="flex flex-col">
                   <SettingRow data-setting="anomaliesEnabled" :highlighted="hl('anomaliesEnabled')">
-                    <Switch :model-value="anomalies.enabled" subtitle="Детекторы подозрительной активности при проведении осмотра" @update:model-value="setS('anomalies.enabled', $event)">
+                    <Switch :readonly="ro" :model-value="anomalies.enabled" subtitle="Детекторы подозрительной активности при проведении осмотра" @update:model-value="setS('anomalies.enabled', $event)">
                       Отображать блок аномалий
                     </Switch>
                   </SettingRow>
@@ -1311,7 +1312,7 @@ if (import.meta.client) {
                     {{ m.rule('anomalies').reason }}
                   </Callout>
                   <div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-                    <Checkbox
+                    <Checkbox :readonly="ro"
                       :model-value="m.detectorSetState(DETECTOR_IDS) === 'all'"
                       :indeterminate="m.detectorSetState(DETECTOR_IDS) === 'some'"
                       :disabled="anomaliesOff"
@@ -1321,14 +1322,14 @@ if (import.meta.client) {
                       {{ m.detectorsOn.value }} из {{ DETECTOR_IDS.length }} включено
                     </Checkbox>
                     <div class="w-90" data-field="defaultRole">
-                      <Field label="Роль видимости по умолчанию" :disabled="anomaliesOff">
+                      <Field :readonly="ro" label="Роль видимости по умолчанию" :disabled="anomaliesOff">
                         <Select v-model="defaultRole" :items="ROLE_LADDER" placeholder="" :show-icon="false" :searchable="false" :disabled="anomaliesOff" />
                       </Field>
                     </div>
                   </div>
                   <div v-for="g in DETECTOR_GROUPS" :key="g.id" class="flex flex-col gap-1" :data-detector-group="g.id">
                     <!-- Группа из одного детектора — без подзаголовка (r2 §4). -->
-                    <Checkbox
+                    <Checkbox :readonly="ro"
                       v-if="g.title"
                       :model-value="m.detectorSetState(g.detectors.map(d => d.id)) === 'all'"
                       :indeterminate="m.detectorSetState(g.detectors.map(d => d.id)) === 'some'"
@@ -1347,14 +1348,14 @@ if (import.meta.client) {
                         :help="d.help"
                         :meta="detectorRoleText(d.id)"
                       >
-                        <Checkbox :model-value="anomalies.detectors[d.id]?.on ?? false" :disabled="anomaliesOff" @update:model-value="m.setDetector(d.id, { on: $event })">
+                        <Checkbox :readonly="ro" :model-value="anomalies.detectors[d.id]?.on ?? false" :disabled="anomaliesOff" @update:model-value="m.setDetector(d.id, { on: $event })">
                           {{ d.title }}
                         </Checkbox>
                         <!-- Роль — переопределением: селект появляется по запросу, у выключенного детектора управления ролью нет. -->
                         <template v-if="anomalies.detectors[d.id]?.on && !anomaliesOff" #action>
                           <template v-if="anomalies.detectors[d.id]?.role">
                             <div class="w-56" :data-field="`detRole-${d.id}`">
-                              <Select
+                              <Select :readonly="ro"
                                 :model-value="anomalies.detectors[d.id]!.role"
                                 :items="ROLE_LADDER"
                                 placeholder=""
@@ -1363,11 +1364,11 @@ if (import.meta.client) {
                                 @update:model-value="m.setDetector(d.id, { role: $event })"
                               />
                             </div>
-                            <ButtonAction size="sm" :show-icon="false" :data-act="`det-inherit-${d.id}`" @click="m.setDetector(d.id, { role: '' })">
+                            <ButtonAction :inert="ro" size="sm" :show-icon="false" :data-act="`det-inherit-${d.id}`" @click="m.setDetector(d.id, { role: '' })">
                               Вернуть роль по умолчанию
                             </ButtonAction>
                           </template>
-                          <ButtonAction v-else size="sm" :show-icon="false" :data-act="`det-override-${d.id}`" @click="m.setDetector(d.id, { role: anomalies.defaultRole })">
+                          <ButtonAction v-else :inert="ro" size="sm" :show-icon="false" :data-act="`det-override-${d.id}`" @click="m.setDetector(d.id, { role: anomalies.defaultRole })">
                             Переопределить роль
                           </ButtonAction>
                         </template>
@@ -1414,13 +1415,13 @@ if (import.meta.client) {
                         {{ templateAccess(t) }}
                       </TableCell>
                       <TableCell variant="slot" :class="['justify-end px-4', TEMPLATE_ACTIONS_COLUMN]">
-                        <TableRowActions :actions="TEMPLATE_ACTIONS" @edit="openTemplate(t.id)" @action="m.removeTemplate(t.id)" />
+                        <TableRowActions :inert="ro" :actions="TEMPLATE_ACTIONS" @edit="openTemplate(t.id)" @action="m.removeTemplate(t.id)" />
                       </TableCell>
                     </TableRow>
                   </Table>
                   <Empty v-else title="Шаблоны не подключены" description="Без шаблона документ не формируется" />
                   <div class="flex">
-                    <Button variant="outline" show-icon data-act="template-add" @click="openTemplate('')">
+                    <Button :inert="ro" variant="outline" show-icon data-act="template-add" @click="openTemplate('')">
                       <template #icon>
                         <Icon name="add" :size="16" />
                       </template>
@@ -1434,22 +1435,22 @@ if (import.meta.client) {
                     Формирование и подписание
                   </Heading>
                   <SettingRow data-setting="pdfSign" :highlighted="hl('pdfSign')" :collapsed="!pdf.sign">
-                    <Checkbox :model-value="pdf.sign" subtitle="Добавляет в процесс этап подписания клиентом — статус «Согласование с клиентом». Клиент получает документ и подписывает его кодом из СМС" @update:model-value="setS('pdf.sign', $event)">
+                    <Checkbox :readonly="ro" :model-value="pdf.sign" subtitle="Добавляет в процесс этап подписания клиентом — статус «Согласование с клиентом». Клиент получает документ и подписывает его кодом из СМС" @update:model-value="setS('pdf.sign', $event)">
                       Запрашивать подписание документа после успешной экспертизы
                     </Checkbox>
                     <template #children>
                       <div class="flex max-w-110 flex-col py-2" data-field="signer">
-                        <Field label="Кто подписывает документ">
+                        <Field :readonly="ro" label="Кто подписывает документ">
                           <Select v-model="pdfSigner" :items="PDF_SIGNERS" placeholder="" :show-icon="false" :searchable="false" />
                         </Field>
                       </div>
                       <SettingRow data-setting="showSigned" :highlighted="hl('showSigned')">
-                        <Checkbox :model-value="pdf.showSigned" @update:model-value="setS('pdf.showSigned', $event)">
+                        <Checkbox :readonly="ro" :model-value="pdf.showSigned" @update:model-value="setS('pdf.showSigned', $event)">
                           Показывать подписанный PDF в приложении
                         </Checkbox>
                       </SettingRow>
                       <SettingRow data-setting="mailSigned" :highlighted="hl('mailSigned')">
-                        <Checkbox :model-value="pdf.mailSigned" @update:model-value="setS('pdf.mailSigned', $event)">
+                        <Checkbox :readonly="ro" :model-value="pdf.mailSigned" @update:model-value="setS('pdf.mailSigned', $event)">
                           Отправлять подписанный PDF на почту
                         </Checkbox>
                       </SettingRow>
@@ -1457,12 +1458,12 @@ if (import.meta.client) {
                   </SettingRow>
                   <FieldSet legend="PDF без подписи">
                     <SettingRow data-setting="unsignedShow" :highlighted="hl('unsignedShow')">
-                      <Checkbox :model-value="pdf.unsignedShow" @update:model-value="setS('pdf.unsignedShow', $event)">
+                      <Checkbox :readonly="ro" :model-value="pdf.unsignedShow" @update:model-value="setS('pdf.unsignedShow', $event)">
                         Формировать PDF без подписи и показывать в приложении после экспертизы
                       </Checkbox>
                     </SettingRow>
                     <SettingRow data-setting="unsignedMail" :highlighted="hl('unsignedMail')">
-                      <Checkbox :model-value="pdf.unsignedMail" @update:model-value="setS('pdf.unsignedMail', $event)">
+                      <Checkbox :readonly="ro" :model-value="pdf.unsignedMail" @update:model-value="setS('pdf.unsignedMail', $event)">
                         Отправлять PDF без подписи на почту
                       </Checkbox>
                     </SettingRow>
@@ -1474,7 +1475,7 @@ if (import.meta.client) {
                     Имя файла и вложения
                   </Heading>
                   <div class="flex flex-col gap-2" data-formula="pdfFileName">
-                    <Field label="Формула имени PDF-документа" hint="Пустая формула — кнопка скачивания документа в приложении не покажется">
+                    <Field :readonly="ro" label="Формула имени PDF-документа" hint="Пустая формула — кнопка скачивания документа в приложении не покажется">
                       <FormulaInput
                         :model-value="pdf.fileName"
                         :variables="m.variables.value"
@@ -1486,7 +1487,7 @@ if (import.meta.client) {
                     <FormulaPreview :value="formulaPreview(pdf.fileName, m.variableSamples.value)" />
                   </div>
                   <SettingRow data-setting="attachExtra" :highlighted="hl('attachExtra')">
-                    <Checkbox :model-value="pdf.attachExtra" @update:model-value="setS('pdf.attachExtra', $event)">
+                    <Checkbox :readonly="ro" :model-value="pdf.attachExtra" @update:model-value="setS('pdf.attachExtra', $event)">
                       Прикреплять в конец документа PDF-файлы из дополнительных файлов
                     </Checkbox>
                   </SettingRow>

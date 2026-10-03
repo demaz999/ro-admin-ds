@@ -1,5 +1,6 @@
 import type { VariantProps } from 'class-variance-authority'
 import { cva } from 'class-variance-authority'
+import { READONLY_SURFACE } from '../field'
 
 export { default as Textarea } from './Textarea.vue'
 
@@ -40,8 +41,8 @@ export const textareaVariants = cva(
   {
     variants: {
       invalid: {
-        true: 'bg-field-error hover:bg-field-error-hover focus-within:bg-field-error-hover',
-        false: 'bg-field hover:bg-field-hover focus-within:bg-field-hover',
+        true: '',
+        false: '',
       },
       /** Состояние мастера `State`: пусто против заполненного. */
       floating: {
@@ -52,11 +53,21 @@ export const textareaVariants = cva(
         true: 'pointer-events-none opacity-[var(--opacity-disabled)]',
         false: '',
       },
+      /** Только чтение — такт 68: поверхность без заливки с рамкой `--input`, наведения нет (`ui/field/index.ts`). */
+      readonly: {
+        true: READONLY_SURFACE,
+        false: '',
+      },
     },
+    compoundVariants: [
+      { invalid: true, readonly: false, class: 'bg-field-error hover:bg-field-error-hover focus-within:bg-field-error-hover' },
+      { invalid: false, readonly: false, class: 'bg-field hover:bg-field-hover focus-within:bg-field-hover' },
+    ],
     defaultVariants: {
       invalid: false,
       floating: false,
       disabled: false,
+      readonly: false,
     },
   },
 )

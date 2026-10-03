@@ -1,5 +1,6 @@
 import type { VariantProps } from 'class-variance-authority'
 import { cva } from 'class-variance-authority'
+import { READONLY_SURFACE } from '../field'
 
 export { default as Input } from './Input.vue'
 
@@ -95,17 +96,24 @@ export const inputVariants = cva(
         true: 'pointer-events-none opacity-[var(--opacity-disabled)]',
         false: '',
       },
+      /** Только чтение — такт 68: поверхность без заливки с рамкой `--input`, наведения нет (`ui/field/index.ts`). */
+      readonly: {
+        true: READONLY_SURFACE,
+        false: '',
+      },
     },
     compoundVariants: [
       // Заливка и тень — только когда поле не в ошибке: иначе ошибка перекрывается.
       {
         variant: 'filled',
         invalid: false,
+        readonly: false,
         class: 'bg-field hover:bg-field-hover focus-within:bg-field-hover',
       },
       {
         variant: 'elevated',
         invalid: false,
+        readonly: false,
         class: 'bg-field-elevated shadow-elevated hover:shadow-elevated-hover focus-within:shadow-elevated-pressed',
       },
       // У поля поверх карты подложка белая и в ошибке — краснеет только у обычного.
@@ -124,6 +132,7 @@ export const inputVariants = cva(
       size: 'md',
       floating: false,
       disabled: false,
+      readonly: false,
     },
   },
 )
@@ -148,4 +157,8 @@ export type InputVariants = VariantProps<typeof inputVariants>
  *   отступ справа — поле 16, как у крестика очистки. Рисуется у пустого поля; при непустом значении на его месте крестик
  *   очистки (`clearable`); у пустого поля в фокусе крестика при слоте нет. Без слота разметка и вид прежние. Пример —
  *   поиск страницы схемы: `Kbd` «/» в слоте. Такт 67.
+ * - **Добавлено.** Проп `readonly` — «только чтение» (такт 68): значение полным контрастом `--foreground`, выделяется и
+ *   копируется, правки нет (атрибут `readonly` у поля); заливки нет — рамка 1 `--input`, наведения нет, фокус с клавиатуры —
+ *   кольцо 2 `--ring`; крестик очистки и слот `end` не рисуются. Внутри `Field readonly` включается сам. Без пропа вид и
+ *   поведение прежние.
  */

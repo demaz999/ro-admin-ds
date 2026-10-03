@@ -1,5 +1,10 @@
+<!--
+  @debt Ось `readonly` — дефолт по аналогии с китом: состояния «только чтение» у мастера `803:9446` и спеки нет.
+  См. docs/design-debt.md, «Ось readonly», и `ui/field/index.ts`, «Ось readonly».
+-->
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useReadonly } from '../field'
 import { Icon } from '../icon'
 import { IconButton } from '../icon-button'
 
@@ -40,6 +45,11 @@ const props = withDefaults(defineProps<{
   /** Подписи для вспомогательных технологий: кнопки без текста. */
   decrementLabel?: string
   incrementLabel?: string
+  /**
+   * Только чтение — своё либо от `Field readonly` (такт 68): кнопок «−» и «+» нет, остаётся плашка значения — фокусируемая,
+   * `role="spinbutton"` с `aria-readonly`; число выделяется и копируется. Разбор — `ui/field/index.ts`, «Ось readonly».
+   */
+  readonly?: boolean
 }>(), {
   min: 0,
   max: Number.POSITIVE_INFINITY,
@@ -47,7 +57,10 @@ const props = withDefaults(defineProps<{
   disabled: false,
   decrementLabel: 'Уменьшить',
   incrementLabel: 'Увеличить',
+  readonly: false,
 })
+
+const ro = useReadonly(() => props.readonly, () => props.disabled)
 
 const model = defineModel<number>({ default: 0 })
 
@@ -55,6 +68,7 @@ const canDecrement = computed(() => !props.disabled && model.value > props.min)
 const canIncrement = computed(() => !props.disabled && model.value < props.max)
 
 function step(direction: 1 | -1) {
+  if (ro.value) return
   const next = model.value + direction * props.step
   model.value = Math.min(props.max, Math.max(props.min, next))
 }
@@ -63,10 +77,12 @@ function step(direction: 1 | -1) {
 <template>
   <div
     data-slot="stepper"
+    :data-readonly="ro ? '' : undefined"
     class="inline-flex w-fit items-center gap-2"
     :class="props.disabled ? 'pointer-events-none opacity-[var(--opacity-disabled-strong)]' : ''"
   >
     <IconButton
+      v-if="!ro"
       variant="ghost"
       size="sm"
       :disabled="!canDecrement"
@@ -79,12 +95,20 @@ function step(direction: 1 | -1) {
     <!-- Плашка не залита: только контур 2px и радиус 6. -->
     <span
       data-slot="stepper-value"
-      class="flex size-8 items-center justify-center rounded-sm border-2 border-stroke-neutral text-sm font-medium text-field-foreground-hover"
+      :tabindex="ro ? 0 : undefined"
+      :role="ro ? 'spinbutton' : undefined"
+      :aria-readonly="ro ? 'true' : undefined"
+      :aria-valuenow="ro ? model : undefined"
+      :aria-valuemin="ro ? props.min : undefined"
+      :aria-valuemax="ro && Number.isFinite(props.max) ? props.max : undefined"
+      class="flex size-8 items-center justify-center rounded-sm border-2 border-stroke-neutral text-sm font-medium outline-none"
+      :class="ro ? 'text-foreground focus-visible:ring-2 focus-visible:ring-ring' : 'text-field-foreground-hover'"
     >
       {{ model }}
     </span>
 
     <IconButton
+      v-if="!ro"
       variant="ghost"
       size="sm"
       :disabled="!canIncrement"

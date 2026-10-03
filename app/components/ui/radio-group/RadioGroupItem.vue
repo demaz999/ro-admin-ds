@@ -1,8 +1,13 @@
+<!--
+  @debt Ось `readonly` — дефолт по аналогии с китом: состояния «только чтение» у мастера `590:5372` и спеки нет.
+  См. docs/design-debt.md, «Ось readonly», и `ui/field/index.ts`, «Ось readonly».
+-->
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RadioGroupItem, useForwardProps } from 'reka-ui'
 import { cn } from '@/lib/utils'
-import { choiceRowVariants, choiceTitleVariants } from '../checkbox'
+import { choiceReadonlyGuard, choiceRowVariants, choiceTitleVariants } from '../checkbox'
+import { useReadonly } from '../field'
 import { choiceCardVariants } from '.'
 
 /**
@@ -27,12 +32,21 @@ const props = withDefaults(defineProps<{
   checked?: boolean
   /** `row` — строка мастера; `card` — карточка выбора с описанием (такт 39). */
   variant?: 'row' | 'card'
+  /**
+   * Только чтение — своё, от `RadioGroup readonly` либо от `Field readonly` (такт 68): выбор отказан, фокус и стрелки
+   * остаются (`aria-readonly`); бренд заменён нейтральным `--foreground-secondary`.
+   */
+  readonly?: boolean
 }>(), {
   subtitle: '',
   disabled: false,
   checked: false,
   variant: 'row',
+  readonly: false,
 })
+
+const ro = useReadonly(() => props.readonly, () => props.disabled)
+const guard = choiceReadonlyGuard(ro)
 
 const forwarded = useForwardProps(computed(() => ({ value: props.value, disabled: props.disabled })))
 </script>
@@ -41,13 +55,18 @@ const forwarded = useForwardProps(computed(() => ({ value: props.value, disabled
   <label
     data-slot="choice"
     :data-variant="props.variant"
-    :class="props.variant === 'card' ? choiceCardVariants({ disabled }) : choiceRowVariants({ disabled })"
+    :data-readonly="ro ? '' : undefined"
+    :class="props.variant === 'card' ? choiceCardVariants({ disabled, readonly: ro }) : choiceRowVariants({ disabled, readonly: ro })"
+    @click.capture="guard.onClickCapture"
+    @keydown.capture="guard.onKeydownCapture"
   >
     <span class="flex h-5 shrink-0 items-center">
       <RadioGroupItem
         v-bind="forwarded"
         data-slot="choice-control"
-        class="group/radio flex size-4 items-center justify-center rounded-full border-2 border-primary bg-transparent outline-none"
+        :aria-readonly="ro ? 'true' : undefined"
+        class="group/radio flex size-4 items-center justify-center rounded-full border-2 bg-transparent outline-none"
+        :class="ro ? 'border-foreground-secondary' : 'border-primary'"
       >
         <!--
           Традиционная анатомия: кольцо остаётся тонким и в отмеченном состоянии,
@@ -55,7 +74,7 @@ const forwarded = useForwardProps(computed(() => ({ value: props.value, disabled
           целиком, а точка внутри белая. Сознательное отклонение, решение
           Михаила; запись в docs/figma-fixes.md.
         -->
-        <span class="hidden size-2 rounded-full bg-primary group-data-[state=checked]/radio:block" />
+        <span class="hidden size-2 rounded-full group-data-[state=checked]/radio:block" :class="ro ? 'bg-foreground-secondary' : 'bg-primary'" />
       </RadioGroupItem>
     </span>
 

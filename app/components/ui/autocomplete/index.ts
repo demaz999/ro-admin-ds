@@ -1,5 +1,6 @@
 import type { VariantProps } from 'class-variance-authority'
 import { cva } from 'class-variance-authority'
+import { READONLY_SURFACE } from '../field'
 
 export { default as Autocomplete } from './Autocomplete.vue'
 
@@ -19,8 +20,8 @@ export const autocompleteVariants = cva(
   {
     variants: {
       variant: {
-        filled: 'bg-field hover:bg-field-hover focus-within:bg-field-hover',
-        elevated: 'bg-field-elevated shadow-elevated hover:shadow-elevated-hover focus-within:shadow-elevated-pressed',
+        filled: '',
+        elevated: '',
       },
       floating: {
         true: 'h-10 gap-3 py-0.5',
@@ -30,11 +31,21 @@ export const autocompleteVariants = cva(
         true: 'pointer-events-none opacity-[var(--opacity-disabled)]',
         false: '',
       },
+      /** Только чтение — такт 68: поверхность без заливки с рамкой `--input`, наведения нет (`ui/field/index.ts`). */
+      readonly: {
+        true: READONLY_SURFACE,
+        false: '',
+      },
     },
+    compoundVariants: [
+      { variant: 'filled', readonly: false, class: 'bg-field hover:bg-field-hover focus-within:bg-field-hover' },
+      { variant: 'elevated', readonly: false, class: 'bg-field-elevated shadow-elevated hover:shadow-elevated-hover focus-within:shadow-elevated-pressed' },
+    ],
     defaultVariants: {
       variant: 'filled',
       floating: false,
       disabled: false,
+      readonly: false,
     },
   },
 )

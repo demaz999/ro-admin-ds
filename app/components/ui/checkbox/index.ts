@@ -1,3 +1,4 @@
+import type { Ref } from 'vue'
 import { cva } from 'class-variance-authority'
 
 export { default as Checkbox } from './Checkbox.vue'
@@ -36,12 +37,39 @@ export const choiceRowVariants = cva(
     variants: {
       disabled: {
         true: 'pointer-events-none opacity-[var(--opacity-disabled)]',
-        false: 'cursor-pointer',
+        false: '',
+      },
+      /** Только чтение — такт 68: курсор обычный, наведения нет (`ui/field/index.ts`, «Ось readonly»). */
+      readonly: {
+        true: 'cursor-default',
+        false: '',
       },
     },
-    defaultVariants: { disabled: false },
+    compoundVariants: [{ disabled: false, readonly: false, class: 'cursor-pointer' }],
+    defaultVariants: { disabled: false, readonly: false },
   },
 )
+
+/**
+ * Отказ в переключении для «только чтения» — такт 68. Строка выбора — `label` вокруг кнопки Reka: клик по подписи и по
+ * контролу, пробел (клик кнопки) и стрелки группы радиокнопок (фокус соседа и его клик) приходят к контролу событием
+ * `click`; Enter у `Switch` переключает с `keydown`. Оба события гасятся на фазе погружения у корня строки — до
+ * обработчиков Reka; фокус и Tab проходят.
+ */
+export function choiceReadonlyGuard(ro: Ref<boolean>) {
+  return {
+    onClickCapture(event: MouseEvent) {
+      if (!ro.value) return
+      event.preventDefault()
+      event.stopPropagation()
+    },
+    onKeydownCapture(event: KeyboardEvent) {
+      if (!ro.value || (event.key !== 'Enter' && event.key !== ' ')) return
+      event.preventDefault()
+      event.stopPropagation()
+    },
+  }
+}
 
 /** Заголовок строки: темнеет, когда контрол включён. */
 export const choiceTitleVariants = cva('text-sm font-medium', {
@@ -67,4 +95,10 @@ export const choiceTitleVariants = cva('text-sm font-medium', {
  * - **Меняет существующее.** Зазор от флажка до подписи — 8 (было 12): флажок с подписью уже на 4. Решение владельца 2026-10-01 (такт 56); тот же зазор — у `RadioGroupItem` и `Switch` (довесок к такту 56).
  * - **Исправлено.** Состояние `indeterminate` доходит до контрола: `aria-checked="mixed"`, клик из него отмечает флажок (`update:modelValue` — `true`). Вид прежний.
  * - **Меняет существующее.** Без подписи (нет слота и `subtitle`) выводится только контрол: компонент занимает 16 вместо 28 по ширине и встаёт по центру отведённого места. С подписью — прежний.
+ *
+ * ### Черновик следующей версии — относительно `handover-2026-10-02`
+ *
+ * - **Добавлено.** Проп `readonly` — «только чтение» (такт 68): флажок и подпись видны полным контрастом, клик, пробел и
+ *   Enter не переключают, фокус остаётся (`aria-readonly`); бренд контрола заменён нейтральным `--foreground-secondary`,
+ *   наведения нет, курсор обычный. Внутри `Field readonly` включается сам. Без пропа вид и поведение прежние.
  */

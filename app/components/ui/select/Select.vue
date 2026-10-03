@@ -1,3 +1,7 @@
+<!--
+  @debt Ось `readonly` — дефолт по аналогии с китом: состояния «только чтение» у мастера и спеки нет.
+  См. docs/design-debt.md, «Ось readonly», и `ui/field/index.ts`, «Ось readonly».
+-->
 <script setup lang="ts">
 import { computed } from 'vue'
 import {
@@ -10,6 +14,7 @@ import {
   ComboboxTrigger,
   ComboboxViewport,
 } from 'reka-ui'
+import { useReadonly } from '../field'
 import SelectContent from './SelectContent.vue'
 import SelectItem from './SelectItem.vue'
 import SelectMultiple from './SelectMultiple.vue'
@@ -60,6 +65,11 @@ const props = withDefaults(defineProps<{
   disabled?: boolean
   /** Набор значений чипами — мастер `multiselect` `251:16816`; значение — `v-model:values`. Такт 62. */
   multiple?: boolean
+  /**
+   * Только чтение — своё либо от `Field readonly` (такт 68): список не открывается, значение выделяется и копируется.
+   * Корня `Combobox` нет — стоит один триггер. Разбор — `ui/field/index.ts`, «Ось readonly».
+   */
+  readonly?: boolean
 }>(), {
   variant: 'filled',
   size: 'md',
@@ -69,7 +79,10 @@ const props = withDefaults(defineProps<{
   showIcon: true,
   disabled: false,
   multiple: false,
+  readonly: false,
 })
+
+const ro = useReadonly(() => props.readonly, () => props.disabled)
 
 const model = defineModel<string>({ default: '' })
 /** Значение оси `multiple`. */
@@ -89,7 +102,22 @@ const selected = computed(() => props.items.find(i => i.value === model.value))
     :items="props.items"
     :searchable="searchable"
     :disabled="props.disabled"
+    :readonly="ro"
   />
+  <!-- Только чтение: список не нужен — триггер без корня Combobox, клик и клавиши его не открывают. -->
+  <SelectTrigger
+    v-else-if="ro"
+    :variant="props.variant"
+    :size="props.size"
+    :placeholder="props.placeholder"
+    :label="selected?.label ?? ''"
+    :show-icon="props.showIcon"
+    readonly
+  >
+    <template #icon>
+      <slot name="icon" />
+    </template>
+  </SelectTrigger>
   <ComboboxRoot v-else v-model="model" :disabled="props.disabled" class="w-full">
     <ComboboxAnchor as-child>
       <!--

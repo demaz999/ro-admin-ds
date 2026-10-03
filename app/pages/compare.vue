@@ -12,6 +12,13 @@ useHead({ title: 'Наложение — сверка с Атомом' })
  * то же для lanassa.
  */
 const VALUE = 'Input text'
+/** Только чтение — такт 68: строки «обычное · только чтение · выключено» без наложения, мастера у оси нет. */
+const RO_CASES = [
+  { id: 'normal', label: 'обычное' },
+  { id: 'readonly', label: 'только чтение' },
+  { id: 'disabled', label: 'выключено' },
+] as const
+const RO_ITEMS = [{ value: 'one', label: 'Option' }, { value: 'two', label: 'Option 2' }]
 
 const variants = [
   // включённые, размер 40
@@ -484,6 +491,21 @@ const textareaVariants = [
           </div>
         </div>
       </div>
+
+      <!-- Только чтение — такт 68: мастера у оси нет, строка без наложения. -->
+      <div class="space-y-2" data-matrix="input-readonly">
+        <p class="max-w-3xl text-sm text-muted-foreground">
+          <strong>Только чтение</strong> (такт 68) — значение полным контрастом выделяется и копируется, правки нет; поле без заливки с рамкой, наведения нет. Мастера у оси нет — строка без наложения; полная матрица десяти контролов — <code>/scheme-edit/states</code>.
+        </p>
+        <div class="flex flex-wrap gap-6">
+          <div v-for="st in RO_CASES" :key="st.id" class="w-72 space-y-1" :data-case="'input-' + st.id">
+            <p class="text-xs text-muted-foreground">
+              {{ st.label }}
+            </p>
+            <Input :model-value="VALUE" clearable :readonly="st.id === 'readonly'" :disabled="st.id === 'disabled'" />
+          </div>
+        </div>
+      </div>
     </section>
 
     <section class="space-y-2">
@@ -683,6 +705,21 @@ const textareaVariants = [
           :disabled="s.disabled ?? false"
         />
       </CompareFrame>
+
+      <!-- Только чтение — такт 68: мастера у оси нет, строка без наложения. -->
+      <div class="space-y-2" data-matrix="select-readonly">
+        <p class="max-w-3xl text-sm text-muted-foreground">
+          <strong>Только чтение</strong> (такт 68) — значение полным контрастом выделяется и копируется, правки нет; поле без заливки с рамкой, наведения нет. Мастера у оси нет — строка без наложения; полная матрица десяти контролов — <code>/scheme-edit/states</code>.
+        </p>
+        <div class="flex flex-wrap gap-6">
+          <div v-for="st in RO_CASES" :key="st.id" class="w-72 space-y-1" :data-case="'select-' + st.id">
+            <p class="text-xs text-muted-foreground">
+              {{ st.label }}
+            </p>
+            <Select model-value="one" :items="RO_ITEMS" :readonly="st.id === 'readonly'" :disabled="st.id === 'disabled'" />
+          </div>
+        </div>
+      </div>
     </section>
 
     <section class="space-y-2">
@@ -752,6 +789,21 @@ const textareaVariants = [
           :disabled="a.disabled ?? false"
         />
       </CompareFrame>
+
+      <!-- Только чтение — такт 68: мастера у оси нет, строка без наложения. -->
+      <div class="space-y-2" data-matrix="autocomplete-readonly">
+        <p class="max-w-3xl text-sm text-muted-foreground">
+          <strong>Только чтение</strong> (такт 68) — значение полным контрастом выделяется и копируется, правки нет; поле без заливки с рамкой, наведения нет. Мастера у оси нет — строка без наложения; полная матрица десяти контролов — <code>/scheme-edit/states</code>.
+        </p>
+        <div class="flex flex-wrap gap-6">
+          <div v-for="st in RO_CASES" :key="st.id" class="w-72 space-y-1" :data-case="'autocomplete-' + st.id">
+            <p class="text-xs text-muted-foreground">
+              {{ st.label }}
+            </p>
+            <Autocomplete :model-value="VALUE" :items="RO_ITEMS" :readonly="st.id === 'readonly'" :disabled="st.id === 'disabled'" />
+          </div>
+        </div>
+      </div>
     </section>
 
     <section class="space-y-2">
@@ -824,6 +876,21 @@ const textareaVariants = [
       >
         <Textarea :model-value="t.value ?? ''" :disabled="t.disabled ?? false" />
       </CompareFrame>
+
+      <!-- Только чтение — такт 68: мастера у оси нет, строка без наложения. -->
+      <div class="space-y-2" data-matrix="textarea-readonly">
+        <p class="max-w-3xl text-sm text-muted-foreground">
+          <strong>Только чтение</strong> (такт 68) — значение полным контрастом выделяется и копируется, правки нет; поле без заливки с рамкой, наведения нет. Мастера у оси нет — строка без наложения; полная матрица десяти контролов — <code>/scheme-edit/states</code>.
+        </p>
+        <div class="flex flex-wrap gap-6">
+          <div v-for="st in RO_CASES" :key="st.id" class="w-72 space-y-1" :data-case="'textarea-' + st.id">
+            <p class="text-xs text-muted-foreground">
+              {{ st.label }}
+            </p>
+            <Textarea :model-value="VALUE" :readonly="st.id === 'readonly'" :disabled="st.id === 'disabled'" />
+          </div>
+        </div>
+      </div>
     </section>
 
     <section class="space-y-2">
@@ -897,6 +964,23 @@ const textareaVariants = [
           <Input :model-value="f.value ?? ''" placeholder="Placeholder" :invalid="f.invalid" />
         </Field>
       </CompareFrame>
+
+      <!-- Только чтение — такт 68: мастера у оси нет, строка без наложения. -->
+      <div class="space-y-2" data-matrix="field-readonly">
+        <p class="max-w-3xl text-sm text-muted-foreground">
+          <strong>Только чтение</strong> (такт 68) — <code>Field readonly</code> отдаёт ось контролу внутри: поле без заливки с рамкой, значение полным контрастом, крестика и наведения нет. Мастера у оси нет — строка без наложения; полная матрица десяти контролов — <code>/scheme-edit/states</code>.
+        </p>
+        <div class="flex flex-wrap gap-6">
+          <div v-for="st in RO_CASES" :key="st.id" class="w-72 space-y-1" :data-case="'field-' + st.id">
+            <p class="text-xs text-muted-foreground">
+              {{ st.label }}
+            </p>
+            <Field label="Подпись" hint="Подсказка под полем" :readonly="st.id === 'readonly'" :disabled="st.id === 'disabled'">
+              <Input :model-value="VALUE" placeholder="Placeholder" :disabled="st.id === 'disabled'" />
+            </Field>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!--
@@ -963,6 +1047,21 @@ const textareaVariants = [
           <Select :values="f.values" multiple :items="[{ value: 'a', label: 'Badge text' }]" placeholder="Placeholder" :disabled="f.disabled" />
         </Field>
       </CompareFrame>
+
+      <!-- Только чтение — такт 68: мастера у оси нет, строка без наложения. -->
+      <div class="space-y-2" data-matrix="select-multiple-readonly">
+        <p class="max-w-3xl text-sm text-muted-foreground">
+          <strong>Только чтение</strong> (такт 68) — значение полным контрастом выделяется и копируется, правки нет; поле без заливки с рамкой, наведения нет. Мастера у оси нет — строка без наложения; полная матрица десяти контролов — <code>/scheme-edit/states</code>.
+        </p>
+        <div class="flex flex-wrap gap-6">
+          <div v-for="st in RO_CASES" :key="st.id" class="w-72 space-y-1" :data-case="'select-multiple-' + st.id">
+            <p class="text-xs text-muted-foreground">
+              {{ st.label }}
+            </p>
+            <Select :values="['one', 'two']" multiple :items="RO_ITEMS" placeholder="Placeholder" :readonly="st.id === 'readonly'" :disabled="st.id === 'disabled'" />
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- Такт 63: вариант `outline` у Button — мастер кита 1 `btn_outline` `1990:226`. -->

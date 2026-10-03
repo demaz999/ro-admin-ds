@@ -1,8 +1,13 @@
+<!--
+  @debt Ось `readonly` — дефолт по аналогии с китом: состояния «только чтение» у мастера `486:4733` и спеки нет.
+  См. docs/design-debt.md, «Ось readonly», и `ui/field/index.ts`, «Ось readonly».
+-->
 <script setup lang="ts">
 import { computed } from 'vue'
 import { CheckboxIndicator, CheckboxRoot } from 'reka-ui'
+import { useReadonly } from '../field'
 import { Icon } from '../icon'
-import { choiceRowVariants, choiceTitleVariants } from '.'
+import { choiceReadonlyGuard, choiceRowVariants, choiceTitleVariants } from '.'
 
 /**
  * Флажок — мастер `Checkbox` `486:4733`, спека `486:4305`,
@@ -35,12 +40,21 @@ const props = withDefaults(defineProps<{
    * его родным радиусом и рамкой. Решение владельца от 2026-08-18, правка 11-б.
    */
   onImage?: boolean
+  /**
+   * Только чтение — своё либо от `Field readonly` (такт 68): переключение отказано, фокус остаётся (`aria-readonly`);
+   * бренд заменён нейтральным `--foreground-secondary`. Разбор — `ui/field/index.ts`, «Ось readonly».
+   */
+  readonly?: boolean
 }>(), {
   indeterminate: false,
   subtitle: '',
   disabled: false,
   onImage: false,
+  readonly: false,
 })
+
+const ro = useReadonly(() => props.readonly, () => props.disabled)
+const guard = choiceReadonlyGuard(ro)
 
 const model = defineModel<boolean>({ default: false })
 
@@ -53,22 +67,31 @@ const filled = computed(() => model.value || props.indeterminate)
  */
 const state = computed<boolean | 'indeterminate'>({
   get: () => (props.indeterminate ? 'indeterminate' : model.value),
-  set: (value) => { model.value = value === true },
+  set: (value) => { if (!ro.value) model.value = value === true },
 })
 </script>
 
 <template>
-  <label data-slot="choice" :class="choiceRowVariants({ disabled })">
+  <label
+    data-slot="choice"
+    :data-readonly="ro ? '' : undefined"
+    :class="choiceRowVariants({ disabled, readonly: ro })"
+    @click.capture="guard.onClickCapture"
+    @keydown.capture="guard.onKeydownCapture"
+  >
     <span class="flex h-5 shrink-0 items-center">
       <CheckboxRoot
         v-model="state"
         :disabled="props.disabled"
         data-slot="choice-control"
-        class="flex size-4 items-center justify-center rounded-xs border-2 border-primary text-primary-foreground outline-none transition-colors"
+        :aria-readonly="ro ? 'true' : undefined"
+        class="flex size-4 items-center justify-center rounded-xs border-2 text-primary-foreground outline-none transition-colors"
         :class="[
-          filled
-            ? 'bg-primary hover:bg-primary-hover hover:border-primary-hover'
-            : props.onImage ? 'bg-field-elevated hover:border-primary-hover' : 'bg-transparent hover:border-primary-hover',
+          ro
+            ? filled ? 'border-foreground-secondary bg-foreground-secondary' : props.onImage ? 'border-foreground-secondary bg-field-elevated' : 'border-foreground-secondary bg-transparent'
+            : filled
+              ? 'border-primary bg-primary hover:bg-primary-hover hover:border-primary-hover'
+              : props.onImage ? 'border-primary bg-field-elevated hover:border-primary-hover' : 'border-primary bg-transparent hover:border-primary-hover',
           props.onImage ? 'shadow-on-image' : '',
         ]"
         :style="{ transitionDuration: 'var(--duration-hover)' }"

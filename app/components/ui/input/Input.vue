@@ -1,5 +1,10 @@
+<!--
+  @debt Ось `readonly` — дефолт по аналогии с китом: состояния «только чтение» у мастера и спеки нет.
+  См. docs/design-debt.md, «Ось readonly», и `ui/field/index.ts`, «Ось readonly».
+-->
 <script setup lang="ts">
 import { computed, ref, useSlots } from 'vue'
+import { useReadonly } from '../field'
 import { Icon } from '../icon'
 import { inputVariants, type InputVariants } from '.'
 
@@ -19,6 +24,8 @@ const props = withDefaults(defineProps<{
   /** Строка сообщения об ошибке — в спеке подписана «text about error here». */
   errorText?: string
   disabled?: boolean
+  /** Только чтение — своё либо от `Field readonly`. Такт 68; разбор — `ui/field/index.ts`, «Ось readonly». */
+  readonly?: boolean
 }>(), {
   variant: 'filled',
   size: 'md',
@@ -28,7 +35,11 @@ const props = withDefaults(defineProps<{
   invalid: false,
   errorText: '',
   disabled: false,
+  readonly: false,
 })
+
+/** Только чтение: значение выделяется и копируется, правки нет; крестика и слота `end` нет, наведения нет. */
+const ro = useReadonly(() => props.readonly, () => props.disabled)
 
 const model = defineModel<string>({ default: '' })
 
@@ -59,8 +70,8 @@ const isFloating = computed(() => isActive.value && props.placeholder !== '')
  */
 const slots = useSlots()
 const hasEnd = computed(() => !!slots.end)
-const showEnd = computed(() => hasEnd.value && model.value === '')
-const showClear = computed(() => props.clearable && isActive.value && !showEnd.value)
+const showEnd = computed(() => hasEnd.value && model.value === '' && !ro.value)
+const showClear = computed(() => props.clearable && isActive.value && !showEnd.value && !ro.value)
 </script>
 
 <template>
@@ -77,7 +88,8 @@ const showClear = computed(() => props.clearable && isActive.value && !showEnd.v
     -->
     <div
       data-slot="field"
-      :class="inputVariants({ variant, size, invalid, floating: isFloating, disabled })"
+      :data-readonly="ro ? '' : undefined"
+      :class="inputVariants({ variant, size, invalid: invalid && !ro, floating: isFloating, disabled, readonly: ro })"
     >
       <div
         class="flex min-w-0 flex-1 items-center gap-2"
@@ -94,7 +106,8 @@ const showClear = computed(() => props.clearable && isActive.value && !showEnd.v
           <span
             v-show="isFloating"
             data-slot="field-label"
-            class="h-4 w-full truncate text-xs font-medium text-field-placeholder group-hover/field:text-field-placeholder-hover group-focus-within/field:text-field-placeholder-hover"
+            class="h-4 w-full truncate text-xs font-medium text-field-placeholder"
+            :class="ro ? '' : 'group-hover/field:text-field-placeholder-hover group-focus-within/field:text-field-placeholder-hover'"
           >
             {{ props.placeholder }}
           </span>
@@ -104,8 +117,10 @@ const showClear = computed(() => props.clearable && isActive.value && !showEnd.v
             type="text"
             :placeholder="isFloating ? undefined : props.placeholder"
             :disabled="props.disabled"
+            :readonly="ro"
             :aria-invalid="props.invalid || undefined"
-            class="h-5 w-full min-w-0 bg-transparent text-sm font-medium outline-none text-field-foreground placeholder:text-field-placeholder group-hover/field:text-field-foreground-hover group-hover/field:placeholder:text-field-placeholder-hover group-focus-within/field:text-field-foreground-hover"
+            class="h-5 w-full min-w-0 bg-transparent text-sm font-medium outline-none placeholder:text-field-placeholder"
+            :class="ro ? 'text-foreground' : 'text-field-foreground group-hover/field:text-field-foreground-hover group-hover/field:placeholder:text-field-placeholder-hover group-focus-within/field:text-field-foreground-hover'"
             @focus="focused = true"
             @blur="focused = false"
           >

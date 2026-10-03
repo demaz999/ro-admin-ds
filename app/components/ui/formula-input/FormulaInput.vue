@@ -1,8 +1,13 @@
+<!--
+  @debt Ось `readonly` — дефолт по аналогии с китом: состояния «только чтение» у поля формулы нет нигде (мастера нет).
+  См. docs/design-debt.md, «Ось readonly», и `ui/field/index.ts`, «Ось readonly».
+-->
 <script setup lang="ts">
 import type { FormulaVariable } from '.'
 import { computed, h, onBeforeUnmount, onMounted, ref, render, watch } from 'vue'
 import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
 import { cn } from '@/lib/utils'
+import { READONLY_SURFACE, useReadonly } from '../field'
 import { Icon } from '../icon'
 import { SelectContent, SelectGroup, SelectItem } from '../select'
 import { FORMULA_TOKEN, hasFormulaToken } from '.'
@@ -21,8 +26,15 @@ const props = withDefaults(defineProps<{
   label?: string
   invalid?: boolean
   disabled?: boolean
+  /**
+   * Только чтение — своё либо от `Field readonly` (такт 68): область не редактируется, но фокусируема и выделяется;
+   * кнопки «Переменная» и крестиков у чипов нет. Разбор — `ui/field/index.ts`, «Ось readonly».
+   */
+  readonly?: boolean
   class?: string
-}>(), { variables: () => [], addLabel: 'Переменная', placeholder: '', label: '', invalid: false, disabled: false })
+}>(), { variables: () => [], addLabel: 'Переменная', placeholder: '', label: '', invalid: false, disabled: false, readonly: false })
+
+const ro = useReadonly(() => props.readonly, () => props.disabled)
 
 const model = defineModel<string>({ default: '' })
 
@@ -45,7 +57,8 @@ const groups = computed(() => {
 /* ------------------------------ узлы области ------------------------------ */
 const CHIP = 'mx-px inline-flex h-6 items-center gap-1 rounded-full bg-secondary pr-1.5 pl-3 align-middle text-2xs font-bold text-primary select-none'
 const CHIP_INVALID = 'mx-px inline-flex h-6 items-center gap-1 rounded-full bg-destructive-surface pr-1.5 pl-3 align-middle text-2xs font-bold text-destructive-strong select-none'
-const CHIP_REMOVE = 'flex size-3 shrink-0 cursor-pointer items-center justify-center rounded-full outline-none hover:opacity-[var(--opacity-icon-muted)]'
+/* Крестик чипа в «только чтении» не рисуется: чипы строятся в обход шаблона, поэтому прячет их атрибут корня. */
+const CHIP_REMOVE = 'flex size-3 shrink-0 cursor-pointer items-center justify-center rounded-full outline-none hover:opacity-[var(--opacity-icon-muted)] group-data-[readonly]/formula:hidden'
 
 const isChip = (n: Node | null | undefined): n is HTMLElement => !!n && n.nodeType === 1 && (n as HTMLElement).dataset.slot === 'formula-chip'
 
@@ -215,6 +228,7 @@ function onInput() {
 }
 
 function onKeydown(event: KeyboardEvent) {
+  if (ro.value) return
   const el = editor.value!
   if (event.key === 'Enter') { event.preventDefault(); return }
   if (event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return
@@ -236,6 +250,7 @@ function onKeydown(event: KeyboardEvent) {
 
 function onPaste(event: ClipboardEvent) {
   event.preventDefault()
+  if (ro.value) return
   const text = (event.clipboardData?.getData('text/plain') ?? '').replace(/\s*\r?\n\s*/g, ' ')
   if (text) insertNodes(toNodes(text))
 }
@@ -243,7 +258,7 @@ function onPaste(event: ClipboardEvent) {
 function onClick(event: MouseEvent) {
   const remove = (event.target as HTMLElement).closest?.('[data-slot=formula-chip-remove]')
   const chip = remove?.closest('[data-slot=formula-chip]') as HTMLElement | null
-  if (chip && !props.disabled) { event.preventDefault(); removeChip(chip) }
+  if (chip && !props.disabled && !ro.value) { event.preventDefault(); removeChip(chip) }
   else rememberCaret()
 }
 
@@ -260,9 +275,11 @@ onBeforeUnmount(() => { editor.value?.querySelectorAll('[data-slot=formula-chip-
     data-slot="formula-input"
     :data-invalid="props.invalid ? '' : undefined"
     :data-disabled="props.disabled ? '' : undefined"
+    :data-readonly="ro ? '' : undefined"
     :class="cn(
-      'group/formula flex min-h-10 w-full items-start gap-1 rounded-md p-2 transition-colors focus-within:ring-2 focus-within:ring-ring',
-      props.invalid ? 'bg-field-error' : 'bg-field hover:bg-field-hover',
+      'group/formula flex min-h-10 w-full items-start gap-1 rounded-md p-2 transition-colors',
+      ro ? READONLY_SURFACE : 'focus-within:ring-2 focus-within:ring-ring',
+      ro ? '' : props.invalid ? 'bg-field-error' : 'bg-field hover:bg-field-hover',
       props.disabled ? 'pointer-events-none opacity-[var(--opacity-disabled)]' : '',
       props.class,
     )"
@@ -276,11 +293,14 @@ onBeforeUnmount(() => { editor.value?.querySelectorAll('[data-slot=formula-chip-
       aria-multiline="false"
       :aria-label="props.label || undefined"
       :aria-invalid="props.invalid || undefined"
-      :contenteditable="props.disabled ? 'false' : 'true'"
+      :aria-readonly="ro ? 'true' : undefined"
+      :tabindex="ro ? 0 : undefined"
+      :contenteditable="props.disabled || ro ? 'false' : 'true'"
       spellcheck="false"
       :data-empty="empty ? '' : undefined"
       :data-placeholder="props.placeholder"
-      class="min-h-6 min-w-0 flex-1 px-2 text-sm leading-6 font-medium break-words whitespace-pre-wrap text-field-foreground outline-none data-[empty]:before:pointer-events-none data-[empty]:before:text-field-placeholder data-[empty]:before:content-[attr(data-placeholder)]"
+      class="min-h-6 min-w-0 flex-1 px-2 text-sm leading-6 font-medium break-words whitespace-pre-wrap outline-none data-[empty]:before:pointer-events-none data-[empty]:before:text-field-placeholder data-[empty]:before:content-[attr(data-placeholder)]"
+      :class="ro ? 'text-foreground' : 'text-field-foreground'"
       @input="onInput"
       @keydown="onKeydown"
       @paste="onPaste"
@@ -289,7 +309,7 @@ onBeforeUnmount(() => { editor.value?.querySelectorAll('[data-slot=formula-chip-
       @blur="rememberCaret"
     />
 
-    <PopoverRoot v-model:open="open">
+    <PopoverRoot v-if="!ro" v-model:open="open">
       <PopoverTrigger as-child>
         <button
           type="button"

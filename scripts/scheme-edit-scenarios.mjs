@@ -127,6 +127,20 @@ async function openPage(width = 1440) {
       await sleep(150)
     },
     async type(text) { await send('Input.insertText', { text }); await sleep(200) },
+    /**
+     * Выделение текста протяжкой мыши — такт 68: нажатие у левого края текста, десять шагов движения, отпускание у правого.
+     * Цель — элемент с текстом (поле ввода или узел значения); проверка — `String(getSelection())` в слепке (`sel`).
+     */
+    async selectText(sel) {
+      await this.point(sel)
+      const r = await evaluate(`(() => { const el = ${sel}; const b = el.getBoundingClientRect(); return { x1: b.x + 2, x2: b.x + b.width - 2, y: b.y + b.height / 2 } })()`)
+      await send('Page.bringToFront')
+      await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: r.x1, y: r.y })
+      await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: r.x1, y: r.y, button: 'left', clickCount: 1 })
+      for (let k = 1; k <= 10; k++) await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: r.x1 + (r.x2 - r.x1) * k / 10, y: r.y, button: 'left', buttons: 1 })
+      await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: r.x2, y: r.y, button: 'left', clickCount: 1 })
+      await sleep(200)
+    },
     /** «/» — клавиша с текстом: `keyDown` доходит до обработчика хоткея; если его не перехватили, знак печатается. */
     async slash() {
       await send('Page.bringToFront')
@@ -263,6 +277,31 @@ function kit(page) {
     async templateDelete(id) {
       await page.click(`document.querySelector('[data-template=${id}] [data-slot=table-row-actions-secondary] button')`)
       await page.click(`document.querySelector('[data-menu=row-actions] [data-action=delete]')`)
+    },
+    /* ---------- такт 68: только чтение ---------- */
+    selectText: sel => page.selectText(sel),
+    /** Поле ввода: клик в середину значения и набор знака — в «только чтении» значение прежнее. */
+    async tryType(field) {
+      await page.click(`(el => el?.matches('input, textarea') ? el : el?.querySelector('input, textarea'))(document.querySelector('[data-field=${field}]'))`)
+      await page.type('Ж')
+    },
+    /** Стирание в поле с фокусом: Backspace и Delete — каретка в середине значения, оба стёрли бы по знаку. */
+    async tryErase() {
+      await page.key('Backspace')
+      await page.key('Delete')
+    },
+    /** Одиночный выбор: клик по полю, Enter, пробел и стрелка вниз — в «только чтении» список не открывается. */
+    async tryOpen(field) {
+      await page.click(`document.querySelector('[data-field=${field}] [data-slot=field]')`)
+      await page.key('Enter', 'Enter', { text: '\r' })
+      await page.key(' ', 'Space', { text: ' ' })
+      await page.key('ArrowDown')
+    },
+    /** Флажок строки настройки: клик по подписи, клик по контролу и пробел — в «только чтении» значение прежнее. */
+    async tryToggle(key) {
+      await page.click(`document.querySelector('[data-setting=${key}] [data-slot=choice-title]')`)
+      await page.click(Q.setting(key))
+      await page.key(' ', 'Space', { text: ' ' })
     },
     check: field => page.click(`document.querySelector('[data-field=${field}] [data-slot=choice-control], [data-field=${field}][data-slot=choice] [data-slot=choice-control]')`),
     async tabs(n) { for (let k = 0; k < n; k++) await page.key('Tab') },
@@ -458,7 +497,25 @@ function kit(page) {
           menuItems: [...document.querySelectorAll('[data-menu=scheme] [data-slot=list-item]')].map(x => t(x.textContent)),
           viewing: root.dataset.viewing,
           banner7: t(document.querySelector('[data-viewing-banner]')?.textContent) || null,
-          readonly: !!document.querySelector('[data-readonly][inert]'),
+          /*
+           * Такт 68: поля разделов — «только чтение» осью readonly; inert — только у действий. Признак истинен, когда
+           * обёртка разделов помечена и каждое невыключенное поле и контрол выбора вне inert несут ось; часть — 'partial'.
+           */
+          readonly: (() => {
+            const col = document.querySelector('[data-settings-column]')
+            if (!col) return null
+            const wrap = !!col.querySelector('[data-readonly]:not([data-slot])')
+            const live = x => !x.closest('[inert]')
+            const fields = [...col.querySelectorAll('[data-slot=field-wrapper]')].filter(x => live(x) && x.dataset.state !== 'disabled').map(x => 'readonly' in x.dataset)
+            const ctrls = [...col.querySelectorAll('[data-slot=choice-control]')].filter(x => live(x) && !x.disabled).map(x => x.getAttribute('aria-readonly') === 'true')
+            const all = [wrap, ...fields, ...ctrls]
+            return all.every(Boolean) ? true : all.some(Boolean) ? 'partial' : false
+          })(),
+          inertOnFields: !!document.querySelector('[data-settings-column] [inert] [data-slot=field-wrapper], [data-settings-column] [inert] [data-slot=choice]'),
+          sel: String(window.getSelection()) || null,
+          typeValue: t(document.querySelector('[data-field=schemeType] [data-slot=field-input]')?.textContent) || null,
+          listOpen: !!document.querySelector('[data-slot=popover] [data-slot=list-item]'),
+          focusRo: document.activeElement ? (document.activeElement.readOnly === true || document.activeElement.getAttribute('aria-readonly') === 'true') : false,
           shownDescription: document.querySelector('[data-field=description] textarea, textarea[data-field=description]')?.value ?? null,
           current: M.current.value?.id ?? null,
           atMark: window.__markY == null ? null : Math.abs(window.scrollY - window.__markY) <= 1 && window.__markY > 300,
@@ -656,6 +713,12 @@ const SCENARIOS = {
   'СС-11/просмотр': ['поиск работает в просмотре прошлой версии: переход и подсветка есть, правки нет (r2 §2, состояние 7)', [
     ['«/», «пропускать», Enter', async (K) => { await K.slash(); await K.type('пропускать'); await K.key('Enter') },
       { viewing: 'v1', section: 'general', flash: ['skipExpertise'], foundVisible: true, readonly: true, writes: 0 }],
+    ['найденный флажок: клик по подписи, по контролу и пробел — правки нет, фокус на флажке', K => K.tryToggle('skipExpertise'),
+      { 'g.behavior.skipExpertise': false, focusRo: true, writes: 0, saveLog: [] }],
+    ['«/», «наименование», Enter — фокус в поле только для чтения; набор знака — правки нет', async (K) => { await K.slash(); await K.type('наименование'); await K.key('Enter'); await K.type('Ж') },
+      { focusField: 'name', focusRo: true, name: 'КАСКО — осмотр легкового автомобиля', writes: 0, saveLog: [] }],
+    ['значение найденного поля выделяется', K => K.selectText(Q.nameInput),
+      { sel: 'КАСКО — осмотр легкового автомобиля', focusField: 'name' }],
   ], { query: 'view=v1' }],
   'СС-12': ['поиск: пустая выдача — «Ничего не найдено по «…»» и «Быстрый переход» (r2 §3; аудит, «Требования к поиску»)', [
     ['«фаыфа» — пустая выдача подсказывает', async (K) => { await K.searchClick(); await K.type('фаыфа') },
@@ -739,14 +802,30 @@ const SCENARIOS = {
       { viewing: 'v1', surface: '', status: null, headerActs: ['history', 'view-copy', 'view-leave'], readonly: true,
         banner7: 'Вы смотрите версию от 14.08.2026, 10:20, по ней проведено 128 осмотров. Текущая — от 22.09.2026, 16:05. Настройки открыты только для чтения',
         shownDescription: 'Осмотр автомобиля перед оформлением полиса', title: 'КАСКО — осмотр легкового автомобиля' }],
-    ['нажатие по настройке — правки нет', K => K.toggle('skipExpertise'), { 'g.behavior.skipExpertise': false, writes: 0, saveLog: [], dirty: true }, { blind: true }],
+    ['нажатие по настройке — правки нет: клик доходит до флажка только для чтения', K => K.toggle('skipExpertise'), { 'g.behavior.skipExpertise': false, writes: 0, saveLog: [], dirty: true, focusRo: true, inertOnFields: false }],
     ['навигатор работает: раздел «PDF»', K => K.section('pdf'), { section: 'pdf', viewing: 'v1', readonly: true, 'templates.length': 2 }],
     ['табы работают', async (K) => { await K.tab('form'); await K.tab('settings') }, { tab: 'settings', viewing: 'v1' }],
     ['«Сделать копию»', K => K.act('view-copy'), { notices: ['Копия схемы — вне стенда'], viewing: 'v1' }],
     ['«Перейти к текущей версии» — снова черновик', K => K.act('view-leave'), { viewing: '', readonly: false, banner7: null, 'status.state': 'draft', headerActs: ['history', 'preview', 'publish', 'menu'] }],
   ]],
   'СС-47/вход': ['просмотр прошлой версии — вход адресом, как из осмотра, прошедшего по старому снимку (r2 §2, состояние 7)', [
-    ['старт', null, { viewing: 'v1', readonly: true, status: null, headerActs: ['history', 'view-copy', 'view-leave'], shownDescription: 'Осмотр автомобиля перед оформлением полиса' }],
+    ['старт', null, { viewing: 'v1', readonly: true, status: null, headerActs: ['history', 'view-copy', 'view-leave'], shownDescription: 'Осмотр автомобиля перед оформлением полиса', inertOnFields: false }],
+    ['«Наименование»: значение выделяется протяжкой мыши', K => K.selectText(Q.nameInput),
+      { sel: 'КАСКО — осмотр легкового автомобиля', focusField: 'name', focusRo: true }],
+    ['«Наименование»: клик и набор знака — правки нет', K => K.tryType('name'),
+      { name: 'КАСКО — осмотр легкового автомобиля', focusRo: true, writes: 0, saveLog: [] }],
+    ['«Наименование»: Backspace и Delete — правки нет', K => K.tryErase(),
+      { name: 'КАСКО — осмотр легкового автомобиля', focusField: 'name', writes: 0, saveLog: [] }],
+    ['«Описание»: значение выделяется', K => K.selectText(`document.querySelector('[data-field=description] textarea')`),
+      { sel: 'Осмотр автомобиля перед оформлением полиса', focusField: 'description' }],
+    ['«Тип схемы»: значение выделяется', K => K.selectText(`document.querySelector('[data-field=schemeType] [data-slot=field-input]')`),
+      { sel: 'Осмотр транспорта', typeValue: 'Осмотр транспорта' }],
+    ['«Тип схемы»: клик, Enter, пробел и стрелка — список не открывается, фокус на поле', K => K.tryOpen('schemeType'),
+      { listOpen: false, typeValue: 'Осмотр транспорта', focusField: 'schemeType', focusRo: true, writes: 0 }],
+    ['флажок «Пропускать экспертизу»: клик по подписи, по контролу и пробел — правки нет', K => K.tryToggle('skipExpertise'),
+      { 'g.behavior.skipExpertise': false, focusRo: true, writes: 0, saveLog: [] }],
+    ['подпись флажка выделяется', K => K.selectText(`document.querySelector('[data-setting=skipExpertise] [data-slot=choice-title]')`),
+      { sel: 'Пропускать экспертизу' }],
   ], { query: 'view=v1' }],
   'СС-48': ['валидация: блок предупреждений в диффе; критичное выключает «Опубликовать» с причиной (r2 §8; аудит, «Валидационный гейт публикации»)', [
     ['формула с переменной, которой нет в форме, — предупреждение, публикация доступна', async (K) => { await K.formulaEnd('zipName'); await K.paste('zipName', '_{Car:colour}'); await K.settled(); await K.publish() },

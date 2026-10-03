@@ -1,6 +1,11 @@
+<!--
+  @debt Ось `readonly` — дефолт по аналогии с китом: состояния «только чтение» у мастера `1072:10873` и спеки нет.
+  См. docs/design-debt.md, «Ось readonly», и `ui/field/index.ts`, «Ось readonly».
+-->
 <script setup lang="ts">
 import { SwitchRoot, SwitchThumb } from 'reka-ui'
-import { choiceRowVariants, choiceTitleVariants } from '../checkbox'
+import { choiceReadonlyGuard, choiceRowVariants, choiceTitleVariants } from '../checkbox'
+import { useReadonly } from '../field'
 
 /**
  * Переключатель — мастер `Switcher` `1072:10873`, спека `1072:8677`,
@@ -20,22 +25,36 @@ import { choiceRowVariants, choiceTitleVariants } from '../checkbox'
 const props = withDefaults(defineProps<{
   subtitle?: string
   disabled?: boolean
+  /** Только чтение — своё либо от `Field readonly` (такт 68): переключение отказано, фокус остаётся (`aria-readonly`). */
+  readonly?: boolean
 }>(), {
   subtitle: '',
   disabled: false,
+  readonly: false,
 })
+
+const ro = useReadonly(() => props.readonly, () => props.disabled)
+const guard = choiceReadonlyGuard(ro)
 
 const model = defineModel<boolean>({ default: false })
 </script>
 
 <template>
-  <label data-slot="choice" :class="choiceRowVariants({ disabled })">
+  <label
+    data-slot="choice"
+    :data-readonly="ro ? '' : undefined"
+    :class="choiceRowVariants({ disabled, readonly: ro })"
+    @click.capture="guard.onClickCapture"
+    @keydown.capture="guard.onKeydownCapture"
+  >
     <span class="flex h-5 shrink-0 items-center">
       <SwitchRoot
         v-model="model"
         :disabled="props.disabled"
         data-slot="choice-control"
-        class="flex h-5 w-8 items-center rounded-full bg-muted p-0.5 outline-none transition-colors data-[state=checked]:bg-primary"
+        :aria-readonly="ro ? 'true' : undefined"
+        class="flex h-5 w-8 items-center rounded-full bg-muted p-0.5 outline-none transition-colors"
+        :class="ro ? 'data-[state=checked]:bg-foreground-secondary' : 'data-[state=checked]:bg-primary'"
       >
         <SwitchThumb
           class="block size-4 rounded-full bg-primary-foreground transition-transform data-[state=checked]:translate-x-3"

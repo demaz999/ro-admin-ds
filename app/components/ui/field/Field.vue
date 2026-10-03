@@ -1,7 +1,11 @@
+<!--
+  @debt Ось `readonly` — дефолт по аналогии с китом: состояния «только чтение» нет ни у мастера `720:11753`, ни у Атома.
+  См. docs/design-debt.md, «Ось readonly», и `index.ts`, «Ось readonly».
+-->
 <script setup lang="ts">
 import type { FieldLabelVariants, FieldVariants } from '.'
 import { computed } from 'vue'
-import { fieldLabelVariants, fieldVariants } from '.'
+import { fieldLabelVariants, fieldVariants, provideReadonly } from '.'
 
 /**
  * Полевая обвязка — мастер `input` `720:11753` кита 1.
@@ -32,6 +36,8 @@ const props = withDefaults(defineProps<{
   labelWidth?: NonNullable<FieldLabelVariants['labelWidth']>
   /** Обязательное поле: « *» `--destructive` после подписи. Такт 36; прецедент `StepRow`. */
   required?: boolean
+  /** Только чтение: ось уходит вложенному контролу через контекст. Такт 68; разбор — `index.ts`, «Ось readonly». */
+  readonly?: boolean
 }>(), {
   label: '',
   orientation: 'top',
@@ -42,7 +48,11 @@ const props = withDefaults(defineProps<{
   controlHeight: 40,
   labelWidth: 'content',
   required: false,
+  readonly: false,
 })
+
+/** Контекст оси `readonly` для контрола внутри: `useReadonly` в каждом из десяти контролов. */
+const readonly = provideReadonly(() => props.readonly)
 
 /**
  * Состояние вывешивается на корень: ошибка и выключенность красят подпись,
@@ -63,6 +73,7 @@ const hasHintRow = computed(() => Boolean(props.hint || props.counter))
   <div
     data-slot="field-wrapper"
     :data-state="state"
+    :data-readonly="readonly && !props.disabled ? '' : undefined"
     :class="fieldVariants({ orientation: props.orientation })"
   >
     <label

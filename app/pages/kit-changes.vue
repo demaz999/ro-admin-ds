@@ -39,6 +39,13 @@ const DRAFT_ROLES = ['Администратор', 'Эксперт', 'Опера
 const draftRoles = ref(['Администратор', 'Эксперт'])
 /* Слот end у Input — такт 67. */
 const draftSearch = ref('')
+/* Ось readonly — такт 68: обычное, только чтение, выключено рядом. */
+const RO_CASES = [
+  { id: 'normal', label: 'обычное' },
+  { id: 'readonly', label: 'только чтение' },
+  { id: 'disabled', label: 'выключено' },
+] as const
+const ro = ref({ name: 'КАСКО — осмотр', text: 'Осмотр автомобиля перед оформлением полиса', type: 'Рабочее', roles: ['Администратор', 'Эксперт'], owner: 'Демо Страхование', minutes: 60, check: true, active: true, mode: 'a' })
 </script>
 
 <template>
@@ -133,6 +140,36 @@ const draftSearch = ref('')
               Основное
             </Heading>
           </template>
+          <div v-else-if="c.id.startsWith('readonly-')" class="grid grid-cols-3 gap-3">
+            <div v-for="st in RO_CASES" :key="st.id" class="flex min-w-0 flex-col gap-1" :data-case="st.id">
+              <span class="text-xs text-muted-foreground">{{ st.label }}</span>
+              <Field v-if="c.id === 'readonly-field'" label="Наименование" hint="Подсказка" :readonly="st.id === 'readonly'" :disabled="st.id === 'disabled'">
+                <Input v-model="ro.name" placeholder="" :show-icon="false" :disabled="st.id === 'disabled'" />
+              </Field>
+              <Input v-else-if="c.id === 'readonly-input'" v-model="ro.name" placeholder="" :show-icon="false" clearable :readonly="st.id === 'readonly'" :disabled="st.id === 'disabled'" />
+              <Textarea v-else-if="c.id === 'readonly-textarea'" v-model="ro.text" placeholder="Описание" :readonly="st.id === 'readonly'" :disabled="st.id === 'disabled'" />
+              <template v-else-if="c.id === 'readonly-select'">
+                <Select v-model="ro.type" :items="ITEMS" placeholder="" :show-icon="false" :readonly="st.id === 'readonly'" :disabled="st.id === 'disabled'" />
+                <Select v-model:values="ro.roles" multiple :items="DRAFT_ROLES" placeholder="Выберите роли" :readonly="st.id === 'readonly'" :disabled="st.id === 'disabled'" />
+              </template>
+              <Autocomplete v-else-if="c.id === 'readonly-autocomplete'" v-model="ro.owner" :items="[{ value: 'demo', label: 'Демо Страхование' }]" placeholder="Найти компанию" :readonly="st.id === 'readonly'" :disabled="st.id === 'disabled'" />
+              <InputNumber v-else-if="c.id === 'readonly-input-number'" v-model="ro.minutes" :min="5" :max="120" :step="5" :readonly="st.id === 'readonly'" :disabled="st.id === 'disabled'" />
+              <Checkbox v-else-if="c.id === 'readonly-checkbox'" v-model="ro.check" :readonly="st.id === 'readonly'" :disabled="st.id === 'disabled'">
+                Пропускать экспертизу
+              </Checkbox>
+              <Switch v-else-if="c.id === 'readonly-switch'" v-model="ro.active" :readonly="st.id === 'readonly'" :disabled="st.id === 'disabled'">
+                Схема активна
+              </Switch>
+              <RadioGroup v-else-if="c.id === 'readonly-radio'" v-model="ro.mode" :readonly="st.id === 'readonly'" :disabled="st.id === 'disabled'">
+                <RadioGroupItem value="a" :checked="ro.mode === 'a'" :disabled="st.id === 'disabled'">
+                  Обычный
+                </RadioGroupItem>
+                <RadioGroupItem value="b" :checked="ro.mode === 'b'" :disabled="st.id === 'disabled'">
+                  Мультиосмотр
+                </RadioGroupItem>
+              </RadioGroup>
+            </div>
+          </div>
         </div>
       </div>
     </section>

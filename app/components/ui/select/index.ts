@@ -1,5 +1,6 @@
 import type { VariantProps } from 'class-variance-authority'
 import { cva } from 'class-variance-authority'
+import { READONLY_SURFACE } from '../field'
 
 export { default as Select } from './Select.vue'
 export { default as SelectContent } from './SelectContent.vue'
@@ -54,8 +55,8 @@ export const selectTriggerVariants = cva(
   {
     variants: {
       variant: {
-        filled: 'bg-field hover:bg-field-hover',
-        elevated: 'bg-field-elevated shadow-elevated hover:shadow-elevated-hover',
+        filled: '',
+        elevated: '',
       },
       /**
        * Размер. `md` — мастер `434:3074`, 40px и радиус 8. `lg` — раздел
@@ -75,8 +76,15 @@ export const selectTriggerVariants = cva(
         true: 'pointer-events-none opacity-[var(--opacity-disabled)]',
         false: '',
       },
+      /** Только чтение — такт 68: поверхность без заливки с рамкой `--input`, наведения и шеврона нет (`ui/field/index.ts`). */
+      readonly: {
+        true: READONLY_SURFACE,
+        false: '',
+      },
     },
     compoundVariants: [
+      { variant: 'filled', readonly: false, class: 'bg-field hover:bg-field-hover' },
+      { variant: 'elevated', readonly: false, class: 'bg-field-elevated shadow-elevated hover:shadow-elevated-hover' },
       // У размера 40 паддинг одинаковый во всех шестнадцати вариантах мастера,
       // а у размера 64 он меняется с 22 на 14, ровно как у Input размера lanassa.
       { size: 'lg', floating: false, class: 'py-5.5' },
@@ -87,6 +95,7 @@ export const selectTriggerVariants = cva(
       size: 'md',
       floating: false,
       disabled: false,
+      readonly: false,
     },
   },
 )
@@ -138,19 +147,28 @@ export type SelectTriggerVariants = VariantProps<typeof selectTriggerVariants>
  *   свободному месту тела тоже раскрывает список.
  */
 export const selectMultiBodyVariants = cva(
-  'group/field relative flex min-h-10 w-full cursor-pointer items-center gap-2 rounded-md px-4 py-2 outline-none',
+  'group/field relative flex min-h-10 w-full items-center gap-2 rounded-md px-4 py-2 outline-none',
   {
     variants: {
       variant: {
-        filled: 'bg-field hover:bg-field-hover',
-        elevated: 'bg-field-elevated shadow-elevated hover:shadow-elevated-hover',
+        filled: '',
+        elevated: '',
       },
       disabled: {
         true: 'pointer-events-none opacity-[var(--opacity-disabled)]',
         false: '',
       },
+      /** Только чтение — такт 68: без заливки, рамка `--input`; чипы без крестиков, кнопки раскрытия нет. */
+      readonly: {
+        true: READONLY_SURFACE,
+        false: 'cursor-pointer',
+      },
     },
-    defaultVariants: { variant: 'filled', disabled: false },
+    compoundVariants: [
+      { variant: 'filled', readonly: false, class: 'bg-field hover:bg-field-hover' },
+      { variant: 'elevated', readonly: false, class: 'bg-field-elevated shadow-elevated hover:shadow-elevated-hover' },
+    ],
+    defaultVariants: { variant: 'filled', disabled: false, readonly: false },
   },
 )
 
@@ -189,4 +207,8 @@ export const selectChipVariants = cva(
  * - **Добавлено.** Ось `multiple` — набор значений чипами «текст ×» по мастеру кита 1 `multiselect` `251:16816`:
  *   значение — `v-model:values` (массив строк), тело растёт с переносом чипов, список остаётся открытым при выборе,
  *   у выбранной строки — галочка. Без `multiple` вызовы прежние. Такт 62.
+ * - **Добавлено.** Проп `readonly` — «только чтение» (такт 68), у одиночного выбора и у `multiple`: значение полным контрастом
+ *   `--foreground`, выделяется и копируется; список не открывается ни мышью, ни с клавиатуры; шеврона и крестиков чипов нет;
+ *   заливки нет — рамка 1 `--input`, наведения нет, фокус с клавиатуры — кольцо 2 `--ring`, `aria-readonly`. Внутри
+ *   `Field readonly` включается сам. Без пропа вид и поведение прежние.
  */

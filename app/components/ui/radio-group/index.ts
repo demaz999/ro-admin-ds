@@ -40,14 +40,23 @@ export { default as RadioGroupItem } from './RadioGroupItem.vue'
  */
 /* Зазор от точки до подписи — 8, как у строки выбора (довесок к такту 56, решение владельца 2026-10-01; было 12). */
 export const choiceCardVariants = cva(
-  'flex w-full items-start gap-2 rounded-md border border-stroke-neutral bg-card p-3 outline-none has-data-[state=checked]:border-primary has-data-[state=checked]:bg-surface-selected has-data-[state=checked]:ring-1 has-data-[state=checked]:ring-primary',
+  'flex w-full items-start gap-2 rounded-md border border-stroke-neutral bg-card p-3 outline-none has-data-[state=checked]:ring-1',
   {
     variants: {
       disabled: {
         true: 'pointer-events-none opacity-[var(--opacity-disabled)]',
-        false: 'cursor-pointer hover:not-has-data-[state=checked]:bg-accent',
+        false: '',
+      },
+      /**
+       * Только чтение — такт 68: отмеченная — рамка и кольцо `--foreground-secondary` на фоне `--card`, наведения нет,
+       * курсор обычный (`ui/field/index.ts`, «Ось readonly»).
+       */
+      readonly: {
+        true: 'cursor-default has-data-[state=checked]:border-foreground-secondary has-data-[state=checked]:ring-foreground-secondary',
+        false: 'has-data-[state=checked]:border-primary has-data-[state=checked]:bg-surface-selected has-data-[state=checked]:ring-primary',
       },
     },
-    defaultVariants: { disabled: false },
+    compoundVariants: [{ disabled: false, readonly: false, class: 'cursor-pointer hover:not-has-data-[state=checked]:bg-accent' }],
+    defaultVariants: { disabled: false, readonly: false },
   },
 )

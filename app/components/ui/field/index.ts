@@ -1,5 +1,7 @@
 import type { VariantProps } from 'class-variance-authority'
+import type { InjectionKey, Ref } from 'vue'
 import { cva } from 'class-variance-authority'
+import { computed, inject, provide } from 'vue'
 
 export { default as Field } from './Field.vue'
 export { default as FieldSet } from './FieldSet.vue'
@@ -117,6 +119,49 @@ export const fieldLabelVariants = cva(
   },
 )
 
+/**
+ * ## Ось `readonly` — только чтение, такт 68
+ *
+ * @debt Состояния «только чтение» нет ни у мастера `720:11753`, ни у Атома (`249:2768`, спеки `237:2820`, `486:4305`,
+ * `590:5112`, `1072:8677`): дефолт по аналогии с китом — `docs/design-debt.md`, «Ось readonly». Решение оркестратора
+ * 2026-10-03 (пункт 3 разбора тактов 62–65); итог и замеры — `docs/scheme-edit.md`, раздел 20.
+ *
+ * `Field readonly` отдаёт ось вложенным контролам через контекст: `Input`, `Textarea`, `Select` (и `multiple`),
+ * `Autocomplete`, `InputNumber`, `FormulaInput`, `Checkbox`, `Switch`, `RadioGroup` с `RadioGroupItem`. У каждого
+ * контрола есть свой проп `readonly` — он работает и без обвязки. Выключенность сильнее: при `disabled` ось не действует.
+ *
+ * | | только чтение | выключено |
+ * |---|---|---|
+ * | значение | видно полным контрастом `--foreground`, выделяется и копируется | прозрачность `--opacity-disabled` 0.48 |
+ * | поверхность поля | без заливки, рамка 1 `--input` — поле кита 1 `input` в покое (`tokens.md`, «Select: роль в мастере») | заливка поля на прозрачности |
+ * | контрол выбора | бренд заменён нейтральным `--foreground-secondary`, анатомия та же | бренд на прозрачности |
+ * | наведение | нет | нет |
+ * | фокус | доступен у контролов со значением; кольцо 2 `--ring` у фокуса с клавиатуры | недоступен |
+ * | правка | отказ: ввод, вставка, выбор, переключение, крестики и шевроны не рисуются | события погашены |
+ * | доступность | `aria-readonly` либо атрибут `readonly` у поля | `disabled` |
+ */
+export const FIELD_READONLY: InjectionKey<Ref<boolean>> = Symbol('field-readonly')
+
+/** Ось `readonly` контрола: свой проп или контекст обвязки; выключенный — не «только чтение». */
+export function useReadonly(own: () => boolean | undefined, disabled: () => boolean | undefined = () => false) {
+  const ctx = inject(FIELD_READONLY, null)
+  return computed(() => !disabled() && (!!own() || !!ctx?.value))
+}
+
+/** Отдать ось вложенным контролам; обвязка внутри обвязки наследует «только чтение» внешней. */
+export function provideReadonly(own: () => boolean | undefined) {
+  const ctx = inject(FIELD_READONLY, null)
+  const value = computed(() => !!own() || !!ctx?.value)
+  provide(FIELD_READONLY, value)
+  return value
+}
+
+/**
+ * Поверхность поля только для чтения: заливки нет, рамка 1 `--input` внутрь коробки — геометрия прежняя; фокус с
+ * клавиатуры — кольцо 2 `--ring` (у поля внутри — по `:has`, у фокусируемого корня — по своему `:focus-visible`).
+ */
+export const READONLY_SURFACE = 'bg-transparent shadow-none ring-1 ring-inset ring-input has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring focus-visible:ring-2 focus-visible:ring-ring'
+
 export type FieldVariants = VariantProps<typeof fieldVariants>
 export type FieldLabelVariants = VariantProps<typeof fieldLabelVariants>
 
@@ -131,4 +176,11 @@ export type FieldLabelVariants = VariantProps<typeof fieldLabelVariants>
  * Версия выпущена тактом 57 по закрытию экрана «Свободная съёмка»: git-метка `handover-2026-10-01`.
  *
  * - **Добавлено.** Проп `labelWidth` (`content` · `form` — колонка подписи 170 при `orientation="left"`) и проп `required` — знак « *» цветом `--destructive` у подписи.
+ *
+ * ### Черновик следующей версии — относительно `handover-2026-10-02`
+ *
+ * - **Добавлено.** Проп `readonly` — «только чтение»: обвязка отдаёт его вложенному контролу (`Input`, `Textarea`, `Select`,
+ *   `Autocomplete`, `InputNumber`, `FormulaInput`, `Checkbox`, `Switch`, `RadioGroup`). Значение видно полным контрастом,
+ *   выделяется и копируется, правки нет; вид отличается от выключенного. Подпись и подсказка прежние. Без пропа вид и поведение
+ *   прежние. Такт 68.
  */

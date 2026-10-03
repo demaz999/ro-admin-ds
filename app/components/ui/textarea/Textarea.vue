@@ -1,5 +1,10 @@
+<!--
+  @debt Ось `readonly` — дефолт по аналогии с китом: состояния «только чтение» у мастера и спеки нет.
+  См. docs/design-debt.md, «Ось readonly», и `ui/field/index.ts`, «Ось readonly».
+-->
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useReadonly } from '../field'
 import { textareaVariants } from '.'
 
 const props = withDefaults(defineProps<{
@@ -9,12 +14,17 @@ const props = withDefaults(defineProps<{
   invalid?: boolean
   errorText?: string
   disabled?: boolean
+  /** Только чтение — своё либо от `Field readonly`. Такт 68; разбор — `ui/field/index.ts`, «Ось readonly». */
+  readonly?: boolean
 }>(), {
   placeholder: 'Placeholder',
   invalid: false,
   errorText: '',
   disabled: false,
+  readonly: false,
 })
+
+const ro = useReadonly(() => props.readonly, () => props.disabled)
 
 const model = defineModel<string>({ default: '' })
 
@@ -33,12 +43,14 @@ const isFloating = computed(() => focused.value || model.value.length > 0)
     <div
       data-slot="field"
       class="h-35"
-      :class="textareaVariants({ invalid, floating: isFloating, disabled })"
+      :data-readonly="ro ? '' : undefined"
+      :class="textareaVariants({ invalid: invalid && !ro, floating: isFloating, disabled, readonly: ro })"
     >
       <span
         v-show="isFloating"
         data-slot="field-label"
-        class="h-4 w-full shrink-0 truncate text-xs font-medium text-field-placeholder group-hover/field:text-field-placeholder-hover group-focus-within/field:text-field-placeholder-hover"
+        class="h-4 w-full shrink-0 truncate text-xs font-medium text-field-placeholder"
+        :class="ro ? '' : 'group-hover/field:text-field-placeholder-hover group-focus-within/field:text-field-placeholder-hover'"
       >
         {{ props.placeholder }}
       </span>
@@ -48,8 +60,10 @@ const isFloating = computed(() => focused.value || model.value.length > 0)
         data-slot="field-input"
         :placeholder="isFloating ? undefined : props.placeholder"
         :disabled="props.disabled"
+        :readonly="ro"
         :aria-invalid="props.invalid || undefined"
-        class="field-scroll min-h-0 w-full flex-1 resize-none bg-transparent text-sm font-medium outline-none text-field-foreground placeholder:text-field-placeholder group-hover/field:text-field-foreground-hover group-hover/field:placeholder:text-field-placeholder-hover group-focus-within/field:text-field-foreground-hover"
+        class="field-scroll min-h-0 w-full flex-1 resize-none bg-transparent text-sm font-medium outline-none placeholder:text-field-placeholder"
+        :class="ro ? 'text-foreground' : 'text-field-foreground group-hover/field:text-field-foreground-hover group-hover/field:placeholder:text-field-placeholder-hover group-focus-within/field:text-field-foreground-hover'"
         @focus="focused = true"
         @blur="focused = false"
       />
@@ -92,5 +106,10 @@ const isFloating = computed(() => focused.value || model.value.length > 0)
 .field-scroll::-webkit-scrollbar-thumb {
   background: var(--field-scroll-thumb);
   border-radius: var(--radius-2xs);
+}
+
+/* Только чтение (такт 68): заливки нет, белый бегунок на белом не виден — серый бегунок плашки `--popover-scroll-thumb`. */
+.field-scroll[readonly]::-webkit-scrollbar-thumb {
+  background: var(--popover-scroll-thumb);
 }
 </style>

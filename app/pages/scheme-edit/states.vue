@@ -13,6 +13,7 @@ import { formulaPreview } from '~/components/ui/formula-input'
  * П4: `PublishStatus`, `Diff` с частями, ось `ModalCardHeader back` (`docs/scheme-edit.md`, раздел 8, карточки 5 и 6).
  * П3: вариант `Button variant="outline"` — мастер кита 1 `btn_outline` `1990:226`; события `edit` и `action` у
  * `TableRowActions`.
+ * Такт 68: ось `readonly` у `Field` и десяти контролов — матрица «обычное · только чтение · выключено».
  */
 definePageMeta({ layout: false })
 useHead({ title: 'Редактирование схемы осмотра — матрицы' })
@@ -47,6 +48,33 @@ const SAMPLES = { 'Car:vin': 'DEMO0000000001024', 'Car:regnum': 'А000АА00', '
 const formula = ref('Осмотр {Inspection:number} — {Car:vin}')
 const formulaEmpty = ref('')
 const formulaUnknown = ref('Архив {Car:vin}_{Car:color}')
+
+/* ------------------------------ Такт 68: только чтение ------------------------------ */
+const RO_STATES = [
+  { id: 'normal', label: 'обычное' },
+  { id: 'readonly', label: 'только чтение' },
+  { id: 'disabled', label: 'выключено' },
+] as const
+const SCHEME_TYPES = [{ value: 'car', label: 'Осмотр транспорта' }, { value: 'house', label: 'Осмотр недвижимости' }]
+const OWNERS = [{ value: 'demo', label: 'Демо Страхование' }, { value: 'test', label: 'Тест Лизинг' }]
+const ro = ref({
+  name: 'КАСКО — осмотр легкового автомобиля',
+  description: 'Осмотр автомобиля перед оформлением полиса',
+  type: 'car',
+  roles: ['admin', 'expert'],
+  owner: 'Демо Страхование',
+  minutes: 60,
+  formula: 'Осмотр {Inspection:number} — {Car:vin}',
+  check: true,
+  active: true,
+  mode: 'regular',
+})
+const READONLY_EXAMPLE = `<!-- обвязка отдаёт ось контролу внутри: значение выделяется и копируется, правки нет -->
+<Field label="Наименование" readonly>
+  <Input v-model="name" placeholder="" :show-icon="false" />
+</Field>
+<!-- без обвязки — свой проп у каждого из десяти контролов -->
+<Checkbox v-model="skipExpertise" readonly>Пропускать экспертизу</Checkbox>`
 
 /* ------------------------------ П5 ------------------------------ */
 const flash = ref<number | null>(null)
@@ -510,6 +538,93 @@ const FORMULA_EXAMPLE = `<Field label="Тема письма оповещени�
         </Field>
       </div>
       <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ FORMULA_EXAMPLE }}</pre>
+    </section>
+
+    <!-- ============================ Такт 68 ============================ -->
+    <section class="flex flex-col gap-4" data-matrix="readonly">
+      <Heading>Только чтение — ось readonly у Field и десяти контролов: обычное · только чтение · выключено</Heading>
+      <div class="grid grid-cols-3 gap-x-6 gap-y-6">
+        <template v-for="st in RO_STATES" :key="'h-' + st.id">
+          <Heading level="group">
+            {{ st.label }}
+          </Heading>
+        </template>
+
+        <template v-for="st in RO_STATES" :key="'input-' + st.id">
+          <Field label="Input" :readonly="st.id === 'readonly'" :data-case="'input-' + st.id">
+            <Input v-model="ro.name" placeholder="" :show-icon="false" clearable :disabled="st.id === 'disabled'" />
+          </Field>
+        </template>
+        <template v-for="st in RO_STATES" :key="'textarea-' + st.id">
+          <Field label="Textarea" :readonly="st.id === 'readonly'" :data-case="'textarea-' + st.id">
+            <Textarea v-model="ro.description" placeholder="Описание" :disabled="st.id === 'disabled'" />
+          </Field>
+        </template>
+        <template v-for="st in RO_STATES" :key="'select-' + st.id">
+          <Field label="Select" :readonly="st.id === 'readonly'" :data-case="'select-' + st.id">
+            <Select v-model="ro.type" :items="SCHEME_TYPES" placeholder="" :show-icon="false" :searchable="false" :disabled="st.id === 'disabled'" />
+          </Field>
+        </template>
+        <template v-for="st in RO_STATES" :key="'select-multiple-' + st.id">
+          <Field label="Select multiple" :readonly="st.id === 'readonly'" :data-case="'select-multiple-' + st.id">
+            <Select v-model:values="ro.roles" multiple :items="ROLES" placeholder="Выберите роли" :disabled="st.id === 'disabled'" />
+          </Field>
+        </template>
+        <template v-for="st in RO_STATES" :key="'autocomplete-' + st.id">
+          <Field label="Autocomplete" :readonly="st.id === 'readonly'" :data-case="'autocomplete-' + st.id">
+            <Autocomplete v-model="ro.owner" :items="OWNERS" placeholder="Найти компанию" :disabled="st.id === 'disabled'" />
+          </Field>
+        </template>
+        <template v-for="st in RO_STATES" :key="'input-number-' + st.id">
+          <Field label="InputNumber" orientation="left" :control-height="32" :readonly="st.id === 'readonly'" :data-case="'input-number-' + st.id">
+            <InputNumber v-model="ro.minutes" :min="5" :max="120" :step="5" :disabled="st.id === 'disabled'" />
+          </Field>
+        </template>
+        <template v-for="st in RO_STATES" :key="'formula-' + st.id">
+          <Field label="FormulaInput" :readonly="st.id === 'readonly'" :data-case="'formula-' + st.id">
+            <FormulaInput v-model="ro.formula" :variables="VARIABLES" label="FormulaInput" :disabled="st.id === 'disabled'" />
+          </Field>
+        </template>
+        <template v-for="st in RO_STATES" :key="'checkbox-' + st.id">
+          <Field label="Checkbox" :readonly="st.id === 'readonly'" :data-case="'checkbox-' + st.id">
+            <Checkbox v-model="ro.check" subtitle="Пояснение" :disabled="st.id === 'disabled'">
+              Пропускать экспертизу
+            </Checkbox>
+          </Field>
+        </template>
+        <template v-for="st in RO_STATES" :key="'switch-' + st.id">
+          <Field label="Switch" :readonly="st.id === 'readonly'" :data-case="'switch-' + st.id">
+            <Switch v-model="ro.active" :disabled="st.id === 'disabled'">
+              Схема активна
+            </Switch>
+          </Field>
+        </template>
+        <template v-for="st in RO_STATES" :key="'radio-' + st.id">
+          <Field label="RadioGroupItem" :readonly="st.id === 'readonly'" :data-case="'radio-' + st.id">
+            <RadioGroup v-model="ro.mode" :disabled="st.id === 'disabled'">
+              <RadioGroupItem value="regular" :checked="ro.mode === 'regular'" :disabled="st.id === 'disabled'">
+                Обычный
+              </RadioGroupItem>
+              <RadioGroupItem value="multi" :checked="ro.mode === 'multi'" :disabled="st.id === 'disabled'">
+                Мультиосмотр
+              </RadioGroupItem>
+            </RadioGroup>
+          </Field>
+        </template>
+        <template v-for="st in RO_STATES" :key="'radio-card-' + st.id">
+          <Field label="RadioGroupItem card" :readonly="st.id === 'readonly'" :data-case="'radio-card-' + st.id">
+            <RadioGroup v-model="ro.mode" class="grid grid-cols-2" :disabled="st.id === 'disabled'">
+              <RadioGroupItem variant="card" value="regular" :checked="ro.mode === 'regular'" :disabled="st.id === 'disabled'">
+                Обычный
+              </RadioGroupItem>
+              <RadioGroupItem variant="card" value="multi" :checked="ro.mode === 'multi'" :disabled="st.id === 'disabled'">
+                Мульти
+              </RadioGroupItem>
+            </RadioGroup>
+          </Field>
+        </template>
+      </div>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ READONLY_EXAMPLE }}</pre>
     </section>
   </main>
 </template>

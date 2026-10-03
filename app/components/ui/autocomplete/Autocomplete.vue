@@ -1,3 +1,7 @@
+<!--
+  @debt Ось `readonly` — дефолт по аналогии с китом: состояния «только чтение» у мастера и спеки нет.
+  См. docs/design-debt.md, «Ось readonly», и `ui/field/index.ts`, «Ось readonly».
+-->
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import {
@@ -9,6 +13,7 @@ import {
   ComboboxRoot,
   ComboboxViewport,
 } from 'reka-ui'
+import { useReadonly } from '../field'
 import { Icon } from '../icon'
 import { SelectContent, SelectItem } from '../select'
 import { autocompleteVariants, type AutocompleteVariants } from '.'
@@ -54,6 +59,8 @@ const props = withDefaults(defineProps<{
   /** Булев проп мастера `Show ClearButton`. В мастере нарисован во всех заполненных. */
   clearable?: boolean
   disabled?: boolean
+  /** Только чтение — своё либо от `Field readonly` (такт 68): подсказки не открываются, ввода нет, крестика нет. */
+  readonly?: boolean
 }>(), {
   variant: 'filled',
   placeholder: 'Placeholder',
@@ -61,7 +68,17 @@ const props = withDefaults(defineProps<{
   showIcon: true,
   clearable: true,
   disabled: false,
+  readonly: false,
 })
+
+const ro = useReadonly(() => props.readonly, () => props.disabled)
+
+/**
+ * Раскрытие списка держит компонент: в «только чтении» запрос на раскрытие (фокус, клик, стрелка) отклоняется. Корень
+ * всегда управляемый — смена оси на лету не запирает его (ловушка булева пропа `CLAUDE.md`).
+ */
+const open = ref(false)
+function setOpen(value: boolean) { open.value = ro.value ? false : value }
 
 /** Модель компонента — введённый ТЕКСТ: значение может не совпасть ни с одной строкой. */
 const model = defineModel<string>({ default: '' })
@@ -88,6 +105,7 @@ function pick(label: string) {
 <template>
   <ComboboxRoot
     v-model="picked"
+    :open="open"
     :disabled="props.disabled"
     ignore-filter
     open-on-focus
@@ -95,11 +113,13 @@ function pick(label: string) {
     :reset-search-term-on-blur="false"
     :reset-search-term-on-select="false"
     class="w-full"
+    @update:open="setOpen"
   >
     <ComboboxAnchor as-child>
       <div
         data-slot="field"
-        :class="autocompleteVariants({ variant, floating: isFloating, disabled })"
+        :data-readonly="ro ? '' : undefined"
+        :class="autocompleteVariants({ variant, floating: isFloating, disabled, readonly: ro })"
       >
         <div class="flex min-w-0 flex-1 items-center gap-2" :class="isFloating ? 'h-9' : 'h-5'">
           <slot v-if="props.showIcon" name="icon">
@@ -110,7 +130,8 @@ function pick(label: string) {
             <span
               v-show="isFloating"
               data-slot="field-label"
-              class="h-4 w-full truncate text-xs font-medium text-field-placeholder group-hover/field:text-field-placeholder-hover group-focus-within/field:text-field-placeholder-hover"
+              class="h-4 w-full truncate text-xs font-medium text-field-placeholder"
+              :class="ro ? '' : 'group-hover/field:text-field-placeholder-hover group-focus-within/field:text-field-placeholder-hover'"
             >
               {{ props.placeholder }}
             </span>
@@ -121,7 +142,9 @@ function pick(label: string) {
                 data-slot="field-input"
                 :placeholder="isFloating ? undefined : props.placeholder"
                 :disabled="props.disabled"
-                class="h-5 w-full min-w-0 bg-transparent text-sm font-medium outline-none text-field-foreground placeholder:text-field-placeholder group-hover/field:text-field-foreground-hover group-focus-within/field:text-field-foreground-hover"
+                :readonly="ro"
+                class="h-5 w-full min-w-0 bg-transparent text-sm font-medium outline-none placeholder:text-field-placeholder"
+                :class="ro ? 'text-foreground' : 'text-field-foreground group-hover/field:text-field-foreground-hover group-focus-within/field:text-field-foreground-hover'"
                 @focus="focused = true"
                 @blur="focused = false"
               >
@@ -130,7 +153,7 @@ function pick(label: string) {
         </div>
 
         <button
-          v-if="props.clearable && isFloating"
+          v-if="props.clearable && isFloating && !ro"
           data-slot="field-clear"
           type="button"
           :disabled="props.disabled"
