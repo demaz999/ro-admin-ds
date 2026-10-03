@@ -193,6 +193,16 @@ const Q = {
   addType: `document.querySelector('[data-act=add-type]')`,
   typeSearch: `(document.querySelector('[data-field=type-search]')?.matches('input') ? document.querySelector('[data-field=type-search]') : document.querySelector('[data-field=type-search] input'))`,
   typeOption: id => `document.querySelector('[data-type-option=${id}]')`,
+  /* Такт 80, П4: вкладка «Схемы осмотра», панель группы. */
+  groupSettings: id => `document.querySelector('[data-group=${id}] [data-act=group-settings]')`,
+  schemeSettings: id => `document.querySelector('[data-scheme=${id}] [data-act=scheme-settings]')`,
+  groupMode: v => `document.querySelector('[data-side=group] [data-group-mode=${v}] [data-slot=choice-control]')`,
+  groupClient: `document.querySelector('[data-field=group-price] [data-slot=price-pair-client] input')`,
+  groupNonClient: `document.querySelector('[data-field=group-price] [data-slot=price-pair-non-client] input')`,
+  groupLock: `document.querySelector('[data-field=group-price] [data-pair-lock]')`,
+  groupStepTo: k => `document.querySelectorAll('[data-field=group-scale] [data-slot=regress-scale-step]')[${k}]?.querySelector('[data-slot=regress-scale-to] input')`,
+  groupStepPrice: k => `document.querySelectorAll('[data-field=group-scale] [data-slot=regress-scale-step]')[${k}]?.querySelector('[data-slot=regress-scale-price] input')`,
+  panelClose: `[...document.querySelectorAll('[data-side=group] [data-slot=modal-card-header] button')].find(b => b.getAttribute('aria-label') === 'Закрыть')`,
 }
 
 function kit(page) {
@@ -268,6 +278,13 @@ function kit(page) {
         const typeRows = [...document.querySelectorAll('[data-type-row]')]
         const picker = document.querySelector('[data-type-picker]')
         const typesEmpty = document.querySelector('[data-types-empty]')
+        /* Такт 80: текст по текстовым узлам через пробел (ловушка такта 64); тон метки — по роли рамки. */
+        const leaf = (el) => { if (!el) return null; const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); const out = []; while (w.nextNode()) { const x = t(w.currentNode.textContent); if (x) out.push(x) } return out.join(' ') }
+        const TONES = ['primary', 'warning', 'foreground-secondary', 'success', 'destructive', 'background']
+        const badgesOf = el => el ? [...el.querySelectorAll('[data-slot=badge]')].map(b => t(b.textContent) + ' | ' + (b.dataset.appearance ?? 'filled') + ' ' + (TONES.find(x => b.classList.contains('border-' + x)) ?? '?')) : null
+        const side = document.querySelector('[data-side=group]')
+        const gpair = side?.querySelector('[data-field=group-price]')
+        const gscale = side?.querySelector('[data-field=group-scale]')
         const base = M.view.value.base
         /* Где фокус: поле пары, замок, часть ступени шкалы, кнопка подсказки. */
         const where = (() => {
@@ -375,6 +392,45 @@ function kit(page) {
           } : null,
           modelTypes: M.view.value.objectTypes.map(x => [x.typeId, x.price.client, x.price.nonClient, x.price.linked, x.scale.on, x.scale.form, x.scale.steps.length]),
           expanded: [...M.ui.expanded],
+          /* Такт 80: группы и схемы вкладки, панель группы. Текст вилки — листовые узлы через пробел (ловушка такта 64). */
+          groups: document.querySelector('[data-block=schemes]') ? [...document.querySelectorAll('[data-group]')].map((g) => {
+            const empty = g.querySelector('[data-group-empty]')
+            return {
+              id: g.dataset.group,
+              name: t(g.querySelector('[data-group-name]')?.textContent),
+              badges: badgesOf(g.querySelector('[data-group-head] [data-badges]')),
+              range: leaf(g.querySelector('[data-group-range]')),
+              schemes: [...g.querySelectorAll('[data-scheme]')].map(x => ({
+                id: x.dataset.scheme,
+                name: t(x.querySelector('[data-scheme-name]')?.textContent),
+                badges: badgesOf(x.querySelector('[data-badges]')),
+                range: leaf(x.querySelector('[data-scheme-range]')),
+                dimmed: x.hasAttribute('data-dimmed'),
+              })),
+              empty: empty ? t(empty.querySelector('[data-slot=empty-title]')?.textContent) : null,
+            }
+          }) : null,
+          panel: side ? {
+            title: t(side.querySelector('[data-slot=modal-card-title]')?.textContent),
+            name: t(side.querySelector('[data-panel-name] [data-slot=heading]')?.textContent),
+            count: t(side.querySelector('[data-panel-name] [data-slot=heading-description]')?.textContent),
+            modes: [...side.querySelectorAll('[data-group-mode]')].map(x => ({
+              value: x.dataset.groupMode,
+              checked: x.querySelector('[data-slot=choice-control]')?.getAttribute('data-state') === 'checked',
+              title: t(x.querySelector('[data-slot=choice-title]')?.textContent),
+              description: leaf(x.querySelector('[data-slot=choice-description]')),
+              body: x.querySelector('[data-slot=choice-panel]') ? (x.querySelector('[data-field=group-price]') ? 'pair' : x.querySelector('[data-field=group-scale]') ? 'scale' : 'other') : null,
+            })),
+            pair: gpair ? { client: val(pinput(gpair, 'client')), nonClient: val(pinput(gpair, 'non-client')), linked: gpair.hasAttribute('data-linked') } : null,
+            steps: gscale ? stepsOf(gscale) : null,
+            inheriting: t(side.querySelector('[data-inheriting]')?.textContent) || null,
+            schemes: [...side.querySelectorAll('[data-group-scheme]')].map(x => t(x.querySelector('[data-group-scheme-name]')?.textContent) + ' | ' + leaf(x.querySelector('[data-group-scheme-range]'))),
+            schemesEmpty: t(side.querySelector('[data-group-schemes-empty] [data-slot=empty-title]')?.textContent) || null,
+            /* Только чтение: в списке схем группы нет ни полей, ни кнопок. */
+            schemesControls: side.querySelectorAll('[data-group-schemes] [data-slot=table] :is(button, input, a, [tabindex])').length,
+          } : null,
+          modelGroups: M.view.value.groups.map(g => [g.id, g.mode, g.price.client, g.price.nonClient, g.price.linked, g.scale.on, g.scale.steps.map(x => [x.from, x.to, x.price.client])]),
+          focusGroup: document.activeElement?.closest('[data-group]')?.dataset.group ?? null,
           focus: where,
           notices,
         })
@@ -394,6 +450,42 @@ const TABS = ['Базовые настройки', 'Типы объектов', 
 const TYPES_ALL = ['Легковой автомобиль', 'Грузовой автомобиль', 'Мотоцикл', 'Автобус', 'Прицеп', 'Спецтехника', 'Сельхозтехника',
   'Водный транспорт', 'Оборудование', 'Квартира', 'Частный дом', 'Коммерческая недвижимость', 'Земельный участок']
 const TYPES_FREE = TYPES_ALL.filter(x => !['Легковой автомобиль', 'Спецтехника', 'Квартира'].includes(x))
+/* Такт 80, П4: ожидания вкладки «Схемы осмотра» и панели группы по демо-данным (6.7). */
+const G = range => `Стоимость осмотров группы по умолчанию: ${range} · наследуется схемами без индивидуальной цены`
+const B = (text, tone) => `${text} | outline ${tone}`
+const SCHEMES_START = [
+  { id: 'g-kasko', name: 'КАСКО', badges: [B('3 схемы', 'foreground-secondary')], range: G('500–700 ₽'), empty: null, schemes: [
+    { id: 's-car', name: 'Осмотр легкового автомобиля', badges: [B('По группе', 'primary')], range: 'Вилка цен от 500 ₽ до 700 ₽', dimmed: false },
+    { id: 's-moto', name: 'Осмотр мотоцикла', badges: [B('Индивид. цены', 'primary'), B('Новая', 'warning')], range: 'Вилка цен от 450 ₽ до 650 ₽', dimmed: false },
+    { id: 's-pre', name: 'Предстраховой осмотр автомобиля', badges: [B('Регресс-шкала', 'primary')], range: 'Вилка цен от 600 ₽ до 900 ₽', dimmed: false }] },
+  { id: 'g-osago', name: 'ОСАГО', badges: [B('2 схемы', 'foreground-secondary')], range: G('900–1 100 ₽'), empty: null, schemes: [
+    { id: 's-vehicle', name: 'Осмотр транспортного средства', badges: [B('По группе', 'primary')], range: 'Вилка цен от 900 ₽ до 1 100 ₽', dimmed: false },
+    { id: 's-trailer', name: 'Осмотр прицепа', badges: [B('По группе', 'primary'), B('Устаревшая', 'foreground-secondary')], range: 'Вилка цен от 900 ₽ до 1 100 ₽', dimmed: true }] },
+  { id: 'g-realty', name: 'Недвижимость', badges: [B('2 схемы', 'foreground-secondary'), B('Регресс-шкала', 'primary')], range: G('1 000–1 200 ₽'), empty: null, schemes: [
+    { id: 's-flat', name: 'Осмотр квартиры', badges: [B('По группе', 'primary'), B('Индивидуальные типы', 'primary'), B('Мульти', 'foreground-secondary')], range: 'Вилка цен от 1 000 ₽ до 1 200 ₽', dimmed: false },
+    { id: 's-house', name: 'Осмотр частного дома', badges: [B('Индивид. цены', 'primary'), B('Вложенный', 'foreground-secondary')], range: 'Вилка цен 1 500 ₽', dimmed: false }] },
+]
+/** Режимы панели: отмечен `checked`, у него тело `body` (`pair`, `scale`; у компании тела нет — «—»). */
+const MODES = (checked, body) => [
+  { value: 'company', checked: checked === 'company', title: 'Базовая цена компании', description: 'Наследует цену компании: 500–700 ₽', body: null },
+  { value: 'fixed', checked: checked === 'fixed', title: 'Фиксированная цена группы', description: 'Фиксированная цена только для этой группы', body: checked === 'fixed' ? body : null },
+  { value: 'scale', checked: checked === 'scale', title: 'Регресс-шкала группы', description: 'Цена снижается при росте объёма осмотров', body: checked === 'scale' ? body : null },
+]
+const PANEL_KASKO = {
+  title: 'Настройка группы', name: 'КАСКО', count: '3 схемы', pair: null, steps: null, inheriting: '1 по группе',
+  schemes: ['Осмотр легкового автомобиля | 500–700 ₽', 'Осмотр мотоцикла | 450–650 ₽', 'Предстраховой осмотр автомобиля | 600–900 ₽'], schemesEmpty: null, schemesControls: 0,
+}
+/** Панель ОСАГО в режиме `mode`: фиксированная — пара 900 / 1 100; компания — вилка компании у обеих схем. */
+const PANEL_OSAGO = mode => ({
+  title: 'Настройка группы', name: 'ОСАГО', count: '2 схемы', modes: MODES(mode, mode === 'fixed' ? 'pair' : '—'),
+  pair: mode === 'fixed' ? { client: '900', nonClient: '1 100', linked: false } : null, steps: null, inheriting: '2 по группе',
+  schemes: mode === 'fixed' ? ['Осмотр транспортного средства | 900–1 100 ₽', 'Осмотр прицепа | 900–1 100 ₽'] : ['Осмотр транспортного средства | 500–700 ₽', 'Осмотр прицепа | 500–700 ₽'],
+  schemesEmpty: null, schemesControls: 0,
+})
+const MG_KASKO = ['g-kasko', 'company', null, null, true, false, [[1, null, null]]]
+const MG_OSAGO = ['g-osago', 'fixed', 900, 1100, false, false, [[1, null, null]]]
+const MG_REALTY = ['g-realty', 'scale', null, null, true, true, [[1, 500, 1200], [501, null, 1000]]]
+
 const SCENARIOS = {
   'ТФ-01': ['«Назад» ведёт к карточке компании; вход вне скоупа — уведомление-заглушка (§11 «Вход»; scope, «Вне скоупа»)', [
     ['старт', null, { title: 'Тарификация', tab: 'base', period: 'current', save: 'saved', saveText: 'Все изменения сохранены', saveSurface: 'light', applyButton: 'Сохранить изменения', applyIcon: true, notices: [] }],
@@ -403,7 +495,7 @@ const SCENARIOS = {
     ['старт', null, { tabs: TABS, tab: 'base', tabActive: ['base'], tabIcons: [true, true, true], counts: { base: null, types: '3', schemes: '7' }, minPayment: '20 000' }],
     ['правка на «Базовых»: минимальная сумма 25000', async (K) => { await K.setMin('25000'); await K.settled() },
       { minPayment: '25 000', viewMin: 25000, saveLog: ['saving', 'saved'], writes: 1, dirty: true }],
-    ['вкладка «Схемы осмотра»', K => K.tab('schemes'), { tab: 'schemes', tabActive: ['schemes'], pending: '«Схемы осмотра» — порция П4', dirty: true }],
+    ['вкладка «Схемы осмотра» — собрана (П4, такт 80)', K => K.tab('schemes'), { tab: 'schemes', tabActive: ['schemes'], pending: null, dirty: true }],
     ['вкладка «Типы объектов» — собрана (П3, такт 79)', K => K.tab('types'), { tab: 'types', tabActive: ['types'], pending: null, dirty: true }],
     ['назад на «Базовые» — правка на месте', K => K.tab('base'), { tab: 'base', tabActive: ['base'], minPayment: '25 000', viewMin: 25000, dirty: true, saveLog: [], writes: 1, pending: null }],
     ['набор без типов объектов и с пустой группой — счётчики следуют', K => K.start('data=empty'), { counts: { base: null, types: '0', schemes: '5' }, tab: 'base' }],
@@ -621,6 +713,69 @@ const SCENARIOS = {
     ['выбрать «Квартиру» — таблица вместо пустого', async (K) => { await K.click(Q.typeOption('t-flat')); await K.settled() }, {
       typesEmpty: null, picker: null, counts: { base: null, types: '1', schemes: '5' }, modelTypes: [['t-flat', null, null, true, false, 'single', 1]] }],
   ], { query: 'data=empty&tab=types' }],
+
+  /* ------------------------------ П4 — такт 80: «Схемы осмотра» и панель группы ------------------------------ */
+  'ТФ-17': ['вкладка «Схемы осмотра»: группы со схемами, метки по 6.6, вилки по 6.5, устаревшая приглушена, пустая группа (§11; стр. 25, 45, 46, 55, 56)', [
+    ['старт — три группы, семь схем', null, { counts: { base: null, types: '3', schemes: '7' }, groups: SCHEMES_START }],
+    ['шестерёнка схемы — панель схемы в порции П5', K => K.click(Q.schemeSettings('s-car')), { notices: ['Панель схемы — порция П5'], panel: null, dirty: false }],
+    ['набор `?data=empty` — группа «Недвижимость» без схем', K => K.start('tab=schemes&data=empty'), { counts: { base: null, types: '0', schemes: '5' }, groups: [
+      SCHEMES_START[0], SCHEMES_START[1],
+      { id: 'g-realty', name: 'Недвижимость', badges: ['0 схем | outline foreground-secondary', 'Регресс-шкала | outline primary'], range: G('1 000–1 200 ₽'), schemes: [], empty: 'В группе пока нет схем' }] }],
+  ], { query: 'tab=schemes' }],
+  'ТФ-18': ['панель группы: три режима; цена и шкала группы; вилка и метка группы на странице следуют режиму (§11, §3, §5; стр. 29, 36, 53)', [
+    ['«Настроить группу» у КАСКО — по умолчанию «Базовая цена компании»', K => K.click(Q.groupSettings('g-kasko')), {
+      panel: { ...PANEL_KASKO, modes: MODES('company', '—') }, dirty: false }],
+    ['«Фиксированная цена группы» — тело с парой, вилка группы и схем «По группе» пустая', async (K) => { await K.click(Q.groupMode('fixed')); await K.settled() }, {
+      dirty: true, saveLog: ['saving', 'saved'],
+      panel: { ...PANEL_KASKO, modes: MODES('fixed', 'pair'), pair: { client: '', nonClient: '', linked: true }, schemes: ['Осмотр легкового автомобиля | —', 'Осмотр мотоцикла | 450–650 ₽', 'Предстраховой осмотр автомобиля | 600–900 ₽'] },
+      groups: [{ ...SCHEMES_START[0], range: G('—'), schemes: [{ ...SCHEMES_START[0].schemes[0], range: 'Вилка цен —' }, SCHEMES_START[0].schemes[1], SCHEMES_START[0].schemes[2]] }, SCHEMES_START[1], SCHEMES_START[2]] }],
+    ['цена «Клиент» 800 — пара связана, одна цена', async (K) => { await K.fill(Q.groupClient, '800'); await K.settled() }, {
+      panel: { ...PANEL_KASKO, modes: MODES('fixed', 'pair'), pair: { client: '800', nonClient: '800', linked: true }, schemes: ['Осмотр легкового автомобиля | 800 ₽', 'Осмотр мотоцикла | 450–650 ₽', 'Предстраховой осмотр автомобиля | 600–900 ₽'] },
+      groups: [{ ...SCHEMES_START[0], range: G('800 ₽'), schemes: [{ ...SCHEMES_START[0].schemes[0], range: 'Вилка цен 800 ₽' }, SCHEMES_START[0].schemes[1], SCHEMES_START[0].schemes[2]] }, SCHEMES_START[1], SCHEMES_START[2]] }],
+    ['развязать и «Не клиент» 1000 — вилка «от … до …»', async (K) => { await K.click(Q.groupLock); await K.fill(Q.groupNonClient, '1000'); await K.settled() }, {
+      panel: { ...PANEL_KASKO, modes: MODES('fixed', 'pair'), pair: { client: '800', nonClient: '1 000', linked: false }, schemes: ['Осмотр легкового автомобиля | 800–1 000 ₽', 'Осмотр мотоцикла | 450–650 ₽', 'Предстраховой осмотр автомобиля | 600–900 ₽'] },
+      groups: [{ ...SCHEMES_START[0], range: G('800–1 000 ₽'), schemes: [{ ...SCHEMES_START[0].schemes[0], range: 'Вилка цен от 800 ₽ до 1 000 ₽' }, SCHEMES_START[0].schemes[1], SCHEMES_START[0].schemes[2]] }, SCHEMES_START[1], SCHEMES_START[2]] }],
+    ['«Регресс-шкала группы» — тело со шкалой, метка «Регресс-шкала» у группы', async (K) => { await K.click(Q.groupMode('scale')); await K.settled() }, {
+      panel: { ...PANEL_KASKO, modes: MODES('scale', 'scale'), pair: null, steps: [{ from: '1', to: '', price: '', error: null, removable: false }],
+        schemes: ['Осмотр легкового автомобиля | —', 'Осмотр мотоцикла | 450–650 ₽', 'Предстраховой осмотр автомобиля | 600–900 ₽'] },
+      groups: [{ ...SCHEMES_START[0], badges: ['3 схемы | outline foreground-secondary', 'Регресс-шкала | outline primary'], range: G('—'), schemes: [{ ...SCHEMES_START[0].schemes[0], range: 'Вилка цен —' }, SCHEMES_START[0].schemes[1], SCHEMES_START[0].schemes[2]] }, SCHEMES_START[1], SCHEMES_START[2]],
+      modelGroups: [['g-kasko', 'scale', 800, 1000, false, true, [[1, null, null]]], MG_OSAGO, MG_REALTY] }],
+    ['ступени: цена 1200, «До» 100, цена второй 1000 — вилка мин–макс', async (K) => {
+      await K.fill(Q.groupStepPrice(0), '1200'); await K.settled()
+      await K.fill(Q.groupStepTo(0), '100'); await K.settled()
+      await K.fill(Q.groupStepPrice(1), '1000'); await K.settled() }, {
+      panel: { ...PANEL_KASKO, modes: MODES('scale', 'scale'), pair: null,
+        steps: [{ from: '1', to: '100', price: '1 200', error: null, removable: true }, { from: '101', to: '', price: '1 000', error: null, removable: true }],
+        schemes: ['Осмотр легкового автомобиля | 1 000–1 200 ₽', 'Осмотр мотоцикла | 450–650 ₽', 'Предстраховой осмотр автомобиля | 600–900 ₽'] },
+      groups: [{ ...SCHEMES_START[0], badges: ['3 схемы | outline foreground-secondary', 'Регресс-шкала | outline primary'], range: G('1 000–1 200 ₽'), schemes: [{ ...SCHEMES_START[0].schemes[0], range: 'Вилка цен от 1 000 ₽ до 1 200 ₽' }, SCHEMES_START[0].schemes[1], SCHEMES_START[0].schemes[2]] }, SCHEMES_START[1], SCHEMES_START[2]] }],
+    ['снова «Базовая цена компании» — вилка компании; цена и ступени группы сохранены', async (K) => { await K.click(Q.groupMode('company')); await K.settled() }, {
+      panel: { ...PANEL_KASKO, modes: MODES('company', '—'), pair: null, steps: null },
+      groups: SCHEMES_START,
+      modelGroups: [['g-kasko', 'company', 800, 1000, false, false, [[1, 100, 1200], [101, null, 1000]]], MG_OSAGO, MG_REALTY] }],
+  ], { query: 'tab=schemes' }],
+  'ТФ-19': ['«Схемы в группе» — только чтение: цена каждой схемы, «N по группе» (§11)', [
+    ['`?open=group` — КАСКО: три схемы, одна наследует цену группы', null, { tab: 'schemes', panel: { ...PANEL_KASKO, modes: MODES('company', '—') } }],
+    ['ОСАГО — фиксированная цена группы, обе схемы по группе', K => K.start('open=group&group=g-osago'), { panel: PANEL_OSAGO('fixed') }],
+    ['«Недвижимость» в наборе `?data=empty` — схем нет', K => K.start('open=group&group=g-realty&data=empty'), { panel: {
+      title: 'Настройка группы', name: 'Недвижимость', count: '0 схем',
+      modes: [
+        { value: 'company', checked: false, title: 'Базовая цена компании', description: 'Наследует цену компании: 500–700 ₽', body: null },
+        { value: 'fixed', checked: false, title: 'Фиксированная цена группы', description: 'Фиксированная цена только для этой группы', body: null },
+        { value: 'scale', checked: true, title: 'Регресс-шкала группы', description: 'Цена снижается при росте объёма осмотров', body: 'scale' }],
+      pair: null, steps: [{ from: '1', to: '500', price: '1 200', error: null, removable: true }, { from: '501', to: '', price: '1 000', error: null, removable: true }],
+      inheriting: '0 по группе', schemes: [], schemesEmpty: 'В группе пока нет схем', schemesControls: 0 } }],
+    ['`?mode=fixed` — режим открытой группы как данные, правки нет', K => K.start('open=group&mode=fixed'), { dirty: false, writes: 0, panel: { ...PANEL_KASKO, modes: MODES('fixed', 'pair'), pair: { client: '', nonClient: '', linked: true }, schemes: ['Осмотр легкового автомобиля | —', 'Осмотр мотоцикла | 450–650 ₽', 'Предстраховой осмотр автомобиля | 600–900 ₽'] } }],
+  ], { query: 'open=group' }],
+  'ТФ-24': ['панель группы: Esc и крестик закрывают, фокус на открывателе, правки панели остались (§8; стр. 53)', [
+    ['открыть панель ОСАГО', K => K.click(Q.groupSettings('g-osago')), { panel: PANEL_OSAGO('fixed') }],
+    ['режим «Базовая цена компании» — пишется сразу', async (K) => { await K.click(Q.groupMode('company')); await K.settled() }, { dirty: true, saveLog: ['saving', 'saved'], panel: PANEL_OSAGO('company') }],
+    ['Esc — панель закрыта, фокус на «Настроить группу» ОСАГО, вилка группы — компании', K => K.escape(), {
+      panel: null, focus: 'group-settings', focusGroup: 'g-osago', dirty: true,
+      groups: [SCHEMES_START[0], { ...SCHEMES_START[1], range: G('500–700 ₽'), schemes: [{ ...SCHEMES_START[1].schemes[0], range: 'Вилка цен от 500 ₽ до 700 ₽' }, { ...SCHEMES_START[1].schemes[1], range: 'Вилка цен от 500 ₽ до 700 ₽' }] }, SCHEMES_START[2]],
+      modelGroups: [MG_KASKO, ['g-osago', 'company', 900, 1100, false, false, [[1, null, null]]], MG_REALTY] }],
+    ['открыть снова — режим сохранён', K => K.click(Q.groupSettings('g-osago')), { panel: PANEL_OSAGO('company') }],
+    ['крестик — панель закрыта, фокус на открывателе', K => K.click(Q.panelClose), { panel: null, focus: 'group-settings', focusGroup: 'g-osago' }],
+  ], { query: 'tab=schemes' }],
 }
 
 /* ------------------------------ прогон ------------------------------ */
@@ -629,6 +784,8 @@ function diff(a, b, path = '') {
   if (a && b && typeof a === 'object' && typeof b === 'object' && !Array.isArray(a)) {
     return [...new Set([...Object.keys(a), ...Object.keys(b)])].flatMap(k => diff(a[k], b[k], path ? `${path}.${k}` : k))
   }
+  /* Массивы одной длины — по элементам: провал называет номер и поле (такт 80, списки групп и схем). */
+  if (Array.isArray(a) && Array.isArray(b) && a.length === b.length) return a.flatMap((x, k) => diff(x, b[k], `${path}[${k}]`))
   const show = (v) => { const x = JSON.stringify(v); return x && x.length > 160 ? `${x.slice(0, 157)}…` : x }
   return [`${path}: ожидание ${show(a)} · кит ${show(b)}`]
 }

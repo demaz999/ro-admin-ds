@@ -46,6 +46,9 @@ const draftRoles = ref(['Администратор', 'Эксперт'])
 const draftSearch = ref('')
 /* Числовой ввод у Input — такт 78. */
 const draftPrice = ref('50000')
+/* Слот panel у RadioGroupItem — такт 80. */
+const draftMode = ref('fixed')
+const draftPair = ref({ client: 900 as number | null, nonClient: 1100 as number | null, linked: false })
 /** Такт 72: пример закрываемой плашки — закрытие помнит страница. */
 const calloutClosed = ref(false)
 /* Ось readonly — такт 68: обычное, только чтение, выключено рядом. */
@@ -89,7 +92,48 @@ const ro = ref({ name: 'КАСКО — осмотр', text: 'Осмотр авт
           </p>
         </div>
         <div data-example class="flex min-w-0 flex-col items-stretch gap-3">
-          <template v-if="c.id === 'button-loading'">
+          <template v-if="c.id === 'badge-outline'">
+            <div class="flex flex-wrap items-center gap-2">
+              <Badge appearance="outline" variant="neutral">2 схемы</Badge>
+              <Badge appearance="outline">Регресс-шкала</Badge>
+              <Badge appearance="outline" variant="warning">Новая</Badge>
+              <Badge appearance="outline" variant="success">Применён</Badge>
+              <Badge appearance="outline" variant="destructive">Необратимо</Badge>
+              <Badge>Регресс-шкала</Badge>
+            </div>
+            <span class="text-xs text-muted-foreground">контур пяти ролей и залитая метка рядом; матрица — /tariffs/states</span>
+          </template>
+          <template v-else-if="c.id === 'radio-panel'">
+            <RadioGroup v-model="draftMode" class="flex flex-col gap-2">
+              <RadioGroupItem value="company" variant="card" :checked="draftMode === 'company'">
+                Базовая цена компании
+                <template #description>
+                  Наследует цену компании
+                </template>
+              </RadioGroupItem>
+              <RadioGroupItem value="fixed" variant="card" :checked="draftMode === 'fixed'">
+                Фиксированная цена группы
+                <template #description>
+                  Фиксированная цена только для этой группы
+                </template>
+                <template #panel>
+                  <PricePair v-model:client="draftPair.client" v-model:non-client="draftPair.nonClient" v-model:linked="draftPair.linked" stretch />
+                </template>
+              </RadioGroupItem>
+            </RadioGroup>
+            <span class="text-xs text-muted-foreground">тело — только у отмеченной карточки; переключите режим</span>
+          </template>
+          <template v-else-if="c.id === 'card-dimmed'">
+            <div class="flex flex-col gap-1">
+              <Card tone="muted" size="sm">
+                <span class="text-xs">tone="muted", size="sm"</span>
+              </Card>
+              <Card tone="muted" size="sm" dimmed>
+                <span class="text-xs">tone="muted", size="sm", dimmed</span>
+              </Card>
+            </div>
+          </template>
+          <template v-else-if="c.id === 'button-loading'">
             <div class="flex flex-wrap items-center gap-3">
               <Button show-icon>
                 <template #icon>

@@ -10,4 +10,6 @@ export const TARIFFS_COVERAGE_STATES = [
   'scale=on', 'open=help',
   /* Такт 79, П3: раскрытые строки типов (шкала выключена и «По ролям»), выбор типа, пустой список типов. */
   'expand=t-car,t-special', 'open=type-picker', 'tab=types&data=empty',
+  /* Такт 80, П4: вкладка «Схемы осмотра» с пустой группой; панель группы в трёх режимах; панель пустой группы. */
+  'tab=schemes&data=empty', 'open=group', 'open=group&mode=fixed', 'open=group&mode=scale', 'open=group&group=g-realty&data=empty',
 ] as const

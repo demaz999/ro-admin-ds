@@ -3,7 +3,8 @@
   См. docs/design-debt.md, «Ось readonly», и `ui/field/index.ts`, «Ось readonly».
 -->
 <script setup lang="ts">
-import { computed } from 'vue'
+import { createReusableTemplate } from '@vueuse/core'
+import { computed, useSlots } from 'vue'
 import { RadioGroupItem, useForwardProps } from 'reka-ui'
 import { cn } from '@/lib/utils'
 import { choiceReadonlyGuard, choiceRowVariants, choiceTitleVariants } from '../checkbox'
@@ -23,7 +24,11 @@ import { choiceCardVariants } from '.'
  * Вариант `card` — карточка выбора, такт 39 (карточка режима автораспределения VA-9265 §12.1–12.2,
  * прототип `.wmode`): тот же контрол и заголовок в рамке во всю ширину, под заголовком — слоты
  * `description` и `meta`. Разбор — `index.ts`.
+ *
+ * Слот `panel` у карточки — такт 80: содержимое выбранного режима под карточкой в общей с ней рамке (Figma `32021:6851`).
+ * Рисуется только у отмеченной; корнем становится рамка, карточка и её подпись для чтения с экрана прежние.
  */
+defineOptions({ inheritAttrs: false })
 const props = withDefaults(defineProps<{
   value: string
   subtitle?: string
@@ -49,14 +54,21 @@ const ro = useReadonly(() => props.readonly, () => props.disabled)
 const guard = choiceReadonlyGuard(ro)
 
 const forwarded = useForwardProps(computed(() => ({ value: props.value, disabled: props.disabled })))
+
+/** Рамка с телом режима — только у карточки со слотом `panel`; без слота разметка прежняя. */
+const slots = useSlots()
+const framed = computed(() => props.variant === 'card' && !!slots.panel)
+const [DefineChoice, ReuseChoice] = createReusableTemplate()
 </script>
 
 <template>
+  <DefineChoice>
   <label
+    v-bind="framed ? {} : $attrs"
     data-slot="choice"
     :data-variant="props.variant"
     :data-readonly="ro ? '' : undefined"
-    :class="props.variant === 'card' ? choiceCardVariants({ disabled, readonly: ro }) : choiceRowVariants({ disabled, readonly: ro })"
+    :class="props.variant === 'card' ? cn(choiceCardVariants({ disabled, readonly: ro }), framed && 'relative') : choiceRowVariants({ disabled, readonly: ro })"
     @click.capture="guard.onClickCapture"
     @keydown.capture="guard.onKeydownCapture"
   >
@@ -97,4 +109,22 @@ const forwarded = useForwardProps(computed(() => ({ value: props.value, disabled
       </span>
     </span>
   </label>
+  </DefineChoice>
+
+  <!--
+    Рамка карточки с телом — Figma `32021:6851`: тело ниже карточки внутри общей рамки 1 `--border-neutral` с радиусом 8.
+    Тело заходит под нижние углы карточки на радиус (`-mt-2`, поле сверху 16 + 8): рамка продолжает её бока. Тело стоит вне
+    `label` — его текст не входит в имя радиокнопки, нажатия по полям тела выбор не трогают.
+  -->
+  <div v-if="framed" v-bind="$attrs" data-slot="choice-frame" :data-open="props.checked ? '' : undefined" class="flex w-full flex-col">
+    <ReuseChoice />
+    <div
+      v-if="props.checked"
+      data-slot="choice-panel"
+      class="-mt-2 flex flex-col gap-4 rounded-b-md border border-t-0 border-stroke-neutral px-4 pt-6 pb-4"
+    >
+      <slot name="panel" />
+    </div>
+  </div>
+  <ReuseChoice v-else />
 </template>

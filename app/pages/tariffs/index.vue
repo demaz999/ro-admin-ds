@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { RegressStep, ScaleForm } from '~/components/ui/regress-scale'
 import { computed, nextTick, ref, watch } from 'vue'
-import { createModel, TABS, type Dataset, type Price, type SaveState, type TabId } from '~/stands/tariffs/model'
+import { createModel, TABS, type Dataset, type GroupMode, type Price, type RowBadge, type SaveState, type TabId } from '~/stands/tariffs/model'
 import demo from '~/stands/tariffs/demo-data.json'
 
 /**
@@ -24,7 +24,11 @@ import demo from '~/stands/tariffs/demo-data.json'
  * П3: вкладка «Типы объектов» — блок с «Добавить тип объекта» (№ 21), таблица типов на `Table` с раскрытием, парой цен,
  * рубильником шкалы и удалением (№ 22), шкала типа в раскрытой строке (№ 23), выбор типа из справочника с поиском (№ 24),
  * удаление с «Отменить» (№ 25, 56), пустой список (№ 26).
- * «Схемы осмотра» — порция П4: на её месте `Empty` с названием порции. Переключатель периода — П6.1.
+ * П4 (такт 80): вкладка «Схемы осмотра» — группы на `Card` с метками `Badge appearance="outline"`, вилкой `PriceRange` и
+ * «Настроить группу» (№ 27–29); строки схем — `Card tone="muted" size="sm"`, устаревшая — `dimmed` (№ 30, 31); пустая
+ * группа — `Empty` (№ 57). Панель группы — `ModalCard` edge (№ 32): режимы — `RadioGroupItem variant="card"` со слотом
+ * `panel` (№ 33), фиксированная цена — `PricePair` (№ 34), шкала — `RegressScale` (№ 35), «Схемы в группе» — `Table`
+ * только для чтения (№ 36). Панель схемы (шестерёнка строки) — порция П5: уведомление-заглушка. Переключатель периода — П6.1.
  *
  * ## Поведение — модель `~/stands/tariffs/model.ts`
  *
@@ -44,6 +48,9 @@ import demo from '~/stands/tariffs/demo-data.json'
  * | `?open=help` | открыта подсказка «Как считается стоимость» (такт 78) |
  * | `?expand=<id типа>` | раскрыта строка типа объекта, через запятую — несколько; без `?tab=` — вкладка «Типы объектов» (такт 79) |
  * | `?open=type-picker` | открыт выбор типа из справочника; без `?tab=` — вкладка «Типы объектов» (такт 79) |
+ * | `?open=group` | открыта панель группы; без `?tab=` — вкладка «Схемы осмотра» (такт 80) |
+ * | `?group=<id группы>` | какая группа открыта: `g-kasko`, `g-osago`, `g-realty`; без параметра — первая (такт 80) |
+ * | `?mode=company` · `fixed` · `scale` | режим открытой группы — как данные, правка не пишется (такт 80) |
  */
 definePageMeta({ layout: false })
 useHead({ title: 'Тарификация — стенд' })
@@ -51,11 +58,13 @@ useHead({ title: 'Тарификация — стенд' })
 const route = useRoute()
 const q = (k: string) => String(route.query[k] ?? '')
 
-const OPEN_AT_LOAD = ['help', 'type-picker']
+const OPEN_AT_LOAD = ['help', 'type-picker', 'group']
 const openAtLoad = OPEN_AT_LOAD.find(s => s === q('open'))
 const expandAtLoad = q('expand') ? q('expand').split(',').filter(Boolean) : []
 /* Выбор типа и раскрытая строка живут на «Типах объектов»: без `?tab=` оснастка такта 79 открывает эту вкладку. */
-const tabAtLoad = TABS.find(t => t.id === q('tab'))?.id ?? (openAtLoad === 'type-picker' || expandAtLoad.length ? 'types' : undefined)
+const tabAtLoad = TABS.find(t => t.id === q('tab'))?.id
+  ?? (openAtLoad === 'type-picker' || expandAtLoad.length ? 'types' : openAtLoad === 'group' ? 'schemes' : undefined)
+const MODES: GroupMode[] = ['company', 'fixed', 'scale']
 const saveAtLoad = (['saving', 'error'] as SaveState[]).find(s => s === q('save'))
 const m = createModel(demo as unknown as Dataset, {
   data: q('data') === 'empty' ? 'empty' : 'main',
@@ -65,6 +74,8 @@ const m = createModel(demo as unknown as Dataset, {
   scale: q('scale') === 'on',
   open: openAtLoad,
   expand: expandAtLoad,
+  group: q('group') || undefined,
+  mode: MODES.find(x => x === q('mode')),
 })
 
 const tab = computed<string>({ get: () => m.ui.tab, set: v => m.setTab(v as TabId) })
@@ -180,9 +191,55 @@ function onPickerKeydown(e: KeyboardEvent) {
   }
 }
 
-/** Содержимое вкладок, которое соберут следующие порции, — план `tariffs.md`, раздел 10. */
-const PENDING: Record<string, { title: string, description: string }> = {
-  schemes: { title: '«Схемы осмотра» — порция П4', description: 'Группы и схемы с вилками цен и метками, панели группы и схемы' },
+/* ------------------------------ «Схемы осмотра» и панель группы — П4, такт 80 ------------------------------ */
+/**
+ * Тон метки — строка 25 реестра (решение оркестратора 3): режимы — `default`, «Новая» — `warning`, счёт и признаки —
+ * `neutral`; расширенная палитра не берётся.
+ */
+const BADGE_TONE: Record<RowBadge['kind'], 'default' | 'warning' | 'neutral'> = { mode: 'default', new: 'warning', flag: 'neutral', count: 'neutral' }
+
+/** Группы со схемами (№ 27, 30): метки по 6.6, вилки по 6.5. */
+const groupRows = computed(() => m.view.value.groups.map(g => ({
+  id: g.id,
+  name: g.name,
+  badges: m.groupBadges(g.id),
+  range: m.groupRange(g.id),
+  schemes: m.schemesOf(g.id).map(x => ({
+    id: x.id,
+    name: x.name,
+    badges: m.schemeBadges(x.id),
+    range: m.schemeRange(x.id),
+    outdated: x.flags.includes('outdated'),
+  })),
+})))
+/** Вход в панель схемы — порция П5 (решение оркестратора 2 промпта такта 80): уведомление-заглушка. */
+const openScheme = () => m.pendingPortion('Панель схемы', 'П5')
+
+/** Панель группы (№ 32–36): открыта — `ui.open === 'group'`; закрытие — Esc, крестик, клик мимо. */
+const groupOpen = computed({
+  get: () => m.ui.open === 'group' && m.ui.panel?.kind === 'group',
+  set: (v: boolean) => { if (!v) m.closePanel() },
+})
+const panelGroup = computed(() => (m.ui.panel?.kind === 'group' ? m.groupOf(m.ui.panel.id) : undefined))
+const panelSchemes = computed(() => (panelGroup.value
+  ? m.schemesOf(panelGroup.value.id).map(x => ({ id: x.id, name: x.name, range: m.schemeRange(x.id) }))
+  : []))
+const groupMode = computed({
+  get: () => panelGroup.value?.mode ?? 'company',
+  set: (v: string) => { if (panelGroup.value) m.setGroupMode(panelGroup.value.id, v as GroupMode) },
+})
+/** Пара и шкала группы — `setPrice`, `setScale` модели по пути группы; правки сразу в черновик (стр. 53). */
+function setGroupPrice(patch: Partial<Price>) {
+  const path = panelGroup.value && m.groupPath(panelGroup.value.id)
+  if (path) m.setPrice(`${path}.price`, patch)
+}
+function setGroupScale(patch: { steps?: RegressStep[], form?: ScaleForm }) {
+  const path = panelGroup.value && m.groupPath(panelGroup.value.id)
+  if (path) m.setScale(`${path}.scale`, patch)
+}
+function groupStepRemoved(previous: RegressStep[]) {
+  const path = panelGroup.value && m.groupPath(panelGroup.value.id)
+  if (path) m.stepRemoved(`${path}.scale`, previous)
 }
 
 if (import.meta.client) {
@@ -522,12 +579,159 @@ if (import.meta.client) {
           </div>
         </TabsContent>
 
-        <TabsContent v-for="t in TABS.slice(2)" :key="t.id" :value="t.id">
-          <div class="flex flex-col pt-6">
-            <Empty :title="PENDING[t.id]?.title" :description="PENDING[t.id]?.description" />
+        <TabsContent value="schemes">
+          <!-- Вкладка «Схемы осмотра» — Figma `30875:127755`: блоки групп через 4. -->
+          <div class="flex flex-col gap-1 pt-6" data-block="schemes">
+            <Card v-for="g in groupRows" :key="g.id" as="section" class="flex flex-col gap-6" :data-group="g.id">
+              <!-- Строка группы — Figma `30875:127808`: имя и метки, вилка группы, «Настроить группу». -->
+              <div class="flex items-baseline gap-6" data-group-head>
+                <div class="flex shrink-0 items-center gap-3">
+                  <Heading level="group" data-group-name>
+                    {{ g.name }}
+                  </Heading>
+                  <div class="flex items-center gap-0.5" data-badges>
+                    <Badge v-for="b in g.badges" :key="b.id" appearance="outline" :variant="BADGE_TONE[b.kind]" :data-badge="b.id">
+                      {{ b.text }}
+                    </Badge>
+                  </div>
+                </div>
+                <PriceRange
+                  layout="dash"
+                  label="Стоимость осмотров группы по умолчанию:"
+                  note="наследуется схемами без индивидуальной цены"
+                  :min="g.range.min"
+                  :max="g.range.max"
+                  class="flex-1"
+                  data-group-range
+                />
+                <ButtonAction class="shrink-0" data-act="group-settings" @click="m.openGroup(g.id)">
+                  <template #icon>
+                    <Icon name="settings" :size="16" />
+                  </template>
+                  Настроить группу
+                </ButtonAction>
+              </div>
+
+              <!-- Строки схем — Figma `30875:127821`: имя с метками, вилка «от … до …», шестерёнка; устаревшая приглушена (§11). -->
+              <div v-if="g.schemes.length" class="flex flex-col gap-1">
+                <Card
+                  v-for="x in g.schemes"
+                  :key="x.id"
+                  tone="muted"
+                  size="sm"
+                  :dimmed="x.outdated"
+                  class="flex items-center gap-5"
+                  :data-scheme="x.id"
+                >
+                  <div class="flex min-w-0 flex-1 items-center gap-3">
+                    <Heading data-scheme-name>
+                      {{ x.name }}
+                    </Heading>
+                    <div class="flex items-center gap-0.5" data-badges>
+                      <Badge v-for="b in x.badges" :key="b.id" appearance="outline" :variant="BADGE_TONE[b.kind]" :data-badge="b.id">
+                        {{ b.text }}
+                      </Badge>
+                    </div>
+                  </div>
+                  <PriceRange label="Вилка цен" :min="x.range.min" :max="x.range.max" class="shrink-0" data-scheme-range />
+                  <IconButton variant="ghost" :label="`Настроить схему: ${x.name}`" data-act="scheme-settings" @click="openScheme">
+                    <Icon name="settings" :size="16" />
+                  </IconButton>
+                </Card>
+              </div>
+              <!-- Пустая группа (№ 57, стр. 46): схемы добавляются в конструкторе схем — действия на странице нет. -->
+              <Empty
+                v-else
+                title="В группе пока нет схем"
+                description="Цена группы применится к схемам, когда они появятся в группе"
+                data-group-empty
+              />
+            </Card>
           </div>
         </TabsContent>
       </Tabs>
+
+      <!-- Панель группы — Figma `32021:6684`, `32021:6756`, `32021:6829`: сайд 642, правки сразу в черновик (стр. 53), подвала нет. -->
+      <ModalCard v-model:open="groupOpen">
+        <ModalCardContent placement="edge" data-side="group">
+          <ModalCardHeader title="Настройка группы" />
+          <ModalCardBody v-if="panelGroup" class="flex flex-col gap-8">
+            <!-- Имя группы и число схем — Figma `32021:6689`; цены в подстроке нет (VA-14951, стр. 04). -->
+            <Heading level="page" :description="`${panelSchemes.length} ${m.schemesWord(panelSchemes.length)}`" data-panel-name>
+              {{ panelGroup.name }}
+            </Heading>
+
+            <!-- Режимы — Figma `32021:6693`: названия по §11 (стр. 29); тело выбранного — в общей рамке с карточкой (стр. 36). -->
+            <RadioGroup v-model="groupMode" class="flex flex-col gap-2" data-field="group-mode">
+              <RadioGroupItem value="company" variant="card" :checked="groupMode === 'company'" data-group-mode="company">
+                Базовая цена компании
+                <template #description>
+                  Наследует цену компании:
+                  <PriceRange size="sm" layout="dash" :min="m.companyRange().min" :max="m.companyRange().max" data-company-range />
+                </template>
+              </RadioGroupItem>
+              <RadioGroupItem value="fixed" variant="card" :checked="groupMode === 'fixed'" data-group-mode="fixed">
+                Фиксированная цена группы
+                <template #description>
+                  Фиксированная цена только для этой группы
+                </template>
+                <template #panel>
+                  <PricePair
+                    stretch
+                    :client="panelGroup.price.client"
+                    :non-client="panelGroup.price.nonClient"
+                    :linked="panelGroup.price.linked"
+                    data-field="group-price"
+                    @update:client="v => setGroupPrice({ client: v })"
+                    @update:non-client="v => setGroupPrice({ nonClient: v })"
+                    @update:linked="v => setGroupPrice({ linked: v })"
+                  />
+                </template>
+              </RadioGroupItem>
+              <RadioGroupItem value="scale" variant="card" :checked="groupMode === 'scale'" data-group-mode="scale">
+                Регресс-шкала группы
+                <template #description>
+                  Цена снижается при росте объёма осмотров
+                </template>
+                <template #panel>
+                  <RegressScale
+                    label=""
+                    :steps="panelGroup.scale.steps"
+                    :form="panelGroup.scale.form"
+                    data-field="group-scale"
+                    @update:steps="v => setGroupScale({ steps: v })"
+                    @update:form="v => setGroupScale({ form: v })"
+                    @remove-step="e => groupStepRemoved(e.previous)"
+                  />
+                </template>
+              </RadioGroupItem>
+            </RadioGroup>
+
+            <!-- «Схемы в группе» — Figma `32021:6894`: только чтение, цена схемы справа; «N по группе» — схемы, наследующие цену группы. -->
+            <section class="flex flex-col gap-4" data-group-schemes>
+              <div class="flex items-center justify-between gap-4">
+                <Heading level="group">
+                  Схемы в группе
+                </Heading>
+                <Badge appearance="outline" variant="neutral" data-inheriting>
+                  {{ m.inheritingCount(panelGroup.id) }} по группе
+                </Badge>
+              </div>
+              <Table v-if="panelSchemes.length">
+                <TableRow v-for="x in panelSchemes" :key="x.id" :data-group-scheme="x.id">
+                  <TableCell class="min-w-0 flex-1 pl-6" data-group-scheme-name>
+                    {{ x.name }}
+                  </TableCell>
+                  <TableCell variant="slot" class="justify-end">
+                    <PriceRange layout="dash" :min="x.range.min" :max="x.range.max" data-group-scheme-range />
+                  </TableCell>
+                </TableRow>
+              </Table>
+              <Empty v-else title="В группе пока нет схем" data-group-schemes-empty />
+            </section>
+          </ModalCardBody>
+        </ModalCardContent>
+      </ModalCard>
 
       <Toaster>
         <Toast

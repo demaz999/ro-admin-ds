@@ -11,6 +11,9 @@ import { ref } from 'vue'
  *
  * П2 (такт 78): `PricePair` и `RegressScale` (карточки 1 и 2, раздел 8); оси `Input unit` и `Input numeric`, `Field
  * orientation="split"` и `hintTone`, `Card size="sm"`, `IconButton variant="destructive"` (раздел 9).
+ *
+ * П4 (такт 80): `PriceRange` (карточка 4, раздел 8); оси `Badge appearance="outline"`, слот `panel` у `RadioGroupItem`,
+ * `Card dimmed` (раздел 9).
  */
 definePageMeta({ layout: false })
 useHead({ title: 'Тарификация — матрицы' })
@@ -72,6 +75,48 @@ const SCALE_EXAMPLE = `<RegressScale
 const unitValue = ref('20000')
 const UNIT_EXAMPLE = `<Input v-model="sum" numeric unit="₽" placeholder="" :show-icon="false" />
 <!-- numeric: только цифры, разряды неразрывным пробелом при показе; в модели — строка цифр -->`
+
+/* ------------------------------ П4 — такт 80 ------------------------------ */
+
+/** Вилка: все виды формата 6.5 в двух раскладках. */
+const RANGE_CASES = [
+  { id: 'range', label: 'диапазон', min: 3500, max: 4500 },
+  { id: 'single', label: 'одна цена', min: 1500, max: 1500 },
+  { id: 'from', label: 'только нижняя — «от»', min: 20000, max: null },
+  { id: 'none', label: 'цены нет', min: null, max: null },
+  { id: 'swap', label: 'min больше max — по порядку', min: 75000, max: 50000 },
+] as const
+const RANGE_EXAMPLE = `<PriceRange label="Вилка цен" :min="range.min" :max="range.max" />
+<!-- «от 50 000 ₽ до 75 000 ₽»; равные — «X ₽»; только min — «от X ₽»; ничего — «—» -->
+<PriceRange layout="dash" label="Стоимость осмотров группы по умолчанию:" :min="3500" :max="4500"
+  note="наследуется схемами без индивидуальной цены" />   <!-- «3 500–4 500 ₽ · …» -->`
+
+/** Метки-контуры: шесть ролей. */
+const BADGE_ROLES = ['default', 'success', 'warning', 'destructive', 'neutral'] as const
+const BADGE_EXAMPLE = `<Badge appearance="outline" variant="default">Регресс-шкала</Badge>
+<Badge appearance="outline" variant="warning">Новая</Badge>
+<Badge appearance="outline" variant="neutral">2 схемы</Badge>   <!-- контур 20: рамка 1 и текст тона, 12/16 -->`
+
+/** Карточки режима с телом: живой пример. */
+const mode = ref('fixed')
+const modePrice = ref({ client: 900 as number | null, nonClient: 1100 as number | null, linked: false })
+const modeSteps = ref<RegressStep[]>([
+  { from: 1, to: 500, price: { client: 1200, nonClient: 1200, linked: true } },
+  { from: 501, to: null, price: { client: 1000, nonClient: 1000, linked: true } },
+])
+const modeForm = ref<ScaleForm>('single')
+const PANEL_EXAMPLE = `<RadioGroup v-model="group.mode">
+  <RadioGroupItem value="fixed" variant="card" :checked="group.mode === 'fixed'">
+    Фиксированная цена группы
+    <template #description>Фиксированная цена только для этой группы</template>
+    <template #panel>
+      <PricePair stretch v-model:client="…" v-model:non-client="…" v-model:linked="…" />
+    </template>
+  </RadioGroupItem>
+</RadioGroup>   <!-- тело рисуется только у отмеченной, в общей рамке с карточкой -->`
+
+const DIMMED_EXAMPLE = `<Card tone="muted" size="sm" :dimmed="scheme.outdated"> … </Card>
+<!-- содержимое на 0.48, подложка прежняя; нажатия остаются -->`
 
 const FIELD_EXAMPLE = `<Field orientation="split" label="Базовая стоимость схемы осмотра" :hint="hint" :hint-tone="scale.on ? 'warning' : 'default'">
   <PricePair … />
@@ -245,6 +290,117 @@ const FIELD_EXAMPLE = `<Field orientation="split" label="Базовая стои
         </Card>
       </div>
       <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ FIELD_EXAMPLE }}</pre>
+    </section>
+
+    <section class="flex flex-col gap-4" data-matrix="price-range">
+      <Heading>PriceRange — вилка цен (Figma `30875:127825`, `30875:127816`)</Heading>
+      <div class="grid grid-cols-[14rem_auto_auto_auto] items-baseline gap-x-8 gap-y-4 text-xs">
+        <span />
+        <span>prefixed · md</span>
+        <span>dash · md</span>
+        <span>dash · sm</span>
+        <template v-for="c in RANGE_CASES" :key="c.id">
+          <span>{{ c.label }}</span>
+          <PriceRange label="Вилка цен" :min="c.min" :max="c.max" :data-case="`range-${c.id}-prefixed`" />
+          <PriceRange layout="dash" :min="c.min" :max="c.max" :data-case="`range-${c.id}-dash`" />
+          <PriceRange layout="dash" size="sm" :min="c.min" :max="c.max" :data-case="`range-${c.id}-sm`" />
+        </template>
+      </div>
+      <Heading>С подписью и пояснением — строка группы; на тонированной плитке — строка схемы</Heading>
+      <div class="flex flex-col gap-3">
+        <PriceRange layout="dash" label="Стоимость осмотров группы по умолчанию:" :min="3500" :max="4500" note="наследуется схемами без индивидуальной цены" data-case="range-group" />
+        <Card tone="muted" size="sm" class="flex items-center justify-between gap-5">
+          <Heading>Осмотр легкового автомобиля</Heading>
+          <PriceRange label="Вилка цен" :min="50000" :max="75000" data-case="range-on-tone" />
+        </Card>
+      </div>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ RANGE_EXAMPLE }}</pre>
+    </section>
+
+    <section class="flex flex-col gap-4" data-matrix="badge-outline">
+      <Heading>Badge · appearance="outline" — метка-контур (Figma `31175:4820`)</Heading>
+      <div class="grid grid-cols-[8rem_auto_auto_auto] items-center justify-start gap-x-6 gap-y-3 text-xs">
+        <span />
+        <span>контур</span>
+        <span>контур на тоне</span>
+        <span>залитая md (прежняя)</span>
+        <template v-for="v in BADGE_ROLES" :key="v">
+          <span>{{ v }}</span>
+          <Badge appearance="outline" :variant="v" :data-case="`badge-outline-${v}`">Регресс-шкала</Badge>
+          <Card tone="muted" size="sm" class="flex">
+            <Badge appearance="outline" :variant="v" :data-case="`badge-outline-tone-${v}`">2 схемы</Badge>
+          </Card>
+          <Badge :variant="v" :data-case="`badge-filled-${v}`">Регресс-шкала</Badge>
+        </template>
+      </div>
+      <div class="flex w-fit items-center gap-3 rounded-md bg-foreground p-3">
+        <Badge appearance="outline" variant="inverse" data-case="badge-outline-inverse">Регресс-шкала</Badge>
+        <Badge variant="inverse" data-case="badge-filled-inverse">Регресс-шкала</Badge>
+      </div>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ BADGE_EXAMPLE }}</pre>
+    </section>
+
+    <section class="flex flex-col gap-4" data-matrix="radio-panel">
+      <Heading>RadioGroupItem · слот panel — тело выбранного режима (Figma `32021:6851`, `32021:6858`)</Heading>
+      <div class="w-160">
+        <RadioGroup v-model="mode" class="flex flex-col gap-2" data-case="radio-panel-live">
+          <RadioGroupItem value="company" variant="card" :checked="mode === 'company'">
+            Базовая цена компании
+            <template #description>
+              Наследует цену компании: <PriceRange size="sm" layout="dash" :min="500" :max="700" />
+            </template>
+          </RadioGroupItem>
+          <RadioGroupItem value="fixed" variant="card" :checked="mode === 'fixed'">
+            Фиксированная цена группы
+            <template #description>
+              Фиксированная цена только для этой группы
+            </template>
+            <template #panel>
+              <PricePair v-model:client="modePrice.client" v-model:non-client="modePrice.nonClient" v-model:linked="modePrice.linked" stretch />
+            </template>
+          </RadioGroupItem>
+          <RadioGroupItem value="scale" variant="card" :checked="mode === 'scale'">
+            Регресс-шкала группы
+            <template #description>
+              Цена снижается при росте объёма осмотров
+            </template>
+            <template #panel>
+              <RegressScale v-model:steps="modeSteps" v-model:form="modeForm" label="" />
+            </template>
+          </RadioGroupItem>
+        </RadioGroup>
+      </div>
+      <Heading>Без слота panel — карточка прежняя</Heading>
+      <div class="w-160">
+        <RadioGroup model-value="a" class="flex flex-col gap-2" data-case="radio-card-plain">
+          <RadioGroupItem value="a" variant="card" checked>
+            Сквозной учет
+            <template #description>
+              Любой выполненный осмотр увеличивает счётчик во всех активных шкалах компании
+            </template>
+          </RadioGroupItem>
+        </RadioGroup>
+      </div>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ PANEL_EXAMPLE }}</pre>
+    </section>
+
+    <section class="flex flex-col gap-4" data-matrix="card-dimmed">
+      <Heading>Card · dimmed — устаревшая схема приглушена (§11; макета нет)</Heading>
+      <div class="flex w-200 flex-col gap-1">
+        <Card tone="muted" size="sm" class="flex items-center gap-5" data-case="card-muted">
+          <Heading class="flex-1">Осмотр транспортного средства</Heading>
+          <PriceRange label="Вилка цен" :min="900" :max="1100" />
+        </Card>
+        <Card tone="muted" size="sm" dimmed class="flex items-center gap-5" data-case="card-muted-dimmed">
+          <Heading class="flex-1">Осмотр прицепа</Heading>
+          <Badge appearance="outline" variant="neutral">Устаревшая</Badge>
+          <PriceRange label="Вилка цен" :min="900" :max="1100" />
+        </Card>
+        <Card size="sm" dimmed data-case="card-default-dimmed">
+          <span>Card size="sm", tone="default", dimmed: рамка и подложка прежние, содержимое на 0.48</span>
+        </Card>
+      </div>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ DIMMED_EXAMPLE }}</pre>
     </section>
 
     <section class="flex flex-col gap-4" data-matrix="icon-button-destructive">

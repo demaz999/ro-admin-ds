@@ -75,3 +75,63 @@ export const badgeVariants = cva(
 )
 
 export type BadgeVariants = VariantProps<typeof badgeVariants>
+
+/**
+ * ## Вид `appearance="outline"` — метка-контур, такт 80 (решение агента, правило 21; нехватка в ките)
+ *
+ * Метки режима и признаков на странице тарификации — контуры (Figma `31175:4820`, 10 меток): высота 20, поля 2 / 8,
+ * радиус полный, рамка 1 и текст 12/16 одного тона, заливки нет. Мастера контура у `Badge` нет; состав — тот же текстовый
+ * бейдж, поэтому контур — ось вида существующего компонента (`docs/tariffs.md`, раздел 5, № 28; раздел 9).
+ *
+ * | часть | кит | макет |
+ * |---|---|---|
+ * | высота | 20 (`h-5`) | 20 |
+ * | поля | 8 по бокам | 2 / 8 |
+ * | радиус | полный | полный |
+ * | кегль | 12/16 regular (`text-2xs`) | 12/16 |
+ * | рамка | 1, тон роли | 1, тон метки |
+ *
+ * Тон — те же шесть ролей. Текст тёмной ступенью тона там, где она есть в теме: 12/16 на белом и на `--accent` держит
+ * контраст 4.5:1.
+ *
+ * | роль | рамка | текст |
+ * |---|---|---|
+ * | `default` | `--primary` | `--primary` |
+ * | `success` | `--success` | `--success-strong` |
+ * | `warning` | `--warning` | `--warning-strong` |
+ * | `destructive` | `--destructive` | `--destructive-strong` |
+ * | `neutral` | `--foreground-secondary` | `--foreground-secondary` — `secondary/default` макета у «N схемы» |
+ * | `inverse` | `--background` | `--background` |
+ *
+ * Цвета меток макета из расширенной палитры (`status-01`, `-02`, `-03`, `-06`, `#d461ba`) не берутся: метки стоят на
+ * семантических ролях (строка 25 реестра `docs/tariffs.md`, решение оркестратора 3 промпта такта 80).
+ */
+export const badgeOutlineVariants = cva(
+  'inline-flex h-5 w-fit shrink-0 items-center rounded-full border bg-transparent px-2 text-2xs font-normal whitespace-nowrap',
+  {
+    variants: {
+      variant: {
+        default: 'border-primary text-primary',
+        success: 'border-success text-success-strong',
+        warning: 'border-warning text-warning-strong',
+        destructive: 'border-destructive text-destructive-strong',
+        neutral: 'border-foreground-secondary text-foreground-secondary',
+        inverse: 'border-background text-background',
+      },
+    },
+    defaultVariants: { variant: 'default' },
+  },
+)
+
+/**
+ * ## Изменения после передачи
+ *
+ * Правило 23 `docs/chat-protocol.md`: каждое изменение переданного компонента маркируется здесь, в `CHANGELOG.md` и в
+ * «Передано фронтам»; живые примеры — стенд `/kit-changes`. `Badge` передан фронтам 2026-09-30.
+ *
+ * ### Черновик следующей версии — относительно `handover-2026-10-02`
+ *
+ * - **Добавлено.** Метка-контур: высота 20, поля 8 по бокам, радиус полный, рамка 1 и текст 12/16 regular тона роли, заливки
+ *   нет; у `success`, `warning`, `destructive` текст — тёмная ступень тона (`--*-strong`), у `neutral` — `--foreground-secondary`.
+ *   Размер у контура один. Залитая метка прежняя. API: проп `appearance` — `filled` по умолчанию, `outline`. Такт 80.
+ */

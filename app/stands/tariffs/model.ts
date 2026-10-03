@@ -33,6 +33,16 @@ import { chainSteps, stepErrors } from '~/components/ui/regress-scale/rules'
  * имени) и `addType`; удаление с «Отменить» — `removeType` (стр. 52); раскрытие строки — `toggleExpand`; рубильник
  * шкалы типа — `setTypeScaleOn` (включение раскрывает строку, стр. 69); пара и шкала типа — `setPrice` и `setScale` по
  * пути `objectTypes.<номер>`, номер — `typePath`. Оснастка `?expand=<id типа>`, `?open=type-picker`. Сценарии ТФ-13–ТФ-16.
+ *
+ * ## Что добавлено в П4 — такт 80
+ *
+ * Схемы осмотра и группы (уровни 3 и 4а, §3, §11): вилки цен по 6.5 — `companyRange`, `groupRange`, `schemeRange` (цены
+ * типов в вилку схемы не входят, стр. 56); метки строк по 6.6 — `groupBadges`, `schemeBadges`; схемы группы —
+ * `schemesOf`. Панель группы — `openGroup`, `closePanel`; режим группы — `setGroupMode` (шкала группы включена ровно в
+ * режиме «Регресс-шкала группы»: режим сам исключает фиксированную цену, §5); пара и шкала группы — `setPrice` и
+ * `setScale` по пути `groups.<номер>`, номер — `groupPath`. Правки панели пишутся сразу (автосохранение §8, стр. 53).
+ * Оснастка `?open=group`, `?group=<id>`, `?mode=company|fixed|scale` — режим открытой группы как данные. Сценарии
+ * ТФ-17–ТФ-19, ТФ-24 (группа).
  */
 
 /* ------------------------------ данные ------------------------------ */
@@ -118,6 +128,10 @@ export const TABS: { id: TabId, label: string, icon: string }[] = [
 ]
 
 export type SaveState = 'saving' | 'saved' | 'error'
+/** Вилка цен — 6.5: `min` и `max` в ₽; равные — одна цена; `max: null` при заданном `min` — «от X ₽»; обе `null` — цены нет. */
+export interface Range { min: number | null, max: number | null }
+/** Метка строки — 6.6: `mode` — режим уровня, `new` — новая схема, `flag` — признак из данных, `count` — счёт. */
+export interface RowBadge { id: string, text: string, kind: 'mode' | 'new' | 'flag' | 'count' }
 export interface Notice { id: number, text: string, kind: 'ok' | 'err', undo: boolean }
 
 export interface ModelOptions {
@@ -134,6 +148,10 @@ export interface ModelOptions {
   open?: string
   /** Раскрытые строки типов при загрузке — оснастка `?expand=` (такт 79): id типов через запятую. */
   expand?: string[]
+  /** Открытая панель группы при загрузке — оснастка `?open=group&group=<id>` (такт 80); без `group` — первая группа. */
+  group?: string
+  /** Режим открытой группы при загрузке — оснастка `?mode=` (такт 80): во всех периодах, как данные — правка не пишется. */
+  mode?: GroupMode
 }
 
 /** Сколько длится запись черновика на стенде. */
@@ -209,6 +227,9 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     base.schemes = base.schemes.filter(s => !data.empty.emptyGroups.includes(s.groupId))
   }
   if (opts.scale) base.base.scale.on = true
+  /* Оснастка `?mode=` (такт 80): режим открытой группы — как данные; шкала группы включена ровно в режиме шкалы. */
+  const groupAtLoad = opts.open === 'group' ? (base.groups.find(g => g.id === opts.group) ?? base.groups[0]) : undefined
+  if (groupAtLoad && opts.mode) { groupAtLoad.mode = opts.mode; groupAtLoad.scale.on = opts.mode === 'scale' }
   const fromOf = (f: FromSpec) => 'ahead' in f ? addMonths(now, f.ahead) : ym(parseYm(now).y + f.year, f.month)
   const periods = reactive<Period[]>(data.periods.map((p) => {
     const settings = clone(base)
@@ -283,7 +304,7 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     /** Открытая поверхность — порции П2–П6.2: подсказка (`help`, такт 78), список периодов, окна, панели (6.9, `?open=`). */
     open: (opts.open ?? '') as string,
     /** Открытая панель группы или схемы — порции П4, П5. */
-    panel: null as null | { kind: 'group' | 'scheme', id: string, tab: 'pricing' | 'types' },
+    panel: (groupAtLoad ? { kind: 'group', id: groupAtLoad.id, tab: 'pricing' } : null) as null | { kind: 'group' | 'scheme', id: string, tab: 'pricing' | 'types' },
     /** Раскрытые строки типов — порция П3 (такт 79), оснастка `?expand=`. */
     expanded: [...(opts.expand ?? [])] as string[],
   })
@@ -422,6 +443,103 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     return true
   }
 
+  /* ------------------------------ операции П4 — такт 80: схемы осмотра и панель группы ------------------------------ */
+  /** Диапазон цен: меньшая и большая из заданных; одна цена — равные границы; цен нет — `null` и `null`. */
+  function bounds(values: (number | null)[]): Range {
+    const xs = values.filter((v): v is number => v != null)
+    return xs.length ? { min: Math.min(...xs), max: Math.max(...xs) } : { min: null, max: null }
+  }
+  const pairValues = (p: Price) => [p.client, p.linked ? p.client : p.nonClient]
+  /** Цены шкалы: «Единая цена» — цена клиента ступени, «По ролям» — обе (6.2). */
+  const scaleValues = (sc: Scale) => sc.steps.flatMap(st => (sc.form === 'single' ? [st.price.client] : pairValues(st.price)))
+  /**
+   * Вилка компании (уровень 1, режим группы «Базовая цена компании») — §11 «Что показывается в вилке цен группы»: пара
+   * «клиент – не клиент» базовой цены; при включённой общей шкале — мин–макс шкалы; если базовой цены нет, а задана
+   * минимальная сумма за период — «от X ₽».
+   */
+  function companyRange(): Range {
+    const b = view.value.base
+    const r = bounds(b.scale.on ? scaleValues(b.scale) : pairValues(b.price))
+    if (r.min == null && b.minPayment != null) return { min: b.minPayment, max: null }
+    return r
+  }
+  const groupOf = (id: string) => view.value.groups.find(g => g.id === id)
+  const schemeOf = (id: string) => view.value.schemes.find(x => x.id === id)
+  /** Вилка группы по режиму (6.5): компания · фиксированная пара · мин–макс шкалы. */
+  function groupRange(id: string): Range {
+    const g = groupOf(id)
+    if (!g) return { min: null, max: null }
+    if (g.mode === 'company') return companyRange()
+    return bounds(g.mode === 'fixed' ? pairValues(g.price) : scaleValues(g.scale))
+  }
+  /** Вилка схемы по режиму (6.5): «По группе» — вилка группы; индивидуальная пара; мин–макс шкалы. Цены типов не входят (стр. 56). */
+  function schemeRange(id: string): Range {
+    const x = schemeOf(id)
+    if (!x) return { min: null, max: null }
+    if (x.mode === 'group') return groupRange(x.groupId)
+    return bounds(x.mode === 'individual' ? pairValues(x.price) : scaleValues(x.scale))
+  }
+  /** Схемы группы в порядке данных. */
+  const schemesOf = (groupId: string) => view.value.schemes.filter(x => x.groupId === groupId)
+  /** «1 схема», «2 схемы», «5 схем». */
+  function schemesWord(n: number) {
+    const d = n % 10
+    const h = n % 100
+    return d === 1 && h !== 11 ? 'схема' : d >= 2 && d <= 4 && (h < 12 || h > 14) ? 'схемы' : 'схем'
+  }
+  /** Метки строки группы — 6.6: счёт «N схемы»; режим — только «Регресс-шкала». */
+  function groupBadges(id: string): RowBadge[] {
+    const g = groupOf(id)
+    if (!g) return []
+    const n = schemesOf(id).length
+    const out: RowBadge[] = [{ id: 'count', text: `${n} ${schemesWord(n)}`, kind: 'count' }]
+    if (g.mode === 'scale') out.push({ id: 'mode', text: 'Регресс-шкала', kind: 'mode' })
+    return out
+  }
+  /** Метки строки схемы — 6.6: режим, индивидуальные типы, признаки из данных (стр. 55). */
+  const MODE_BADGE: Record<SchemeMode, string> = { group: 'По группе', individual: 'Индивид. цены', scale: 'Регресс-шкала' }
+  const FLAG_BADGE: Record<SchemeFlag, string> = { new: 'Новая', outdated: 'Устаревшая', multi: 'Мульти', nested: 'Вложенный' }
+  function schemeBadges(id: string): RowBadge[] {
+    const x = schemeOf(id)
+    if (!x) return []
+    const out: RowBadge[] = [{ id: 'mode', text: MODE_BADGE[x.mode], kind: 'mode' }]
+    if (x.individualTypes) out.push({ id: 'types', text: 'Индивидуальные типы', kind: 'mode' })
+    for (const f of x.flags) out.push({ id: f, text: FLAG_BADGE[f], kind: f === 'new' ? 'new' : 'flag' })
+    return out
+  }
+  /** Сколько схем группы в режиме «По группе» — метка «N по группе» панели (6.6, № 36). */
+  const inheritingCount = (groupId: string) => schemesOf(groupId).filter(x => x.mode === 'group').length
+  /** Путь группы в выбранном периоде — `groups.<номер>`. */
+  function groupPath(id: string): string | null {
+    const k = view.value.groups.findIndex(g => g.id === id)
+    return k < 0 ? null : `groups.${k}`
+  }
+  /** Открыть панель группы (№ 32): «Настроить группу». */
+  function openGroup(id: string) {
+    if (!groupOf(id)) return
+    ui.panel = { kind: 'group', id, tab: 'pricing' }
+    ui.open = 'group'
+  }
+  /** Закрыть панель — Esc, крестик, клик мимо (ТФ-24): правки панели уже записаны автосохранением. */
+  function closePanel() {
+    ui.panel = null
+    if (ui.open === 'group' || ui.open === 'scheme') ui.open = ''
+  }
+  /**
+   * Режим группы (№ 33, §11): «Базовая цена компании» · «Фиксированная цена группы» · «Регресс-шкала группы». Шкала группы
+   * включена ровно в режиме шкалы — режим сам исключает фиксированную цену (§5). Пара и ступени не стираются: возврат к
+   * режиму показывает прежние значения.
+   */
+  function setGroupMode(id: string, mode: GroupMode): boolean {
+    const path = groupPath(id)
+    const g = groupOf(id)
+    if (!path || !g) return false
+    const next = clone(g)
+    next.mode = mode
+    next.scale.on = mode === 'scale'
+    return set(path, next)
+  }
+
   /* ------------------------------ вычисления для страницы ------------------------------ */
   /** Счётчики вкладок (№ 8): типов объектов и схем выбранного периода. */
   const counts = computed(() => ({ types: view.value.objectTypes.length, schemes: view.value.schemes.length }))
@@ -430,7 +548,7 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   function dump() {
     return JSON.stringify({
       now, selected: selectedId.id, periods: periods.map(p => ({ id: p.id, status: p.status, from: p.from, to: p.to, dirty: !!p.pending })),
-      view: view.value, save: save.state, writes: save.writes, apply: apply.state, applied: apply.count, ui: { tab: ui.tab, open: ui.open, expanded: ui.expanded },
+      view: view.value, save: save.state, writes: save.writes, apply: apply.state, applied: apply.count, ui: { tab: ui.tab, open: ui.open, expanded: ui.expanded, panel: ui.panel },
       errors: { base: scaleErrors('base.scale') },
     })
   }
@@ -440,6 +558,8 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     set, get, setTab, back, retry, applyChanges, pendingPortion, notify, dismissNotice, undo, dump,
     setPrice, setScale, stepRemoved, setOpen, scaleErrors,
     typeOf, typePath, pickerTypes, addType, removeType, toggleExpand, setTypeScaleOn,
+    companyRange, groupRange, schemeRange, schemesOf, schemesWord, groupBadges, schemeBadges, inheritingCount, groupPath, groupOf, schemeOf,
+    openGroup, closePanel, setGroupMode,
   }
 }
 

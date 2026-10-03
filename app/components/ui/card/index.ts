@@ -34,12 +34,21 @@ export const cardVariants = cva('', {
       md: 'rounded-2xl p-6',
       sm: 'rounded-md p-4',
     },
+    /**
+     * Приглушение — такт 80: дети-элементы корня на ступени `--opacity-disabled` 0.48, поверхность и рамка прежние. Устаревшая схема в
+     * списке страницы тарификации (§11: «устаревшие схемы приглушены»); в макете приглушения нет — строка 45 реестра
+     * `docs/tariffs.md`. Взаимодействие не гасится: вход в настройку остаётся.
+     */
+    dimmed: {
+      true: '*:opacity-[var(--opacity-disabled)]',
+      false: '',
+    },
     tone: {
       default: 'border border-border bg-card text-card-foreground',
       muted: 'bg-accent text-accent-foreground',
     },
   },
-  defaultVariants: { tone: 'default', size: 'md' },
+  defaultVariants: { tone: 'default', size: 'md', dimmed: false },
 })
 
 export type CardVariants = VariantProps<typeof cardVariants>
@@ -56,4 +65,7 @@ export type CardVariants = VariantProps<typeof cardVariants>
  * - **Добавлено.** Проп `size="sm"` — плитка внутри блока: радиус 8 (`--radius-md`), поля 16; тон — любой (`muted` —
  *   тонированная плитка). Макет тарификации `31767:8590`, `30875:127821`, `31099:5334`. Без пропа (`md`) поверхность
  *   прежняя: радиус 24, поля 24. Такт 78.
+ * - **Добавлено.** Проп `dimmed` — приглушённая поверхность: содержимое на прозрачности 0.48 (`--opacity-disabled`),
+ *   подложка и рамка прежние; нажатия и фокус содержимого остаются. Устаревшая схема в списке страницы тарификации (§11).
+ *   Без пропа поверхность прежняя. Такт 80.
  */
