@@ -183,6 +183,16 @@ const Q = {
   counter: v => `document.querySelector('[data-counter=${v}] [data-slot=choice-control]')`,
   help: `document.querySelector('[data-act=help]')`,
   undo: `[...document.querySelectorAll('[data-slot=toast] button')].find(b => b.textContent.replace(/\\s+/g, ' ').trim() === 'Отменить')`,
+  /* Такт 79, П3: вкладка «Типы объектов» — строки, раскрытие, рубильник, удаление, выбор типа. */
+  typeExpand: id => `document.querySelector('[data-type-row=${id}] [data-act=type-expand]')`,
+  typeSwitch: id => `document.querySelector('[data-type-row=${id}] [data-field=type-scale-switch] [data-slot=choice-control]')`,
+  typeRemove: id => `document.querySelector('[data-type-row=${id}] [data-act=type-remove]')`,
+  typeClient: id => `document.querySelector('[data-type-row=${id}] [data-slot=price-pair-client] input')`,
+  typeForm: (id, f) => `document.querySelector('[data-type-body=${id}] [data-scale-form=${f}]')`,
+  typeStepTo: (id, k) => `document.querySelectorAll('[data-type-body=${id}] [data-slot=regress-scale-step]')[${k}]?.querySelector('[data-slot=regress-scale-to] input')`,
+  addType: `document.querySelector('[data-act=add-type]')`,
+  typeSearch: `(document.querySelector('[data-field=type-search]')?.matches('input') ? document.querySelector('[data-field=type-search]') : document.querySelector('[data-field=type-search] input'))`,
+  typeOption: id => `document.querySelector('[data-type-option=${id}]')`,
 }
 
 function kit(page) {
@@ -245,6 +255,19 @@ function kit(page) {
         const stepEls = [...(scaleEl?.querySelectorAll('[data-slot=regress-scale-step]') ?? [])]
         const val = el => (el ? t(el.value) : null)
         const help = document.querySelector('[data-help]')
+        const stepsOf = el => [...el.querySelectorAll('[data-slot=regress-scale-step]')].map((s) => {
+          const x = { from: val(s.querySelector('[data-slot=regress-scale-from] input')), to: val(s.querySelector('[data-slot=regress-scale-to] input')) }
+          const single = s.querySelector('[data-slot=regress-scale-price] input')
+          if (single) x.price = val(single)
+          else { const pp = s.querySelector('[data-slot=price-pair]'); x.client = val(pinput(pp, 'client')); x.nonClient = val(pinput(pp, 'non-client')); x.linked = pp.hasAttribute('data-linked') }
+          x.error = t(s.querySelector('[data-slot=field-error]')?.textContent) || null
+          x.removable = !!s.querySelector('[data-step-remove]')
+          return x
+        })
+        /* Такт 79: строки типов, раскрытая строка со шкалой типа, пустой список, выбор типа. */
+        const typeRows = [...document.querySelectorAll('[data-type-row]')]
+        const picker = document.querySelector('[data-type-picker]')
+        const typesEmpty = document.querySelector('[data-types-empty]')
         const base = M.view.value.base
         /* Где фокус: поле пары, замок, часть ступени шкалы, кнопка подсказки. */
         const where = (() => {
@@ -253,7 +276,7 @@ function kit(page) {
           if (a.closest('[data-act=help]')) return 'help'
           const st = a.closest('[data-slot=regress-scale-step]')
           const pre = st ? 'step' + st.dataset.step : a.closest('[data-field=base-price]') ? 'base-price' : null
-          if (!pre) return a.closest('[data-field]')?.dataset.field ?? a.tagName.toLowerCase()
+          if (!pre) return a.closest('[data-field]')?.dataset.field ?? a.closest('[data-act]')?.dataset.act ?? a.tagName.toLowerCase()
           const part = a.closest('[data-pair-lock]') ? 'lock' : a.closest('[data-step-remove]') ? 'remove'
             : a.closest('[data-slot=price-pair-non-client]') ? 'non-client' : a.closest('[data-slot=price-pair-client]') ? 'client'
             : a.closest('[data-slot=regress-scale-from]') ? 'from' : a.closest('[data-slot=regress-scale-to]') ? 'to'
@@ -323,6 +346,35 @@ function kit(page) {
             steps: [...help.querySelectorAll('[data-help-step]')].map(r => t(r.innerText)),
           } : null,
           helpOpen: root.dataset.open === 'help',
+          types: document.querySelector('[data-block=types]') ? typeRows.map((r) => {
+            const id = r.dataset.typeRow
+            const pp = r.querySelector('[data-slot=price-pair]')
+            const sc = document.querySelector('[data-type-body=' + id + '] [data-field=type-scale]')
+            return {
+              id,
+              name: t(r.querySelector('[data-type-name]')?.textContent),
+              client: val(pinput(pp, 'client')),
+              nonClient: val(pinput(pp, 'non-client')),
+              linked: pp.hasAttribute('data-linked'),
+              pairDisabled: !!pinput(pp, 'client')?.disabled,
+              scale: r.querySelector('[data-field=type-scale-switch] [data-slot=choice-control]')?.getAttribute('data-state') ?? null,
+              expanded: r.querySelector('[data-act=type-expand]')?.getAttribute('aria-expanded') === 'true',
+              body: sc ? {
+                disabled: !!sc.querySelector('[data-slot=regress-scale-to] input')?.disabled,
+                form: sc.dataset.form ?? null,
+                head: [...sc.querySelectorAll('[data-slot=regress-scale-head] span:not(:has(span))')].map(s => t(s.textContent)).filter(Boolean),
+                steps: stepsOf(sc),
+              } : null,
+            }
+          }) : null,
+          typesEmpty: typesEmpty ? { title: t(typesEmpty.querySelector('[data-slot=empty-title]')?.textContent), action: t(typesEmpty.querySelector('[data-act=add-type]')?.textContent) } : null,
+          picker: picker ? {
+            options: [...picker.querySelectorAll('[data-type-option]')].map(o => t(o.textContent)),
+            active: t(picker.querySelector('[data-type-option][data-selected]')?.textContent) || null,
+            empty: t(picker.querySelector('[data-type-picker-empty] [data-slot=empty-title]')?.textContent) || null,
+          } : null,
+          modelTypes: M.view.value.objectTypes.map(x => [x.typeId, x.price.client, x.price.nonClient, x.price.linked, x.scale.on, x.scale.form, x.scale.steps.length]),
+          expanded: [...M.ui.expanded],
           focus: where,
           notices,
         })
@@ -338,6 +390,10 @@ function kit(page) {
  * Ожидание — подмножество слепка; источник — в названии сценария.
  */
 const TABS = ['Базовые настройки', 'Типы объектов', 'Схемы осмотра']
+/** Справочник типов демо-данных (6.7) в его порядке; свободные — без трёх типов вкладки. */
+const TYPES_ALL = ['Легковой автомобиль', 'Грузовой автомобиль', 'Мотоцикл', 'Автобус', 'Прицеп', 'Спецтехника', 'Сельхозтехника',
+  'Водный транспорт', 'Оборудование', 'Квартира', 'Частный дом', 'Коммерческая недвижимость', 'Земельный участок']
+const TYPES_FREE = TYPES_ALL.filter(x => !['Легковой автомобиль', 'Спецтехника', 'Квартира'].includes(x))
 const SCENARIOS = {
   'ТФ-01': ['«Назад» ведёт к карточке компании; вход вне скоупа — уведомление-заглушка (§11 «Вход»; scope, «Вне скоупа»)', [
     ['старт', null, { title: 'Тарификация', tab: 'base', period: 'current', save: 'saved', saveText: 'Все изменения сохранены', saveSurface: 'light', applyButton: 'Сохранить изменения', applyIcon: true, notices: [] }],
@@ -348,7 +404,7 @@ const SCENARIOS = {
     ['правка на «Базовых»: минимальная сумма 25000', async (K) => { await K.setMin('25000'); await K.settled() },
       { minPayment: '25 000', viewMin: 25000, saveLog: ['saving', 'saved'], writes: 1, dirty: true }],
     ['вкладка «Схемы осмотра»', K => K.tab('schemes'), { tab: 'schemes', tabActive: ['schemes'], pending: '«Схемы осмотра» — порция П4', dirty: true }],
-    ['вкладка «Типы объектов»', K => K.tab('types'), { tab: 'types', tabActive: ['types'], pending: '«Типы объектов» — порция П3', dirty: true }],
+    ['вкладка «Типы объектов» — собрана (П3, такт 79)', K => K.tab('types'), { tab: 'types', tabActive: ['types'], pending: null, dirty: true }],
     ['назад на «Базовые» — правка на месте', K => K.tab('base'), { tab: 'base', tabActive: ['base'], minPayment: '25 000', viewMin: 25000, dirty: true, saveLog: [], writes: 1, pending: null }],
     ['набор без типов объектов и с пустой группой — счётчики следуют', K => K.start('data=empty'), { counts: { base: null, types: '0', schemes: '5' }, tab: 'base' }],
   ]],
@@ -500,6 +556,71 @@ const SCENARIOS = {
     ['Tab — «От» второй ступени', K => K.tabKey(), { focus: 'step2:from' }],
     ['Tab — «До» второй ступени', K => K.tabKey(), { focus: 'step2:to' }],
   ]],
+
+  /* ------------------------------ П3 — такт 79: «Типы объектов» ------------------------------ */
+  'ТФ-13': ['выбор типа из справочника: поиск, добавленные уходят из списка, пустой поиск — «Ничего не найдено» (§11)', [
+    ['старт — три типа', null, { counts: { base: null, types: '3', schemes: '7' }, picker: null,
+      modelTypes: [['t-car', 300, 300, true, false, 'single', 1], ['t-special', 800, 1000, false, true, 'roles', 2], ['t-flat', 600, 600, true, false, 'single', 1]] }],
+    ['«Добавить тип объекта» — справочник без добавленных, фокус в поиске', K => K.click(Q.addType), {
+      picker: { options: TYPES_FREE, active: null, empty: null }, focus: 'type-search' }],
+    ['поиск «мото»', async (K) => { await K.page.type('мото') }, { picker: { options: ['Мотоцикл'], active: null, empty: null } }],
+    ['выбрать «Мотоцикл» — в таблице последним, цена не задана, пара связана, шкала выключена', async (K) => { await K.click(Q.typeOption('t-moto')); await K.settled() }, {
+      picker: null, counts: { base: null, types: '4', schemes: '7' }, dirty: true, saveLog: ['saving', 'saved'],
+      modelTypes: [['t-car', 300, 300, true, false, 'single', 1], ['t-special', 800, 1000, false, true, 'roles', 2], ['t-flat', 600, 600, true, false, 'single', 1], ['t-moto', null, null, true, false, 'single', 1]] }],
+    ['открыть снова — «Мотоцикла» в списке нет', K => K.click(Q.addType), { picker: { options: TYPES_FREE.filter(x => x !== 'Мотоцикл'), active: null, empty: null } }],
+    ['стрелка вниз дважды — второй пункт', async (K) => { await K.page.key('ArrowDown'); await K.page.key('ArrowDown') }, { picker: { options: TYPES_FREE.filter(x => x !== 'Мотоцикл'), active: 'Автобус', empty: null } }],
+    ['Enter — «Автобус» добавлен, выбор закрыт', async (K) => { await K.enter(); await K.settled() }, { picker: null, counts: { base: null, types: '5', schemes: '7' } }],
+    ['открыть и искать «яхта» — «Ничего не найдено»', async (K) => { await K.click(Q.addType); await K.page.type('яхта') }, { picker: { options: [], active: null, empty: 'Ничего не найдено' } }],
+    ['Esc — выбор закрыт, фокус на кнопке, типов прежнее число', K => K.escape(), { picker: null, focus: 'add-type', counts: { base: null, types: '5', schemes: '7' } }],
+  ], { query: 'tab=types' }],
+  'ТФ-14': ['строка типа: раскрытие, шкала типа и пара цен взаимоисключающие, форма «По ролям» (§5, §11; стр. 08, 69)', [
+    ['старт — строки свёрнуты; у «Спецтехники» шкала включена и пара выключена', null, { types: [
+      { id: 't-car', name: 'Легковой автомобиль', client: '300', nonClient: '300', linked: true, pairDisabled: false, scale: 'unchecked', expanded: false, body: null },
+      { id: 't-special', name: 'Спецтехника', client: '800', nonClient: '1 000', linked: false, pairDisabled: true, scale: 'checked', expanded: false, body: null },
+      { id: 't-flat', name: 'Квартира', client: '600', nonClient: '600', linked: true, pairDisabled: false, scale: 'unchecked', expanded: false, body: null }] }],
+    ['раскрыть «Легковой автомобиль» — шкала выключена', K => K.click(Q.typeExpand('t-car')), { expanded: ['t-car'], types: [
+      { id: 't-car', name: 'Легковой автомобиль', client: '300', nonClient: '300', linked: true, pairDisabled: false, scale: 'unchecked', expanded: true,
+        body: { disabled: true, form: 'single', head: ['От', 'До', 'Цена'], steps: [{ from: '1', to: '', price: '300', error: null, removable: false }] } },
+      { id: 't-special', name: 'Спецтехника', client: '800', nonClient: '1 000', linked: false, pairDisabled: true, scale: 'checked', expanded: false, body: null },
+      { id: 't-flat', name: 'Квартира', client: '600', nonClient: '600', linked: true, pairDisabled: false, scale: 'unchecked', expanded: false, body: null }] }],
+    ['включить шкалу — пара выключена, шкала доступна', async (K) => { await K.click(Q.typeSwitch('t-car')); await K.settled() }, { dirty: true, saveLog: ['saving', 'saved'], types: [
+      { id: 't-car', name: 'Легковой автомобиль', client: '300', nonClient: '300', linked: true, pairDisabled: true, scale: 'checked', expanded: true,
+        body: { disabled: false, form: 'single', head: ['От', 'До', 'Цена'], steps: [{ from: '1', to: '', price: '300', error: null, removable: false }] } },
+      { id: 't-special', name: 'Спецтехника', client: '800', nonClient: '1 000', linked: false, pairDisabled: true, scale: 'checked', expanded: false, body: null },
+      { id: 't-flat', name: 'Квартира', client: '600', nonClient: '600', linked: true, pairDisabled: false, scale: 'unchecked', expanded: false, body: null }] }],
+    ['форма «По ролям» — колонки «Клиент», «Не клиент», пара связана', async (K) => { await K.click(Q.typeForm('t-car', 'roles')); await K.settled() }, {
+      modelTypes: [['t-car', 300, 300, true, true, 'roles', 1], ['t-special', 800, 1000, false, true, 'roles', 2], ['t-flat', 600, 600, true, false, 'single', 1]] }],
+    ['выключить шкалу — пара доступна, раскрытая строка остаётся, шкала выключена', async (K) => { await K.click(Q.typeSwitch('t-car')); await K.settled() }, { types: [
+      { id: 't-car', name: 'Легковой автомобиль', client: '300', nonClient: '300', linked: true, pairDisabled: false, scale: 'unchecked', expanded: true,
+        body: { disabled: true, form: 'roles', head: ['От', 'До', 'Клиент', 'Не клиент'], steps: [{ from: '1', to: '', client: '300', nonClient: '300', linked: true, error: null, removable: false }] } },
+      { id: 't-special', name: 'Спецтехника', client: '800', nonClient: '1 000', linked: false, pairDisabled: true, scale: 'checked', expanded: false, body: null },
+      { id: 't-flat', name: 'Квартира', client: '600', nonClient: '600', linked: true, pairDisabled: false, scale: 'unchecked', expanded: false, body: null }] }],
+    ['свернуть', K => K.click(Q.typeExpand('t-car')), { expanded: [] }],
+    ['включить шкалу у свёрнутой «Квартиры» — строка раскрывается сама', async (K) => { await K.click(Q.typeSwitch('t-flat')); await K.settled() }, { expanded: ['t-flat'] }],
+    ['«До» первой ступени «Квартиры» 100 — новая ступень', async (K) => { await K.fill(Q.typeStepTo('t-flat', 0), '100'); await K.settled() }, {
+      modelTypes: [['t-car', 300, 300, true, false, 'roles', 1], ['t-special', 800, 1000, false, true, 'roles', 2], ['t-flat', 600, 600, true, true, 'single', 2]] }],
+    ['цена «Клиент» строки при выключенной шкале правится', async (K) => { await K.fill(Q.typeClient('t-car'), '350'); await K.settled() }, {
+      modelTypes: [['t-car', 350, 350, true, false, 'roles', 1], ['t-special', 800, 1000, false, true, 'roles', 2], ['t-flat', 600, 600, true, true, 'single', 2]] }],
+  ], { query: 'tab=types' }],
+  'ТФ-15': ['удаление типа с «Отменить»: тип исчез и вернулся на место (§11; стр. 31, 52)', [
+    ['старт — «Спецтехника» раскрыта', null, { counts: { base: null, types: '3', schemes: '7' }, expanded: ['t-special'] }],
+    ['удалить «Спецтехнику»', async (K) => { await K.click(Q.typeRemove('t-special')); await K.settled() }, {
+      notices: ['Тип «Спецтехника» удалён'], counts: { base: null, types: '2', schemes: '7' }, dirty: true, expanded: [],
+      modelTypes: [['t-car', 300, 300, true, false, 'single', 1], ['t-flat', 600, 600, true, false, 'single', 1]] }],
+    ['выбор типа — «Спецтехника» снова в справочнике', K => K.click(Q.addType), { picker: { options: TYPES_ALL.filter(x => x !== 'Легковой автомобиль' && x !== 'Квартира'), active: null, empty: null } }],
+    /* Esc закрыл бы и уведомление с «Отменить» (слой Reka): выбор закрывается повторным нажатием открывателя. */
+    ['повторное нажатие «Добавить тип объекта» — выбор закрыт', K => K.click(Q.addType), { picker: null }],
+    ['«Отменить» — тип на своём месте, строка раскрыта, правок нет', async (K) => { await K.undo(); await K.settled() }, {
+      counts: { base: null, types: '3', schemes: '7' }, dirty: false, expanded: ['t-special'],
+      modelTypes: [['t-car', 300, 300, true, false, 'single', 1], ['t-special', 800, 1000, false, true, 'roles', 2], ['t-flat', 600, 600, true, false, 'single', 1]] }],
+  ], { query: 'tab=types&expand=t-special' }],
+  'ТФ-16': ['пустой список типов: «Empty» с «Добавить тип объекта» (§11; стр. 46)', [
+    ['старт — `?data=empty`', null, { counts: { base: null, types: '0', schemes: '5' }, types: [],
+      typesEmpty: { title: 'Типов объектов пока нет', action: 'Добавить тип объекта' }, picker: null }],
+    ['«Добавить тип объекта» из пустого — весь справочник', K => K.click(Q.addType), { picker: { options: TYPES_ALL, active: null, empty: null } }],
+    ['выбрать «Квартиру» — таблица вместо пустого', async (K) => { await K.click(Q.typeOption('t-flat')); await K.settled() }, {
+      typesEmpty: null, picker: null, counts: { base: null, types: '1', schemes: '5' }, modelTypes: [['t-flat', null, null, true, false, 'single', 1]] }],
+  ], { query: 'data=empty&tab=types' }],
 }
 
 /* ------------------------------ прогон ------------------------------ */

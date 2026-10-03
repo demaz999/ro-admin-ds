@@ -26,6 +26,13 @@ import { chainSteps, stepErrors } from '~/components/ui/regress-scale/rules'
  * Пара и замок — `setPrice` (`pairWith`, 6.3); шкала — `setScale` (цепочка «От» правилами `ui/regress-scale/rules.ts`, 6.2),
  * удаление ступени с «Отменить» — `stepRemoved` и `undo`; ошибки «До» — `scaleErrors`; подсказка «Как считается
  * стоимость» — `setOpen('help')`; оснастка `?scale=on`, `?open=help`. Сценарии ТФ-05–ТФ-12, ТФ-36.
+ *
+ * ## Что добавлено в П3 — такт 79
+ *
+ * Типы объектов (уровень 2, §3, §11): выбор из справочника — `pickerTypes` (добавленные уходят из списка, поиск по
+ * имени) и `addType`; удаление с «Отменить» — `removeType` (стр. 52); раскрытие строки — `toggleExpand`; рубильник
+ * шкалы типа — `setTypeScaleOn` (включение раскрывает строку, стр. 69); пара и шкала типа — `setPrice` и `setScale` по
+ * пути `objectTypes.<номер>`, номер — `typePath`. Оснастка `?expand=<id типа>`, `?open=type-picker`. Сценарии ТФ-13–ТФ-16.
  */
 
 /* ------------------------------ данные ------------------------------ */
@@ -123,8 +130,10 @@ export interface ModelOptions {
   now?: string
   /** Общая шкала включена при загрузке — оснастка `?scale=on` (такт 78): во всех периодах, как данные: правка не пишется. */
   scale?: boolean
-  /** Открытая поверхность при загрузке — оснастка `?open=` (такт 78: `help`). */
+  /** Открытая поверхность при загрузке — оснастка `?open=` (такт 78: `help`; такт 79: `type-picker`). */
   open?: string
+  /** Раскрытые строки типов при загрузке — оснастка `?expand=` (такт 79): id типов через запятую. */
+  expand?: string[]
 }
 
 /** Сколько длится запись черновика на стенде. */
@@ -275,8 +284,8 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     open: (opts.open ?? '') as string,
     /** Открытая панель группы или схемы — порции П4, П5. */
     panel: null as null | { kind: 'group' | 'scheme', id: string, tab: 'pricing' | 'types' },
-    /** Раскрытые строки типов — порция П3. */
-    expanded: [] as string[],
+    /** Раскрытые строки типов — порция П3 (такт 79), оснастка `?expand=`. */
+    expanded: [...(opts.expand ?? [])] as string[],
   })
 
   /* ------------------------------ уведомления ------------------------------ */
@@ -353,6 +362,66 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   /** Ошибки «До» ступеней шкалы уровня — §5, стр. 50. */
   const scaleErrors = (path: string) => stepErrors((get(path) as Scale).steps)
 
+  /* ------------------------------ операции П3 — такт 79: типы объектов ------------------------------ */
+  /** Тип справочника по id. */
+  const typeOf = (id: string) => data.catalog.find(t => t.id === id)
+  /** Путь настройки типа в выбранном периоде — `objectTypes.<номер>`; номер меняется при удалении, поэтому берётся заново. */
+  function typePath(id: string): string | null {
+    const k = view.value.objectTypes.findIndex(t => t.typeId === id)
+    return k < 0 ? null : `objectTypes.${k}`
+  }
+  /**
+   * Список выбора типа (№ 24, §11 «выбор из справочника компании, поиск»): справочник без уже добавленных, по запросу —
+   * вхождение без учёта регистра; пустой результат страница показывает «Ничего не найдено».
+   */
+  function pickerTypes(query = ''): CatalogType[] {
+    const q = query.trim().toLowerCase()
+    const added = new Set(view.value.objectTypes.map(t => t.typeId))
+    return data.catalog.filter(t => !added.has(t.id) && (!q || t.name.toLowerCase().includes(q)))
+  }
+  /**
+   * Добавить тип из справочника (№ 24): в конец таблицы; цена не задана — «Тип без цены не тарифицируется» (§11), пара
+   * связана (стр. 51), шкала выключена (§5, стр. 07). Уже добавленный — отказ без правки.
+   */
+  function addType(id: string): boolean {
+    if (!typeOf(id) || view.value.objectTypes.some(t => t.typeId === id)) return false
+    const empty = () => ({ client: null, nonClient: null, linked: true })
+    const rate: ObjectTypeRate = { typeId: id, price: empty(), scale: { on: false, form: 'single', steps: [{ from: 1, to: null, price: empty() }] } }
+    return set('objectTypes', [...clone(view.value.objectTypes), rate])
+  }
+  /** Удалить тип (№ 25): уведомление с «Отменить» (стр. 52) — тип возвращается на своё место, с раскрытием строки. */
+  function removeType(id: string): boolean {
+    const list = clone(view.value.objectTypes)
+    const k = list.findIndex(t => t.typeId === id)
+    if (k < 0) return false
+    const [rate] = list.splice(k, 1)
+    const wasExpanded = ui.expanded.includes(id)
+    if (!set('objectTypes', list)) return false
+    ui.expanded = ui.expanded.filter(x => x !== id)
+    notify(`Тип «${typeOf(id)?.name ?? id}» удалён`, 'ok', () => {
+      if (view.value.objectTypes.some(t => t.typeId === id)) return
+      const back = clone(view.value.objectTypes)
+      back.splice(Math.min(k, back.length), 0, rate!)
+      set('objectTypes', back)
+      if (wasExpanded && !ui.expanded.includes(id)) ui.expanded.push(id)
+    })
+    return true
+  }
+  /** Раскрыть или свернуть строку типа (№ 22, 23): в раскрытой — шкала типа. */
+  function toggleExpand(id: string) {
+    ui.expanded = ui.expanded.includes(id) ? ui.expanded.filter(x => x !== id) : [...ui.expanded, id]
+  }
+  /**
+   * Рубильник шкалы типа (№ 22): включённая шкала выключает пару строки (§5, стр. 08); включение раскрывает строку —
+   * ступени видны сразу (стр. 69).
+   */
+  function setTypeScaleOn(id: string, on: boolean): boolean {
+    const path = typePath(id)
+    if (!path || !setScale(`${path}.scale`, { on })) return false
+    if (on && !ui.expanded.includes(id)) ui.expanded = [...ui.expanded, id]
+    return true
+  }
+
   /* ------------------------------ вычисления для страницы ------------------------------ */
   /** Счётчики вкладок (№ 8): типов объектов и схем выбранного периода. */
   const counts = computed(() => ({ types: view.value.objectTypes.length, schemes: view.value.schemes.length }))
@@ -361,7 +430,7 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   function dump() {
     return JSON.stringify({
       now, selected: selectedId.id, periods: periods.map(p => ({ id: p.id, status: p.status, from: p.from, to: p.to, dirty: !!p.pending })),
-      view: view.value, save: save.state, writes: save.writes, apply: apply.state, applied: apply.count, ui: { tab: ui.tab, open: ui.open },
+      view: view.value, save: save.state, writes: save.writes, apply: apply.state, applied: apply.count, ui: { tab: ui.tab, open: ui.open, expanded: ui.expanded },
       errors: { base: scaleErrors('base.scale') },
     })
   }
@@ -370,6 +439,7 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     company: data.company, catalog: data.catalog, now, periods, selected, selectedId, view, dirty, readonly, save, apply, ui, notices, counts,
     set, get, setTab, back, retry, applyChanges, pendingPortion, notify, dismissNotice, undo, dump,
     setPrice, setScale, stepRemoved, setOpen, scaleErrors,
+    typeOf, typePath, pickerTypes, addType, removeType, toggleExpand, setTypeScaleOn,
   }
 }
 

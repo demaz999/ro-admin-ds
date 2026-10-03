@@ -8,4 +8,6 @@ export const TARIFFS_COVERAGE_STATES = [
   '', 'tab=types', 'tab=schemes', 'save=saving', 'save=error', 'data=empty',
   /* Такт 78, П2: общая шкала включена; открыта подсказка «Как считается стоимость». */
   'scale=on', 'open=help',
+  /* Такт 79, П3: раскрытые строки типов (шкала выключена и «По ролям»), выбор типа, пустой список типов. */
+  'expand=t-car,t-special', 'open=type-picker', 'tab=types&data=empty',
 ] as const

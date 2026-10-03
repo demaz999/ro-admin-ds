@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { RegressStep, ScaleForm } from '~/components/ui/regress-scale'
-import { computed } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { createModel, TABS, type Dataset, type Price, type SaveState, type TabId } from '~/stands/tariffs/model'
 import demo from '~/stands/tariffs/demo-data.json'
 
@@ -20,7 +20,11 @@ import demo from '~/stands/tariffs/demo-data.json'
  * «Базовые настройки» целиком — блоки на `Card` (№ 11), заголовки с подписью и рубильником (№ 12), минимальная сумма (№ 13),
  * базовая стоимость схемы с парой цен (№ 14, 15), подсказка тоном предупреждения (№ 16), рубильник общей шкалы (№ 17),
  * шкала с формой (№ 18, 19), учёт прогресса (№ 20), числовой ввод цен (№ 52), ошибка «До» меньше «От» (№ 53).
- * «Типы объектов» и «Схемы осмотра» — порции П3, П4: на их месте `Empty` с названием порции. Переключатель периода — П6.1.
+ *
+ * П3: вкладка «Типы объектов» — блок с «Добавить тип объекта» (№ 21), таблица типов на `Table` с раскрытием, парой цен,
+ * рубильником шкалы и удалением (№ 22), шкала типа в раскрытой строке (№ 23), выбор типа из справочника с поиском (№ 24),
+ * удаление с «Отменить» (№ 25, 56), пустой список (№ 26).
+ * «Схемы осмотра» — порция П4: на её месте `Empty` с названием порции. Переключатель периода — П6.1.
  *
  * ## Поведение — модель `~/stands/tariffs/model.ts`
  *
@@ -38,6 +42,8 @@ import demo from '~/stands/tariffs/demo-data.json'
  * | `?data=empty` | компания без типов объектов, группа без схем |
  * | `?scale=on` | общая регресс-шкала включена (такт 78) |
  * | `?open=help` | открыта подсказка «Как считается стоимость» (такт 78) |
+ * | `?expand=<id типа>` | раскрыта строка типа объекта, через запятую — несколько; без `?tab=` — вкладка «Типы объектов» (такт 79) |
+ * | `?open=type-picker` | открыт выбор типа из справочника; без `?tab=` — вкладка «Типы объектов» (такт 79) |
  */
 definePageMeta({ layout: false })
 useHead({ title: 'Тарификация — стенд' })
@@ -45,7 +51,11 @@ useHead({ title: 'Тарификация — стенд' })
 const route = useRoute()
 const q = (k: string) => String(route.query[k] ?? '')
 
-const tabAtLoad = TABS.find(t => t.id === q('tab'))?.id
+const OPEN_AT_LOAD = ['help', 'type-picker']
+const openAtLoad = OPEN_AT_LOAD.find(s => s === q('open'))
+const expandAtLoad = q('expand') ? q('expand').split(',').filter(Boolean) : []
+/* Выбор типа и раскрытая строка живут на «Типах объектов»: без `?tab=` оснастка такта 79 открывает эту вкладку. */
+const tabAtLoad = TABS.find(t => t.id === q('tab'))?.id ?? (openAtLoad === 'type-picker' || expandAtLoad.length ? 'types' : undefined)
 const saveAtLoad = (['saving', 'error'] as SaveState[]).find(s => s === q('save'))
 const m = createModel(demo as unknown as Dataset, {
   data: q('data') === 'empty' ? 'empty' : 'main',
@@ -53,7 +63,8 @@ const m = createModel(demo as unknown as Dataset, {
   save: saveAtLoad,
   now: q('now') || undefined,
   scale: q('scale') === 'on',
-  open: q('open') === 'help' ? 'help' : undefined,
+  open: openAtLoad,
+  expand: expandAtLoad,
 })
 
 const tab = computed<string>({ get: () => m.ui.tab, set: v => m.setTab(v as TabId) })
@@ -108,9 +119,69 @@ const helpOpen = computed({ get: () => m.ui.open === 'help', set: (v: boolean) =
 /** Счётчик вкладки (№ 8): у «Базовых настроек» его нет. */
 const countOf = (id: TabId) => (id === 'types' ? m.counts.value.types : id === 'schemes' ? m.counts.value.schemes : undefined)
 
+/* ------------------------------ «Типы объектов» — П3, такт 79 ------------------------------ */
+/** Подпись блока — по §3 (строка 12 реестра): режима «По типам объектов» в сводке нет. */
+const TYPES_DESCRIPTION = 'Глобальные цены по типам объектов. Применяются во всех схемах, где для типа не задана индивидуальная цена'
+
+/** Строки таблицы типов (№ 22): тип справочника, пара, шкала, раскрытие. */
+const typeRows = computed(() => m.view.value.objectTypes.map(t => ({
+  id: t.typeId,
+  name: m.typeOf(t.typeId)?.name ?? t.typeId,
+  icon: m.typeOf(t.typeId)?.icon ?? 'package',
+  price: t.price,
+  scale: t.scale,
+  expanded: m.ui.expanded.includes(t.typeId),
+})))
+
+/** Пара цен типа (№ 22): правила пары — `setPrice` модели по пути типа. */
+function setTypePrice(id: string, patch: Partial<Price>) {
+  const path = m.typePath(id)
+  if (path) m.setPrice(`${path}.price`, patch)
+}
+/** Шкала типа (№ 23): ступени и форма — `setScale` модели; удаление ступени — уведомление с «Отменить». */
+function setTypeScale(id: string, patch: { steps?: RegressStep[], form?: ScaleForm }) {
+  const path = m.typePath(id)
+  if (path) m.setScale(`${path}.scale`, patch)
+}
+function typeStepRemoved(id: string, previous: RegressStep[]) {
+  const path = m.typePath(id)
+  if (path) m.stepRemoved(`${path}.scale`, previous)
+}
+
+/**
+ * Выбор типа из справочника (№ 24) — композиция раздела 4: `ButtonAction` + `Popover` + `SelectContent` с поиском `Input`
+ * и пунктами `SelectItem`; пустой поиск — `Empty` «Ничего не найдено». Клавиатура: стрелки по пунктам, Enter добавляет.
+ */
+const pickerOpen = computed({
+  get: () => m.ui.open === 'type-picker',
+  set: (v: boolean) => { m.setOpen(v ? 'type-picker' : '') },
+})
+const typeQuery = ref('')
+const activeType = ref(-1)
+const pickerList = computed(() => m.pickerTypes(typeQuery.value))
+watch(pickerOpen, (v) => { if (v) { typeQuery.value = ''; activeType.value = -1 } })
+watch(typeQuery, () => { activeType.value = -1 })
+function pickType(id: string) {
+  m.addType(id)
+  pickerOpen.value = false
+}
+function onPickerKeydown(e: KeyboardEvent) {
+  const n = pickerList.value.length
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault()
+    if (!n) return
+    activeType.value = e.key === 'ArrowDown' ? (activeType.value + 1) % n : (activeType.value - 1 + n) % n
+    /* Пункт длинного списка — в видимую часть области прокрутки (ловушка такта 63). */
+    nextTick(() => document.querySelector(`[data-type-option="${pickerList.value[activeType.value]?.id}"]`)?.scrollIntoView({ block: 'nearest' }))
+  }
+  else if (e.key === 'Enter' && activeType.value >= 0 && pickerList.value[activeType.value]) {
+    e.preventDefault()
+    pickType(pickerList.value[activeType.value]!.id)
+  }
+}
+
 /** Содержимое вкладок, которое соберут следующие порции, — план `tariffs.md`, раздел 10. */
 const PENDING: Record<string, { title: string, description: string }> = {
-  types: { title: '«Типы объектов» — порция П3', description: 'Глобальные цены типов объектов, шкалы типов, выбор типа из справочника' },
   schemes: { title: '«Схемы осмотра» — порция П4', description: 'Группы и схемы с вилками цен и метками, панели группы и схемы' },
 }
 
@@ -304,7 +375,154 @@ if (import.meta.client) {
           </div>
         </TabsContent>
 
-        <TabsContent v-for="t in TABS.slice(1)" :key="t.id" :value="t.id">
+        <TabsContent value="types">
+          <div class="flex flex-col gap-2 pt-6">
+            <!-- Блок «Типы объектов» — Figma `30863:3843`: шапка с «Добавить тип объекта», колонки, строки типов. -->
+            <Card as="section" class="flex flex-col gap-6" data-block="types">
+              <!-- Один выбор типа на блок (№ 24): открыватель — кнопка шапки либо действие пустого списка. -->
+              <Popover v-model:open="pickerOpen">
+                <div class="flex items-start justify-between gap-6">
+                  <Heading level="group" :description="TYPES_DESCRIPTION">
+                    Типы объектов
+                  </Heading>
+                  <PopoverTrigger v-if="typeRows.length" as-child>
+                    <ButtonAction data-act="add-type">
+                      <template #icon>
+                        <Icon name="add" :size="16" />
+                      </template>
+                      Добавить тип объекта
+                    </ButtonAction>
+                  </PopoverTrigger>
+                </div>
+
+                <!-- Таблица типов — Figma `30863:3850`, `30863:3857`: колонки «Тип объекта», «Клиент, ₽», «Не клиент, ₽», «Регресс-шкала». -->
+                <Table v-if="typeRows.length" data-types-table>
+                  <TableRow>
+                    <TableHead variant="expand" aria-hidden="true" />
+                    <TableHead class="min-w-0 flex-1">
+                      Тип объекта
+                    </TableHead>
+                    <TableHead class="w-46">
+                      Клиент, ₽
+                    </TableHead>
+                    <TableHead class="w-46">
+                      Не клиент, ₽
+                    </TableHead>
+                    <TableHead class="w-40">
+                      Регресс-шкала
+                    </TableHead>
+                    <TableHead class="w-16" aria-hidden="true" />
+                  </TableRow>
+
+                  <template v-for="row in typeRows" :key="row.id">
+                    <TableRow :data-type-row="row.id" :data-expanded="row.expanded ? '' : undefined">
+                      <TableCell variant="slot" class="w-16 justify-center px-0">
+                        <IconButton
+                          variant="ghost"
+                          :label="row.expanded ? `Свернуть: ${row.name}` : `Раскрыть шкалу: ${row.name}`"
+                          :aria-expanded="row.expanded ? 'true' : 'false'"
+                          data-act="type-expand"
+                          @click="m.toggleExpand(row.id)"
+                        >
+                          <Icon :name="row.expanded ? 'chevron-up' : 'chevron-down'" :size="16" />
+                        </IconButton>
+                      </TableCell>
+                      <TableCell variant="slot" class="min-w-0 flex-1">
+                        <TableCellIdentity :icon="row.icon" data-type-name>
+                          {{ row.name }}
+                        </TableCellIdentity>
+                      </TableCell>
+                      <!-- Пара цен типа: при включённой шкале выключена (§5, стр. 08). -->
+                      <TableCell variant="slot">
+                        <PricePair
+                          :labels="false"
+                          :client="row.price.client"
+                          :non-client="row.price.nonClient"
+                          :linked="row.price.linked"
+                          :disabled="row.scale.on"
+                          data-field="type-price"
+                          @update:client="v => setTypePrice(row.id, { client: v })"
+                          @update:non-client="v => setTypePrice(row.id, { nonClient: v })"
+                          @update:linked="v => setTypePrice(row.id, { linked: v })"
+                        />
+                      </TableCell>
+                      <TableCell variant="slot" class="w-40">
+                        <Switch
+                          :model-value="row.scale.on"
+                          :aria-label="`Регресс-шкала: ${row.name}`"
+                          data-field="type-scale-switch"
+                          @update:model-value="v => m.setTypeScaleOn(row.id, !!v)"
+                        />
+                      </TableCell>
+                      <TableCell variant="slot" class="w-16 justify-center px-0">
+                        <IconButton variant="destructive" :label="`Удалить тип: ${row.name}`" data-act="type-remove" @click="m.removeType(row.id)">
+                          <Icon name="delete" :size="16" />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                    <!-- Раскрытая строка — Figma `30863:3894`: шкала типа на всю ширину таблицы; при выключенной шкале — выключена (стр. 69). -->
+                    <TableRow v-if="row.expanded" :data-type-body="row.id">
+                      <TableCell variant="slot" class="h-auto min-w-0 flex-1 py-4 pl-16">
+                        <RegressScale
+                          :steps="row.scale.steps"
+                          :form="row.scale.form"
+                          :disabled="!row.scale.on"
+                          class="w-full"
+                          data-field="type-scale"
+                          @update:steps="v => setTypeScale(row.id, { steps: v })"
+                          @update:form="v => setTypeScale(row.id, { form: v })"
+                          @remove-step="e => typeStepRemoved(row.id, e.previous)"
+                        />
+                      </TableCell>
+                    </TableRow>
+                  </template>
+                </Table>
+
+                <!-- Пустой список (№ 26, стр. 46): действие закрывает пустоту — тот же выбор типа. -->
+                <Empty
+                  v-else
+                  title="Типов объектов пока нет"
+                  description="Добавьте тип из справочника компании, чтобы задать ему цену и регресс-шкалу"
+                  data-types-empty
+                >
+                  <template #action>
+                    <PopoverTrigger as-child>
+                      <Button variant="secondary" data-act="add-type">
+                        Добавить тип объекта
+                      </Button>
+                    </PopoverTrigger>
+                  </template>
+                </Empty>
+
+                <!-- Выбор типа — Figma `31488:258091`: плашка с поиском и списком справочника; добавленные типы из списка ушли. -->
+                <PopoverContent as-child align="end" :side-offset="4" :width="320">
+                  <SelectContent data-type-picker @keydown="onPickerKeydown">
+                    <template #search>
+                      <Input v-model="typeQuery" placeholder="Поиск типа объекта" clearable data-field="type-search" />
+                    </template>
+                    <SelectItem
+                      v-for="(t, k) in pickerList"
+                      :key="t.id"
+                      :selected="k === activeType"
+                      :data-type-option="t.id"
+                      @click="pickType(t.id)"
+                    >
+                      {{ t.name }}
+                    </SelectItem>
+                    <Empty
+                      v-if="!pickerList.length"
+                      :title="typeQuery.trim() ? 'Ничего не найдено' : 'Все типы справочника добавлены'"
+                      class="px-4 py-6"
+                      data-type-picker-empty
+                    />
+                  </SelectContent>
+                </PopoverContent>
+              </Popover>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent v-for="t in TABS.slice(2)" :key="t.id" :value="t.id">
           <div class="flex flex-col pt-6">
             <Empty :title="PENDING[t.id]?.title" :description="PENDING[t.id]?.description" />
           </div>
