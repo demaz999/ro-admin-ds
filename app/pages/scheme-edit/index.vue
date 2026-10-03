@@ -45,7 +45,7 @@ import demo from '~/stands/scheme-edit/demo-data.json'
  * найденного — ось `highlighted` у `SettingRow` (№ 12). Клавиатура: `/` — фокус в поиск, стрелки — по выдаче, Enter —
  * переход, Esc — очистить и снять выдачу.
  * **П6 (такт 69).** Таб «Форма» (№ 39–42, 62, 68, 70): список групп — `Card` с `RadioGroupItem variant="card"` и настройками
- * группы только для чтения, «Добавить группу»; панель полей — заголовок группы со счётом, «Добавить поле», «Вставить из
+ * группы парами `FrameMeta layout="stack"` (довесок 1), «Добавить группу»; панель полей — заголовок группы со счётом, «Добавить поле», «Вставить из
  * другой схемы» (заглушка), «Заполнить алиасы автоматически»; поля — `Table` с выбором строк, признаком «зависимое» и
  * действиями строки; массовые действия — `ActionBar layout="panel"`; сайды поля (четыре секции) и группы — `ModalCard edge`.
  * Табы «Процессы и шаги», «Витрина» — порциями П7–П8: на их месте `Empty`.
@@ -469,6 +469,15 @@ const fg = computed(() => m.formGroup.value)
 const groupValue = computed<string>({ get: () => fg.value?.id ?? '', set: v => m.selectGroup(v) })
 const typeLabel = (t: string) => FIELD_TYPES.find(x => x.value === t)?.label ?? t
 const label = (list: { value: string, label: string }[], v: string) => list.find(x => x.value === v)?.label ?? v
+/** «Настройки группы» — четыре пары блока `33179:4467`. */
+const groupMeta = computed(() => (fg.value
+  ? [
+      { label: 'Алиас', value: fg.value.alias || 'не задан' },
+      { label: 'Экран создания', value: label(CREATE_SCREENS, fg.value.createScreen) },
+      { label: 'В мобильном', value: label(MOBILE_SHOW, fg.value.mobile) },
+      { label: 'Редактирование', value: fg.value.editable ? 'Разрешено' : 'Запрещено' },
+    ]
+  : []))
 const fieldsTitle = computed(() => (fg.value ? `${fg.value.title} · ${fg.value.fields.length} ${plural(fg.value.fields.length, 'поле', 'поля', 'полей')}` : ''))
 const selectedCount = computed(() => m.ui.selectedFields.length)
 const selectedText = computed(() => `Выбрано: ${selectedCount.value} ${plural(selectedCount.value, 'поле', 'поля', 'полей')}`)
@@ -1635,21 +1644,14 @@ if (import.meta.client) {
                   </template>
                 </RadioGroupItem>
               </RadioGroup>
-              <!-- Настройки группы — блок `33179:4467`: значения только для чтения, правка — в сайде группы. -->
-              <FieldSet v-if="fg" legend="Настройки группы" class="px-3 pt-3 pb-3" data-group-settings>
-                <Field readonly label="Алиас" data-field="groupAlias">
-                  <Input :model-value="fg.alias" readonly :show-icon="false" placeholder="" />
-                </Field>
-                <Field readonly label="Экран создания" data-field="groupScreen">
-                  <Input :model-value="label(CREATE_SCREENS, fg.createScreen)" readonly placeholder="" :show-icon="false" />
-                </Field>
-                <Field readonly label="В мобильном" data-field="groupMobile">
-                  <Input :model-value="label(MOBILE_SHOW, fg.mobile)" readonly placeholder="" :show-icon="false" />
-                </Field>
-                <Field readonly label="Редактирование" data-field="groupEditable">
-                  <Input :model-value="fg.editable ? 'Разрешено' : 'Запрещено'" readonly placeholder="" :show-icon="false" />
-                </Field>
-              </FieldSet>
+              <!--
+                Настройки группы — блок `33179:4467`: пары «подпись — значение» текстом — `FrameMeta layout="stack"` (ступень 1,
+                решение оркестратора, довесок 1 к такту 69); правка — в сайде группы.
+              -->
+              <div v-if="fg" class="flex flex-col gap-2 px-3 pt-3 pb-3" data-group-settings>
+                <Heading>Настройки группы</Heading>
+                <FrameMeta layout="stack" :rows="groupMeta" />
+              </div>
             </Card>
             <Button :inert="ro" variant="outline" class="w-full" data-act="group-add" @click="openGroup('')">
               Добавить группу
@@ -1890,38 +1892,47 @@ if (import.meta.client) {
             </Field>
           </FieldSet>
 
+          <!--
+            Шаг строк флажков — 32, как в макете (`32936:16508`…`32936:16543`: строка 20, зазор 12); флажки — `Checkbox` кита
+            (довесок 1 к такту 69): строка `SettingRow` с полями 8 давала шаг около 51.
+          -->
           <FieldSet legend="Поведение и видимость">
-            <SettingRow data-setting="fdRequired">
-              <Checkbox v-model="fd.required">
+            <div class="flex flex-col gap-3" data-field-flags>
+              <Checkbox v-model="fd.required" data-field="fdRequired">
                 Обязательное заполнение
               </Checkbox>
-            </SettingRow>
-            <SettingRow data-setting="fdWebOnly">
-              <Checkbox v-model="fd.webOnly">
+              <Checkbox v-model="fd.webOnly" data-field="fdWebOnly">
                 Только для web (скрыто в мобильном)
               </Checkbox>
-            </SettingRow>
-            <SettingRow data-setting="fdMobile">
-              <Checkbox v-model="fd.mobileAfterCreate">
+              <Checkbox v-model="fd.mobileAfterCreate" data-field="fdMobile">
                 Отображается в мобильном после создания осмотра
               </Checkbox>
-            </SettingRow>
-            <!-- «гасит»: согласование выключено в «Настройках» — причина под строкой (аудит, сайд поля). -->
-            <SettingRow v-slot="{ disabled }" data-setting="fdApproval" :reason="m.fieldApprovalReason.value">
-              <Checkbox v-model="fd.approval" :disabled="disabled">
+              <!-- «гасит»: согласование выключено в «Настройках» — причина строкой пояснения под флажком (макет `32936:16531`). -->
+              <Checkbox v-model="fd.approval" :disabled="!!m.fieldApprovalReason.value" :subtitle="m.fieldApprovalReason.value" data-field="fdApproval">
                 Отправлять на согласование
               </Checkbox>
-            </SettingRow>
-            <SettingRow data-setting="fdNoConfidential" help="Значение поля можно передавать в отчёты и выгрузки без маскирования">
-              <Checkbox v-model="fd.noConfidential">
-                Поле не содержит конфиденциальных данных
-              </Checkbox>
-            </SettingRow>
-            <SettingRow data-setting="fdHighlight">
-              <Checkbox v-model="fd.highlight">
+              <!-- «?» — только у этой строки, как в макете (`32936:16538`). -->
+              <div class="flex items-start gap-2">
+                <Checkbox v-model="fd.noConfidential" data-field="fdNoConfidential">
+                  Поле не содержит конфиденциальных данных
+                </Checkbox>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <IconButton variant="ghost" size="sm" rounded label="Пояснение" class="-my-0.5 shrink-0" data-field-help>
+                        <Icon name="help" :size="16" />
+                      </IconButton>
+                    </TooltipTrigger>
+                    <TooltipContent class="max-w-80 whitespace-normal">
+                      Значение поля можно передавать в отчёты и выгрузки без маскирования
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              <Checkbox v-model="fd.highlight" data-field="fdHighlight">
                 Подсвечивать поле
               </Checkbox>
-            </SettingRow>
+            </div>
           </FieldSet>
 
           <!-- Условная секция: только у типа с выбором (аудит: «не висят серыми всегда»). -->

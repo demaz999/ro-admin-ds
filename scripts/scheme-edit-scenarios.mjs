@@ -548,7 +548,8 @@ function kit(page) {
             return {
               groups: [...el.querySelectorAll('[data-form-group]')].map(g => t(g.querySelector('[data-slot=choice-title]').textContent)),
               group: t(el.querySelector('[data-form-group] [data-slot=choice-control][data-state=checked]')?.closest('[data-form-group]')?.querySelector('[data-slot=choice-title]').textContent) || null,
-              settings: ['groupAlias', 'groupScreen', 'groupMobile', 'groupEditable'].map(k => el.querySelector('[data-field=' + k + '] input')?.value ?? null),
+              /* Довесок 1: «Настройки группы» — пары FrameMeta; слепок — значения пар. */
+              settings: [...el.querySelectorAll('[data-group-settings] [data-slot=frame-meta] dd')].map(x => t(x.textContent)),
               title: t(el.querySelector('[data-fields-title]')?.textContent) || null,
               rows: [...el.querySelectorAll('[data-form-row]')].map(r => { const c = r.querySelectorAll('[data-slot=table-cell]')
                 return [t(c[1].textContent), t(r.querySelector('[data-slot=table-cell-identity]').textContent), t(c[3].textContent), t(c[4].textContent),
@@ -560,10 +561,11 @@ function kit(page) {
             } })(),
           /* Просмотр версии на «Форме»: поля группы — «только чтение», флажки строк — aria-readonly, действия — под inert. */
           formRo: (() => { const el = document.querySelector('[data-form]'); if (!el) return null
-            const fields = [...el.querySelectorAll('[data-slot=field-wrapper]')].filter(x => x.querySelector('input'))
             const checks = [...el.querySelectorAll('[data-fields-table] [data-slot=choice-control]')]
             const acts = [...el.querySelectorAll('[data-act]')]
-            return { fields: fields.length > 0 && fields.every(x => 'readonly' in x.dataset), checks: checks.length > 0 && checks.every(x => x.getAttribute('aria-readonly') === 'true'),
+            /* Довесок 1: настройки группы — текст FrameMeta; редактируемых полей вне inert на «Форме» нет. */
+            const editable = [...el.querySelectorAll('input, textarea, [contenteditable=true]')].filter(x => !x.readOnly && !x.closest('[inert]'))
+            return { noEdit: editable.length === 0, checks: checks.length > 0 && checks.every(x => x.getAttribute('aria-readonly') === 'true'),
               actsInert: acts.length > 0 && acts.every(x => !!x.closest('[inert]')), rowActsInert: [...el.querySelectorAll('[data-slot=table-row-actions]')].every(x => !!x.closest('[inert]')) } })(),
           fieldSide: (() => { const el = document.querySelector('[data-side=field]'); if (!el) return null
             return {
@@ -572,6 +574,13 @@ function kit(page) {
               alias: el.querySelector('[data-field=fdAlias] input, input[data-field=fdAlias]')?.value ?? null,
               type: t(el.querySelector('[data-field=fdType] [data-slot=field-input]')?.textContent) || null,
               choices: !!el.querySelector('[data-field-choices]'),
+              /* Довесок 1: флажки секции «Поведение и видимость» — Checkbox; причина — строка пояснения под флажком. */
+              checks: Object.fromEntries([...el.querySelectorAll('[data-field-flags] [data-slot=choice][data-field]')].map(c => [c.dataset.field, {
+                checked: c.querySelector('[data-slot=choice-control]').getAttribute('aria-checked') === 'true', off: !!c.querySelector('[data-slot=choice-control]').disabled,
+                sub: t(c.querySelector('[data-slot=choice-subtitle]')?.textContent) }])),
+              help: [...el.querySelectorAll('[data-field-help]')].map(b => b.closest('div')?.querySelector('[data-slot=choice]')?.dataset.field ?? null),
+              /* Шаг строк флажков: верх строки к верху следующей. */
+              step: (() => { const r = [...el.querySelectorAll('[data-field-flags] [data-slot=choice]')].map(c => Math.round(c.getBoundingClientRect().top)); return r.slice(1).map((y, k) => y - r[k]) })(),
             } })(),
           focusRow: document.activeElement?.closest?.('[data-form-row]')?.dataset.formRow ?? null,
         })
@@ -859,7 +868,7 @@ const SCENARIOS = {
     ['навигатор работает: раздел «PDF»', K => K.section('pdf'), { section: 'pdf', viewing: 'v1', readonly: true, 'templates.length': 2 }],
     ['таб «Форма»: поля группы только для чтения, действия под inert, выбор группы работает', async (K) => { await K.tab('form'); await K.group('g-car') },
       { tab: 'form', viewing: 'v1', 'form.group': 'Автомобиль', 'form.title': 'Автомобиль · 2 поля', 'form.settings': ['Car', '1-й экран', 'Всегда', 'Разрешено'],
-        formRo: { fields: true, checks: true, actsInert: true, rowActsInert: true }, writes: 0 }],
+        formRo: { noEdit: true, checks: true, actsInert: true, rowActsInert: true }, writes: 0 }],
     ['«Форма»: клик по флажку строки — выделения нет, фокус на флажке', K => K.rowCheck('f-vin'), { 'form.selected': 0, 'form.bar': null, focusRo: true, focusRow: 'f-vin', writes: 0 }],
     ['табы работают', async (K) => { await K.tab('settings') }, { tab: 'settings', viewing: 'v1' }],
     ['«Сделать копию»', K => K.act('view-copy'), { notices: ['Копия схемы — вне стенда'], viewing: 'v1' }],
@@ -1096,7 +1105,8 @@ const SCENARIOS = {
     ['карандаш у «Года выпуска» — сайд с тремя секциями: тип без выбора', K => K.rowEdit('f-year'),
       { surface: 'field', sideTitle: 'Редактирование поля — Год выпуска', 'fieldSide.legends': ['Основное', 'Поведение и видимость', 'Валидация и подсказки'],
         'fieldSide.title': 'Год выпуска', 'fieldSide.alias': 'year', 'fieldSide.type': 'Число', 'steppers.fdOrder': 4,
-        'rows.fdApproval': { checked: false, off: true, reason: 'Сначала включите согласование в разделе Настройки', meta: '', tone: '', help: false, children: false }, 'rows.fdNoConfidential.help': true }],
+        'fieldSide.checks.fdApproval': { checked: false, off: true, sub: 'Сначала включите согласование в разделе Настройки' }, 'fieldSide.help': ['fdNoConfidential'],
+        'fieldSide.step': [32, 32, 32, 48, 32] }],
     ['тип «Выбор» — четыре секции', K => K.select('fdType', 'Выбор'), { 'fieldSide.legends': ['Основное', 'Поведение и видимость', 'Варианты выбора', 'Валидация и подсказки'], 'fieldSide.choices': true }],
     ['тип «Число», «Отмена» — полотно прежнее', async (K) => { await K.select('fdType', 'Число'); await K.act('field-cancel') },
       { surface: '', fieldSide: null, 'form.rows.3': '4 · Год выпуска · year · Число', writes: 0 }],
@@ -1107,7 +1117,7 @@ const SCENARIOS = {
       { notices: ['Алиас — латиницей без пробелов, первая — буква'], surface: 'field', writes: 1 }],
     ['«Предложить по названию» и «Сохранить»', async (K) => { await K.act('alias-suggest'); await K.act('field-save'); await K.settled() },
       { surface: '', 'form.rows.1': '2 · Тип кузова · tip_kuzova · Выбор · Обязательное', writes: 2 }],
-    ['согласование включено в «Настройках» — у поля флажок доступен; отметить и сохранить', async (K) => { await K.tab('settings'); await K.toggle('approval'); await K.settled(); await K.tab('form'); await K.rowEdit('f-year'); await K.toggle('fdApproval'); await K.act('field-save'); await K.settled() },
+    ['согласование включено в «Настройках» — у поля флажок доступен; отметить и сохранить', async (K) => { await K.tab('settings'); await K.toggle('approval'); await K.settled(); await K.tab('form'); await K.rowEdit('f-year'); await K.check('fdApproval'); await K.act('field-save'); await K.settled() },
       { surface: '', 'form.rows.3': '4 · Год выпуска · year · Число · Согласование', 'g.behavior.approval': true, writes: 4 }],
   ], { query: 'tab=form&group=g-body' }],
   'СС-58': ['сайд группы: открывается карандашом у списка групп; «Сохранить» меняет настройки группы в панели (r2 §5; аудит, «Принцип: всё редактирование сущности — в сайде»)', [

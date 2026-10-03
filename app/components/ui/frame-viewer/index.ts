@@ -65,3 +65,17 @@ export type FrameBindState = 'free' | 'assigned' | 'locked'
 export type FrameSuggestion =
   | { kind: 'step', stepName: string, ownerName: string, blocked?: 'frozen' | 'full' }
   | { kind: 'create', title: string, inv?: string, stageTitle: string }
+
+/**
+ * ## Изменения после передачи
+ *
+ * Части просмотра переданы фронтам версией `handover-2026-10-01` (составные компоненты экрана). Правило 23
+ * `docs/chat-protocol.md`: каждое изменение маркируется здесь, в `CHANGELOG.md` и в «Передано фронтам».
+ *
+ * ### Черновик следующей версии — относительно `handover-2026-10-02`
+ *
+ * - **Добавлено.** `FrameMeta` — проп `layout`: `grid` (по умолчанию — прежняя сетка «подпись | значение» с линией снизу)
+ *   и `stack` — пары столбиком: подпись 13/16 `--foreground-secondary` над значением 13/16 medium `--foreground`, пары через
+ *   8, без линии и полей — место задаёт контейнер. Без пропа вид прежний. Такт 69, довесок 1: «Настройки группы» страницы
+ *   схемы (Figma `33179:4467`).
+ */

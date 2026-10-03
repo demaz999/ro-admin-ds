@@ -1686,6 +1686,10 @@ const textareaVariants = [
         <div class="w-side-panel rounded-xs border border-border-soft">
           <FrameMeta :rows="[{ label: 'Файл', value: 'IMG_3315.jpeg' }, { label: 'Время', value: '10:25:54' }, { label: 'Тип', value: 'Фото' }, { label: 'Распознано', value: 'Ткацкий участок' }]" />
         </div>
+        <!-- Такт 69, довесок 1: FrameMeta layout="stack" — «Настройки группы» страницы схемы; мастера нет, наложения нет. -->
+        <div class="w-group-list p-4">
+          <FrameMeta layout="stack" :rows="[{ label: 'Алиас', value: 'Body' }, { label: 'Экран создания', value: '2-й экран' }, { label: 'В мобильном', value: 'После создания' }, { label: 'Редактирование', value: 'Разрешено' }]" />
+        </div>
       </div>
       <!--
         Такт 35: окно-карточка — центральное 600 с «Горячими клавишами» и 440 с прогрессом, внутри рамки.

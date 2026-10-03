@@ -80,7 +80,18 @@ const ro = ref({ name: 'КАСКО — осмотр', text: 'Осмотр авт
           </p>
         </div>
         <div data-example class="flex min-w-0 flex-col items-stretch gap-3">
-          <template v-if="c.id === 'action-bar-panel'">
+          <template v-if="c.id === 'frame-meta-stack'">
+            <div class="flex flex-wrap items-start gap-6">
+              <div class="w-group-list">
+                <FrameMeta layout="stack" :rows="[{ label: 'Алиас', value: 'Body' }, { label: 'Экран создания', value: '2-й экран' }, { label: 'В мобильном', value: 'После создания' }, { label: 'Редактирование', value: 'Разрешено' }]" />
+              </div>
+              <div class="w-side-panel">
+                <FrameMeta :rows="[{ label: 'Файл', value: 'IMG_3315.jpeg' }, { label: 'Время', value: '10:25:54' }]" />
+              </div>
+            </div>
+            <span class="text-xs text-muted-foreground">слева — stack; справа — прежняя сетка grid</span>
+          </template>
+          <template v-else-if="c.id === 'action-bar-panel'">
             <ActionBar layout="panel" count="Выбрано: 2 поля">
               <Button variant="secondary">
                 Сделать обязательными

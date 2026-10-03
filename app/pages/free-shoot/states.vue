@@ -1171,6 +1171,13 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
               <FrameMeta :rows="META" />
             </div>
           </div>
+          <!-- Такт 69, довесок 1: раскладка stack — пары столбиком на полотне (страница схемы, «Настройки группы» 33179:4467). -->
+          <div class="space-y-1" data-matrix="frame-meta-stack">
+            <p class="text-2xs text-muted-foreground">FrameMeta layout="stack" — подпись над значением, пары через 8, без линии и полей</p>
+            <div class="w-group-list rounded-xs border border-border-soft p-4">
+              <FrameMeta layout="stack" :rows="[{ label: 'Алиас', value: 'Body' }, { label: 'Экран создания', value: '2-й экран' }, { label: 'В мобильном', value: 'После создания' }, { label: 'Редактирование', value: 'Разрешено' }]" />
+            </div>
+          </div>
           <div class="flex flex-wrap items-center gap-3">
             <p class="text-2xs text-muted-foreground">метка в верхней полосе</p>
             <FrameStatus assigned />
