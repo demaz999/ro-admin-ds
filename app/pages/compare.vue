@@ -1101,6 +1101,36 @@ const textareaVariants = [
       </CompareFrame>
     </section>
 
+    <!--
+      Такт 73: наложение краевой карточки на мастер кита 1 `card` 817:34525 (очередь с такта 35, `modal-family.md`).
+      Экспорт 1x — 682×1064: карточка 642×1024 на 20, 16, вокруг — тень 0/4/20. Тело мастера пустое, подвала нет.
+    -->
+    <section data-theme="rososmotr" class="space-y-2 bg-background font-sans text-foreground" data-compare="modal-card-edge">
+      <h2 class="text-lg font-bold">
+        ModalCard · edge · кит 1, 817:34525 · такт 73
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Краевое размещение <code>placement="edge"</code> с шапкой <code>modal_cards_header</code> <code>type=close</code>
+        <code>864:2745</code>. Код стоит в рамке на месте карточки мастера: 642×1024 со сдвигом 20, 16 — поле экспорта под тень.
+        Замер расхождений — <code>docs/scheme-edit.md</code>, раздел «Такт 73».
+      </p>
+      <CompareFrame
+        title="card · edge · 642×1024"
+        node="817:34525"
+        master="kit1/card_817-34525.png"
+        :width="682"
+        :height="1064"
+      >
+        <div class="absolute top-4 left-5 h-256 w-modal-edge">
+          <ModalCard :open="true" :modal="false">
+            <ModalCardContent inline placement="edge">
+              <ModalCardHeader title="Заголовок" />
+            </ModalCardContent>
+          </ModalCard>
+        </div>
+      </CompareFrame>
+    </section>
+
     <section data-theme="rososmotr" class="space-y-2 bg-background font-sans text-foreground">
       <h2 class="text-lg font-bold">
         Slider · кит 1, 2034:5889 · очередь 2
@@ -1708,7 +1738,7 @@ const textareaVariants = [
       </div>
       <!--
         Такт 35: окно-карточка — центральное 600 с «Горячими клавишами» и 440 с прогрессом, внутри рамки.
-        Наложение краевого размещения на экспорт 817:34525 — после авторизации Figma MCP.
+        Наложение краевого размещения на экспорт 817:34525 — раздел «ModalCard · edge» выше (такт 73).
       -->
       <div class="grid max-w-5xl grid-cols-2 items-start gap-4">
         <div class="relative h-150 overflow-hidden rounded-md border border-border-soft bg-background">

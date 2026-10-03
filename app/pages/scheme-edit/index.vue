@@ -978,22 +978,11 @@ if (import.meta.client) {
         <template v-for="t in TABS" :key="t.id">
           <!--
             Новая схема (№ 66; аудит, «Двухфазность и табы»): «Форма» и «Процессы и шаги» неактивны до первого сохранения.
-            Выключенная вкладка событий не получает — причину держит обёртка с `tabindex` (ловушка тактов 48–53).
+            Причину держит сама вкладка — проп `reason` (такт 73, строка 166): подсказка, фокус с клавиатуры, кольцо кита.
           -->
-          <TooltipProvider v-if="m.tabLocked(t.id)">
-            <Tooltip>
-              <TooltipTrigger as-child>
-                <span tabindex="0" :data-tab-lock="t.id" :aria-label="`${t.label}: ${m.PHASE_REASON}`">
-                  <TabsTrigger :value="t.id" disabled :data-tab-trigger="t.id">
-                    {{ t.label }}
-                  </TabsTrigger>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent class="max-w-80 whitespace-normal">
-                {{ m.PHASE_REASON }}
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <TabsTrigger v-if="m.tabLocked(t.id)" :value="t.id" disabled :reason="m.PHASE_REASON" :data-tab-trigger="t.id">
+            {{ t.label }}
+          </TabsTrigger>
           <TabsTrigger v-else :value="t.id" :data-tab-trigger="t.id">
             <!-- Звезда «Витрины» — макет `33347:6751`: глиф 12, зазор вкладки 8 (строка 13 реестра покрытия). -->
             <Icon v-if="t.id === 'showcase'" name="star" :size="12" />
@@ -1252,12 +1241,10 @@ if (import.meta.client) {
                       <Select v-model="deadlineFrom" :items="DEADLINE_EVENTS" placeholder="" :show-icon="false" :searchable="false" :disabled="deadlineMode === 'none'" />
                     </Field>
                   </div>
-                  <div class="flex flex-col gap-3">
-                    <Heading level="group">
-                      Кто может редактировать дедлайн
-                    </Heading>
-                    <Select :readonly="ro" v-model:values="deadlineEditors" multiple :items="ROLES" placeholder="Выберите роли" data-field="deadlineEditors" />
-                  </div>
+                  <!-- Сверка дублей, такт 73: подпись одного контрола — `Field label`, как у «Кто может задавать координату вручную». -->
+                  <Field :readonly="ro" label="Кто может редактировать дедлайн">
+                    <Select v-model:values="deadlineEditors" multiple :items="ROLES" placeholder="Выберите роли" data-field="deadlineEditors" />
+                  </Field>
                   <Field :readonly="ro" label="Кто может делиться осмотром">
                     <RadioGroup v-model="share" class="grid grid-cols-4" data-radio="share">
                       <RadioGroupItem variant="card" value="anyone" :checked="share === 'anyone'">
@@ -1406,8 +1393,8 @@ if (import.meta.client) {
                         <Button :inert="ro" data-act="reason-create" @click="createReason()">
                           Создать обоснование
                         </Button>
-                        <Button :inert="ro" variant="outline" data-act="reason-cancel" @click="closeReasonForm()">
-                          Отменить
+                        <Button :inert="ro" variant="secondary" data-act="reason-cancel" @click="closeReasonForm()">
+                          Отмена
                         </Button>
                       </div>
                     </Card>
@@ -1425,6 +1412,10 @@ if (import.meta.client) {
                   <Heading level="group">
                     Если не заполнен блок обратной связи
                   </Heading>
+                  <!-- Сверка дублей, такт 73: группу гасит тот же рубильник — причина стоит и здесь (строка 65). -->
+                  <Callout v-if="m.rule('feedbackBlock').reason" data-reason-callout="feedback-block">
+                    {{ m.rule('feedbackBlock').reason }}
+                  </Callout>
                   <SettingRow data-setting="blockRepeat" :highlighted="hl('blockRepeat')">
                     <Checkbox :readonly="ro" :model-value="web.blockRepeat" :disabled="!web.feedback" @update:model-value="setS('web.blockRepeat', $event)">
                       Запретить переход в «Повтор»
@@ -1574,7 +1565,7 @@ if (import.meta.client) {
                 <Heading level="title" description="Автоматический расчёт стоимости ремонта по классам отделки для недвижимости">
                   Анализ стоимости отделки
                 </Heading>
-                <Callout v-if="finishOff" tone="warning" data-reason-callout="finish">
+                <Callout v-if="finishOff" data-reason-callout="finish">
                   {{ m.rule('finishCost').reason }}. Тип схемы задаётся в разделе «Общие → Основное»
                 </Callout>
                 <Card class="flex flex-col gap-4">
@@ -1660,7 +1651,7 @@ if (import.meta.client) {
                   <Heading level="group" description="Распознавание повреждений, распознавание VIN и оценка ущерба — для схем с типом «Осмотр транспорта»">
                     Модули для авто
                   </Heading>
-                  <Callout v-if="autoOff" tone="warning" data-reason-callout="auto">
+                  <Callout v-if="autoOff" data-reason-callout="auto">
                     {{ m.rule('autoModules').reason }}. Тип схемы задаётся в разделе «Общие → Основное»
                   </Callout>
                   <SettingRow data-setting="damage" :highlighted="hl('damage')">
@@ -1937,7 +1928,11 @@ if (import.meta.client) {
                 <FrameMeta layout="stack" :rows="groupMeta" />
               </div>
             </Card>
-            <Button :inert="ro" variant="outline" class="w-full" data-act="group-add" @click="openGroup('')">
+            <!-- Сверка дублей, такт 73: «Добавить …» — контурная кнопка с плюсом, как у остальных добавлений страницы. -->
+            <Button :inert="ro" variant="outline" show-icon class="w-full" data-act="group-add" @click="openGroup('')">
+              <template #icon>
+                <Icon name="add" :size="16" />
+              </template>
               Добавить группу
             </Button>
           </div>
@@ -1991,8 +1986,9 @@ if (import.meta.client) {
                 <Button variant="outline" data-act="bulk-clear" @click="m.clearFieldSelection()">
                   Снять выделение
                 </Button>
+                <!-- Сверка дублей, такт 73: подпись массового удаления — как у панели шагов (макет `32765:6576`). -->
                 <Button variant="destructive" class="ml-auto" data-act="bulk-delete" @click="m.bulkFields('delete')">
-                  Удалить
+                  Удалить выбранные
                 </Button>
               </ActionBar>
 
@@ -3148,8 +3144,9 @@ if (import.meta.client) {
           <template #note>
             После публикации создаётся неизменяемый снимок версии
           </template>
-          <Button variant="outline" data-act="publish-cancel" @click="m.closeSurface()">
-            Отменить
+          <!-- Сверка дублей, такт 73: отказ от окна — «Отмена» `secondary`, как в сайдах и окнах подтверждения (строки 33, 89). -->
+          <Button variant="secondary" data-act="publish-cancel" @click="m.closeSurface()">
+            Отмена
           </Button>
           <Button :disabled="m.blocked.value" data-act="publish-confirm" @click="m.confirmPublish()">
             Опубликовать
@@ -3179,7 +3176,7 @@ if (import.meta.client) {
           <template #note>
             После публикации создаётся неизменяемый снимок версии
           </template>
-          <Button variant="outline" data-act="first-cancel" @click="m.closeSurface()">
+          <Button variant="secondary" data-act="first-cancel" @click="m.closeSurface()">
             Отмена
           </Button>
           <Button :disabled="m.blocked.value" data-act="first-confirm" @click="m.confirmPublish()">

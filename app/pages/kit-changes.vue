@@ -24,6 +24,8 @@ const tabLine = ref('a')
 const tabCount = ref('a')
 const tabStretch = ref('a')
 const tabSeg = ref('a')
+/** Такт 73: выключенная вкладка с причиной. */
+const tabReason = ref('a')
 const inputBare = ref('ИНВ-10798')
 const inputFloat = ref('ИНВ-10798')
 const ITEMS = ['Рабочее', 'Неисправно', 'На консервации'].map(x => ({ value: x, label: x }))
@@ -142,6 +144,22 @@ const ro = ref({ name: 'КАСКО — осмотр', text: 'Осмотр авт
               </template>
             </Input>
             <span class="text-xs text-muted-foreground">пустое поле — слот; значение — крестик на месте слота</span>
+          </template>
+          <template v-else-if="c.id === 'tabs-reason'">
+            <Tabs v-model="tabReason" class="w-full">
+              <TabsList>
+                <TabsTrigger value="a">
+                  Настройки
+                </TabsTrigger>
+                <TabsTrigger value="b" disabled reason="Станет доступно после первого сохранения схемы">
+                  Форма
+                </TabsTrigger>
+                <TabsTrigger value="c" disabled>
+                  Процессы
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <span class="text-xs text-muted-foreground">«Форма» — disabled с reason: наведение и Tab показывают причину, кольцо кита; «Процессы» — disabled без причины, прежний</span>
           </template>
           <template v-else-if="c.id === 'callout-closable'">
             <Callout v-if="!calloutClosed" closable @close="calloutClosed = true">

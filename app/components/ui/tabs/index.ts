@@ -99,6 +99,28 @@ export const tabsTriggerVariants = cva(
   },
 )
 
+/**
+ * Обёртка выключенной вкладки с причиной — проп `reason` у `TabsTrigger` (такт 73, решение оркестратора 2026-10-03).
+ * Выключенная вкладка событий не получает (`disabled:pointer-events-none`): подсказку причины и фокус с клавиатуры
+ * держит обёртка — прецедент `FrameBindBar` (такт 52). Кольцо фокуса — кольцо кита 2 `--ring` внутрь, как у
+ * включённой вкладки `line` (такт 47). Рисует его слой `after` над вкладкой: вкладка стоит на прозрачности
+ * `--opacity-disabled`, и кольцо на ней самой вышло бы бледным; у списка `line` прокрутка по горизонтали, внешнее
+ * кольцо он бы обрезал. Скругление слоя — по форме вкладки вида.
+ */
+export const tabsTriggerReasonVariants = cva(
+  'relative inline-flex shrink-0 outline-none after:pointer-events-none after:absolute after:inset-0 after:z-20 focus-visible:after:ring-2 focus-visible:after:ring-ring focus-visible:after:ring-inset',
+  {
+    variants: {
+      variant: {
+        line: '',
+        pill: 'after:rounded-full',
+        segmented: 'after:rounded-sm',
+      },
+    },
+    defaultVariants: { variant: 'line' },
+  },
+)
+
 export type TabsListVariants = VariantProps<typeof tabsListVariants>
 export type TabsTriggerVariants = VariantProps<typeof tabsTriggerVariants>
 
@@ -116,4 +138,12 @@ export type TabsTriggerVariants = VariantProps<typeof tabsTriggerVariants>
  * - **Добавлено.** У вида `line`: проп `count` у `TabsTrigger` — счётчик вкладки (0 показывается); слот `end` у `TabsList` — правый слот высотой 44.
  * - **Добавлено.** Проп `stretch` у `TabsList` вида `line` — список во всю ширину контейнера, линия 1 `--border` идёт под всем списком вместе с его полями. `TabsList` принимает `class`.
  * - **Меняет существующее.** Вид `line` выглядит как VaTabs (va-ui 0.2.0): вкладка 44, поля 0 16, 15/20 bold `--foreground-secondary`, нижняя граница 1 `--border` у каждой вкладки; активная — `--foreground` над подложкой `--background` с радиусом 8 8 0 0 и полосой 2 `--primary`, переезд 0.16 с. Было: линия 4 под текстом активной вкладки.
+ *
+ * ### Черновик следующей версии — относительно `handover-2026-10-02`
+ *
+ * - **Добавлено.** Причина выключения у вкладки (`reason` вместе с `disabled`), такт 73: выключенная вкладка остаётся на
+ *   прозрачности 0.48 и не нажимается; наведение на неё и фокус с клавиатуры (Tab) показывают подсказку с причиной; в
+ *   фокусе — кольцо кита 2 `--ring` внутрь вкладки полным цветом, как у включённой. Стрелки списка выключенную вкладку
+ *   пропускают, Tab на неё встаёт. Имя для чтения с экрана — «подпись вкладки: причина». Без причины выключенная
+ *   вкладка прежняя: фокуса и подсказки нет.
  */

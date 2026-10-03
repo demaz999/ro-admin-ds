@@ -783,9 +783,11 @@ function kit(page) {
           hint: t(document.querySelector('[data-autosave-hint] [data-slot=callout-text]')?.textContent) || null,
           /* Двухфазность новой схемы: выключенные табы и обёртки с причиной; подсказка — текст открытой подсказки. */
           tabLock: { off: [...document.querySelectorAll('[data-tab-trigger]')].filter(b => b.disabled).map(b => b.dataset.tabTrigger),
-            wrap: [...document.querySelectorAll('[data-tab-lock]')].map(w => w.dataset.tabLock + ' | ' + w.getAttribute('aria-label')) },
+            wrap: [...document.querySelectorAll('[data-slot=tabs-trigger-reason]')].map(w => w.querySelector('[data-tab-trigger]')?.dataset.tabTrigger + ' | ' + w.getAttribute('aria-label')) },
           tooltip: t([...document.querySelectorAll('[data-slot=tooltip-content]')].pop()?.innerText.split(String.fromCharCode(10))[0]) || null,
-          focusLock: document.activeElement?.dataset?.tabLock ?? null,
+          focusLock: document.activeElement?.closest?.('[data-slot=tabs-trigger-reason]')?.querySelector('[data-tab-trigger]')?.dataset.tabTrigger ?? null,
+          /* Кольцо кита у вкладки с причиной в фокусе — слой after обёртки (такт 73): тень кольца не пуста. */
+          lockRing: document.activeElement?.dataset?.slot === 'tabs-trigger-reason' ? getComputedStyle(document.activeElement, '::after').boxShadow !== 'none' : null,
           emptyActs: [...document.querySelectorAll('[data-slot=tabs-content][data-state=active] [data-slot=empty] [data-act]')].map(b => b.dataset.act),
         })
       })()`)
@@ -1163,7 +1165,7 @@ const SCENARIOS = {
     ['«Отменить» в уведомлении — вариант на месте', async (K) => { await K.undo(); await K.settled() }, { reasons: ['Координаты — geo', 'Фото с экрана — screen-photo', 'Размытое фото — blur'], writes: 3 }],
     ['выключить блок — варианты и запреты погашены с причиной', async (K) => { await K.toggle('feedback'); await K.settled() },
       { 's.web.feedback': false, reasonsRemovable: 0, reasonAddOff: true, 'rows.blockRepeat.off': true, 'rows.blockRefuse.off': true, 'rows.blockContract.off': true,
-        callouts: { feedback: 'Включите блок обратной связи на странице экспертизы' }, 'dots.web': 'off' }],
+        callouts: { feedback: 'Включите блок обратной связи на странице экспертизы', 'feedback-block': 'Включите блок обратной связи на странице экспертизы' }, 'dots.web': 'off' }],
     ['включить блок и поставить запрет перехода в «Отказ»', async (K) => { await K.toggle('feedback'); await K.toggle('blockRefuse'); await K.settled() },
       { 's.web.feedback': true, 's.web.blockRefuse': true, 'rows.blockRefuse.off': false, callouts: {}, reasonsRemovable: 3 }],
   ], { query: 'section=web' }],
@@ -1582,11 +1584,11 @@ const SCENARIOS = {
     ['«Добавить процесс» из пустого состояния — сайд процесса', K => K.act('process-add-empty'), { surface: 'process', 'procSide.title': 'Добавление процесса' }],
   ], { query: 'data=new&saved=1' }],
   'СС-55': ['новая схема: «Форма» и «Процессы и шаги» неактивны с пояснением до первого автосохранения (r2 §8; аудит, «Двухфазность и табы»)', [
-    ['старт: две вкладки выключены, причину держат обёртки', null, { tab: 'settings', 'tabLock.off': ['form', 'processes'],
+    ['старт: две вкладки выключены, причину держат сами вкладки (проп reason)', null, { tab: 'settings', 'tabLock.off': ['form', 'processes'],
       'tabLock.wrap': ['form | Форма: Станет доступно после первого сохранения схемы: полям и шагам нужен её идентификатор', 'processes | Процессы и шаги: Станет доступно после первого сохранения схемы: полям и шагам нужен её идентификатор'] }],
     ['клик по «Форме» — таб прежний', K => K.tab('form'), { tab: 'settings', notices: [], writes: 0 }, { blind: true }],
-    ['Tab из поиска: «Настройки», затем обёртка «Формы» — подсказка с причиной', async (K) => { await K.searchClick(); await K.tabs(2); await K.wait(900) },
-      { focusLock: 'form', tooltip: 'Станет доступно после первого сохранения схемы: полям и шагам нужен её идентификатор' }],
+    ['Tab из поиска: «Настройки», затем «Форма» — кольцо кита и подсказка с причиной', async (K) => { await K.searchClick(); await K.tabs(2); await K.wait(900) },
+      { focusLock: 'form', lockRing: true, tooltip: 'Станет доступно после первого сохранения схемы: полям и шагам нужен её идентификатор' }],
     ['быстрый переход «Процессы и шаги» — отказ с причиной', async (K) => { await K.searchClick(); await K.type('ъъъ'); await K.quickLink(3) },
       { tab: 'settings', notices: ['Станет доступно после первого сохранения схемы: полям и шагам нужен её идентификатор'] }],
     ['первая правка сохранена — вкладки активны', async (K) => { await K.rename('Осмотр склада'); await K.settled() }, { 'tabLock.off': [], 'tabLock.wrap': [], writes: 1, saveLog: ['saving', 'saved'] }],
