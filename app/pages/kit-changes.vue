@@ -24,6 +24,9 @@ const tabLine = ref('a')
 const tabCount = ref('a')
 const tabStretch = ref('a')
 const tabSeg = ref('a')
+/** Такт 74: флажки с причиной и без; поле для нажатия в отступ коробки. */
+const checkReasonOn = ref(true)
+const inputBox = ref('КАСКО — осмотр легкового автомобиля')
 /** Такт 73: выключенная вкладка с причиной. */
 const tabReason = ref('a')
 const inputBare = ref('ИНВ-10798')
@@ -144,6 +147,26 @@ const ro = ref({ name: 'КАСКО — осмотр', text: 'Осмотр авт
               </template>
             </Input>
             <span class="text-xs text-muted-foreground">пустое поле — слот; значение — крестик на месте слота</span>
+          </template>
+          <template v-else-if="c.id === 'checkbox-reason'">
+            <Checkbox v-model="checkReasonOn">
+              Согласование включено
+            </Checkbox>
+            <Checkbox disabled reason="Сначала включите согласование в разделе Настройки">
+              Отправлять на согласование
+            </Checkbox>
+            <Checkbox disabled subtitle="Пояснение гаснет вместе с флажком" reason="Недоступна компании — подключается через менеджера">
+              Детектор подмены снимка
+            </Checkbox>
+            <Checkbox disabled>
+              Выключен без причины
+            </Checkbox>
+            <span class="text-xs text-muted-foreground">disabled с reason: флажок и подпись на 0.48, причина полным контрастом; без reason — прежний</span>
+          </template>
+          <template v-else-if="c.id === 'input-box-focus'">
+            <Input v-model="inputBox" placeholder="Продающее название" :show-icon="false" />
+            <Input v-model="inputBox" placeholder="Поиск по настройкам" clearable />
+            <span class="text-xs text-muted-foreground">нажатие в отступ 16 слева или справа, в строку подписи или по иконке — фокус в поле, курсор у ближайшего края текста</span>
           </template>
           <template v-else-if="c.id === 'tabs-reason'">
             <Tabs v-model="tabReason" class="w-full">

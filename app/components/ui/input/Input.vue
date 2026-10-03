@@ -72,6 +72,36 @@ const slots = useSlots()
 const hasEnd = computed(() => !!slots.end)
 const showEnd = computed(() => hasEnd.value && model.value === '' && !ro.value)
 const showClear = computed(() => props.clearable && isActive.value && !showEnd.value && !ro.value)
+
+/**
+ * Нажатие в любую точку коробки ставит фокус в поле — такт 74, решение оркестратора 2026-10-03 (дефект с такта 68):
+ * отступы 16 по бокам, строка подписи и иконка поля фокус не ставили. Курсор встаёт к ближайшему краю текста: левее
+ * середины текста — в начало, правее — в конец. Нажатие по самому полю, по крестику и по кнопкам слота `end` идёт
+ * своим путём; у выключенного поля фокуса нет.
+ */
+const inputEl = ref<HTMLInputElement | null>(null)
+let measure: CanvasRenderingContext2D | null = null
+
+function onBoxDown(event: MouseEvent) {
+  const el = inputEl.value
+  const target = event.target as HTMLElement | null
+  if (!el || props.disabled || event.button !== 0 || !target) return
+  const own = target.closest('button, a, input, textarea, select, [tabindex]')
+  if (target === el || (own && (event.currentTarget as HTMLElement).contains(own))) return
+  event.preventDefault()
+  const rect = el.getBoundingClientRect()
+  measure ??= document.createElement('canvas').getContext('2d')
+  const style = getComputedStyle(el)
+  let width = 0
+  if (measure) {
+    measure.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`
+    width = measure.measureText(el.value).width
+  }
+  const start = rect.left - el.scrollLeft
+  const pos = event.clientX < start + width / 2 ? 0 : el.value.length
+  el.focus()
+  el.setSelectionRange(pos, pos)
+}
 </script>
 
 <template>
@@ -90,6 +120,7 @@ const showClear = computed(() => props.clearable && isActive.value && !showEnd.v
       data-slot="field"
       :data-readonly="ro ? '' : undefined"
       :class="[inputVariants({ variant, size, invalid: invalid && !ro, floating: isFloating, disabled, readonly: ro }), ro ? READONLY_SURFACE : '']"
+      @mousedown="onBoxDown"
     >
       <div
         class="flex min-w-0 flex-1 items-center gap-2"
@@ -112,6 +143,7 @@ const showClear = computed(() => props.clearable && isActive.value && !showEnd.v
             {{ props.placeholder }}
           </span>
           <input
+            ref="inputEl"
             v-model="model"
             data-slot="field-input"
             type="text"

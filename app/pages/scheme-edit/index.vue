@@ -280,8 +280,11 @@ const EMPTY_TEMPLATE: PdfTemplateDraft = { id: '', title: '', template: 'act-veh
 /** Черновик сайда шаблона: правки живут здесь до «Сохранить» (r2 §7). */
 const tpl = ref<PdfTemplateDraft>({ ...EMPTY_TEMPLATE })
 const tplInvalid = ref(false)
+/** Имя в заголовке сайда правки — на момент открытия (карточка Д, такт 74: «Редактирование … — имя»). */
+const tplTitle = ref('')
 function openTemplate(id: string) {
   tpl.value = { ...(pdf.value.templates.find(t => t.id === id) ?? EMPTY_TEMPLATE) }
+  tplTitle.value = tpl.value.title
   tplInvalid.value = false
   m.openSide('template')
 }
@@ -513,7 +516,7 @@ const groupMeta = computed(() => (fg.value
       { label: 'Редактирование', value: fg.value.editable ? 'Разрешено' : 'Запрещено' },
     ]
   : []))
-const fieldsTitle = computed(() => (fg.value ? `${fg.value.title} · ${fg.value.fields.length} ${plural(fg.value.fields.length, 'поле', 'поля', 'полей')}` : ''))
+const fieldsCount = computed(() => (fg.value ? `${fg.value.fields.length} ${plural(fg.value.fields.length, 'поле', 'поля', 'полей')}` : ''))
 const selectedCount = computed(() => m.ui.selectedFields.length)
 const selectedText = computed(() => `Выбрано: ${selectedCount.value} ${plural(selectedCount.value, 'поле', 'поля', 'полей')}`)
 const FIELD_ACTIONS: TableRowActionItem[] = [{ key: 'delete', label: 'Удалить', icon: 'delete', destructive: true }]
@@ -1607,9 +1610,9 @@ if (import.meta.client) {
                     </TableRow>
                     <TableRow v-for="c in FINISH_CLASSES" :key="c.code" :data-class="c.code">
                       <TableCell variant="slot" class="w-24 px-4">
-                        <Badge variant="neutral">
+                        <Chip variant="neutral">
                           {{ c.code }}
-                        </Badge>
+                        </Chip>
                       </TableCell>
                       <TableCell class="min-w-0 flex-1 px-4">
                         {{ c.title }}
@@ -1901,7 +1904,7 @@ if (import.meta.client) {
           <div class="flex w-group-list shrink-0 flex-col gap-2">
             <Card class="flex flex-col gap-1 p-1" data-groups>
               <div class="flex h-12 items-center justify-between gap-2 pr-2 pl-4">
-                <Heading>Группы</Heading>
+                <Heading level="group">Группы</Heading>
                 <div v-if="fg" :inert="ro" class="flex items-center gap-1">
                   <IconButton variant="ghost" size="md" label="Настройки группы" data-act="group-edit" @click="openGroup(fg.id)">
                     <Icon name="edit" :size="20" />
@@ -1929,7 +1932,7 @@ if (import.meta.client) {
               </div>
             </Card>
             <!-- Сверка дублей, такт 73: «Добавить …» — контурная кнопка с плюсом, как у остальных добавлений страницы. -->
-            <Button :inert="ro" variant="outline" show-icon class="w-full" data-act="group-add" @click="openGroup('')">
+            <Button v-if="m.formGroups.value.length" :inert="ro" variant="outline" show-icon class="w-full" data-act="group-add" @click="openGroup('')">
               <template #icon>
                 <Icon name="add" :size="16" />
               </template>
@@ -1940,11 +1943,15 @@ if (import.meta.client) {
           <!-- Панель полей — № 40, 41: заголовок группы со счётом, действия, таблица полей (`32765:5628`). -->
           <Card class="flex min-w-0 flex-1 flex-col gap-4" data-fields-panel>
             <template v-if="fg">
+              <!-- Счёт — слотом `meta` (карточка Б, такт 74): середина строчных, правило базовой линии. -->
               <Heading level="group" data-fields-title>
-                {{ fieldsTitle }}
+                {{ fg.title }}
+                <template #meta>
+                  {{ fieldsCount }}
+                </template>
               </Heading>
               <div :inert="ro" class="flex flex-wrap items-start gap-2" data-fields-actions>
-                <Button show-icon data-act="field-add" @click="openField('')">
+                <Button v-if="fg.fields.length" show-icon data-act="field-add" @click="openField('')">
                   <template #icon>
                     <Icon name="add" :size="16" />
                   </template>
@@ -2112,7 +2119,7 @@ if (import.meta.client) {
         <div class="flex flex-col gap-3 pt-6" data-processes :data-readonly="ro || undefined">
           <!-- Действия таба — № 43 (`32765:6553`): «Заполнить изображения» — заглушка (r2 §9), «Вставить шаг из другой схемы» — № 70. -->
           <div :inert="ro" class="flex flex-wrap items-center gap-3" data-processes-actions>
-            <Button variant="outline" show-icon data-act="process-add" @click="openProcess('')">
+            <Button v-if="m.processes.value.length" variant="outline" show-icon data-act="process-add" @click="openProcess('')">
               <template #icon>
                 <Icon name="add" :size="16" />
               </template>
@@ -2347,7 +2354,7 @@ if (import.meta.client) {
                 </TableCell>
                 <!-- Фото-подсказка — № 47 (`32765:6709`, `32765:6773`): статус на месте, загрузка инлайн в ячейке, без «Сохранить». -->
                 <TableCell variant="slot" class="h-auto w-44 flex-col items-start gap-2 px-4 pt-4 pb-3" :data-step-hints="st.hints">
-                  <Badge :variant="st.hints ? 'success' : 'warning'" data-hint-status>
+                  <Badge size="sm" :variant="st.hints ? 'success' : 'warning'" data-hint-status>
                     {{ hintText(st.hints) }}
                   </Badge>
                   <div :inert="ro" class="flex w-full flex-col items-start gap-2">
@@ -2569,7 +2576,7 @@ if (import.meta.client) {
     <!-- ============================ сайд шаблона PDF — № 38 ============================ -->
     <ModalCard v-model:open="templateOpen">
       <ModalCardContent placement="edge" data-side="template">
-        <ModalCardHeader :title="tpl.id ? 'Редактирование шаблона' : 'Добавление шаблона'" />
+        <ModalCardHeader :title="tpl.id ? `Редактирование шаблона — ${tplTitle}` : 'Добавление шаблона'" />
         <ModalCardBody class="flex flex-col gap-4">
           <Field label="Отображаемое название" required :invalid="tplInvalid" :hint="tplInvalid ? 'Заполните отображаемое название' : ''">
             <Input v-model="tpl.title" placeholder="Например, Акт осмотра" :show-icon="false" :invalid="tplInvalid" data-field="tplTitle" />
@@ -2605,7 +2612,7 @@ if (import.meta.client) {
     <!-- ============================ сайд поля — № 42: четыре секции (аудит, «Сайд „Редактирование поля“ — эталон»; макет `32936:16381`) ============================ -->
     <ModalCard v-model:open="fieldOpen">
       <ModalCardContent placement="edge" data-side="field">
-        <ModalCardHeader :title="fd.id ? `Редактирование поля — ${fdTitle}` : 'Новое поле'" />
+        <ModalCardHeader :title="fd.id ? `Редактирование поля — ${fdTitle}` : 'Добавление поля'" />
         <ModalCardBody class="flex flex-col gap-6">
           <FieldSet legend="Основное">
             <Field label="Заголовок" required :invalid="fdError?.key === 'title'" :hint="fdError?.key === 'title' ? fdError.text : ''">
@@ -2649,8 +2656,8 @@ if (import.meta.client) {
               <Checkbox v-model="fd.mobileAfterCreate" data-field="fdMobile">
                 Отображается в мобильном после создания осмотра
               </Checkbox>
-              <!-- «гасит»: согласование выключено в «Настройках» — причина строкой пояснения под флажком (макет `32936:16531`). -->
-              <Checkbox v-model="fd.approval" :disabled="!!m.fieldApprovalReason.value" :subtitle="m.fieldApprovalReason.value" data-field="fdApproval">
+              <!-- «гасит»: согласование выключено в «Настройках» — причина `reason` под флажком полным контрастом (макет `32936:16531`; карточка А, такт 74). -->
+              <Checkbox v-model="fd.approval" :disabled="!!m.fieldApprovalReason.value" :reason="m.fieldApprovalReason.value" data-field="fdApproval">
                 Отправлять на согласование
               </Checkbox>
               <!-- «?» — только у этой строки, как в макете (`32936:16538`). -->
@@ -2957,7 +2964,7 @@ if (import.meta.client) {
     -->
     <ModalCard v-model:open="stepOpen">
       <ModalCardContent placement="edge" data-side="step" :data-host="sdHost.overlay ? 'overlay' : 'page'">
-        <ModalCardHeader :title="sd.id ? `Редактирование шага — ${sdTitle}` : 'Новый шаг'" :subtitle="`Процесс «${hostTitle}»`" />
+        <ModalCardHeader :title="sd.id ? `Редактирование шага — ${sdTitle}` : 'Добавление шага'" :subtitle="`Процесс «${hostTitle}»`" />
         <ModalCardBody class="flex flex-col gap-6">
           <FieldSet legend="Основное" data-step-section="main">
             <Field label="Название" required :invalid="sdInvalid" :hint="sdInvalid ? 'Заполните название шага' : ''">
@@ -2998,7 +3005,7 @@ if (import.meta.client) {
             </div>
           </FieldSet>
 
-          <!-- Нейросети: недоступная компании — «гасит» по компании (макет `32765:6702`): флажок выключен, причина строкой пояснения. -->
+          <!-- Нейросети: недоступная компании — «гасит» по компании (макет `32765:6702`): флажок выключен, причина `reason` полным контрастом (карточка А, такт 74). -->
           <FieldSet :legend="`Нейросети · выбрано ${sd.networks.length}`" data-step-section="networks">
             <div class="flex flex-col gap-3" data-step-networks-list>
               <Checkbox
@@ -3006,7 +3013,7 @@ if (import.meta.client) {
                 :key="x.value"
                 :model-value="sd.networks.includes(x.value)"
                 :disabled="!!x.denied"
-                :subtitle="x.denied ?? ''"
+                :reason="x.denied ?? ''"
                 :data-network="x.value"
                 @update:model-value="toggleNetwork(x.value)"
               >
@@ -3071,7 +3078,7 @@ if (import.meta.client) {
               :model-value="nd[x.value] === 'all'"
               :indeterminate="nd[x.value] === 'some'"
               :disabled="!!x.denied"
-              :subtitle="x.denied ?? ''"
+              :reason="x.denied ?? ''"
               :data-network="x.value"
               @update:model-value="cycleNetwork(x.value)"
             >
@@ -3093,7 +3100,7 @@ if (import.meta.client) {
     <!-- ============================ сайд группы — № 68: поля по блоку «Настройки группы» `33179:4467` ============================ -->
     <ModalCard v-model:open="groupOpen">
       <ModalCardContent placement="edge" data-side="group">
-        <ModalCardHeader :title="gd.id ? `Настройки группы — ${gdTitle}` : 'Новая группа'" />
+        <ModalCardHeader :title="gd.id ? `Редактирование группы — ${gdTitle}` : 'Добавление группы'" />
         <ModalCardBody class="flex flex-col gap-4">
           <Field label="Название" required :invalid="gdInvalid" :hint="gdInvalid ? 'Заполните название группы' : ''">
             <Input v-model="gd.title" placeholder="Например, Документы" :show-icon="false" :invalid="gdInvalid" data-field="gdTitle" />
@@ -3237,7 +3244,7 @@ if (import.meta.client) {
                 {{ v.meta }}
               </template>
               <template v-if="v.current" #trailing>
-                <Badge>Текущая</Badge>
+                <Badge size="sm">Текущая</Badge>
               </template>
             </ListRow>
           </ModalCardBody>

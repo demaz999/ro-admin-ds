@@ -3,7 +3,7 @@
   См. docs/design-debt.md, «Ось readonly», и `ui/field/index.ts`, «Ось readonly».
 -->
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, useId } from 'vue'
 import { CheckboxIndicator, CheckboxRoot } from 'reka-ui'
 import { useReadonly } from '../field'
 import { Icon } from '../icon'
@@ -29,6 +29,13 @@ const props = withDefaults(defineProps<{
   subtitle?: string
   disabled?: boolean
   /**
+   * Причина выключения — такт 74, решение оркестратора 2026-10-03 (карточка слияния А, `docs/scheme-edit.md`, раздел 8).
+   * Действует вместе с `disabled`: строка 13/16 `--muted-foreground` под подписью, полным контрастом — флажок, подпись и
+   * пояснение гаснут до 0.48, причина нет. Контрол ссылается на неё `aria-describedby`. Прецедент — `SettingRow reason`
+   * и `TabsTrigger reason` (такт 73). Без `disabled` причина не выводится.
+   */
+  reason?: string
+  /**
    * Контрол лежит **поверх изображения**.
    *
    * Невыбранный получает **непрозрачную заливку** `--field-elevated` — ту же
@@ -49,6 +56,7 @@ const props = withDefaults(defineProps<{
   indeterminate: false,
   subtitle: '',
   disabled: false,
+  reason: '',
   onImage: false,
   readonly: false,
 })
@@ -57,6 +65,11 @@ const ro = useReadonly(() => props.readonly, () => props.disabled)
 const guard = choiceReadonlyGuard(ro)
 
 const model = defineModel<boolean>({ default: false })
+
+/** Причина видна у выключенного: строка гасит контрол и подпись по частям, причину оставляет полным контрастом. */
+const locked = computed(() => props.disabled && !!props.reason)
+const reasonId = useId()
+const dim = computed(() => (locked.value ? 'opacity-[var(--opacity-disabled)]' : ''))
 
 /** Заливка появляется и у отмеченного, и у частичного — так в мастере. */
 const filled = computed(() => model.value || props.indeterminate)
@@ -75,16 +88,17 @@ const state = computed<boolean | 'indeterminate'>({
   <label
     data-slot="choice"
     :data-readonly="ro ? '' : undefined"
-    :class="choiceRowVariants({ disabled, readonly: ro })"
+    :class="[choiceRowVariants({ disabled: disabled && !locked, readonly: ro }), locked ? 'pointer-events-none' : '']"
     @click.capture="guard.onClickCapture"
     @keydown.capture="guard.onKeydownCapture"
   >
-    <span class="flex h-5 shrink-0 items-center">
+    <span class="flex h-5 shrink-0 items-center" :class="dim">
       <CheckboxRoot
         v-model="state"
         :disabled="props.disabled"
         data-slot="choice-control"
         :aria-readonly="ro ? 'true' : undefined"
+        :aria-describedby="locked ? reasonId : undefined"
         class="flex size-4 items-center justify-center rounded-xs border-2 text-primary-foreground outline-none transition-colors"
         :class="[
           ro
@@ -107,16 +121,20 @@ const state = computed<boolean | 'indeterminate'>({
       Блок подписи есть только при подписи. Пустой блок вместе с зазором строки 12 делал флажок без подписи шире
       контрола на 12, и в плашке плитки квадрат стоял на 6 левее центра — такт 48, довесок.
     -->
-    <span v-if="$slots.default || props.subtitle" class="flex min-w-0 flex-col">
-      <span data-slot="choice-title" :class="choiceTitleVariants({ checked: filled })">
+    <span v-if="$slots.default || props.subtitle || locked" class="flex min-w-0 flex-col">
+      <span data-slot="choice-title" :class="[choiceTitleVariants({ checked: filled }), dim]">
         <slot />
       </span>
       <span
         v-if="props.subtitle"
         data-slot="choice-subtitle"
         class="text-xs font-medium text-field-placeholder"
+        :class="dim"
       >
         {{ props.subtitle }}
+      </span>
+      <span v-if="locked" :id="reasonId" data-slot="choice-reason" class="text-xs text-muted-foreground">
+        {{ props.reason }}
       </span>
     </span>
   </label>

@@ -444,6 +444,8 @@ function kit(page) {
     async snapshot() {
       const s = await page.evaluate(`(() => {
         const t = s => (s ?? '').replace(/\\s+/g, ' ').trim()
+        /* Такт 74: причина под флажком полным контрастом — произведение opacity от узла до слоя сайда (анимация слоя не в счёт). */
+        const lit = el => { if (!el) return null; let o = 1; for (let x = el; x && x.nodeType === 1 && !x.matches('[data-side]'); x = x.parentElement) o *= Number(getComputedStyle(x).opacity); return o === 1 }
         const root = ${Q.root}
         const status = document.querySelector('[data-slot=app-bar-status]')
         const M = window.__scheme
@@ -624,7 +626,9 @@ function kit(page) {
               group: t(el.querySelector('[data-form-group] [data-slot=choice-control][data-state=checked]')?.closest('[data-form-group]')?.querySelector('[data-slot=choice-title]').textContent) || null,
               /* Довесок 1: «Настройки группы» — пары FrameMeta; слепок — значения пар. */
               settings: [...el.querySelectorAll('[data-group-settings] [data-slot=frame-meta] dd')].map(x => t(x.textContent)),
-              title: t(el.querySelector('[data-fields-title]')?.textContent) || null,
+              /* Такт 74, карточка Б: счёт — слотом meta; слепок — «заголовок · счёт». */
+              title: (() => { const h = el.querySelector('[data-fields-title]'); if (!h) return null; const head = h.matches('[data-slot=heading]') ? h : h.querySelector('[data-slot=heading]')
+                return [t(head?.textContent), t(h.querySelector('[data-slot=heading-meta]')?.textContent)].filter(Boolean).join(' · ') || null })(),
               rows: [...el.querySelectorAll('[data-form-row]')].map(r => [t(r.querySelector('[data-row-number]').textContent), t(r.querySelector('[data-slot=table-cell-identity]').textContent),
                 t(r.querySelector('[data-field-alias]').textContent), t(r.querySelector('[data-slot=chip]').textContent),
                 [...r.querySelectorAll('[data-badge]')].map(b => t(b.textContent)).join(', ')].filter(Boolean).join(' · ')),
@@ -651,7 +655,9 @@ function kit(page) {
               /* Довесок 1: флажки секции «Поведение и видимость» — Checkbox; причина — строка пояснения под флажком. */
               checks: Object.fromEntries([...el.querySelectorAll('[data-field-flags] [data-slot=choice][data-field]')].map(c => [c.dataset.field, {
                 checked: c.querySelector('[data-slot=choice-control]').getAttribute('aria-checked') === 'true', off: !!c.querySelector('[data-slot=choice-control]').disabled,
-                sub: t(c.querySelector('[data-slot=choice-subtitle]')?.textContent) }])),
+                sub: t(c.querySelector('[data-slot=choice-subtitle]')?.textContent),
+                /* Такт 74, карточка А: причина — reason под подписью, полным контрастом. */
+                why: t(c.querySelector('[data-slot=choice-reason]')?.textContent), whyLit: lit(c.querySelector('[data-slot=choice-reason]')) }])),
               help: [...el.querySelectorAll('[data-field-help]')].map(b => b.closest('div')?.querySelector('[data-slot=choice]')?.dataset.field ?? null),
               /* Шаг строк флажков: верх строки к верху следующей. */
               step: (() => { const r = [...el.querySelectorAll('[data-field-flags] [data-slot=choice]')].map(c => Math.round(c.getBoundingClientRect().top)); return r.slice(1).map((y, k) => y - r[k]) })(),
@@ -721,7 +727,7 @@ function kit(page) {
               order: Number(t(el.querySelector('[data-field=sdOrder] [data-slot=stepper-value]')?.textContent)),
               flags: [...el.querySelectorAll('[data-step-section] [data-slot=choice][data-field]')].filter(c => ctl(c).getAttribute('aria-checked') === 'true').map(c => c.dataset.field),
               networks: nets.filter(c => ctl(c).getAttribute('aria-checked') === 'true').map(c => c.dataset.network),
-              denied: nets.filter(c => ctl(c).disabled).map(c => c.dataset.network + ' | ' + t(c.querySelector('[data-slot=choice-subtitle]')?.textContent)),
+              denied: nets.filter(c => ctl(c).disabled).map(c => c.dataset.network + ' | ' + t(c.querySelector('[data-slot=choice-reason]')?.textContent) + (lit(c.querySelector('[data-slot=choice-reason]')) ? '' : ' | бледно')),
               hint: t(el.querySelector('[data-step-hint-status]')?.textContent),
               links: [...el.querySelectorAll('[data-field=sdLinks] [data-slot=select-chip]')].map(c => t(c.textContent)),
               /* Секция «Нейросети» в окне сайда: верх секции виден. */
@@ -1286,7 +1292,7 @@ const SCENARIOS = {
     ['выбрать «Кузов и комплектация» — поля и настройки группы', K => K.group('g-body'),
       { 'form.group': 'Кузов и комплектация', 'form.settings': ['Body', '2-й экран', 'После создания', 'Разрешено'], 'form.title': 'Кузов и комплектация · 4 поля',
         'form.rows': ['1 · Тип кузова · body_type · Выбор · Обязательное', '2 · Комплектация · trim · Выбор · Зависимое', '3 · Повреждения кузова · has_damage · Чекбокс', '4 · Год выпуска · year · Число'], writes: 0 }],
-    ['«Добавить группу» — сайд новой группы', K => K.act('group-add'), { surface: 'group', sideTitle: 'Новая группа', writes: 0 }],
+    ['«Добавить группу» — сайд новой группы', K => K.act('group-add'), { surface: 'group', sideTitle: 'Добавление группы', writes: 0 }],
     ['пустое название — отказ, сайд открыт', K => K.act('group-save'), { notices: ['Заполните название группы'], surface: 'group', 'form.groups.length': 3, writes: 0 }],
     ['название «Документы», алиас по названию, экран создания — добавить', async (K) => { await K.typeInto('gdTitle', 'Документы'); await K.act('group-alias-suggest'); await K.select('gdScreen', 'Не показывать при создании'); await K.act('group-save'); await K.settled() },
       { surface: '', 'form.groups': ['Заявка', 'Автомобиль', 'Кузов и комплектация', 'Документы'], 'form.group': 'Документы', 'form.settings': ['Dokumenty', 'Не показывать при создании', 'После создания', 'Разрешено'],
@@ -1297,7 +1303,7 @@ const SCENARIOS = {
   ], { query: 'tab=form' }],
   'СС-35': ['форма: добавить поле; удалить поле — toast с «Отменить» (r2 §5; аудит, «Отмена при автосейве»)', [
     ['старт: группа «Автомобиль»', null, { 'form.group': 'Автомобиль', 'form.title': 'Автомобиль · 4 поля' }],
-    ['«Добавить поле» — сайд нового поля, номер — следующий', K => K.act('field-add'), { surface: 'field', sideTitle: 'Новое поле', 'steppers.fdOrder': 5, 'fieldSide.choices': false, writes: 0 }],
+    ['«Добавить поле» — сайд нового поля, номер — следующий', K => K.act('field-add'), { surface: 'field', sideTitle: 'Добавление поля', 'steppers.fdOrder': 5, 'fieldSide.choices': false, writes: 0 }],
     ['пустой заголовок — отказ, сайд открыт', K => K.act('field-save'), { notices: ['Заполните заголовок поля'], surface: 'field', 'form.title': 'Автомобиль · 4 поля', writes: 0 }],
     ['заголовок и тип «Выбор» — появилась секция вариантов', async (K) => { await K.typeInto('fdTitle', 'Цвет салона'); await K.select('fdType', 'Выбор') },
       { 'fieldSide.choices': true, 'fieldSide.legends': ['Основное', 'Поведение и видимость', 'Варианты выбора', 'Валидация и подсказки'], writes: 0 }],
@@ -1335,7 +1341,7 @@ const SCENARIOS = {
     ['карандаш у «Года выпуска» — сайд с тремя секциями: тип без выбора', K => K.rowEdit('f-year'),
       { surface: 'field', sideTitle: 'Редактирование поля — Год выпуска', 'fieldSide.legends': ['Основное', 'Поведение и видимость', 'Валидация и подсказки'],
         'fieldSide.title': 'Год выпуска', 'fieldSide.alias': 'year', 'fieldSide.type': 'Число', 'steppers.fdOrder': 4,
-        'fieldSide.checks.fdApproval': { checked: false, off: true, sub: 'Сначала включите согласование в разделе Настройки' }, 'fieldSide.help': ['fdNoConfidential'],
+        'fieldSide.checks.fdApproval': { checked: false, off: true, sub: '', why: 'Сначала включите согласование в разделе Настройки', whyLit: true }, 'fieldSide.help': ['fdNoConfidential'],
         'fieldSide.step': [32, 32, 32, 48, 32] }],
     ['тип «Выбор» — четыре секции', K => K.select('fdType', 'Выбор'), { 'fieldSide.legends': ['Основное', 'Поведение и видимость', 'Варианты выбора', 'Валидация и подсказки'], 'fieldSide.choices': true }],
     ['тип «Число», «Отмена» — полотно прежнее', async (K) => { await K.select('fdType', 'Число'); await K.act('field-cancel') },
@@ -1351,7 +1357,7 @@ const SCENARIOS = {
       { surface: '', 'form.rows.3': '4 · Год выпуска · year · Число · Согласование', 'g.behavior.approval': true, writes: 4 }],
   ], { query: 'tab=form&group=g-body' }],
   'СС-58': ['сайд группы: открывается карандашом у списка групп; «Сохранить» меняет настройки группы в панели (r2 §5; аудит, «Принцип: всё редактирование сущности — в сайде»)', [
-    ['карандаш — сайд группы «Автомобиль»', K => K.act('group-edit'), { surface: 'group', sideTitle: 'Настройки группы — Автомобиль', writes: 0 }],
+    ['карандаш — сайд группы «Автомобиль»', K => K.act('group-edit'), { surface: 'group', sideTitle: 'Редактирование группы — Автомобиль', writes: 0 }],
     ['правки и «Отмена» — настройки прежние', async (K) => { await K.select('gdScreen', '2-й экран'); await K.select('gdMobile', 'Не показывать'); await K.check('gdEditable'); await K.act('group-cancel') },
       { surface: '', 'form.settings': ['Car', '1-й экран', 'Всегда', 'Разрешено'], writes: 0, saveLog: [] }],
     ['правки и «Сохранить» — настройки в панели', async (K) => { await K.act('group-edit'); await K.select('gdScreen', '2-й экран'); await K.select('gdMobile', 'Не показывать'); await K.check('gdEditable'); await K.act('group-save'); await K.settled() },
@@ -1459,8 +1465,8 @@ const SCENARIOS = {
       { surface: 'step', 'stepSide.title': 'Редактирование шага — Вид справа', 'stepSide.networksInView': true, focusNetwork: 'Распознавание VIN', writes: 1 }],
     ['нажатие на недоступную компании нейросеть — не выбирается', K => K.net('step', 'Детектор подмены снимка'), { 'stepSide.networks': ['Ракурсы авто · Правая сторона'], writes: 1 }, { blind: true }],
     ['Esc — сайд закрыт, фокус на «Настроить нейросети» строки', K => K.key('Escape'), { surface: '', focusAct: 'step-networks', focusStep: 's-right', writes: 1 }],
-    ['«Добавить шаг» у «Осмотра документов» — «Новый шаг», номер следующий; пустое название — отказ', async (K) => { await K.processAct('p-docs', 'step-add'); await K.act('step-save') },
-      { surface: 'step', notices: ['Заполните название шага'], 'stepSide.title': 'Новый шаг', 'stepSide.order': 2, 'stepSide.flags': [], writes: 1 }],
+    ['«Добавить шаг» у «Осмотра документов» — «Добавление шага», номер следующий; пустое название — отказ', async (K) => { await K.processAct('p-docs', 'step-add'); await K.act('step-save') },
+      { surface: 'step', notices: ['Заполните название шага'], 'stepSide.title': 'Добавление шага', 'stepSide.order': 2, 'stepSide.flags': [], writes: 1 }],
     ['«Свидетельство о регистрации», «2 фото» — «Добавить шаг»: строка в конце процесса', async (K) => { await K.typeInto('sdTitle', 'Свидетельство о регистрации'); await K.select('sdMethod', '2 фото'); await K.act('step-save'); await K.settled() },
       { surface: '', 'proc.cards.1': 'Осмотр документов · 2 шага · docs_inspection', 'proc.rows.p-docs.1': '2 · Свидетельство о регистрации · Основной · 2 фото · Нейросети не выбраны · Не установлена', writes: 2 }],
   ], { query: 'tab=processes' }],
@@ -1470,7 +1476,7 @@ const SCENARIOS = {
         steps: [], empty: 'В процессе нет шагов', acts: ['overlay-alias-suggest', 'overlay-step-add', 'overlay-cancel', 'overlay-save'], ro: false, fieldsRo: false, full: true }, writes: 0 }],
     ['Tab по кругу — фокус остаётся в оверлее', K => K.tabs(30), { surface: 'process-overlay', focusIn: 'overlay' }],
     ['«Добавить шаг» — сайд шага поверх оверлея: стек из двух слоёв, фокус в сайде', K => K.act('overlay-step-add'),
-      { surface: 'step', surfaces: ['process-overlay', 'step'], focusIn: 'step', 'stepSide.title': 'Новый шаг', 'stepSide.sub': 'Процесс «Осмотр повреждений»', 'stepSide.host': 'overlay', 'overlay.title': 'Осмотр повреждений' }],
+      { surface: 'step', surfaces: ['process-overlay', 'step'], focusIn: 'step', 'stepSide.title': 'Добавление шага', 'stepSide.sub': 'Процесс «Осмотр повреждений»', 'stepSide.host': 'overlay', 'overlay.title': 'Осмотр повреждений' }],
     ['Tab по кругу — фокус остаётся в сайде', K => K.tabs(40), { surface: 'step', focusIn: 'step' }],
     ['название, Esc — закрыт только сайд, оверлей открыт, фокус на «Добавить шаг» оверлея', async (K) => { await K.typeInto('sdTitle', 'Черновик шага'); await K.key('Escape') },
       { surface: 'process-overlay', surfaces: ['process-overlay'], focusIn: 'overlay', focusAct: 'overlay-step-add', 'overlay.steps': [], writes: 0 }],
@@ -1575,10 +1581,10 @@ const SCENARIOS = {
   ], { query: 'tab=showcase' }],
   'СС-54': ['пустые состояния: пустая форма, пустая группа, ноль процессов (r2 §8; аудит, «Пустые состояния»)', [
     ['таб «Форма» новой схемы — «В форме нет групп» с «Добавить группу»', K => K.tab('form'), { tab: 'form', pending: 'В форме нет групп', emptyActs: ['group-add-empty'], 'form.groups': [] }],
-    ['«Добавить группу» из пустого состояния — сайд новой группы', K => K.act('group-add-empty'), { surface: 'group', sideTitle: 'Новая группа' }],
+    ['«Добавить группу» из пустого состояния — сайд новой группы', K => K.act('group-add-empty'), { surface: 'group', sideTitle: 'Добавление группы' }],
     ['группа создана — «В группе нет полей» с «Добавить поле»', async (K) => { await K.typeInto('gdTitle', 'Объект'); await K.act('group-save'); await K.settled() },
       { surface: '', 'form.groups': ['Объект'], pending: 'В группе нет полей', emptyActs: ['field-add-empty'] }],
-    ['«Добавить поле» из пустого состояния — сайд нового поля', K => K.act('field-add-empty'), { surface: 'field', sideTitle: 'Новое поле' }],
+    ['«Добавить поле» из пустого состояния — сайд нового поля', K => K.act('field-add-empty'), { surface: 'field', sideTitle: 'Добавление поля' }],
     ['таб «Процессы и шаги» — «В схеме нет процессов» с «Добавить процесс»', async (K) => { await K.key('Escape'); await K.tab('processes') },
       { surface: '', tab: 'processes', pending: 'В схеме нет процессов', emptyActs: ['process-add-empty'], 'proc.cards': [] }],
     ['«Добавить процесс» из пустого состояния — сайд процесса', K => K.act('process-add-empty'), { surface: 'process', 'procSide.title': 'Добавление процесса' }],
