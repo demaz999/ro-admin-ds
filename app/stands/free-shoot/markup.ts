@@ -38,13 +38,15 @@ export interface MarkupResult {
 }
 
 /**
- * Исходники экрана — все `.vue` в папке страницы, кроме стенда матриц. Экранов два: `/free-shoot` и, с такта 61,
- * `/scheme-edit` (`docs/scheme-edit.md`): правило стендов экрана у них одно.
+ * Исходники экрана — все `.vue` в папке страницы, кроме стенда матриц. Экранов три: `/free-shoot`, с такта 61
+ * `/scheme-edit` (`docs/scheme-edit.md`), с такта 77 `/tariffs` (`docs/tariffs.md`): правило стендов экрана у них одно.
  */
-export type MarkupScreen = 'free-shoot' | 'scheme-edit'
+export type MarkupScreen = 'free-shoot' | 'scheme-edit' | 'tariffs'
 const SCREENS: Record<MarkupScreen, Record<string, string>> = {
   'free-shoot': import.meta.glob('../../pages/free-shoot/*.vue', { query: '?raw', import: 'default', eager: true }) as Record<string, string>,
   'scheme-edit': import.meta.glob('../../pages/scheme-edit/*.vue', { query: '?raw', import: 'default', eager: true }) as Record<string, string>,
+  /* Такт 77: страница «Тарификация» (`docs/tariffs.md`). */
+  'tariffs': import.meta.glob('../../pages/tariffs/*.vue', { query: '?raw', import: 'default', eager: true }) as Record<string, string>,
 }
 const EXCLUDED = new Set(['states.vue'])
 

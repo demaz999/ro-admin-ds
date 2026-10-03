@@ -7,7 +7,7 @@ import { auditMarkup, auditMarkupSource, MARKUP_CONTROL, type MarkupScreen } fro
  * поэтому считается сразу, без кнопки. Прогон — в приёмку каждого такта, который трогает экран,
  * вместе с проверкой покрытия (`CLAUDE.md`, «Сборка страниц»).
  */
-/** Экран: `/free-shoot` (по умолчанию) или `/scheme-edit` — такт 61. */
+/** Экран: `/free-shoot` (по умолчанию), `/scheme-edit` — такт 61, `/tariffs` — такт 77. */
 const props = withDefaults(defineProps<{ screen?: MarkupScreen }>(), { screen: 'free-shoot' })
 const result = auditMarkup(props.screen)
 const control = auditMarkupSource('контрольный образец', MARKUP_CONTROL.source)

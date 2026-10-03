@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { cn } from '@/lib/utils'
 import { Icon } from '../icon'
-import { buttonVariants, type ButtonVariants } from '.'
+import { Spinner } from '../spinner'
+import { buttonLoadingClass, buttonVariants, type ButtonVariants } from '.'
 
 /**
  * Текстовая кнопка — мастер `57:340`, спека `45:175`.
@@ -20,6 +21,11 @@ const props = withDefaults(defineProps<{
   /** Булев проп мастера `Show icon`. У малого размера слота иконки нет. */
   showIcon?: boolean
   disabled?: boolean
+  /**
+   * Загрузка — такт 77 (`docs/tariffs.md`, раздел 9; макет `30957:18341`, `Loader24` `30957:18364`): спиннер по центру
+   * вместо иконки и подписи, ширина прежняя, кнопка недоступна и не гаснет, `aria-busy`.
+   */
+  loading?: boolean
   type?: 'button' | 'submit' | 'reset'
 }>(), {
   variant: 'default',
@@ -27,6 +33,7 @@ const props = withDefaults(defineProps<{
   wide: false,
   showIcon: false,
   disabled: false,
+  loading: false,
   type: 'button',
 })
 </script>
@@ -35,8 +42,10 @@ const props = withDefaults(defineProps<{
   <button
     data-slot="button"
     :type="props.type"
-    :disabled="props.disabled"
-    :class="cn(buttonVariants({ variant, size, wide }))"
+    :disabled="props.disabled || props.loading"
+    :aria-busy="props.loading || undefined"
+    :data-loading="props.loading || undefined"
+    :class="cn(buttonVariants({ variant, size, wide }), props.loading && buttonLoadingClass)"
     :style="{ transitionProperty: 'background-color', transitionDuration: 'var(--duration-hover)' }"
   >
     <!-- Слот иконки есть только у среднего и большого: у малой его нет в мастере. -->
@@ -44,5 +53,10 @@ const props = withDefaults(defineProps<{
       <Icon name="search" :size="16" />
     </slot>
     <slot />
+
+    <!-- Загрузка: подпись и иконка остаются в потоке прозрачными — ширина прежняя; спиннер поверх по центру. -->
+    <span v-if="props.loading" data-slot="button-loading" class="absolute inset-0 flex items-center justify-center">
+      <Spinner :variant="props.variant === 'default' || props.variant === 'destructive' ? 'inverse' : 'default'" :size="props.size === 'sm' ? 'xs' : 'sm'" label="Выполняется" />
+    </span>
   </button>
 </template>

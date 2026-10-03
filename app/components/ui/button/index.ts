@@ -160,6 +160,22 @@ export const buttonVariants = cva(
 export type ButtonVariants = VariantProps<typeof buttonVariants>
 
 /**
+ * Загрузка — такт 77, нехватка в ките (строка 33 реестра `docs/tariffs.md`). Макет страницы «Тарификация»: `btn_accent`
+ * `30957:18341` 206 × 44 — вместо иконки и подписи `Loader24` `30957:18364` 24 по центру, заливка полная.
+ *
+ * | Что | Как | Провенанс |
+ * |---|---|---|
+ * | спиннер | `Spinner` `sm` 20 по центру (у `sm` кнопки — `xs` 16): у залитых `default`, `destructive` — `inverse`, у прочих — `default` | `Loader24` 24 в кнопке 44 → ступень `Spinner` 20 в кнопке 40 |
+ * | ширина | подпись и иконка остаются в потоке и прозрачны (`text-transparent`) — ширина прежняя | макет: 206 у обеих кнопок |
+ * | доступность | кнопка `disabled` и `aria-busy`; прозрачность выключенной не включается — заливка полная | макет: заливка `30957:18341` = покой |
+ *
+ * Класс подмешивается через `cn` после классов варианта: `text-transparent` и `disabled:opacity-100` побеждают цвет и
+ * прозрачность варианта; `disabled:text-transparent` и `disabled:border-primary` — у контурного варианта, где выключенная
+ * красит текст и рамку. У вариантов без рамки цвет рамки ничего не рисует.
+ */
+export const buttonLoadingClass = 'relative text-transparent disabled:text-transparent disabled:opacity-100 disabled:border-primary'
+
+/**
  * ## Изменения после передачи
  *
  * Компонент передан фронтам 2026-09-30. Правило 23 `docs/chat-protocol.md`: каждое изменение переданного компонента
@@ -167,6 +183,9 @@ export type ButtonVariants = VariantProps<typeof buttonVariants>
  *
  * ### Черновик следующей версии — относительно `handover-2026-10-02`
  *
+ * - **Добавлено.** Загрузка: спиннер 20 по центру вместо иконки и подписи (у малой кнопки — 16), белый у залитых
+ *   `default` и `destructive`, `--primary` у прочих; ширина кнопки прежняя, заливка полная — кнопка не гаснет; нажатия не
+ *   принимает, `aria-busy`. Без пропа кнопка прежняя. API: проп `loading`. Такт 77.
  * - **Добавлено.** Вариант `variant="outline"` — контурная кнопка по мастеру кита 1 `btn_outline` `1990:226`: рамка 1 и
  *   текст `--primary`, наведение `--primary-hover`, нажатие `--primary-pressed`, выключено `--primary-disabled`; фона
  *   нет. Прочие варианты прежние. Такт 63.

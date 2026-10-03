@@ -1,0 +1,158 @@
+{
+  "company": "Демо Страхование",
+  "catalog": [
+    { "id": "t-car", "name": "Легковой автомобиль", "icon": "car" },
+    { "id": "t-truck", "name": "Грузовой автомобиль", "icon": "car" },
+    { "id": "t-moto", "name": "Мотоцикл", "icon": "car" },
+    { "id": "t-bus", "name": "Автобус", "icon": "car" },
+    { "id": "t-trailer", "name": "Прицеп", "icon": "car" },
+    { "id": "t-special", "name": "Спецтехника", "icon": "package" },
+    { "id": "t-agro", "name": "Сельхозтехника", "icon": "package" },
+    { "id": "t-boat", "name": "Водный транспорт", "icon": "package" },
+    { "id": "t-equipment", "name": "Оборудование", "icon": "package" },
+    { "id": "t-flat", "name": "Квартира", "icon": "home" },
+    { "id": "t-house", "name": "Частный дом", "icon": "home" },
+    { "id": "t-commercial", "name": "Коммерческая недвижимость", "icon": "home" },
+    { "id": "t-land", "name": "Земельный участок", "icon": "home" }
+  ],
+  "settings": {
+    "base": {
+      "price": { "client": 500, "nonClient": 700, "linked": false },
+      "minPayment": 20000,
+      "scale": {
+        "on": false,
+        "form": "single",
+        "steps": [
+          { "from": 1, "to": 1000, "price": { "client": 500, "nonClient": 500, "linked": true } },
+          { "from": 1001, "to": null, "price": { "client": 400, "nonClient": 400, "linked": true } }
+        ]
+      },
+      "counter": "global"
+    },
+    "objectTypes": [
+      {
+        "typeId": "t-car",
+        "price": { "client": 300, "nonClient": 300, "linked": true },
+        "scale": { "on": false, "form": "single", "steps": [{ "from": 1, "to": null, "price": { "client": 300, "nonClient": 300, "linked": true } }] }
+      },
+      {
+        "typeId": "t-special",
+        "price": { "client": 800, "nonClient": 1000, "linked": false },
+        "scale": {
+          "on": true,
+          "form": "roles",
+          "steps": [
+            { "from": 1, "to": 200, "price": { "client": 800, "nonClient": 1000, "linked": false } },
+            { "from": 201, "to": null, "price": { "client": 700, "nonClient": 900, "linked": false } }
+          ]
+        }
+      },
+      {
+        "typeId": "t-flat",
+        "price": { "client": 600, "nonClient": 600, "linked": true },
+        "scale": { "on": false, "form": "single", "steps": [{ "from": 1, "to": null, "price": { "client": 600, "nonClient": 600, "linked": true } }] }
+      }
+    ],
+    "groups": [
+      {
+        "id": "g-kasko",
+        "name": "КАСКО",
+        "mode": "company",
+        "price": { "client": null, "nonClient": null, "linked": true },
+        "scale": { "on": false, "form": "single", "steps": [{ "from": 1, "to": null, "price": { "client": null, "nonClient": null, "linked": true } }] }
+      },
+      {
+        "id": "g-osago",
+        "name": "ОСАГО",
+        "mode": "fixed",
+        "price": { "client": 900, "nonClient": 1100, "linked": false },
+        "scale": { "on": false, "form": "single", "steps": [{ "from": 1, "to": null, "price": { "client": null, "nonClient": null, "linked": true } }] }
+      },
+      {
+        "id": "g-realty",
+        "name": "Недвижимость",
+        "mode": "scale",
+        "price": { "client": null, "nonClient": null, "linked": true },
+        "scale": {
+          "on": true,
+          "form": "single",
+          "steps": [
+            { "from": 1, "to": 500, "price": { "client": 1200, "nonClient": 1200, "linked": true } },
+            { "from": 501, "to": null, "price": { "client": 1000, "nonClient": 1000, "linked": true } }
+          ]
+        }
+      }
+    ],
+    "schemes": [
+      {
+        "id": "s-car", "groupId": "g-kasko", "name": "Осмотр легкового автомобиля", "code": "100101",
+        "flags": [], "mode": "group",
+        "price": { "client": null, "nonClient": null, "linked": true },
+        "scale": { "on": false, "form": "single", "steps": [{ "from": 1, "to": null, "price": { "client": null, "nonClient": null, "linked": true } }] },
+        "processes": [], "individualTypes": false, "types": []
+      },
+      {
+        "id": "s-moto", "groupId": "g-kasko", "name": "Осмотр мотоцикла", "code": "100102",
+        "flags": ["new"], "mode": "individual",
+        "price": { "client": 450, "nonClient": 650, "linked": false },
+        "scale": { "on": false, "form": "single", "steps": [{ "from": 1, "to": null, "price": { "client": null, "nonClient": null, "linked": true } }] },
+        "processes": [], "individualTypes": false, "types": []
+      },
+      {
+        "id": "s-pre", "groupId": "g-kasko", "name": "Предстраховой осмотр автомобиля", "code": "100103",
+        "flags": [], "mode": "scale",
+        "price": { "client": null, "nonClient": null, "linked": true },
+        "scale": {
+          "on": true,
+          "form": "roles",
+          "steps": [
+            { "from": 1, "to": 300, "price": { "client": 700, "nonClient": 900, "linked": false } },
+            { "from": 301, "to": null, "price": { "client": 600, "nonClient": 800, "linked": false } }
+          ]
+        },
+        "processes": [], "individualTypes": false, "types": []
+      },
+      {
+        "id": "s-vehicle", "groupId": "g-osago", "name": "Осмотр транспортного средства", "code": "100201",
+        "flags": [], "mode": "group",
+        "price": { "client": null, "nonClient": null, "linked": true },
+        "scale": { "on": false, "form": "single", "steps": [{ "from": 1, "to": null, "price": { "client": null, "nonClient": null, "linked": true } }] },
+        "processes": [], "individualTypes": false, "types": []
+      },
+      {
+        "id": "s-trailer", "groupId": "g-osago", "name": "Осмотр прицепа", "code": "100202",
+        "flags": ["outdated"], "mode": "group",
+        "price": { "client": null, "nonClient": null, "linked": true },
+        "scale": { "on": false, "form": "single", "steps": [{ "from": 1, "to": null, "price": { "client": null, "nonClient": null, "linked": true } }] },
+        "processes": [], "individualTypes": false, "types": []
+      },
+      {
+        "id": "s-flat", "groupId": "g-realty", "name": "Осмотр квартиры", "code": "100301",
+        "flags": ["multi"], "mode": "group",
+        "price": { "client": null, "nonClient": null, "linked": true },
+        "scale": { "on": false, "form": "single", "steps": [{ "from": 1, "to": null, "price": { "client": null, "nonClient": null, "linked": true } }] },
+        "processes": [{ "id": "pr-room", "name": "Комната", "price": { "client": 300, "nonClient": 350, "linked": false } }],
+        "individualTypes": true,
+        "types": [{ "typeId": "t-flat", "price": { "client": 700, "nonClient": 700, "linked": true } }]
+      },
+      {
+        "id": "s-house", "groupId": "g-realty", "name": "Осмотр частного дома", "code": "100302",
+        "flags": ["nested"], "mode": "individual",
+        "price": { "client": 1500, "nonClient": 1500, "linked": true },
+        "scale": { "on": false, "form": "single", "steps": [{ "from": 1, "to": null, "price": { "client": null, "nonClient": null, "linked": true } }] },
+        "processes": [{ "id": "pr-building", "name": "Постройка на участке", "price": { "client": 500, "nonClient": 500, "linked": true } }],
+        "individualTypes": false, "types": []
+      }
+    ]
+  },
+  "periods": [
+    { "id": "p-archive", "status": "archive", "from": { "year": -1, "month": 1 }, "patch": [["base.price.client", 450], ["base.price.nonClient", 600], ["base.minPayment", 15000]] },
+    { "id": "p-current", "status": "queued", "from": { "year": 0, "month": 1 }, "patch": [] },
+    { "id": "p-planned", "status": "queued", "from": { "ahead": 3 }, "patch": [["base.price.client", 550], ["base.price.nonClient", 750]] },
+    { "id": "p-draft", "status": "draft", "from": { "ahead": 6 }, "patch": [["base.minPayment", 25000]] }
+  ],
+  "empty": {
+    "objectTypes": [],
+    "emptyGroups": ["g-realty"]
+  }
+}

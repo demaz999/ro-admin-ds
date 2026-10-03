@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { SCHEME_COVERAGE_STATES } from '~/stands/scheme-edit/coverage'
+import { TARIFFS_COVERAGE_STATES } from '~/stands/tariffs/coverage'
 useHead({ title: 'Наложение — сверка с Атомом' })
 
 /**
@@ -2023,6 +2024,28 @@ const textareaVariants = [
         классы раскладки. Такт 61.
       </p>
       <CompareMarkupAudit screen="scheme-edit" />
+    </section>
+
+    <section class="space-y-3">
+      <h2 class="text-lg font-bold">
+        Автопроверка покрытия страницы тарификации
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Страница <code>/tariffs</code> — то же правило: каждый видимый элемент с отрисовкой лежит внутри компонента кита.
+        Состояния оснастки — <code>app/stands/tariffs/coverage.ts</code>. Такт 77.
+      </p>
+      <CompareCoverageAudit path="/tariffs" :states="TARIFFS_COVERAGE_STATES" />
+    </section>
+
+    <section class="space-y-3">
+      <h2 class="text-lg font-bold">
+        Автопроверка разметки страницы тарификации
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Исходники <code>app/pages/tariffs/*.vue</code>, кроме стенда матриц: на странице только компоненты кита и классы
+        раскладки. Такт 77.
+      </p>
+      <CompareMarkupAudit screen="tariffs" />
     </section>
 
     <section class="space-y-2">

@@ -14,7 +14,7 @@ import { settle } from '~/stands/audit/settle'
  */
 interface Row { state: string, checked: number, findings: CoverageFinding[] }
 
-/** Экран и его состояния оснастки: по умолчанию `/free-shoot`; `/scheme-edit` — такт 61. */
+/** Экран и его состояния оснастки: по умолчанию `/free-shoot`; `/scheme-edit` — такт 61, `/tariffs` — такт 77. */
 const props = withDefaults(defineProps<{ path?: string, states?: readonly string[] }>(), { path: '/free-shoot', states: () => COVERAGE_STATES })
 
 const rows = ref<Row[]>([])

@@ -87,7 +87,39 @@ const ro = ref({ name: 'КАСКО — осмотр', text: 'Осмотр авт
           </p>
         </div>
         <div data-example class="flex min-w-0 flex-col items-stretch gap-3">
-          <template v-if="c.id === 'modal-card-full'">
+          <template v-if="c.id === 'button-loading'">
+            <div class="flex flex-wrap items-center gap-3">
+              <Button show-icon>
+                <template #icon>
+                  <Icon name="save" :size="20" />
+                </template>
+                Сохранить изменения
+              </Button>
+              <Button show-icon loading>
+                <template #icon>
+                  <Icon name="save" :size="20" />
+                </template>
+                Сохранить изменения
+              </Button>
+              <Button variant="secondary" loading>
+                Применить
+              </Button>
+              <Button variant="outline" loading>
+                Применить
+              </Button>
+            </div>
+            <span class="text-xs text-muted-foreground">покой и загрузка той же кнопки — ширина одна; матрица — /tariffs/states</span>
+          </template>
+          <template v-else-if="c.id === 'icon-save'">
+            <span class="flex items-center gap-4 text-xs">
+              <Icon name="save" :size="16" />
+              <Icon name="save" :size="20" />
+              <Icon name="save" :size="24" />
+              <code>save</code>
+            </span>
+            <span class="text-xs text-muted-foreground">20 — в кнопке «Сохранить изменения»</span>
+          </template>
+          <template v-else-if="c.id === 'modal-card-full'">
             <div class="relative h-100 overflow-hidden rounded-md border border-border-soft bg-background">
               <ModalCard :open="true" :modal="false">
                 <ModalCardContent inline placement="full">
