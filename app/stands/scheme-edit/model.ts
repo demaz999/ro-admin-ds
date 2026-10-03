@@ -1,5 +1,8 @@
 import { computed, reactive } from 'vue'
-import { ALIAS_RE, DETECTOR_IDS, DETECTORS_ON, FIELD_SAMPLES, FINISH_CLASSES, suggestAlias, SYSTEM_VARIABLES, type StepFlag } from './catalogs'
+import {
+  ALIAS_RE, DETECTOR_GROUPS, DETECTOR_IDS, DETECTORS_ON, FIELD_SAMPLES, FINISH_CLASSES, showcaseTemplate, SPHERES, suggestAlias, SYSTEM_VARIABLES,
+  type ShowcaseMetric, type ShowcaseProblem, type StepFlag,
+} from './catalogs'
 import { diffConfigs, formatDate, plural, summarize, validateConfig } from './diff'
 import { QUICK_LINKS, searchSettings, type SearchItem } from './search'
 
@@ -42,9 +45,11 @@ export * from './catalogs'
  * фото-подсказок (`uploadHints`), удаление шага и процесса с отменой, перестановка шагов и полей (`moveStep`,
  * `moveField`); шаги входят в поиск. **П7, часть 2 (такт 71):** сайд процесса (`saveProcess`), сайд шага (`saveStep`, шесть
  * секций), нейросети выбранных шагов (`bulkNetworks`), оверлей повторяемого процесса (`openOverlay`) — стек «оверлей →
- * сайд». Дифф, валидация,
- * поиск, публикация, сброс черновика, просмотр снимка, операции формы, процессов и витрины — по своим порциям
- * (`scheme-edit.md`, раздел 10).
+ * сайд». **П8 (такт 72):** витрина — жизненный цикл карточки (`setShowcase`, `publishShowcase`: «Опубликовать на витрину»
+ * после публикации схемы), теги каскадом (`setIndustry`), «Зачем нужен осмотр» с шаблоном по типу объекта (`applyTemplate`),
+ * метрики, модули «Из схемы» (`hideModule`, `schemeModules`) и статусы «Как устроена схема» (`schemeFlow`); двухфазность
+ * новой схемы (`phaseLocked`, `tabLocked`); плашка автосохранения (`closeHint`); поля витрины входят в поиск. Порции —
+ * `scheme-edit.md`, раздел 10.
  */
 
 export type TabId = 'settings' | 'form' | 'processes' | 'showcase'
@@ -318,17 +323,61 @@ export type ProcessDraft = Process & { order: number }
 export type StepDraft = ProcessStep & { order: number }
 /** Нейросеть у выделенных шагов — флажок трёх состояний сайда «Нейросети выбранных шагов». */
 export type NetworkState = 'all' | 'some' | 'none'
+/**
+ * Витрина — r2 §7, аудит, «Таб „Витрина“» (такт 72). Витринная карточка: продающее название, краткое описание, изображение,
+ * цена «от», теги «Индустрия → Сфера применения» (объект — из типа схемы). «Зачем нужен осмотр»: развёрнутое описание,
+ * четыре пары, метрики — предзаполнены шаблоном по типу объекта. «Из схемы»: скрытые на витрине модули.
+ */
 export interface Showcase {
   /** Жизненный цикл карточки — аудит, «Структура таба»: требует украшения → черновик → опубликована. */
   status: 'needs' | 'draft' | 'published'
   title: string
   summary: string
+  /** Изображение карточки — имя файла; пусто — не загружено. */
+  image: string
   priceFrom: number | null
   industry: string
   spheres: string[]
-  problems: { problem: string, effect: string, solution: string }[]
-  metrics: { label: string, value: string }[]
+  /** Развёрнутое описание «Зачем нужен осмотр». */
+  description: string
+  problems: ShowcaseProblem[]
+  metrics: ShowcaseMetric[]
   hiddenModules: string[]
+}
+/** Значения по умолчанию витрины: набор данных хранит только отличия; пары и метрики — из шаблона типа схемы. */
+export const SHOWCASE_DEFAULTS: Omit<Showcase, 'problems' | 'metrics' | 'description'> = {
+  status: 'needs', title: '', summary: '', image: '', priceFrom: null, industry: '', spheres: [], hiddenModules: [],
+}
+/** Модуль «Из схемы» — ИИ-модуль либо проверка, включённые в настройках схемы (аудит, «Стержневой принцип», п. 1). */
+export interface SchemeModule { key: string, label: string }
+const MODULE_GROUPS: Record<string, string> = { geo: 'Проверка геолокации', device: 'Проверка целостности устройства', quality: 'Контроль качества съёмки', single: 'Отказы по другим осмотрам' }
+/**
+ * Модули схемы для витрины: ИИ-модули по типу схемы и группы детекторов аномалий с хотя бы одним включённым. Подписи —
+ * по макету `32765:11704` и разделам «ИИ-анализ», «Аномалии».
+ */
+export function schemeModules(config: SchemeConfig): SchemeModule[] {
+  const g = config.settings.general
+  const ai = config.settings.ai
+  const out: SchemeModule[] = []
+  if (g.schemeType === 'vehicle') {
+    if (ai.damage) out.push({ key: 'damage', label: 'Распознавание повреждений' })
+    if (ai.vinRecognition) out.push({ key: 'vin', label: 'Распознавание VIN' })
+    if (ai.damageCost) out.push({ key: 'damageCost', label: 'Оценка ущерба' })
+  }
+  if (g.schemeType === 'house') out.push({ key: 'finish', label: 'Анализ стоимости отделки' })
+  const an = config.settings.anomalies
+  if (an.enabled) for (const grp of DETECTOR_GROUPS) if (grp.detectors.some(d => an.detectors[d.id]?.on)) out.push({ key: `anomalies-${grp.id}`, label: MODULE_GROUPS[grp.id] ?? grp.title })
+  return out
+}
+/**
+ * «Как устроена схема» — статусная модель осмотра (аудит, «Стержневой принцип», п. 1: «слайдер-флоу = статусная модель»):
+ * создание и выполнение всегда, «ИИ-анализ» — при включённых ИИ-модулях, «Экспертиза» — без «Пропускать экспертизу»,
+ * «Согласование» — при включённом согласовании, «Завершение» всегда.
+ */
+export function schemeFlow(config: SchemeConfig): string[] {
+  const b = config.settings.general.behavior
+  const ai = schemeModules(config).some(x => !x.key.startsWith('anomalies-'))
+  return ['Создание', 'Выполнение', ...(ai ? ['ИИ-анализ'] : []), ...(b.skipExpertise ? [] : ['Экспертиза']), ...(b.approval ? ['Согласование'] : []), 'Завершение']
 }
 export interface SchemeConfig {
   settings: { general: GeneralSettings, mobile: MobileSettings, web: WebSettings, access: AccessSettings, ai: AiSettings, anomalies: AnomalySettings, pdf: PdfSettings }
@@ -379,6 +428,8 @@ export interface ModelOptions {
   selectedFields?: string[]
   /** Выделенные шаги «Процессов и шагов» — оснастка `?steps=` (такт 70). */
   selectedSteps?: string[]
+  /** Новая схема уже сохранялась: «Форма» и «Процессы» доступны — оснастка `?saved=1` (такт 72). */
+  saved?: boolean
 }
 
 /** Сколько длится запись черновика на стенде. */
@@ -392,7 +443,17 @@ function withDefaults(config: SchemeConfig): SchemeConfig {
   for (const [key, def] of Object.entries(GENERAL_DEFAULTS)) g[key] = { ...clone(def), ...(g[key] as object | undefined) }
   const all = config.settings as unknown as Record<string, object | undefined>
   for (const [key, def] of Object.entries(SECTION_DEFAULTS)) all[key] = { ...clone(def), ...all[key] }
+  withShowcaseDefaults(config)
   return withFormDefaults(config)
+}
+/** Витрина (такт 72): недостающее — из значений по умолчанию; пустые пары и метрики — шаблон типа схемы. */
+function withShowcaseDefaults(config: SchemeConfig) {
+  const t = showcaseTemplate(config.settings.general.schemeType)
+  const sc = { ...clone(SHOWCASE_DEFAULTS), ...config.showcase } as Showcase
+  if (!sc.problems?.length) sc.problems = clone(t.problems)
+  if (!sc.metrics?.length) sc.metrics = clone(t.metrics)
+  if (sc.description == null) sc.description = t.description
+  config.showcase = sc
 }
 /** Группы и поля формы: недостающие атрибуты — из значений по умолчанию (такт 69); «зависимое» следует за `dependsOn`. */
 function withFormDefaults(config: SchemeConfig): SchemeConfig {
@@ -440,7 +501,7 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   const publishState = computed<PublishState>(() => !current.value ? 'never' : dirty.value ? 'draft' : 'published')
 
   /* ------------------------------ автосохранение ------------------------------ */
-  const save = reactive({ state: (opts.save ?? 'saved') as SaveState, failNext: !!opts.failNext, writes: 0 })
+  const save = reactive({ state: (opts.save ?? 'saved') as SaveState, failNext: !!opts.failNext, writes: opts.saved ? 1 : 0 })
   let saveTimer: ReturnType<typeof setTimeout> | null = null
   function write() {
     save.state = 'saving'
@@ -458,9 +519,19 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     write()
   }
 
+  /* ------------------------------ двухфазность — такт 72 ------------------------------ */
+  /**
+   * Двухфазность новой схемы (аудит, «Двухфазность и табы»): полям и шагам нужен ID схемы, поэтому «Форма» и «Процессы
+   * и шаги» неактивны до первого сохранения — первой удачной записи черновика. У схемы с версиями всё активно сразу.
+   */
+  const phaseLocked = computed(() => !data.snapshots.length && save.writes === 0)
+  const PHASE_REASON = 'Станет доступно после первого сохранения схемы: полям и шагам нужен её идентификатор'
+  const PHASE_TABS: TabId[] = ['form', 'processes']
+  const tabLocked = (tab: TabId) => phaseLocked.value && PHASE_TABS.includes(tab)
+
   /* ------------------------------ состояние интерфейса ------------------------------ */
   const ui = reactive({
-    tab: (opts.tab ?? 'settings') as TabId,
+    tab: (opts.tab && !tabLocked(opts.tab) ? opts.tab : 'settings') as TabId,
     section: 'general' as SectionId,
     anchor: '',
     /** Прокрутка каждого таба — СС-13: переключение возвращает на прежнее место. */
@@ -521,7 +592,11 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     write()
     return true
   }
-  function setTab(tab: TabId) { ui.tab = tab }
+  function setTab(tab: TabId): boolean {
+    if (tabLocked(tab)) { notify(PHASE_REASON, 'err'); return false }
+    ui.tab = tab
+    return true
+  }
   function setSection(section: SectionId, anchor = '') { ui.section = section; ui.anchor = anchor }
   function rememberScroll(tab: TabId, y: number) { ui.scroll[tab] = Math.round(y) }
   /* ------------------------------ зависимости — П2 ------------------------------ */
@@ -593,7 +668,7 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     if (next) setSection(next)
   }
   /** «Перейти к полям» — переход паттерна «вооружает» (СС-19). */
-  function goToFields() { ui.tab = 'form' }
+  function goToFields() { setTab('form') }
   function openSide(id: string) { ui.surfaces.push({ kind: 'side', id }) }
   function closeSurface() { ui.surfaces.pop() }
   const topSurface = computed<Surface | null>(() => ui.surfaces[ui.surfaces.length - 1] ?? null)
@@ -1039,9 +1114,93 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   function fillImages() { notify('Массовая заливка изображений — вне стенда') }
   function pasteStep() { notify('Выбор шага из другой схемы — вне стенда') }
 
+  /* ------------------------------ «Витрина» — П8, такт 72 ------------------------------ */
+  /**
+   * Таб «Витрина» — r2 §7; аудит, «Таб „Витрина“». Полотно пишет в черновик сразу (`set('showcase')` — тот же отказ в
+   * просмотре версии). Жизненный цикл карточки: правка карточки, требующей оформления или опубликованной, переводит её в
+   * черновик; «Опубликовать на витрину» — отдельная публикация, «вооружает»: доступна после публикации схемы в ядре.
+   */
+  const showcase = computed(() => shown.value.showcase)
+  /** Причина недоступности «Опубликовать на витрину»: схема ещё не опубликована в ядре. */
+  const showcaseReason = computed(() => (current.value ? '' : 'Доступно после публикации схемы в ядре'))
+  /** Правка витрины одной записью: карточка, требующая оформления или опубликованная, уходит в черновик. */
+  function writeShowcase(next: Showcase, touch = true): boolean {
+    if (JSON.stringify(next) === JSON.stringify(draft.config.showcase)) return false
+    if (touch && next.status !== 'draft') next.status = 'draft'
+    return set('showcase', next)
+  }
+  function setShowcase<K extends keyof Showcase>(key: K, value: Showcase[K]): boolean {
+    return writeShowcase({ ...clone(draft.config.showcase), [key]: clone(value) } as Showcase, key !== 'status')
+  }
+  /** Индустрия: сферы чужой индустрии снимаются — каскад тегов. */
+  function setIndustry(industry: string) {
+    const spheres = draft.config.showcase.spheres.filter(v => SPHERES.find(x => x.value === v)?.industry === industry)
+    writeShowcase({ ...clone(draft.config.showcase), industry, spheres })
+  }
+  function setProblem(k: number, key: keyof ShowcaseProblem, value: string) {
+    const list = clone(draft.config.showcase.problems)
+    if (!list[k]) return
+    list[k][key] = value
+    setShowcase('problems', list)
+  }
+  function setMetric(k: number, key: keyof ShowcaseMetric, value: string) {
+    const list = clone(draft.config.showcase.metrics)
+    if (!list[k]) return
+    list[k][key] = value
+    setShowcase('metrics', list)
+  }
+  function addMetric() { setShowcase('metrics', [...clone(draft.config.showcase.metrics), { label: '', value: '' }]) }
+  /** Удаление метрики — уведомление с «Отменить» (аудит, «Отмена при автосейве»). */
+  function removeMetric(k: number) {
+    const before = clone(draft.config.showcase)
+    const gone = before.metrics[k]
+    if (!gone || !setShowcase('metrics', before.metrics.filter((_, i) => i !== k))) return
+    notify(gone.label ? `Метрика «${gone.label}» удалена` : 'Метрика удалена', 'ok', true, () => set('showcase', before))
+  }
+  /** Шаблон «Зачем нужен осмотр» по типу схемы: тексты совпадают с ним — значит, ещё не правили. */
+  const template = computed(() => showcaseTemplate(shown.value.settings.general.schemeType))
+  const fromTemplate = computed(() => {
+    const sc = shown.value.showcase
+    const t = template.value
+    return sc.description === t.description && JSON.stringify(sc.problems) === JSON.stringify(t.problems) && JSON.stringify(sc.metrics) === JSON.stringify(t.metrics)
+  })
+  /** «Заполнить шаблоном» — описание, пары и метрики из шаблона типа схемы; прежние тексты возвращает «Отменить». */
+  function applyTemplate() {
+    const before = clone(draft.config.showcase)
+    const t = template.value
+    if (writeShowcase({ ...clone(before), description: t.description, problems: clone(t.problems), metrics: clone(t.metrics) })) {
+      notify('«Зачем нужен осмотр» заполнен шаблоном', 'ok', true, () => set('showcase', before))
+    }
+  }
+  /** «Из схемы»: модули, включённые в настройках; скрытые на витрине — отдельно. */
+  const modules = computed(() => schemeModules(shown.value))
+  const visibleModules = computed(() => modules.value.filter(x => !shown.value.showcase.hiddenModules.includes(x.key)))
+  const hiddenModules = computed(() => modules.value.filter(x => shown.value.showcase.hiddenModules.includes(x.key)))
+  const flow = computed(() => schemeFlow(shown.value))
+  function hideModule(key: string) {
+    const before = clone(draft.config.showcase)
+    const gone = modules.value.find(x => x.key === key)
+    if (!gone || !setShowcase('hiddenModules', [...before.hiddenModules, key])) return
+    notify(`«${gone.label}» скрыт на витрине`, 'ok', true, () => set('showcase', before))
+  }
+  function showModule(key: string) { setShowcase('hiddenModules', draft.config.showcase.hiddenModules.filter(x => x !== key)) }
+  /** «Опубликовать на витрину» — карточка уходит на сайт; продающее название обязательно. */
+  function publishShowcase(): boolean {
+    if (ui.viewing) { notify('Прошлая версия открыта только для чтения', 'err'); return false }
+    if (showcaseReason.value) { notify('Схема ещё не опубликована в ядре — витрина станет доступна после', 'err'); return false }
+    const sc = draft.config.showcase
+    if (sc.status === 'published') { notify('Карточка уже на витрине: изменений нет'); return false }
+    if (!sc.title.trim()) { notify('Заполните продающее название — без него карточку не опубликовать', 'err'); return false }
+    if (!setShowcase('status', 'published')) return false
+    notify('Карточка опубликована на витрине')
+    return true
+  }
+  /** Плашка «Сохранение теперь автоматическое» — одноразовая ориентация: закрытая не возвращается (СС-56). */
+  function closeHint() { ui.hintClosed = true }
+
   /* ------------------------------ поиск — П5 ------------------------------ */
   /** Выдача по текущему запросу: группы по пути «Настройки → Раздел», поля формы — «Форма → Группа» (такт 69). */
-  const results = computed(() => searchSettings(ui.query, shown.value.form, shown.value.processes))
+  const results = computed(() => searchSettings(ui.query, shown.value.form, shown.value.processes, true))
   function setQuery(q: string) { ui.query = q }
   /**
    * Переход к найденному — `spec-audit.md`, «Требования к поиску»: таб → раздел → якорь; цель для прокрутки и
@@ -1057,6 +1216,10 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
       /* Шаг процесса (такт 70): таб «Процессы и шаги»; цель — строка шага. */
       ui.tab = 'processes'
     }
+    else if (item.showcase) {
+      /* Поле витрины (такт 72): таб «Витрина»; цель — поле карточки. */
+      ui.tab = 'showcase'
+    }
     else {
       ui.tab = 'settings'
       setSection(item.section as SectionId, item.anchor)
@@ -1067,8 +1230,7 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   /** «Быстрый переход» пустой выдачи: раздел либо таб. */
   function quick(index: number) {
     const link = QUICK_LINKS[index]
-    if (!link) return
-    ui.tab = link.tab
+    if (!link || !setTab(link.tab)) return
     if (link.section) setSection(link.section as SectionId, SECTION_ANCHORS[link.section as SectionId][0]?.id ?? '')
     ui.query = ''
   }
@@ -1174,7 +1336,7 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     return JSON.stringify({
       draft: draft.config, author: draft.author, versions: snapshots.map(s => s.id), current: current.value?.id ?? null,
       publish: publishState.value, save: save.state, writes: save.writes,
-      ui: { tab: ui.tab, section: ui.section, anchor: ui.anchor, scroll: ui.scroll, viewing: ui.viewing, surfaces: ui.surfaces.map(x => x.id), historyVersion: ui.historyVersion, group: ui.group, selectedFields: ui.selectedFields, selectedSteps: ui.selectedSteps },
+      ui: { tab: ui.tab, hintClosed: ui.hintClosed, section: ui.section, anchor: ui.anchor, scroll: ui.scroll, viewing: ui.viewing, surfaces: ui.surfaces.map(x => x.id), historyVersion: ui.historyVersion, group: ui.group, selectedFields: ui.selectedFields, selectedSteps: ui.selectedSteps },
     })
   }
 
@@ -1191,6 +1353,9 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     processes, selectedSteps, toggleStep, processSelection, toggleProcessSteps, clearStepSelection, flagState, bulkFlag, bulkMethod, bulkDeleteSteps,
     setStepKind, uploadHints, removeStep, removeProcess, moveStep, fillImages, pasteStep,
     processError, saveProcess, stepError, placeStep, saveStep, networkState, bulkNetworks, openOverlay, canEdit,
+    phaseLocked, PHASE_REASON, tabLocked,
+    showcase, showcaseReason, setShowcase, setIndustry, setProblem, setMetric, addMetric, removeMetric, template, fromTemplate, applyTemplate,
+    modules, visibleModules, hiddenModules, flow, hideModule, showModule, publishShowcase, closeHint,
     undo, addReason, removeReason, toggleGroup, resetCosts, detectorsOn, detectorSetState, toggleDetectorSet, setDetector, saveTemplate, removeTemplate,
   }
 }

@@ -12,7 +12,7 @@ import { SETTINGS, type SettingMeta } from './diff'
  * Чистые функции: DOM и реактивности модуль не знает.
  *
  * **Что в индексе.** Настройки собранных разделов таба «Настройки» — порции П2–П3; поля формы — такт 69 (П6): по
- * заголовку и по алиасу, путь «Форма → Группа». Процессы, шаги и витрина входят в индекс своими порциями П7–П8 (строка
+ * заголовку и по алиасу, путь «Форма → Группа». Шаги процессов — такт 70 (П7), поля витрины — такт 72 (П8): путь «Витрина → Карточка» (строка
  * 102 реестра расхождений).
  */
 
@@ -92,6 +92,8 @@ export interface SearchItem {
   group?: string
   /** Шаг процесса (такт 70): процесс, в котором он стоит. */
   process?: string
+  /** Поле витрины (такт 72): карточка таба «Витрина», в которой оно стоит. */
+  showcase?: string
   /** Пояснение для строки выдачи: синоним либо описание, по которому найдено. */
   hint: string
 }
@@ -117,7 +119,7 @@ const INDEX: Entry[] = SETTINGS
  * Поиск: буквальный матч по подписи, затем по синонимам, затем по описанию — сквозь все разделы. Выдача
  * сгруппирована по пути «Настройки → Раздел»; порядок групп — порядок разделов, внутри — порядок настроек.
  */
-export function searchSettings(query: string, form?: { groups: FormLike[] }, processes: ProcessLike[] = []): SearchResult {
+export function searchSettings(query: string, form?: { groups: FormLike[] }, processes: ProcessLike[] = [], withShowcase = false): SearchResult {
   const q = norm(query)
   if (!q) return { query, groups: [], count: 0 }
   const found: SearchItem[] = []
@@ -149,6 +151,15 @@ export function searchSettings(query: string, form?: { groups: FormLike[] }, pro
         hint: via === 'description' ? (st.description ?? '') : '' })
     }
   }
+  /* Витрина (такт 72): поля трёх карточек по подписи и синонимам; путь — «Витрина → Карточка», цель — поле. */
+  if (withShowcase) {
+    for (const e of SHOWCASE_INDEX) {
+      const synonym = e.synonyms.find(x => norm(x).includes(q))
+      const via = norm(e.label).includes(q) ? 'label' : synonym ? 'synonym' : null
+      if (!via) continue
+      found.push({ key: e.key, label: e.label, section: '', anchor: '', target: e.target, via, showcase: e.card, hint: via === 'synonym' ? 'по запросу «' + synonym + '»' : '' })
+    }
+  }
   const shown = found.slice(0, SEARCH_LIMIT)
   const groups: SearchGroup[] = []
   for (const item of shown) {
@@ -156,7 +167,9 @@ export function searchSettings(query: string, form?: { groups: FormLike[] }, pro
       ? `Форма → ${form?.groups.find(g => g.id === item.group)?.title ?? ''}`
       : item.process
         ? `Процессы → ${processes.find(p => p.id === item.process)?.title ?? ''}`
-        : `Настройки → ${SECTION_LABELS[item.section] ?? item.section}`
+        : item.showcase
+          ? `Витрина → ${item.showcase}`
+          : `Настройки → ${SECTION_LABELS[item.section] ?? item.section}`
     let grp = groups.find(x => x.path === path)
     if (!grp) groups.push(grp = { path, items: [] })
     grp.items.push(item)
@@ -170,4 +183,24 @@ export const QUICK_LINKS: { label: string, tab: 'settings' | 'processes', sectio
   { label: 'Права доступа', tab: 'settings', section: 'access' },
   { label: 'PDF', tab: 'settings', section: 'pdf' },
   { label: 'Процессы и шаги', tab: 'processes' },
+]
+
+/**
+ * Поля таба «Витрина» в индексе поиска — такт 72 (строка 102 реестра расхождений). Цель — значение `data-field` поля либо
+ * `data-act` кнопки на странице; синонимы — слова из аудита, «Таб „Витрина“».
+ */
+export const SHOWCASE_INDEX: { key: string, label: string, card: string, target: string, synonyms: string[] }[] = [
+  { key: 'showcase.publish', label: 'Опубликовать на витрину', card: 'Статус карточки', target: 'publish-showcase', synonyms: ['публикация карточки', 'страница сценария'] },
+  { key: 'showcase.title', label: 'Продающее название', card: 'Витринная карточка', target: 'scTitle', synonyms: ['маркетинговое название', 'заголовок карточки'] },
+  { key: 'showcase.summary', label: 'Краткое описание', card: 'Витринная карточка', target: 'scSummary', synonyms: ['описание для витрины'] },
+  { key: 'showcase.image', label: 'Изображение карточки', card: 'Витринная карточка', target: 'scImage', synonyms: ['картинка', 'обложка'] },
+  { key: 'showcase.priceFrom', label: 'Цена «от»', card: 'Витринная карточка', target: 'scPrice', synonyms: ['стоимость осмотра'] },
+  { key: 'showcase.industry', label: 'Индустрия', card: 'Витринная карточка', target: 'scIndustry', synonyms: ['теги', 'отрасль'] },
+  { key: 'showcase.spheres', label: 'Сфера применения', card: 'Витринная карточка', target: 'scSpheres', synonyms: ['теги', 'сферы'] },
+  { key: 'showcase.object', label: 'Объект', card: 'Витринная карточка', target: 'scObject', synonyms: ['теги'] },
+  { key: 'showcase.description', label: 'Развёрнутое описание', card: 'Зачем нужен осмотр', target: 'scDescription', synonyms: ['ценность осмотра'] },
+  { key: 'showcase.problems', label: 'Проблемы и решения', card: 'Зачем нужен осмотр', target: 'scProblem0', synonyms: ['боли клиента', 'последствия'] },
+  { key: 'showcase.metrics', label: 'Метрики', card: 'Зачем нужен осмотр', target: 'scMetric0', synonyms: ['показатели'] },
+  { key: 'showcase.modules', label: 'ИИ-модули и проверки', card: 'Из схемы', target: 'scModules', synonyms: ['модули на витрине'] },
+  { key: 'showcase.flow', label: 'Как устроена схема', card: 'Из схемы', target: 'scFlow', synonyms: ['статусная модель', 'флоу'] },
 ]

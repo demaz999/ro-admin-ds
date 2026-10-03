@@ -479,6 +479,11 @@ const CALLOUT_EXAMPLE = `<!-- блок окна: заголовок и текс�
     <Button variant="secondary" size="sm" @click="rejectAll()">Отменить автораспределение</Button>
     <Button size="sm" @click="acceptAll()">Принять все объекты</Button>
   </template>
+</Callout>
+
+<!-- такт 72: одноразовая плашка — крестик справа, закрытие помнит потребитель -->
+<Callout v-if="!hintClosed" closable @close="hintClosed = true">
+  Сохранение теперь автоматическое. В боевые осмотры изменения попадают по кнопке «Опубликовать схему»
 </Callout>`
 
 const RADIO_CARD_EXAMPLE = `<!-- карточка выбора: variant="card", под заголовком — description и meta -->
@@ -1647,6 +1652,25 @@ const VIEWER_EXAMPLE = `<Lightbox v-model:open="open" v-model:index="index" :tot
             </template>
           </Callout>
         </div>
+      </div>
+
+      <!-- Такт 72: закрываемая плашка — проп closable, событие close (№ 67 страницы схемы). -->
+      <div data-subsection="callout-closable" class="grid max-w-6xl grid-cols-[10rem_repeat(3,minmax(0,1fr))] items-start gap-4">
+        <span class="text-2xs text-muted-foreground">closable, такт 72</span>
+        <span class="text-2xs text-muted-foreground">текст</span>
+        <span class="text-2xs text-muted-foreground">заголовок и текст</span>
+        <span class="text-2xs text-muted-foreground">с действием</span>
+        <template v-for="c in CALLOUT_TONES" :key="c.tone">
+          <code class="text-2xs">{{ c.tone }}</code>
+          <Callout :tone="c.tone" closable>{{ c.text }}</Callout>
+          <Callout :tone="c.tone" :title="c.title" closable>{{ c.text }}</Callout>
+          <Callout :tone="c.tone" closable>
+            {{ c.title }}
+            <template #actions>
+              <Button variant="secondary" size="sm">Действие</Button>
+            </template>
+          </Callout>
+        </template>
       </div>
 
       <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ CALLOUT_EXAMPLE }}</pre>

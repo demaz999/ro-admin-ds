@@ -20,4 +20,7 @@ export const SCHEME_COVERAGE_STATES = [
   'steps=s-vin-glass,s-vin-metal,s-pts', 'upload=s-vin-metal', 'tab=processes&view=v1',
   /* Такт 71, П7 часть 2: сайды процесса (правка и новый), сайд шага, нейросети выбранных шагов, оверлей — пустой, с шагом, стек «оверлей → сайд», на чтение. */
   'open=process', 'open=new-process', 'open=step', 'open=networks', 'open=overlay', 'open=overlay-filled', 'open=overlay-step', 'view=v2&open=overlay',
+  /* Такт 72, П8: «Витрина» — статусы карточки, новая схема, просмотр версии; пустые «Форма» и «Процессы» сохранённой новой схемы. */
+  'tab=showcase&card=needs', 'tab=showcase&card=published', 'data=new&tab=showcase', 'view=v1&tab=showcase',
+  'data=new&saved=1&tab=form', 'data=new&saved=1&tab=processes',
 ] as const

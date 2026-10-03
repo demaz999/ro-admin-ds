@@ -129,11 +129,27 @@ async function openPage(width = 1440) {
     async type(text) { await send('Input.insertText', { text }); await sleep(200) },
     /**
      * Выделение текста протяжкой мыши — такт 68: нажатие у левого края текста, десять шагов движения, отпускание у правого.
-     * Цель — элемент с текстом (поле ввода или узел значения); проверка — `String(getSelection())` в слепке (`sel`).
+     * Цель — элемент с текстом (поле ввода или узел значения); проверка — `String(getSelection())` в слепке (`sel`), у полей
+     * ввода — ещё `selectionStart` и `selectionEnd` (`selRange`).
+     *
+     * Такт 72, решение чата (внешняя проверка тактов 67–70): протяжка идёт **по первой строке текста** — верх поля плюс
+     * рамка, внутренний отступ и половина интерлиньяжа. Протяжка через середину многострочного поля шла по пустой части
+     * ниже текста: в Linux курсор вставал в конец (42 / 42), выделения не было. У узла с текстом строка — первый
+     * прямоугольник `Range`. `SELECT_BELOW=1` — намеренная поломка: протяжка по пустой части поля — ниже текста, от середины поля вправо (в Windows нажатие ниже текста у левого края ещё попадает в начало строки).
      */
     async selectText(sel) {
       await this.point(sel)
-      const r = await evaluate(`(() => { const el = ${sel}; const b = el.getBoundingClientRect(); return { x1: b.x + 2, x2: b.x + b.width - 2, y: b.y + b.height / 2 } })()`)
+      const below = process.env.SELECT_BELOW ? 1 : 0
+      const r = await evaluate(`(() => { const el = ${sel}; const b = el.getBoundingClientRect()
+        if (el.matches('input, textarea')) {
+          const cs = getComputedStyle(el); const px = v => parseFloat(v) || 0
+          const top = b.y + px(cs.borderTopWidth) + px(cs.paddingTop); const lh = px(cs.lineHeight) || px(cs.fontSize) * 1.25
+          const y = ${below} ? b.y + b.height - px(cs.paddingBottom) - px(cs.borderBottomWidth) - 4 : el.matches('textarea') ? top + lh / 2 : b.y + b.height / 2
+          const x1 = ${below} ? b.x + b.width / 2 : b.x + px(cs.borderLeftWidth) + px(cs.paddingLeft)
+          return { x1, x2: b.x + b.width - px(cs.borderRightWidth) - px(cs.paddingRight) - 2, y }
+        }
+        const range = document.createRange(); range.selectNodeContents(el); const line = range.getClientRects()[0] ?? b
+        return { x1: line.x + 1, x2: line.x + line.width - 1, y: line.y + line.height / 2 } })()`)
       await send('Page.bringToFront')
       await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: r.x1, y: r.y })
       await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: r.x1, y: r.y, button: 'left', clickCount: 1 })
@@ -344,6 +360,15 @@ function kit(page) {
     net: (side, name) => page.click(`document.querySelector('[data-side=${side}] [data-network="${name}"] [data-slot=choice-control], [data-side=${side}] [data-network="${name}"][data-slot=choice] [data-slot=choice-control]')`),
     stepAct: (id, act) => page.click(`document.querySelector('[data-step-row="${id}"] [data-act=${act}]')`),
     overlayStepEdit: id => page.click(`document.querySelector('[data-overlay-step="${id}"] [data-slot=table-row-action]')`),
+    /* ---------- П8, такт 72: «Витрина», новая схема, плашка ---------- */
+    /** Клик по элементу из выражения. */
+    clickEl: sel => page.click(sel),
+    /** Клик в поле (выражение элемента) и набор текста в конец значения. */
+    async typeIn(sel, text) { await page.click(sel); await page.key('End'); await page.type(text) },
+    /** Фокус на элементе программно — для подсказки обёртки выключенного таба. */
+    focus: sel => page.evaluate(`(${sel}.focus(), 1)`),
+    /** Пауза: подсказка открывается с задержкой. */
+    wait: ms => sleep(ms),
     /* ---------- такт 68: только чтение ---------- */
     selectText: sel => page.selectText(sel),
     /** Поле ввода: клик в середину значения и набор знака — в «только чтении» значение прежнее. */
@@ -726,6 +751,42 @@ function kit(page) {
               full: (() => { const r = el.getBoundingClientRect(); return Math.round(r.left) === 0 && Math.round(r.top) === 0 && Math.round(r.width) === innerWidth && Math.round(r.height) === innerHeight })(),
             } })(),
           focusOverlayStep: document.activeElement?.closest?.('[data-overlay-step]')?.dataset.overlayStep ?? null,
+          /* ---------- такт 72: выделение в поле ввода — решение чата, внешняя проверка тактов 67–70 ---------- */
+          selRange: (() => { const a = document.activeElement; return a?.matches?.('input, textarea') ? [a.selectionStart, a.selectionEnd] : null })(),
+          /* ---------- П8, такт 72: «Витрина», пустые состояния, новая схема, плашка ---------- */
+          sc: M.draft.config.showcase,
+          showcase: (() => { const el = document.querySelector('[data-showcase]'); if (!el) return null
+            const val = k => { const x = el.querySelector('[data-field=' + k + ']'); return (x?.matches('input, textarea') ? x : x?.querySelector('input, textarea'))?.value ?? null }
+            const btn = el.querySelector('[data-act=publish-showcase]')
+            const status = el.querySelector('[data-showcase-status]')
+            return {
+              status: t(status?.querySelector('[data-slot=callout-title]')?.textContent), tone: status?.dataset.tone ?? null,
+              text: t(status?.querySelector('[data-slot=callout-text]')?.textContent),
+              publish: btn ? (btn.disabled ? 'off' : 'on') : null,
+              title: val('scTitle'), summary: val('scSummary'), price: val('scPrice'),
+              image: t(el.querySelector('[data-act=showcase-image]')?.textContent),
+              industry: t(el.querySelector('[data-field=scIndustry] [data-slot=field-input]')?.textContent) || null,
+              spheres: [...el.querySelectorAll('[data-field=scSpheres] [data-slot=select-chip]')].map(c => t(c.textContent)),
+              spheresOff: !!el.querySelector('[data-field=scSpheres] [data-multiple][data-disabled]'),
+              object: t(el.querySelector('[data-field=scObject] [data-slot=field-input]')?.textContent) || null,
+              template: t(el.querySelector('[data-template-note] [data-slot=callout-text]')?.textContent),
+              description: val('scDescription'),
+              problems: [...el.querySelectorAll('[data-problem]')].map(p => [...p.querySelectorAll('input')].map(i => i.value).join(' | ')),
+              metrics: [...el.querySelectorAll('[data-metric]')].map(p => [...p.querySelectorAll('input')].map(i => i.value).join(' | ')),
+              modules: [...el.querySelectorAll('[data-module]')].map(c => t(c.textContent)),
+              hidden: [...el.querySelectorAll('[data-module-show]')].map(c => t(c.textContent)),
+              flow: [...el.querySelectorAll('[data-flow] [data-slot=chip]')].map(c => t(c.textContent)),
+              /* Просмотр версии: поля «только чтение», действия под inert, крестиков у модулей нет. */
+              ro: { fields: [...el.querySelectorAll('[data-slot=field-wrapper]')].every(x => 'readonly' in x.dataset),
+                actsInert: [...el.querySelectorAll('[data-act]')].every(x => !!x.closest('[inert]')), removable: el.querySelectorAll('[data-slot=chip-remove]').length },
+            } })(),
+          hint: t(document.querySelector('[data-autosave-hint] [data-slot=callout-text]')?.textContent) || null,
+          /* Двухфазность новой схемы: выключенные табы и обёртки с причиной; подсказка — текст открытой подсказки. */
+          tabLock: { off: [...document.querySelectorAll('[data-tab-trigger]')].filter(b => b.disabled).map(b => b.dataset.tabTrigger),
+            wrap: [...document.querySelectorAll('[data-tab-lock]')].map(w => w.dataset.tabLock + ' | ' + w.getAttribute('aria-label')) },
+          tooltip: t([...document.querySelectorAll('[data-slot=tooltip-content]')].pop()?.innerText.split(String.fromCharCode(10))[0]) || null,
+          focusLock: document.activeElement?.dataset?.tabLock ?? null,
+          emptyActs: [...document.querySelectorAll('[data-slot=tabs-content][data-state=active] [data-slot=empty] [data-act]')].map(b => b.dataset.act),
         })
       })()`)
       return JSON.parse(s)
@@ -749,7 +810,7 @@ const SCENARIOS = {
     ['прокрутить «Настройки» на 120', K => K.scrollBy(120), { tab: 'settings', scrollY: 120 }],
     ['таб «Форма»', K => K.tab('form'), { tab: 'form', tabActive: ['form'], section: 'general', scrollY: 0, pending: null, 'form.title': 'Заявка · 3 поля' }],
     ['таб «Процессы и шаги»', K => K.tab('processes'), { tab: 'processes', tabActive: ['processes'], pending: null, 'proc.cards.length': 3 }],
-    ['таб «Витрина»', K => K.tab('showcase'), { tab: 'showcase', tabActive: ['showcase'], pending: '«Витрина» — порция П8', scrollY: 0 }],
+    ['таб «Витрина» (такт 72): статус карточки и три карточки', K => K.tab('showcase'), { tab: 'showcase', tabActive: ['showcase'], pending: null, 'showcase.status': 'Статус витрины: Черновик карточки', scrollY: 0 }],
     ['назад в «Настройки»', K => K.tab('settings'), { tab: 'settings', tabActive: ['settings'], section: 'general', scrollY: 120, save: 'saved', writes: 0 }],
   ]],
   /* ============================ П2, такт 62 ============================ */
@@ -902,6 +963,8 @@ const SCENARIOS = {
       { results: [{ path: 'Процессы → Осмотр автомобиля', items: ['Шаг «VIN на металле»'] }] }],
     ['шаг по описанию: «лобовое стекло»', K => K.fill('[data-field=search]', 'лобовое стекло'),
       { results: [{ path: 'Процессы → Осмотр автомобиля', items: ['Шаг «VIN под стеклом» | Сфотографируйте VIN-номер через лобовое стекло, номер должен быть чётко виден'] }] }],
+    ['поле витрины (такт 72): «теги» — путь «Витрина → Витринная карточка»', K => K.fill('[data-field=search]', 'теги'),
+      { results: [{ path: 'Витрина → Витринная карточка', items: ['Индустрия | по запросу «теги»', 'Сфера применения | по запросу «теги»', 'Объект | по запросу «теги»'] }] }],
     ['поиск работает с любого таба', async (K) => { await K.key('Escape'); await K.tab('showcase'); await K.slash(); await K.type('дедлайн') },
       { tab: 'showcase', searchOpen: true, 'results.0.path': 'Настройки → Общие', 'results.0.items.0': 'Дедлайн проверки' }],
   ]],
@@ -920,6 +983,8 @@ const SCENARIOS = {
       { tab: 'form', 'form.group': 'Автомобиль', focusRow: 'f-plate', searchOpen: false, query: '', writes: 0 }],
     ['шаг процесса (такт 70): «вид справа», Enter — таб «Процессы и шаги», фокус на флажке строки шага', async (K) => { await K.searchClick(); await K.type('вид справа'); await K.key('Enter') },
       { tab: 'processes', focusStep: 's-right', focusHandle: null, searchOpen: false, query: '', writes: 0 }],
+    ['поле витрины (такт 72): «продающее», Enter — таб «Витрина», фокус в поле', async (K) => { await K.searchClick(); await K.type('продающее'); await K.key('Enter') },
+      { tab: 'showcase', focusField: 'scTitle', searchOpen: false, query: '', writes: 0 }],
   ]],
   'СС-11/просмотр': ['поиск работает в просмотре прошлой версии: переход и подсветка есть, правки нет (r2 §2, состояние 7)', [
     ['«/», «пропускать», Enter', async (K) => { await K.slash(); await K.type('пропускать'); await K.key('Enter') },
@@ -929,7 +994,7 @@ const SCENARIOS = {
     ['«/», «наименование», Enter — фокус в поле только для чтения; набор знака — правки нет', async (K) => { await K.slash(); await K.type('наименование'); await K.key('Enter'); await K.type('Ж') },
       { focusField: 'name', focusRo: true, name: 'КАСКО — осмотр легкового автомобиля', writes: 0, saveLog: [] }],
     ['значение найденного поля выделяется', K => K.selectText(Q.nameInput),
-      { sel: 'КАСКО — осмотр легкового автомобиля', focusField: 'name' }],
+      { sel: 'КАСКО — осмотр легкового автомобиля', selRange: [0, 35], focusField: 'name' }],
   ], { query: 'view=v1' }],
   'СС-12': ['поиск: пустая выдача — «Ничего не найдено по «…»» и «Быстрый переход» (r2 §3; аудит, «Требования к поиску»)', [
     ['«фаыфа» — пустая выдача подсказывает', async (K) => { await K.searchClick(); await K.type('фаыфа') },
@@ -1024,6 +1089,9 @@ const SCENARIOS = {
     ['протяжка ручкой и клик по флажку строки — порядок и выделение прежние', async (K) => { await K.dragRow('s-vin-glass', 's-front', 12); await K.stepCheck('s-front') },
       { 'proc.rows.p-auto': ['1 · VIN под стеклом · Основной · 1 фото · Распознавание VIN, Распознавание шильдиков · Не установлена · Обязательный',
         '2 · Передняя часть · Основной · 2–7 фото · Ракурсы авто · Передняя, Оценка повреждений · Не установлена · Обязательный'], 'proc.selected': 0, 'proc.bar': null, focusStep: 's-front', writes: 0, saveLog: [] }, { blind: true }],
+    ['таб «Витрина» (такт 72): поля только для чтения, действия под inert, крестиков у модулей нет', K => K.tab('showcase'),
+      { tab: 'showcase', viewing: 'v1', 'showcase.title': '', 'showcase.ro': { fields: true, actsInert: true, removable: 0 }, writes: 0 }],
+    ['«Витрина»: клик в продающее название и набор — правки нет', K => K.tryType('scTitle'), { 'showcase.title': '', focusRo: true, writes: 0, saveLog: [] }],
     ['табы работают', async (K) => { await K.tab('settings') }, { tab: 'settings', viewing: 'v1' }],
     ['«Сделать копию»', K => K.act('view-copy'), { notices: ['Копия схемы — вне стенда'], viewing: 'v1' }],
     ['«Перейти к текущей версии» — снова черновик', K => K.act('view-leave'), { viewing: '', readonly: false, banner7: null, 'status.state': 'draft', headerActs: ['history', 'preview', 'publish', 'menu'] }],
@@ -1031,13 +1099,13 @@ const SCENARIOS = {
   'СС-47/вход': ['просмотр прошлой версии — вход адресом, как из осмотра, прошедшего по старому снимку (r2 §2, состояние 7)', [
     ['старт', null, { viewing: 'v1', readonly: true, status: null, headerActs: ['history', 'view-copy', 'view-leave'], shownDescription: 'Осмотр автомобиля перед оформлением полиса', inertOnFields: false }],
     ['«Наименование»: значение выделяется протяжкой мыши', K => K.selectText(Q.nameInput),
-      { sel: 'КАСКО — осмотр легкового автомобиля', focusField: 'name', focusRo: true }],
+      { sel: 'КАСКО — осмотр легкового автомобиля', selRange: [0, 35], focusField: 'name', focusRo: true }],
     ['«Наименование»: клик и набор знака — правки нет', K => K.tryType('name'),
       { name: 'КАСКО — осмотр легкового автомобиля', focusRo: true, writes: 0, saveLog: [] }],
     ['«Наименование»: Backspace и Delete — правки нет', K => K.tryErase(),
       { name: 'КАСКО — осмотр легкового автомобиля', focusField: 'name', writes: 0, saveLog: [] }],
     ['«Описание»: значение выделяется', K => K.selectText(`document.querySelector('[data-field=description] textarea')`),
-      { sel: 'Осмотр автомобиля перед оформлением полиса', focusField: 'description' }],
+      { sel: 'Осмотр автомобиля перед оформлением полиса', selRange: [0, 42], focusField: 'description' }],
     ['«Тип схемы»: значение выделяется', K => K.selectText(`document.querySelector('[data-field=schemeType] [data-slot=field-input]')`),
       { sel: 'Осмотр транспорта', typeValue: 'Осмотр транспорта' }],
     ['«Тип схемы»: клик, Enter, пробел и стрелка — список не открывается, фокус на поле', K => K.tryOpen('schemeType'),
@@ -1445,6 +1513,91 @@ const SCENARIOS = {
     ['«Отмена»; Alt+↓ на ручке «Пробег»', async (K) => { await K.act('field-cancel'); await K.moveKey('f-mileage', 'ArrowDown'); await K.settled() },
       { surface: '', 'form.rows.0': '1 · VIN · vin · Текст · Обязательное, Согласование', 'form.rows.1': '2 · Пробег · mileage · Число · Обязательное', focusHandle: 'f-mileage', writes: 2 }],
   ], { query: 'tab=form&group=g-car' }],
+  /* ============================ П8, такт 72 ============================ */
+  'СС-42': ['витрина: «Опубликовать на витрину» выключена с причиной до публикации схемы; жизненный цикл карточки (r2 §7; аудит, «Структура таба», «Две независимые публикации»)', [
+    ['таб «Витрина» новой схемы: требует оформления, кнопка выключена с причиной', K => K.tab('showcase'),
+      { tab: 'showcase', 'showcase.status': 'Статус витрины: Требует оформления', 'showcase.tone': 'warning', 'showcase.text': 'Схема ещё не опубликована в ядре — витрина станет доступна после', 'showcase.publish': 'off' }],
+    ['нажатие по выключенной кнопке — карточка прежняя', K => K.act('publish-showcase'), { 'showcase.publish': 'off', 'sc.status': 'needs', notices: [], writes: 0 }, { blind: true }],
+    ['продающее название — карточка в черновике', async (K) => { await K.fill('[data-field=scTitle]', 'Осмотр автомобиля онлайн'); await K.settled() },
+      { 'showcase.title': 'Осмотр автомобиля онлайн', 'showcase.status': 'Статус витрины: Черновик карточки', 'showcase.tone': 'neutral', 'showcase.publish': 'off', saveLog: ['saving', 'saved'] }],
+    ['первая публикация схемы — кнопка доступна', async (K) => { await K.publish(); await K.act('first-confirm') },
+      { versions: 1, 'showcase.publish': 'on', 'showcase.text': 'Карточка появится на витрине после публикации', notices: ['Схема опубликована: версия от 03.10.2026, 09:00'] }],
+    ['«Опубликовать на витрину» — карточка на витрине', async (K) => { await K.act('publish-showcase'); await K.settled() },
+      { 'sc.status': 'published', 'showcase.status': 'Статус витрины: Опубликована на витрине', 'showcase.tone': 'success', 'showcase.publish': null, notices: ['Карточка опубликована на витрине'] }],
+    ['правка опубликованной карточки — снова черновик, кнопка вернулась', async (K) => { await K.fill('[data-field=scPrice]', '1990'); await K.settled() },
+      { 'showcase.price': '1990', 'sc.priceFrom': 1990, 'sc.status': 'draft', 'showcase.status': 'Статус витрины: Черновик карточки', 'showcase.publish': 'on' }],
+  ], { query: 'data=new&now=2026-10-03T09:00:00' }],
+  'СС-43': ['витрина: карточка и «Зачем нужен осмотр» — ввод, теги каскадом, четыре пары, метрики (r2 §7; аудит, «Структура таба», «Стержневой принцип: три типа данных»)', [
+    ['старт: карточка, теги, шаблон по типу объекта', null, { 'showcase.title': 'Дистанционный осмотр автомобиля перед страхованием', 'showcase.price': '2599', 'showcase.industry': 'Страхование',
+      'showcase.spheres': ['ПСО — предстраховой осмотр'], 'showcase.object': 'Транспорт', 'showcase.problems.length': 4, 'showcase.metrics.length': 2,
+      'showcase.problems.0': 'Дорого и долго | Выезд эксперта занимает дни и стоит денег | Клиент снимает автомобиль сам за 10–15 минут',
+      'showcase.template': 'Заполнено шаблоном для типа «Осмотр транспорта» — отредактируйте текст под конкретный кейс или оставьте как есть' }],
+    ['краткое описание — запись автосохранением', async (K) => { await K.typeIn("document.querySelector('[data-field=scSummary] textarea')", 'Осмотр по фото за 15 минут'); await K.settled() },
+      { 'showcase.summary': 'Осмотр по фото за 15 минут', 'sc.summary': 'Осмотр по фото за 15 минут', saveLog: ['saving', 'saved'] }],
+    ['цена «от» — только цифры', async (K) => { await K.fill('[data-field=scPrice]', '3 490 ₽'); await K.settled() }, { 'showcase.price': '3490', 'sc.priceFrom': 3490 }],
+    ['изображение — загрузка нажатием', async (K) => { await K.act('showcase-image'); await K.settled() }, { 'sc.image': 'showcase-cover.jpg', 'showcase.image': 'Изображение загружено · showcase-cover.jpg нажмите, чтобы заменить' }],
+    ['индустрия «Лизинг» — сферы другой индустрии сняты', async (K) => { await K.select('scIndustry', 'Лизинг'); await K.settled() },
+      { 'showcase.industry': 'Лизинг', 'showcase.spheres': [], 'sc.industry': 'leasing', 'sc.spheres': [] }],
+    ['сферы: «Передача в лизинг», «Возврат из лизинга»', async (K) => { await K.pick('scSpheres', 'Передача в лизинг', 'Возврат из лизинга'); await K.settled() },
+      { 'showcase.spheres': ['Передача в лизинг', 'Возврат из лизинга'], 'sc.spheres': ['lease-out', 'lease-back'] }],
+    ['пара 2: последствия — правка, текст отличается от шаблона', async (K) => { await K.fill('[data-field=scEffect1]', 'Подмена фото'); await K.settled() },
+      { 'showcase.problems.1': 'Высокий риск мошенничества | Подмена фото | Детекторы аномалий проверяют координаты, устройство и качество съёмки',
+        'showcase.template': 'Текст отличается от шаблона для типа «Осмотр транспорта»' }],
+    ['«Добавить метрику» и ввод', async (K) => { await K.act('metric-add'); await K.fill('[data-field=scMetric2]', 'Осмотров без выезда'); await K.fill('[data-field=scMetricValue2]', '90 %'); await K.settled() },
+      { 'showcase.metrics': ['Снижение выездов | 50–80 %', 'Ускорение получения материалов | до 10 раз', 'Осмотров без выезда | 90 %'] }],
+    ['удалить метрику — уведомление с «Отменить»', async (K) => { await K.clickEl("document.querySelector('[data-metric=\"0\"] [data-act=metric-delete]')"); await K.settled() },
+      { 'showcase.metrics.length': 2, 'showcase.metrics.0': 'Ускорение получения материалов | до 10 раз', notices: ['Метрика «Снижение выездов» удалена'] }],
+    ['«Отменить» — метрика на месте', async (K) => { await K.undo(); await K.settled() }, { 'showcase.metrics.length': 3, 'showcase.metrics.0': 'Снижение выездов | 50–80 %' }],
+    ['«Заполнить шаблоном» — пары и метрики из шаблона, «Отменить» в уведомлении', async (K) => { await K.act('showcase-template'); await K.settled() },
+      { 'showcase.metrics.length': 2, 'showcase.problems.1': 'Высокий риск мошенничества | Подмена фото и повторное использование кадров | Детекторы аномалий проверяют координаты, устройство и качество съёмки',
+        'showcase.template': 'Заполнено шаблоном для типа «Осмотр транспорта» — отредактируйте текст под конкретный кейс или оставьте как есть', notices: ['«Зачем нужен осмотр» заполнен шаблоном'] }],
+    ['пустое продающее название — «Опубликовать на витрину» отказывает', async (K) => { await K.clear('[data-field=scTitle]'); await K.settled(); await K.act('publish-showcase') },
+      { 'showcase.title': '', 'sc.status': 'draft', notices: ['Заполните продающее название — без него карточку не опубликовать'] }],
+    ['дифф публикации схемы — правки витрины в области «Витрина»', async (K) => { await K.publish(); await K.area('showcase') },
+      { surface: 'publish', 'diff.areas.3.id': 'showcase', 'diff.areas.3.tone': 'changed' }],
+  ], { query: 'tab=showcase' }],
+  'СС-44': ['витрина: «Из схемы» — модуль можно скрыть; «Как устроена схема» читается из статусов (r2 §7; аудит, «Стержневой принцип: три типа данных»)', [
+    ['старт: модули из настроек, статусы схемы', null, { 'showcase.modules': ['Распознавание повреждений', 'Распознавание VIN', 'Проверка геолокации', 'Контроль качества съёмки'],
+      'showcase.hidden': [], 'showcase.flow': ['Создание', 'Выполнение', 'ИИ-анализ', 'Экспертиза', 'Завершение'] }],
+    ['скрыть «Распознавание VIN» — уведомление с «Отменить»', async (K) => { await K.clickEl("document.querySelector('[data-module=vin] [data-slot=chip-remove]')"); await K.settled() },
+      { 'showcase.modules': ['Распознавание повреждений', 'Проверка геолокации', 'Контроль качества съёмки'], 'showcase.hidden': ['Распознавание VIN'], 'sc.hiddenModules': ['vin'], notices: ['«Распознавание VIN» скрыт на витрине'] }],
+    ['вернуть модуль кнопкой', async (K) => { await K.clickEl("document.querySelector('[data-module-show=vin]')"); await K.settled() },
+      { 'showcase.modules': ['Распознавание повреждений', 'Распознавание VIN', 'Проверка геолокации', 'Контроль качества съёмки'], 'showcase.hidden': [], 'sc.hiddenModules': [] }],
+    ['согласование в «Настройках» — статус «Согласование» в схеме', async (K) => { await K.tab('settings'); await K.toggle('approval'); await K.settled(); await K.tab('showcase') },
+      { 'showcase.flow': ['Создание', 'Выполнение', 'ИИ-анализ', 'Экспертиза', 'Согласование', 'Завершение'] }],
+    ['«Пропускать экспертизу» — статуса «Экспертиза» нет', async (K) => { await K.tab('settings'); await K.toggle('skipExpertise'); await K.settled(); await K.tab('showcase') },
+      { 'showcase.flow': ['Создание', 'Выполнение', 'ИИ-анализ', 'Согласование', 'Завершение'] }],
+    ['тип схемы «Осмотр недвижимости» — модули, объект и шаблон другого типа', async (K) => { await K.tab('settings'); await K.select('schemeType', 'Осмотр недвижимости'); await K.settled(); await K.tab('showcase') },
+      { 'showcase.modules': ['Анализ стоимости отделки', 'Проверка геолокации', 'Контроль качества съёмки'], 'showcase.object': 'Недвижимость',
+        'showcase.template': 'Текст отличается от шаблона для типа «Осмотр недвижимости»' }],
+  ], { query: 'tab=showcase' }],
+  'СС-54': ['пустые состояния: пустая форма, пустая группа, ноль процессов (r2 §8; аудит, «Пустые состояния»)', [
+    ['таб «Форма» новой схемы — «В форме нет групп» с «Добавить группу»', K => K.tab('form'), { tab: 'form', pending: 'В форме нет групп', emptyActs: ['group-add-empty'], 'form.groups': [] }],
+    ['«Добавить группу» из пустого состояния — сайд новой группы', K => K.act('group-add-empty'), { surface: 'group', sideTitle: 'Новая группа' }],
+    ['группа создана — «В группе нет полей» с «Добавить поле»', async (K) => { await K.typeInto('gdTitle', 'Объект'); await K.act('group-save'); await K.settled() },
+      { surface: '', 'form.groups': ['Объект'], pending: 'В группе нет полей', emptyActs: ['field-add-empty'] }],
+    ['«Добавить поле» из пустого состояния — сайд нового поля', K => K.act('field-add-empty'), { surface: 'field', sideTitle: 'Новое поле' }],
+    ['таб «Процессы и шаги» — «В схеме нет процессов» с «Добавить процесс»', async (K) => { await K.key('Escape'); await K.tab('processes') },
+      { surface: '', tab: 'processes', pending: 'В схеме нет процессов', emptyActs: ['process-add-empty'], 'proc.cards': [] }],
+    ['«Добавить процесс» из пустого состояния — сайд процесса', K => K.act('process-add-empty'), { surface: 'process', 'procSide.title': 'Добавление процесса' }],
+  ], { query: 'data=new&saved=1' }],
+  'СС-55': ['новая схема: «Форма» и «Процессы и шаги» неактивны с пояснением до первого автосохранения (r2 §8; аудит, «Двухфазность и табы»)', [
+    ['старт: две вкладки выключены, причину держат обёртки', null, { tab: 'settings', 'tabLock.off': ['form', 'processes'],
+      'tabLock.wrap': ['form | Форма: Станет доступно после первого сохранения схемы: полям и шагам нужен её идентификатор', 'processes | Процессы и шаги: Станет доступно после первого сохранения схемы: полям и шагам нужен её идентификатор'] }],
+    ['клик по «Форме» — таб прежний', K => K.tab('form'), { tab: 'settings', notices: [], writes: 0 }, { blind: true }],
+    ['Tab из поиска: «Настройки», затем обёртка «Формы» — подсказка с причиной', async (K) => { await K.searchClick(); await K.tabs(2); await K.wait(900) },
+      { focusLock: 'form', tooltip: 'Станет доступно после первого сохранения схемы: полям и шагам нужен её идентификатор' }],
+    ['быстрый переход «Процессы и шаги» — отказ с причиной', async (K) => { await K.searchClick(); await K.type('ъъъ'); await K.quickLink(3) },
+      { tab: 'settings', notices: ['Станет доступно после первого сохранения схемы: полям и шагам нужен её идентификатор'] }],
+    ['первая правка сохранена — вкладки активны', async (K) => { await K.rename('Осмотр склада'); await K.settled() }, { 'tabLock.off': [], 'tabLock.wrap': [], writes: 1, saveLog: ['saving', 'saved'] }],
+    ['таб «Форма» открывается — пустая форма', K => K.tab('form'), { tab: 'form', pending: 'В форме нет групп' }],
+  ], { query: 'data=new' }],
+  'СС-56': ['плашка «Сохранение теперь автоматическое» закрывается и больше не появляется (r2 §8; аудит, «Смена парадигмы — одноразовая ориентация»)', [
+    ['старт: плашка под шапкой', null, { hint: 'Сохранение теперь автоматическое. В боевые осмотры изменения попадают по кнопке «Опубликовать схему»' }],
+    ['крестик — плашка закрыта', K => K.clickEl("document.querySelector('[data-autosave-hint] [data-slot=callout-close]')"), { hint: null, writes: 0 }],
+    ['перезагрузка страницы — плашка не возвращается', K => K.start(), { hint: null }],
+    ['другой таб — плашки нет', K => K.tab('showcase'), { tab: 'showcase', hint: null }],
+  ]],
   'СС-20': ['«Основное»: правка поля уходит автосохранением, «Схема активна» переключается (r2 §2, §4)', [
     ['старт', null, { name: NAME, title: NAME, active: true, save: 'saved', writes: 0, dirty: true, publish: 'draft', versions: 2 }],
     ['наименование: новый текст', async (K) => { await K.rename('КАСКО — осмотр автомобиля'); await K.settled() },

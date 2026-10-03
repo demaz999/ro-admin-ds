@@ -9,6 +9,7 @@ import {
   FIELD_DEFAULTS, FIELD_TYPES, FINISH_CLASSES, GROUP_DEFAULTS, HINT_CONFIGS, MOBILE_SHOW, NETWORKS, OBJECT_TYPES, OWNERS, PDF_PROGRAMS, PDF_SIGNERS, PDF_WHEN,
   PHOTO_RESOLUTIONS, PROCESS_DEFAULTS, REGION_MATRICES, ROLE_LADDER, ROLES, SCHEME_TYPES, SECTION_ANCHORS, SECTIONS, STATUS_DICTIONARIES, STEP_DEFAULTS,
   STEP_FLAGS, STEP_KINDS, STEP_METHODS, suggestAlias, TABS, VIDEO_RESOLUTIONS,
+  INDUSTRIES, SHOWCASE_IMAGE, SHOWCASE_OBJECTS, SHOWCASE_STATUS, SPHERES,
   type BehaviorSettings, type Dataset, type FieldDraft, type FormulaSettings, type GroupDraft, type NetworkState, type PdfTemplate, type PdfTemplateDraft,
   type ProcessDraft, type SaveState, type SectionId, type StepDraft, type TabId,
 } from '~/stands/scheme-edit/model'
@@ -57,8 +58,13 @@ import { useReorder } from '~/stands/scheme-edit/reorder'
  * `FileUpload`), действия строки. Ручка перестановки — и у таблицы полей «Формы» (`~/stands/scheme-edit/reorder.ts`).
  * **П7, часть 2 (такт 71).** Сайд «Добавление / Редактирование процесса» (№ 48, 49) — три секции макетов `33245:5722`,
  * `33245:6032`; сайд шага (№ 63) — шесть секций; сайд «Нейросети выбранных шагов» из панели; оверлей повторяемого процесса
- * (№ 64) — `ModalCard placement="full"`: форма и шаги вместе, сайд шага ложится поверх. Таб «Витрина» — порция П8:
- * на его месте `Empty`.
+ * (№ 64) — `ModalCard placement="full"`: форма и шаги вместе, сайд шага ложится поверх.
+ * **П8 (такт 72).** Таб «Витрина» (№ 50–53, 72): статус карточки — `Callout` в тоне статуса с «Опубликовать на витрину»
+ * (выключена с причиной до публикации схемы); «Витринная карточка» — `Field` с подписью слева, теги «Индустрия → Сфера
+ * применения» (`Select multiple`) → «Объект» из типа схемы; «Зачем нужен осмотр» — описание, четыре пары на `Card muted`, метрики;
+ * «Из схемы» — модули чипами со снятием, «Как устроена схема» — статусы `Chip neutral` со стрелками. Пустые состояния табов
+ * (№ 65) — `Empty` с действием; у новой схемы «Форма» и «Процессы и шаги» неактивны до первого сохранения, причину держит
+ * обёртка с `tabindex` и `Tooltip` (№ 66); плашка «Сохранение теперь автоматическое» — `Callout closable` (№ 67).
  *
  * ## Поведение — модель `~/stands/scheme-edit/model.ts`
  *
@@ -99,6 +105,9 @@ import { useReorder } from '~/stands/scheme-edit/reorder'
  * | `?open=step` · `new-step` | сайд шага: `?step=s-front` — этот шаг, без него — первый шаг первого процесса; `new-step` — новый шаг первого процесса (такт 71) |
  * | `?open=networks` | сайд «Нейросети выбранных шагов»; выделение — `?steps=` (без него — два шага «Осмотра автомобиля») (такт 71) |
  * | `?open=overlay` · `overlay-filled` · `overlay-step` | оверлей повторяемого процесса: пустой; с шагом, добавленным в черновик оверлея; стек «оверлей → сайд нового шага» (такт 71) |
+ * | `?saved=1` | новая схема (`?data=new`) уже сохранялась: «Форма» и «Процессы и шаги» доступны — их пустые состояния (такт 72) |
+ * | `?card=needs` · `published` | статус витринной карточки при загрузке: «Требует оформления», «Опубликована на витрине» (такт 72) |
+ * | `?hint=off` | плашка «Сохранение теперь автоматическое» закрыта при загрузке (такт 72) |
  */
 definePageMeta({ layout: 'admin' })
 useHead({ title: 'Редактирование схемы осмотра — стенд' })
@@ -123,11 +132,13 @@ const m = createModel(q('data') === 'new' ? D.fresh : D.main, {
   group: q('group'),
   selectedFields: q('selected') ? q('selected').split(',') : [],
   selectedSteps: q('steps') ? q('steps').split(',') : [],
+  saved: q('saved') === '1',
 })
 const sectionAtLoad = SECTIONS.find(s => s.id === q('section'))?.id
 if (sectionAtLoad) m.setSection(sectionAtLoad)
 if (q('open') === 'comments') m.openSide('comments')
 if (q('type') === 'house') m.draft.config.settings.general.schemeType = 'house'
+if (q('card') === 'needs' || q('card') === 'published') m.draft.config.showcase.status = q('card') as 'needs' | 'published'
 
 /** Конфигурация на экране: черновик либо открытый на просмотр снимок. */
 const general = computed(() => m.shown.value.settings.general)
@@ -765,8 +776,40 @@ function saveNetworksSide() {
   }
 }
 
-/** Содержимое, которое соберёт следующая порция, — план `scheme-edit.md`, раздел 10. */
-const PENDING = { title: '«Витрина» — порция П8', description: 'Статус карточки, витринная карточка, «Зачем нужен осмотр», «Из схемы»' }
+/* ------------------------------ «Витрина» — П8, такт 72 ------------------------------ */
+const sc = computed(() => m.showcase.value)
+/** Статус карточки — тон плашки: требует оформления — предупреждение, черновик — нейтральный, опубликована — успех. */
+const CARD_TONE = { needs: 'warning', draft: 'neutral', published: 'success' } as const
+const cardText = computed(() => {
+  if (m.showcaseReason.value) return 'Схема ещё не опубликована в ядре — витрина станет доступна после'
+  if (sc.value.status === 'published') return 'Карточка на витрине. Правка карточки вернёт её в черновик — опубликуйте снова'
+  if (sc.value.status === 'needs') return 'Схема опубликована — оформите карточку и опубликуйте её на витрине'
+  return 'Карточка появится на витрине после публикации'
+})
+/** Цена «от» — целое число; прочие знаки отбрасываются, пустое поле — цены нет (необязательное поле). */
+function setPrice(text: string) {
+  const digits = String(text).replace(/\D/g, '')
+  m.setShowcase('priceFrom', digits ? Number(digits) : null)
+}
+/** Сферы применения — в пределах выбранной индустрии (каскад тегов). */
+const sphereItems = computed(() => SPHERES.filter(x => x.industry === sc.value.industry).map(({ value, label }) => ({ value, label })))
+const objectItems = computed(() => [{ value: general.value.schemeType, label: SHOWCASE_OBJECTS[general.value.schemeType] ?? schemeTypeLabel.value }])
+
+/* ------------------------------ плашка «Сохранение теперь автоматическое» — № 67 ------------------------------ */
+/**
+ * Одноразовая ориентация (аудит, «Смена парадигмы»): закрытая плашка не возвращается. На стенде закрытие помнится в
+ * пределах сессии вкладки — `sessionStorage` (решение 5 оркестратора такта 72); хранилище бывает закрыто — чтение и запись
+ * в `try`. Оснастка `?hint=off` закрывает плашку при загрузке.
+ */
+const HINT_KEY = 'scheme-edit:autosave-hint'
+function closeHint() {
+  m.closeHint()
+  try { sessionStorage.setItem(HINT_KEY, 'closed') } catch {}
+}
+if (q('hint') === 'off') m.closeHint()
+onMounted(() => {
+  try { if (sessionStorage.getItem(HINT_KEY) === 'closed') m.closeHint() } catch {}
+})
 
 if (import.meta.client) {
   /* Прогону — состояние модели для сравнения «до / после»; оснастка приёмки. */
@@ -868,6 +911,11 @@ if (import.meta.client) {
       </Callout>
     </div>
 
+    <!-- Плашка «Сохранение теперь автоматическое» — № 67: одноразовая ориентация, закрытая не возвращается (аудит, «Смена парадигмы»). -->
+    <Callout v-if="!ro && !m.ui.hintClosed" closable data-autosave-hint @close="closeHint()">
+      Сохранение теперь автоматическое. В боевые осмотры изменения попадают по кнопке «Опубликовать схему»
+    </Callout>
+
     <!-- ============================ поиск — № 9–11: строкой под шапкой, над табами, на всех табах ============================ -->
     <Popover :open="searchOpen">
       <PopoverAnchor as-child>
@@ -927,9 +975,31 @@ if (import.meta.client) {
 
     <Tabs v-model="tab">
       <TabsList>
-        <TabsTrigger v-for="t in TABS" :key="t.id" :value="t.id" :data-tab-trigger="t.id">
-          {{ t.label }}
-        </TabsTrigger>
+        <template v-for="t in TABS" :key="t.id">
+          <!--
+            Новая схема (№ 66; аудит, «Двухфазность и табы»): «Форма» и «Процессы и шаги» неактивны до первого сохранения.
+            Выключенная вкладка событий не получает — причину держит обёртка с `tabindex` (ловушка тактов 48–53).
+          -->
+          <TooltipProvider v-if="m.tabLocked(t.id)">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <span tabindex="0" :data-tab-lock="t.id" :aria-label="`${t.label}: ${m.PHASE_REASON}`">
+                  <TabsTrigger :value="t.id" disabled :data-tab-trigger="t.id">
+                    {{ t.label }}
+                  </TabsTrigger>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent class="max-w-80 whitespace-normal">
+                {{ m.PHASE_REASON }}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          <TabsTrigger v-else :value="t.id" :data-tab-trigger="t.id">
+            <!-- Звезда «Витрины» — макет `33347:6751`: глиф 12, зазор вкладки 8 (строка 13 реестра покрытия). -->
+            <Icon v-if="t.id === 'showcase'" name="star" :size="12" />
+            {{ t.label }}
+          </TabsTrigger>
+        </template>
       </TabsList>
 
       <TabsContent value="settings">
@@ -2014,9 +2084,28 @@ if (import.meta.client) {
                   </TableCell>
                 </TableRow>
               </Table>
-              <Empty v-else title="В группе нет полей" description="Добавьте первое поле группы" data-fields-empty />
+              <!-- Пустые состояния — № 65 (аудит, «Пустые состояния»): «В группе нет полей» + «Добавить поле». -->
+              <Empty v-else title="В группе нет полей" description="Добавьте первое поле группы" data-fields-empty>
+                <template #action>
+                  <Button :inert="ro" show-icon data-act="field-add-empty" @click="openField('')">
+                    <template #icon>
+                      <Icon name="add" :size="16" />
+                    </template>
+                    Добавить поле
+                  </Button>
+                </template>
+              </Empty>
             </template>
-            <Empty v-else title="В форме нет групп" description="Добавьте первую группу — поля формы живут в группах" data-groups-empty />
+            <Empty v-else title="В форме нет групп" description="Добавьте первую группу — поля формы живут в группах" data-groups-empty>
+              <template #action>
+                <Button :inert="ro" show-icon data-act="group-add-empty" @click="openGroup('')">
+                  <template #icon>
+                    <Icon name="add" :size="16" />
+                  </template>
+                  Добавить группу
+                </Button>
+              </template>
+            </Empty>
           </Card>
         </div>
       </TabsContent>
@@ -2086,6 +2175,20 @@ if (import.meta.client) {
               </div>
             </div>
           </ActionBar>
+
+          <!-- Ноль процессов — № 65 (аудит, «Пустые состояния»): пустое состояние с «Добавить процесс». -->
+          <Card v-if="!m.processes.value.length" data-processes-empty>
+            <Empty title="В схеме нет процессов" description="Процесс — этап осмотра со своими шагами съёмки; добавьте первый">
+              <template #action>
+                <Button :inert="ro" show-icon data-act="process-add-empty" @click="openProcess('')">
+                  <template #icon>
+                    <Icon name="add" :size="16" />
+                  </template>
+                  Добавить процесс
+                </Button>
+              </template>
+            </Empty>
+          </Card>
 
           <!-- Карточка процесса — № 45 (`32765:6623`, `32765:6922`, `32765:7066`): шапка и таблица шагов. -->
           <Card v-for="p in m.processes.value" :key="p.id" class="flex flex-col gap-4" :data-process="p.id">
@@ -2282,9 +2385,160 @@ if (import.meta.client) {
         </div>
       </TabsContent>
 
+      <!-- ============================ «Витрина» — № 50–53, 72 (r2 §7; макет `32765:11378`; аудит, «Таб „Витрина“») ============================ -->
       <TabsContent value="showcase">
-        <div class="flex flex-col pt-6">
-          <Empty :title="PENDING.title" :description="PENDING.description" />
+        <!-- Просмотр прошлой версии (решение 4 такта 72, правило строк 108, 125, 138): поля — «только чтение», действия — под `inert`. -->
+        <div class="flex flex-col gap-3 pt-6" data-showcase :data-readonly="ro || undefined">
+          <!--
+            Статус карточки — № 50 (`32765:11448`): `Callout` в тоне статуса (строка 32). «Опубликовать на витрину» — «вооружает»:
+            выключена, пока схема не опубликована в ядре; причина — текстом плашки (макет: «Доступно после публикации схемы в ядре»).
+          -->
+          <Callout :tone="CARD_TONE[sc.status]" :title="`Статус витрины: ${SHOWCASE_STATUS[sc.status]}`" data-showcase-status>
+            {{ cardText }}
+            <template v-if="sc.status !== 'published'" #actions>
+              <div :inert="ro" class="flex">
+                <Button variant="secondary" :disabled="!!m.showcaseReason.value" data-act="publish-showcase" @click="m.publishShowcase()">
+                  Опубликовать на витрину
+                </Button>
+              </div>
+            </template>
+          </Callout>
+
+          <!-- Витринная карточка — № 51, 72 (`32765:11470`): строки «подпись слева — поле», теги каскадом «Индустрия → Сфера → Объект». -->
+          <Card class="flex flex-col gap-6" data-showcase-card>
+            <Heading level="group" description="Публичное представление схемы для клиентов и менеджеров продаж">
+              Витринная карточка
+            </Heading>
+            <Field :readonly="ro" label="Продающее название" orientation="left" label-width="form" hint="Отличается от технического наименования схемы" data-field="scTitle">
+              <Input :model-value="sc.title" placeholder="" :show-icon="false" @update:model-value="m.setShowcase('title', String($event ?? ''))" />
+            </Field>
+            <Field :readonly="ro" label="Краткое описание" orientation="left" label-width="form" data-field="scSummary">
+              <Textarea :model-value="sc.summary" placeholder="1–2 предложения для карточки на витрине" @update:model-value="m.setShowcase('summary', String($event ?? ''))" />
+            </Field>
+            <Field :readonly="ro" label="Изображение" orientation="left" label-width="form" hint="Релевантное фото объекта. JPEG или PNG, до 5 МБ" data-field="scImage">
+              <button type="button" class="w-full" :inert="ro" data-act="showcase-image" @click="m.setShowcase('image', SHOWCASE_IMAGE)">
+                <FileUpload>
+                  {{ sc.image ? `Изображение загружено · ${sc.image}` : 'Загрузить изображение' }}
+                  <template #hint>
+                    {{ sc.image ? 'нажмите, чтобы заменить' : 'перетащите файл сюда или нажмите для загрузки' }}
+                  </template>
+                </FileUpload>
+              </button>
+            </Field>
+            <Field :readonly="ro" label="Цена от, ₽" orientation="left" label-width="form" hint="Необязательное поле" data-field="scPrice">
+              <div class="w-40">
+                <Input :model-value="sc.priceFrom == null ? '' : String(sc.priceFrom)" placeholder="" :show-icon="false" @update:model-value="setPrice(String($event ?? ''))" />
+              </div>
+            </Field>
+            <Field :readonly="ro" label="Теги" orientation="left" label-width="form">
+              <div class="grid grid-cols-3 gap-3">
+                <Field :readonly="ro" label="Индустрия" data-field="scIndustry">
+                  <Select :model-value="sc.industry" :items="INDUSTRIES" :placeholder="sc.industry ? '' : 'Выберите индустрию'" :show-icon="false" :searchable="false" @update:model-value="m.setIndustry(String($event))" />
+                </Field>
+                <Field :readonly="ro" label="Сфера применения" :hint="sc.industry ? '' : 'Сначала выберите индустрию'" data-field="scSpheres">
+                  <Select :values="sc.spheres" multiple :items="sphereItems" :disabled="!sc.industry" placeholder="Выберите сферы" @update:values="m.setShowcase('spheres', $event)" />
+                </Field>
+                <Field readonly label="Объект" :hint="`Подтянут из типа схемы «${schemeTypeLabel}»`" data-field="scObject">
+                  <Select :model-value="general.schemeType" :items="objectItems" placeholder="" :show-icon="false" :searchable="false" />
+                </Field>
+              </div>
+            </Field>
+          </Card>
+
+          <!-- «Зачем нужен осмотр» — № 52 (`32765:11572`): предзаполнено шаблоном по типу объекта; четыре пары, метрики. -->
+          <Card class="flex flex-col gap-6" data-showcase-why>
+            <Heading level="group" description="Обоснование ценности для клиента — предзаполнено шаблоном по типу объекта">
+              Зачем нужен осмотр
+            </Heading>
+            <Callout data-template-note>
+              {{ m.fromTemplate.value ? `Заполнено шаблоном для типа «${schemeTypeLabel}» — отредактируйте текст под конкретный кейс или оставьте как есть` : `Текст отличается от шаблона для типа «${schemeTypeLabel}»` }}
+              <template v-if="!m.fromTemplate.value" #actions>
+                <div :inert="ro" class="flex">
+                  <Button variant="secondary" size="sm" data-act="showcase-template" @click="m.applyTemplate()">
+                    Заполнить шаблоном
+                  </Button>
+                </div>
+              </template>
+            </Callout>
+            <Field :readonly="ro" label="Развёрнутое описание" data-field="scDescription">
+              <Textarea :model-value="sc.description" placeholder="Подробное описание ценности осмотра для клиента" @update:model-value="m.setShowcase('description', String($event ?? ''))" />
+            </Field>
+            <div class="flex flex-col gap-3">
+              <Heading>Проблемы и решения</Heading>
+              <div class="grid grid-cols-2 gap-3">
+                <Card v-for="(p, k) in sc.problems" :key="k" tone="muted" class="flex flex-col gap-3 p-4" :data-problem="k">
+                  <Field :readonly="ro" label="Проблема" :data-field="`scProblem${k}`">
+                    <Input :model-value="p.problem" placeholder="" :show-icon="false" @update:model-value="m.setProblem(k, 'problem', String($event ?? ''))" />
+                  </Field>
+                  <Field :readonly="ro" label="Последствия" :data-field="`scEffect${k}`">
+                    <Input :model-value="p.effect" placeholder="" :show-icon="false" @update:model-value="m.setProblem(k, 'effect', String($event ?? ''))" />
+                  </Field>
+                  <Field :readonly="ro" label="Решение" :data-field="`scSolution${k}`">
+                    <Input :model-value="p.solution" placeholder="" :show-icon="false" @update:model-value="m.setProblem(k, 'solution', String($event ?? ''))" />
+                  </Field>
+                </Card>
+              </div>
+            </div>
+            <div class="flex flex-col gap-3" data-metrics>
+              <Heading>Метрики</Heading>
+              <div v-for="(x, k) in sc.metrics" :key="k" class="flex items-end gap-3" :data-metric="k">
+                <Field :readonly="ro" :label="k === 0 ? 'Метрика' : ''" class="min-w-0 flex-1" :data-field="`scMetric${k}`">
+                  <Input :model-value="x.label" placeholder="" :show-icon="false" @update:model-value="m.setMetric(k, 'label', String($event ?? ''))" />
+                </Field>
+                <Field :readonly="ro" :label="k === 0 ? 'Значение' : ''" class="w-40 shrink-0" :data-field="`scMetricValue${k}`">
+                  <Input :model-value="x.value" placeholder="" :show-icon="false" @update:model-value="m.setMetric(k, 'value', String($event ?? ''))" />
+                </Field>
+                <IconButton :inert="ro" variant="ghost" size="lg" :label="`Удалить метрику «${x.label}»`" data-act="metric-delete" @click="m.removeMetric(k)">
+                  <Icon name="delete" :size="20" />
+                </IconButton>
+              </div>
+              <div :inert="ro" class="flex">
+                <Button variant="outline" show-icon data-act="metric-add" @click="m.addMetric()">
+                  <template #icon>
+                    <Icon name="add" :size="16" />
+                  </template>
+                  Добавить метрику
+                </Button>
+              </div>
+            </div>
+          </Card>
+
+          <!-- «Из схемы» — № 53 (`32765:11704`): модули подтянуты из настроек и скрываются на витрине; «Как устроена схема» — только чтение. -->
+          <Card class="flex flex-col gap-6" data-showcase-from>
+            <Heading level="group" description="Данные подтянуты из настроек схемы в ядре; на витрине их можно скрыть">
+              Из схемы
+            </Heading>
+            <Field :readonly="ro" label="ИИ-модули и проверки" hint="Из настроек схемы — модуль можно скрыть на витрине" data-field="scModules">
+              <div class="flex flex-wrap gap-2">
+                <Chip v-for="x in m.visibleModules.value" :key="x.key" :trailing="ro ? 'none' : 'remove'" :data-module="x.key" @remove="m.hideModule(x.key)">
+                  {{ x.label }}
+                </Chip>
+                <ToolbarText v-if="!m.visibleModules.value.length">
+                  Модулей для показа нет
+                </ToolbarText>
+              </div>
+            </Field>
+            <Field v-if="m.hiddenModules.value.length" :readonly="ro" label="Скрыто на витрине" data-field="scHidden">
+              <div :inert="ro" class="flex flex-wrap gap-2">
+                <Button v-for="x in m.hiddenModules.value" :key="x.key" variant="outline" size="sm" show-icon :data-module-show="x.key" @click="m.showModule(x.key)">
+                  <template #icon>
+                    <Icon name="add" :size="16" />
+                  </template>
+                  {{ x.label }}
+                </Button>
+              </div>
+            </Field>
+            <Field :readonly="ro" label="Как устроена схема" hint="Формируется автоматически из статусов схемы — правка в «Настройках»" data-field="scFlow">
+              <Card tone="muted" class="flex flex-wrap items-center gap-2 p-4" data-flow>
+                <template v-for="(s, k) in m.flow.value" :key="s">
+                  <Icon v-if="k" name="arrow-forward" :size="12" />
+                  <Chip variant="neutral">
+                    {{ s }}
+                  </Chip>
+                </template>
+              </Card>
+            </Field>
+          </Card>
         </div>
       </TabsContent>
     </Tabs>

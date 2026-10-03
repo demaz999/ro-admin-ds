@@ -445,7 +445,9 @@ node scripts/free-shoot-scenarios.mjs
 `error`, `fail`, с такта 62 — `?section=`, `?open=comments`, с такта 63 — `?open=template`, `?open=reason`, `?type=house`, с такта 64 —
 `?open=publish` · `first-publish` · `reset` · `delete` · `menu` · `history`, `?version=`, `?view=`, `?presence=`, `?now=`,
 с такта 65 — `?q=`, `?found=`, с такта 69 — `?group=`, `?selected=`, `?open=field` · `new-field` · `group` · `new-group`,
-`?field=`, с такта 70 — `?steps=`, `?upload=` — список в `docs/naming.md`, «Такт 61»–«Такт 70».
+`?field=`, с такта 70 — `?steps=`, `?upload=`, с такта 71 — `?open=process` · `new-process` · `step` · `new-step` · `networks` ·
+`overlay` · `overlay-filled` · `overlay-step`, `?process=`, `?step=`, с такта 72 — `?saved=1`, `?card=`, `?hint=off` — список в
+`docs/naming.md`, «Такт 61»–«Такт 72».
 
 **Числа `/compare` снимает скрипт** (такт 62): шрифты, иконки, разметка и покрытие обоих экранов — в headless Chrome
 1440×900 с вкладкой впереди. В панели браузера приложения вкладка бывает скрыта, раскладка экрана там не подстраивается,

@@ -3,7 +3,7 @@ import type { SchemeConfig } from './model'
 import {
   ACCESS_GROUPS, ACCESS_ROLES, COMMENT_DICTIONARIES, DEADLINE_EVENTS, DETECTOR_GROUPS, FINISH_CLASSES, PDF_SIGNERS, PHOTO_RESOLUTIONS,
   REGION_MATRICES, ROLE_LADDER, ROLES, SCHEME_TYPES, STATUS_DICTIONARIES, STEP_FLAGS, STEP_KINDS, VIDEO_RESOLUTIONS,
-  COORDS_MODES, DURATION_MODES, OBJECT_TYPES,
+  COORDS_MODES, DURATION_MODES, OBJECT_TYPES, SHOWCASE_STATUS,
 } from './catalogs'
 
 /**
@@ -285,7 +285,11 @@ export function diffConfigs(from: SchemeConfig, to: SchemeConfig): SchemeDiff {
   for (const [key, label] of Object.entries(SHOWCASE_ATTR)) {
     const a = (from.showcase as unknown as Record<string, unknown>)[key]
     const b = (to.showcase as unknown as Record<string, unknown>)[key]
-    if (!same(a, b)) showcase.push({ kind: 'changed', unit: 'attr', item: { label, before: fieldValue(a), after: fieldValue(b) } })
+    if (same(a, b)) continue
+    /* Такт 72: статус — подписью жизненного цикла; список той же длины с правкой текста — «текст изменён». */
+    const value = (v: unknown) => (key === 'status' ? SHOWCASE_STATUS[v as keyof typeof SHOWCASE_STATUS] ?? String(v) : fieldValue(v))
+    const edited = Array.isArray(a) && Array.isArray(b) && a.length === b.length
+    showcase.push({ kind: 'changed', unit: 'attr', item: { label, before: edited ? `${a.length}` : value(a), after: edited ? `${b.length}, текст изменён` : value(b) } })
   }
 
   const areas = [areaOf('settings', 'Настройки', settings), areaOf('form', 'Форма', form), areaOf('processes', 'Процессы и шаги', processes), areaOf('showcase', 'Витрина', showcase)]
@@ -298,7 +302,7 @@ export function diffConfigs(from: SchemeConfig, to: SchemeConfig): SchemeDiff {
 }
 
 const FIELD_ATTR = { title: 'название', alias: 'алиас', type: 'тип', required: 'обязательное', webOnly: 'только web', dependent: 'зависимое', approval: 'на согласование' } as const
-const SHOWCASE_ATTR = { status: 'Статус карточки', title: 'Продающее название', summary: 'Краткое описание', priceFrom: 'Цена «от»', industry: 'Индустрия', spheres: 'Сфера применения', problems: 'Зачем нужен осмотр', metrics: 'Метрики', hiddenModules: 'Скрытые модули' } as const
+const SHOWCASE_ATTR = { status: 'Статус карточки', title: 'Продающее название', summary: 'Краткое описание', image: 'Изображение', priceFrom: 'Цена «от»', industry: 'Индустрия', spheres: 'Сфера применения', description: 'Развёрнутое описание', problems: 'Проблемы и решения', metrics: 'Метрики', hiddenModules: 'Скрытые модули' } as const
 function fieldValue(v: unknown): string {
   if (typeof v === 'boolean') return v ? 'да' : 'нет'
   if (v == null || v === '') return 'пусто'

@@ -1,20 +1,26 @@
 <script setup lang="ts">
 import { cn } from '@/lib/utils'
+import { Icon } from '../icon'
 import { calloutVariants, type CalloutTone } from '.'
 
 /**
  * Плашка-сообщение в потоке — разбор и таблица «кит | прототип» в `index.ts`.
  * Текст и список — слот по умолчанию: абзац или `<ul>` без классов, оформление даёт компонент.
+ * `closable` (такт 72) — крестик справа, событие `close`; скрывает плашку потребитель.
  */
 const props = withDefaults(defineProps<{
   tone?: CalloutTone
   /** Заголовок плашки — первой строкой, полужирным. */
   title?: string
+  /** Крестик «Закрыть» справа — одноразовая плашка; нажатие отдаёт `close`, плашку убирает потребитель. */
+  closable?: boolean
   class?: string
 }>(), {
   tone: 'neutral',
   title: '',
+  closable: false,
 })
+const emit = defineEmits<{ close: [] }>()
 </script>
 
 <template>
@@ -34,5 +40,19 @@ const props = withDefaults(defineProps<{
     <div v-if="$slots.actions" data-slot="callout-actions" class="flex shrink-0 flex-wrap items-center justify-end gap-4">
       <slot name="actions" />
     </div>
+    <!--
+      Крестик — зона 32 с глифом 16, как у `Alert` (такт 50); поля зоны уходят в поля плашки (−6 по вертикали, −8 справа):
+      высота плашки и правый край текста прежние. Цвет — тон плашки на ступени `--opacity-on-tone`, наведение — полный тон.
+    -->
+    <button
+      v-if="props.closable"
+      type="button"
+      data-slot="callout-close"
+      aria-label="Закрыть"
+      class="group/close -my-1.5 -mr-2 flex size-8 shrink-0 items-center justify-center self-start rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      @click="emit('close')"
+    >
+      <Icon name="close" :size="16" class="opacity-[var(--opacity-on-tone)] group-hover/close:opacity-100" />
+    </button>
   </div>
 </template>

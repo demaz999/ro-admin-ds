@@ -39,6 +39,8 @@ const DRAFT_ROLES = ['Администратор', 'Эксперт', 'Опера
 const draftRoles = ref(['Администратор', 'Эксперт'])
 /* Слот end у Input — такт 67. */
 const draftSearch = ref('')
+/** Такт 72: пример закрываемой плашки — закрытие помнит страница. */
+const calloutClosed = ref(false)
 /* Ось readonly — такт 68: обычное, только чтение, выключено рядом. */
 const RO_CASES = [
   { id: 'normal', label: 'обычное' },
@@ -140,6 +142,30 @@ const ro = ref({ name: 'КАСКО — осмотр', text: 'Осмотр авт
               </template>
             </Input>
             <span class="text-xs text-muted-foreground">пустое поле — слот; значение — крестик на месте слота</span>
+          </template>
+          <template v-else-if="c.id === 'callout-closable'">
+            <Callout v-if="!calloutClosed" closable @close="calloutClosed = true">
+              Сохранение теперь автоматическое. В боевые осмотры изменения попадают по кнопке «Опубликовать схему»
+            </Callout>
+            <Button v-else variant="outline" size="sm" class="self-start" @click="calloutClosed = false">
+              Вернуть плашку
+            </Button>
+            <Callout tone="warning" title="Требует оформления" closable>
+              Заголовок и текст: крестик стоит у первой строки
+            </Callout>
+            <span class="text-xs text-muted-foreground">closable — крестик и событие close; убирает плашку потребитель</span>
+          </template>
+          <template v-else-if="c.id === 'icon-star'">
+            <span class="flex items-center gap-4 text-xs">
+              <Icon name="star" :size="12" />
+              <Icon name="star" :size="16" />
+              <Icon name="star" :size="24" />
+              <code>star</code>
+              <Icon name="arrow-forward" :size="12" />
+              <Icon name="arrow-forward" :size="24" />
+              <code>arrow-forward</code>
+            </span>
+            <span class="text-xs text-muted-foreground">star 12 — таб «Витрина»; arrow-forward 12 — «Как устроена схема»</span>
           </template>
           <template v-else-if="c.id === 'icon-drag'">
             <span class="flex items-center gap-4 text-xs">
