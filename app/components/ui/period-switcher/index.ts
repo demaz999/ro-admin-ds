@@ -14,7 +14,7 @@ export { default as PeriodSwitcherItem } from './PeriodSwitcherItem.vue'
  *
  * | часть | кит | макет |
  * |---|---|---|
- * | триггер | кнопка 28, поля 6 / 12, зазор 8, радиус `--radius-xs`, подложка `--background` | `30957:7813`: 28, поля 6 / 12, зазор 8, радиус 4, `bg/page` |
+ * | триггер | кнопка 28, поля 6 / 12, зазор 8, радиус `--radius-xs`, подложка `--accent` — тон плитки `Card tone="muted"`: белая метка на белой рабочей зоне кита не читается кнопкой (строка 93 реестра `tariffs.md`; карточка 3 называла `--background`) | `30957:7813`: 28, поля 6 / 12, зазор 8, радиус 4, `bg/page` |
  * | точка | `Indicator size="sm"` 8 × 8: текущий — `success`, запланированный — `default`, черновик — `warning`, архив — `neutral` | `PeriodIcon` 8 × 8: `#27ae60` без переменной, `accent/default`, `service/warning-default`, `neutral/disabled` |
  * | статус и срок в триггере | 13/16 regular `--muted-foreground` оба | 12/16 Regular `#999999` и `#bbbbbb` без переменных |
  * | шеврон | `Icon chevron-down` 16 `--muted-foreground` | `Icon` 16, вектор 8 × 4 |

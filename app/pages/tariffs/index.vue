@@ -754,7 +754,10 @@ if (import.meta.client) {
                     </template>
                   </Table>
 
-                  <!-- Пустой список (№ 26, стр. 46): действие закрывает пустоту — тот же выбор типа. -->
+                  <!--
+                    Пустой список (№ 26, стр. 46): действие закрывает пустоту — тот же выбор типа. Кнопка — как у пустых списков
+                    страницы схемы: главная с плюсом (сверка дублей финала, стр. 115).
+                  -->
                   <Empty
                     v-else
                     title="Типов объектов пока нет"
@@ -763,7 +766,10 @@ if (import.meta.client) {
                   >
                     <template #action>
                       <PopoverTrigger as-child>
-                        <Button :inert="ro" variant="secondary" data-act="add-type">
+                        <Button :inert="ro" show-icon data-act="add-type">
+                          <template #icon>
+                            <Icon name="add" :size="16" />
+                          </template>
                           Добавить тип объекта
                         </Button>
                       </PopoverTrigger>
@@ -949,7 +955,13 @@ if (import.meta.client) {
                   </TableCell>
                 </TableRow>
               </Table>
-              <Empty v-else title="В группе пока нет схем" data-group-schemes-empty />
+              <!-- Пустая группа — тот же текст, что на вкладке «Схемы осмотра» (№ 57; сверка дублей финала, стр. 117). -->
+              <Empty
+                v-else
+                title="В группе пока нет схем"
+                description="Цена группы применится к схемам, когда они появятся в группе"
+                data-group-schemes-empty
+              />
             </section>
           </ModalCardBody>
         </ModalCardContent>
@@ -1121,8 +1133,12 @@ if (import.meta.client) {
                       </ButtonAction>
                     </template>
                   </Callout>
+                  <!--
+                    Один выбор типа на блок (№ 24): открыватель — кнопка над плитками либо действие пустого списка. У пустого
+                    списка кнопка добавления одна — в `Empty` (правило `naming.md`, «Такт 74»; сверка дублей финала, стр. 116).
+                  -->
                   <Popover v-model:open="schemePickerOpen">
-                    <div class="flex">
+                    <div v-if="panelSchemeTypes.length" class="flex">
                       <PopoverTrigger as-child>
                         <ButtonAction :inert="ro" data-act="add-scheme-type">
                           <template #icon>
@@ -1132,6 +1148,42 @@ if (import.meta.client) {
                         </ButtonAction>
                       </PopoverTrigger>
                     </div>
+                    <div v-if="panelSchemeTypes.length" class="flex flex-col gap-1">
+                      <Card v-for="t in panelSchemeTypes" :key="t.id" tone="muted" size="sm" class="flex flex-col gap-3" :data-scheme-type="t.id">
+                        <Heading data-scheme-type-name>
+                          {{ t.name }}
+                        </Heading>
+                        <PricePair
+                          :readonly="ro"
+                          stretch
+                          variant="elevated"
+                          :client="t.price.client"
+                          :non-client="t.price.nonClient"
+                          :linked="t.price.linked"
+                          data-field="scheme-type-price"
+                          @update:client="v => setSchemeTypePrice(t.id, { client: v })"
+                          @update:non-client="v => setSchemeTypePrice(t.id, { nonClient: v })"
+                          @update:linked="v => setSchemeTypePrice(t.id, { linked: v })"
+                        />
+                      </Card>
+                    </div>
+                    <Empty
+                      v-else
+                      title="Индивидуальных цен типов пока нет"
+                      description="Добавьте тип из справочника компании, чтобы задать ему цену в этой схеме"
+                      data-scheme-types-empty
+                    >
+                      <template #action>
+                        <PopoverTrigger as-child>
+                          <Button :inert="ro" show-icon data-act="add-scheme-type">
+                            <template #icon>
+                              <Icon name="add" :size="16" />
+                            </template>
+                            Добавить тип объекта
+                          </Button>
+                        </PopoverTrigger>
+                      </template>
+                    </Empty>
                     <PopoverContent as-child align="start" :side-offset="4" :width="320">
                       <SelectContent data-scheme-type-picker @keydown="onSchemePickerKeydown">
                         <template #search>
@@ -1155,31 +1207,6 @@ if (import.meta.client) {
                       </SelectContent>
                     </PopoverContent>
                   </Popover>
-                  <div v-if="panelSchemeTypes.length" class="flex flex-col gap-1">
-                    <Card v-for="t in panelSchemeTypes" :key="t.id" tone="muted" size="sm" class="flex flex-col gap-3" :data-scheme-type="t.id">
-                      <Heading data-scheme-type-name>
-                        {{ t.name }}
-                      </Heading>
-                      <PricePair
-                        :readonly="ro"
-                        stretch
-                        variant="elevated"
-                        :client="t.price.client"
-                        :non-client="t.price.nonClient"
-                        :linked="t.price.linked"
-                        data-field="scheme-type-price"
-                        @update:client="v => setSchemeTypePrice(t.id, { client: v })"
-                        @update:non-client="v => setSchemeTypePrice(t.id, { nonClient: v })"
-                        @update:linked="v => setSchemeTypePrice(t.id, { linked: v })"
-                      />
-                    </Card>
-                  </div>
-                  <Empty
-                    v-else
-                    title="Индивидуальных цен типов пока нет"
-                    description="Добавьте тип из справочника компании, чтобы задать ему цену в этой схеме"
-                    data-scheme-types-empty
-                  />
                 </div>
               </TabsContent>
             </Tabs>
