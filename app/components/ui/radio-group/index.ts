@@ -55,9 +55,18 @@ export const choiceCardVariants = cva(
         true: 'cursor-default has-data-[state=checked]:border-foreground-secondary has-data-[state=checked]:ring-foreground-secondary',
         false: 'has-data-[state=checked]:border-primary has-data-[state=checked]:bg-surface-selected has-data-[state=checked]:ring-primary',
       },
+      /** Тон выбора — такт 83: `destructive` у необратимого варианта; без пропа — бренд. */
+      tone: {
+        default: '',
+        destructive: '',
+      },
     },
-    compoundVariants: [{ disabled: false, readonly: false, class: 'cursor-pointer hover:not-has-data-[state=checked]:bg-accent' }],
-    defaultVariants: { disabled: false, readonly: false },
+    compoundVariants: [
+      { disabled: false, readonly: false, class: 'cursor-pointer hover:not-has-data-[state=checked]:bg-accent' },
+      /* Figma `31246:7501`: выбранная необратимая — заливка `service/error-surface`, рамка `service/error-default`. */
+      { readonly: false, tone: 'destructive', class: 'has-data-[state=checked]:border-destructive has-data-[state=checked]:bg-destructive-surface has-data-[state=checked]:ring-destructive' },
+    ],
+    defaultVariants: { disabled: false, readonly: false, tone: 'default' },
   },
 )
 
@@ -78,6 +87,19 @@ export const choiceCardVariants = cva(
  * Корнем становится рамка `data-slot="choice-frame"`, атрибуты потребителя ложатся на неё; карточка (`label`) прежняя. Тело
  * стоит вне `label`: его текст не входит в имя радиокнопки, нажатия по полям тела выбор не меняют.
  *
+ * ## Проп `tone` у карточки — такт 83 (решение агента, правило 21; нехватка в ките)
+ *
+ * Окно «Дата занята действующим тарифом» страницы тарификации: вариант «Перезаписать текущий тариф» необратим, и выбранная
+ * карточка красится тоном ошибки (Figma `31246:7479`, карточка `31246:7501`; `docs/tariffs.md`, раздел 9, № 50; строка 37
+ * реестра). Состав и поведение прежние — это тон выбора, ось `tone`.
+ *
+ * | часть | кит | макет |
+ * |---|---|---|
+ * | отмеченная карточка | заливка `--destructive-surface`, рамка и кольцо 1 `--destructive` | `31246:7501`: `service/error-surface`, рамка `service/error-default` |
+ * | контрол отмеченной | кольцо 2 и точка 8 `--destructive` | радио `31246:7502` тоном `service/error-default` |
+ * | неотмеченная | как у тона по умолчанию | серая карточка без рамки — строка 81 реестра: карточки кита белые с рамкой |
+ * | «только чтение» | сильнее тона: нейтральный `--foreground-secondary` | — |
+ *
  * ## Изменения после передачи
  *
  * Правило 23 `docs/chat-protocol.md`: каждое изменение переданного компонента маркируется здесь, в `CHANGELOG.md` и в
@@ -89,4 +111,7 @@ export const choiceCardVariants = cva(
  * - **Добавлено.** Тело выбранной карточки выбора: содержимое под отмеченной карточкой в общей с ней рамке — рамка 1
  *   `--border-neutral` продолжает бока карточки и скругляется снизу радиусом 8, поля 16; у неотмеченной тела нет. Без слота
  *   карточка прежняя. API: слот `panel` у `variant="card"`. Такт 80.
+ * - **Добавлено.** Тон необратимого выбора: отмеченная карточка — заливка `--destructive-surface`, рамка и кольцо 1
+ *   `--destructive`, кольцо и точка контрола `--destructive`; неотмеченная и «только чтение» — как без тона. Без пропа
+ *   карточка прежняя. API: проп `tone` — `default` по умолчанию, `destructive`. Такт 83.
  */

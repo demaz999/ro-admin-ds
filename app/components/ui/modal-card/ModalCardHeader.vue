@@ -10,6 +10,7 @@ import { MODAL_CARD_KEY } from '.'
  * Шапка окна-карточки — мастер `modal_cards_header` `864:2747`: строка 28, заголовок 24/28 bold. Оба варианта
  * мастера: `close` `864:2745` — крестик справа; `back` `864:2746` — стрелка «назад» слева от заголовка (такт 64).
  * Подзаголовок 15/20 — из «Экспорта в Excel»: у мастера шапки его нет. У заблокированного окна крестика нет.
+ * Слот `icon` — такт 83: значок окна в круге 28 тона ошибки над заголовком, через 16 (Figma `31246:7448`, `31246:7517`).
  * Разбор — в `index.ts`.
  */
 const props = withDefaults(defineProps<{
@@ -36,6 +37,14 @@ const ctx = inject(MODAL_CARD_KEY, { closable: computed(() => true) })
       <Icon name="arrow-back" :size="17.6" class="text-foreground" />
     </IconButton>
     <div class="flex min-w-0 flex-1 flex-col gap-1">
+      <!--
+        Значок окна — такт 83: круг 28 `--destructive`, поля 4, глиф 20 `--destructive-foreground` (Figma `31246:7448` —
+        `service/error-default`, `24_ic_calendar_month` 20; `31246:7517` — `ic_error`); до заголовка 16 (`31246:7447`, зазор 16).
+        Строка значка — 28: крестик (бокс 24, `mt-0.5`) стоит по её центру, как по центру строки заголовка без значка.
+      -->
+      <span v-if="$slots.icon" data-slot="modal-card-icon" class="mb-3 flex size-7 items-center justify-center rounded-full bg-destructive text-destructive-foreground">
+        <slot name="icon" />
+      </span>
       <DialogTitle data-slot="modal-card-title" class="m-0 text-2xl font-bold text-foreground">
         {{ props.title }}
       </DialogTitle>

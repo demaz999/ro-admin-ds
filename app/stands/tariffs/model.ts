@@ -65,6 +65,20 @@ import { chainSteps, stepErrors } from '~/components/ui/regress-scale/rules'
  * «Отменить» у уведомления возвращает выбор периода, в котором была правка. «Сохранить изменения» на черновике и
  * запланированном — прежнее применение без окон (окна очереди и пересечений — П6.2). Оснастка `?period=`,
  * `?open=periods` · `plan` · `delete-draft`. Сценарии ТФ-25–ТФ-28.
+ *
+ * ## Что добавлено в П6.2 — такт 83
+ *
+ * «Сохранить изменения» по машине окон 6.4 — `requestSave`. Текущий или запланированный без очереди после него — окно
+ * «Применить изменения?» (`confirmApply`; «Оставить в черновике» — `closeWindow`). С очередью — окно «Тариф находится в
+ * очереди» (`confirmQueue`): «Только к этому тарифу» — правки выбранному, «Этот и все последующие» (по умолчанию, §8) —
+ * те же правки (`settingsDiff`) и всем запланированным после него. Черновик: месяц в интервале текущего — окно «Дата занята
+ * действующим тарифом» (`confirmOccupied`: «Запланировать» или «Перезаписать»); месяц запланированного — окно «На эту дату
+ * уже запланирован тариф» (`confirmConflict`: оставить запланированный — новый остаётся черновиком; поставить новый —
+ * прежний уходит в черновики); иначе — черновик встаёт в очередь сразу. Черновик целиком не применён к очереди: кнопка у него
+ * активна всегда (`canSave`, строка 104 реестра). Окна закрываются без изменений «Отменой», крестиком и Esc. Применение —
+ * загрузка кнопки `APPLY_MS`; отказ (`?save=fail`) — уведомление об ошибке, правки на месте. Загрузка страницы —
+ * `?state=loading`. Оснастка `?open=apply` · `queue` · `occupied` · `conflict`, `?queue=this|all`,
+ * `?choice=overwrite|replace`. Сценарии ТФ-29–ТФ-35.
  */
 
 /* ------------------------------ данные ------------------------------ */
@@ -186,7 +200,21 @@ export interface ModelOptions {
   panel?: 'pricing' | 'types'
   /** Выбранный период при загрузке — оснастка `?period=current|planned|draft|archive` (такт 82): первый период статуса. */
   period?: PeriodStatus
+  /** Выбор в окне очереди при загрузке — оснастка `?queue=this|all` (такт 83); без неё — «Этот и все последующие» (§8). */
+  queue?: QueueChoice
+  /** Выбор в окнах пересечений при загрузке — оснастка `?choice=overwrite` («Дата занята») или `replace` («Уже запланирован»), такт 83. */
+  choice?: 'overwrite' | 'replace'
+  /** Загрузка страницы — оснастка `?state=loading` (такт 83, № 54): данных ещё нет, вместо блоков скелетон. */
+  loading?: boolean
+  /** Отказ применения «Сохранить изменения» — оснастка `?save=fail` (такт 83, № 55): уведомление, правки на месте. */
+  saveFail?: boolean
 }
+
+/** Окна «Сохранить изменения» — машина 6.4 (такт 83). */
+export type SaveWindow = 'apply' | 'queue' | 'occupied' | 'conflict'
+export type QueueChoice = 'this' | 'all'
+export type OccupiedChoice = 'plan' | 'overwrite'
+export type ConflictChoice = 'keep' | 'replace'
 
 /** Сколько длится запись черновика на стенде. */
 export const SAVE_MS = 700
@@ -231,6 +259,25 @@ function getPath(root: unknown, path: string): unknown {
   let node = root as Record<string, unknown> | undefined
   for (const k of path.split('.')) node = node?.[k] as Record<string, unknown> | undefined
   return node
+}
+
+/**
+ * Правки периода как список «путь — значение» (такт 83): листья, которые в `next` отличаются от `prev`. Массивы разной длины
+ * (добавленный тип, ступени) — одним листом целиком. «Этот и все последующие» переносит эти листья в настройки следующих
+ * периодов очереди — их собственные значения в прочих местах остаются.
+ */
+export function settingsDiff(prev: unknown, next: unknown, path = ''): [string, unknown][] {
+  if (same(prev, next)) return []
+  const obj = (x: unknown) => x != null && typeof x === 'object'
+  if (Array.isArray(prev) && Array.isArray(next) && prev.length === next.length) {
+    return next.flatMap((x, k) => settingsDiff(prev[k], x, path ? `${path}.${k}` : String(k)))
+  }
+  if (obj(prev) && obj(next) && !Array.isArray(prev) && !Array.isArray(next)) {
+    const a = prev as Record<string, unknown>
+    const b = next as Record<string, unknown>
+    return Object.keys(b).flatMap(k => settingsDiff(a[k], b[k], path ? `${path}.${k}` : k))
+  }
+  return [[path, clone(next)]]
 }
 
 /* ------------------------------ шкала и пара — 6.2, 6.3, чистые функции ------------------------------ */
@@ -300,6 +347,13 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   /** Есть неприменённые правки выбранного периода — «Сохранить изменения» активна (§11, стр. 40). */
   const dirty = computed(() => !!selected.value.pending && !same(selected.value.pending, selected.value.settings))
   const readonly = computed(() => selected.value.status === 'archive')
+  /**
+   * «Сохранить изменения» активна (такт 83): у черновика — всегда, он целиком не применён к очереди и сохраняется постановкой
+   * в очередь (строка 104 реестра); у текущего и запланированного — при неприменённых правках (стр. 40); у архива кнопки нет.
+   */
+  const canSave = computed(() => !readonly.value && (selected.value.status === 'draft' || dirty.value))
+  /** Загрузка страницы — № 54, оснастка `?state=loading`. */
+  const loading = !!opts.loading
 
   /* ------------------------------ автосохранение ------------------------------ */
   const save = reactive({ state: (opts.save ?? 'saved') as SaveState, writes: 0 })
@@ -323,20 +377,24 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   /* ------------------------------ применение — «Сохранить изменения» ------------------------------ */
   const apply = reactive({ state: 'idle' as 'idle' | 'applying', count: 0 })
   /**
-   * «Сохранить изменения» — П1: правки выбранного периода переносятся в его настройки после загрузки кнопки. Окна
-   * «Применить изменения?» и очереди (№ 48–51, 6.4) — порция П6.2.
+   * Применение после окна (такт 83): окно закрыто, кнопка «Сохранить изменения» в загрузке `APPLY_MS`, затем `act` и
+   * уведомление. Отказ (`?save=fail`, № 55) — уведомление об ошибке, правки на месте, кнопка снова активна.
    */
-  function applyChanges() {
-    if (!dirty.value || apply.state === 'applying') return
+  function run(act: () => string) {
+    ui.open = ''
     apply.state = 'applying'
     setTimeout(() => {
-      const p = selected.value
-      if (p.pending) p.settings = p.pending
-      p.pending = null
       apply.state = 'idle'
+      if (opts.saveFail) { notify('Не удалось сохранить изменения. Правки на месте — попробуйте ещё раз', 'err'); return }
+      const text = act()
       apply.count += 1
-      notify('Изменения применены')
+      notify(text)
     }, APPLY_MS)
+  }
+  /** Правки периода — в его применённые настройки. */
+  function commit(p: Period) {
+    if (p.pending) p.settings = p.pending
+    p.pending = null
   }
 
   /* ------------------------------ состояние интерфейса ------------------------------ */
@@ -776,7 +834,136 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     notify('Черновик удалён')
     return true
   }
+  /* ------------------------------ операции П6.2 — такт 83: «Сохранить изменения» и окна 6.4 ------------------------------ */
+  /** Выбор в окнах: очередь — «Этот и все последующие» по умолчанию (§8, стр. 39); пересечения — первый вариант макета. */
+  const win = reactive({ queue: 'all' as QueueChoice, occupied: 'plan' as OccupiedChoice, conflict: 'keep' as ConflictChoice })
+  /** Очередь — текущий и запланированные по дате начала. */
+  const queued = () => periods.filter(p => p.status === 'current' || p.status === 'planned').sort((a, b) => a.from.localeCompare(b.from))
+  /** Запланированные после периода — их задевает «Этот и все последующие». */
+  const after = (p: Period) => queued().filter(x => x.from > p.from)
+  const currentPeriod = () => periods.find(p => p.status === 'current')
+  /** Месяц входит в интервал текущего тарифа (6.4, стр. 43). */
+  function inCurrent(from: string) {
+    const c = currentPeriod()
+    return !!c && from >= c.from && (c.to == null || from <= c.to)
+  }
+  /** Запланированный тариф с тем же началом — «На эту дату уже запланирован тариф». */
+  const sameStart = (from: string) => periods.find(p => p.status === 'planned' && p.from === from)
+  /** Какое окно открывает «Сохранить изменения» у выбранного периода; `null` — черновик встаёт в очередь без окна. */
+  function windowFor(p: Period): SaveWindow | null {
+    if (p.status === 'draft') return inCurrent(p.from) ? 'occupied' : sameStart(p.from) ? 'conflict' : null
+    return after(p).length ? 'queue' : 'apply'
+  }
+  /**
+   * «Сохранить изменения» (№ 6, 48–51; 6.4): открывает окно машины; черновик со свободным месяцем ставится в очередь сразу.
+   * Выбор в окне каждый раз — по умолчанию.
+   */
+  function requestSave() {
+    if (!canSave.value || apply.state === 'applying' || loading) return
+    const p = selected.value
+    const w = windowFor(p)
+    win.queue = 'all'
+    win.occupied = 'plan'
+    win.conflict = 'keep'
+    if (w) { ui.open = w; return }
+    run(() => schedule(p))
+  }
+  /** Черновик — в очередь: правки черновика сохраняются в нём, статус и сроки — по часам модели. */
+  function schedule(p: Period): string {
+    commit(p)
+    p.status = 'planned'
+    restatus()
+    return `Тариф запланирован с ${startLabel(p.from)}`
+  }
+  /** Закрыть окно без изменений: «Отмена», крестик, Esc, «Оставить в черновике» (6.4). */
+  function closeWindow() {
+    if (['apply', 'queue', 'occupied', 'conflict'].includes(ui.open)) ui.open = ''
+  }
+  /** «Применить» в окне «Применить изменения?» (№ 48): правки — в настройки выбранного. */
+  function confirmApply() {
+    if (ui.open !== 'apply') return
+    const p = selected.value
+    run(() => { commit(p); return 'Изменения применены' })
+  }
+  /**
+   * «Сохранить изменения» в окне очереди (№ 49): «Только к этому тарифу» — правки выбранному; «Этот и все последующие» — те же
+   * правки и запланированным после него (§8 «к выбранному и всем последующим»).
+   */
+  function confirmQueue() {
+    if (ui.open !== 'queue') return
+    const p = selected.value
+    const choice = win.queue
+    run(() => {
+      const changes = settingsDiff(p.settings, p.pending ?? p.settings)
+      const rest = choice === 'all' ? after(p) : []
+      commit(p)
+      for (const q of rest) {
+        for (const [path, value] of changes) {
+          setPath(q.settings, path, clone(value))
+          if (q.pending) setPath(q.pending, path, clone(value))
+        }
+        if (q.pending && same(q.pending, q.settings)) q.pending = null
+      }
+      return choice === 'all' ? `Изменения применены к этому и последующим тарифам — ${rest.length + 1}` : 'Изменения применены только к этому тарифу'
+    })
+  }
+  /**
+   * Окно «Дата занята действующим тарифом» (№ 50): «Запланировать» — черновик встаёт в очередь, текущий действует до месяца
+   * перед ним; «Перезаписать» — текущий завершается месяцем перед новым, новый занимает его место. По датам исходы в макете
+   * одинаковы, разница — метка «Необратимо» (стр. 43); возврата запланированного в черновики на стенде нет (строка 106).
+   */
+  function confirmOccupied() {
+    if (ui.open !== 'occupied') return
+    const p = selected.value
+    const choice = win.occupied
+    run(() => {
+      const text = schedule(p)
+      return choice === 'overwrite' ? `Текущий тариф завершён. Новый начнётся с ${startLabel(p.from)}` : text
+    })
+  }
+  /**
+   * Окно «На эту дату уже запланирован тариф» (№ 51): «Оставить запланированный тариф» — новый сохраняется черновиком;
+   * «Поставить в очередь новый тариф» — новый встаёт в очередь, прежний запланированный уходит в черновики (не удаляется).
+   */
+  function confirmConflict() {
+    if (ui.open !== 'conflict') return
+    const p = selected.value
+    const choice = win.conflict
+    run(() => {
+      if (choice === 'keep') { commit(p); return 'Новый тариф сохранён в черновиках' }
+      const old = sameStart(p.from)
+      if (old) { old.status = 'draft'; old.to = null }
+      const text = schedule(p)
+      return `${text}. Прежний перемещён в черновики`
+    })
+  }
+  /** Строки окна очереди (№ 49): выбранный — «Изменяется», последующие — «Затронет» при «Этот и все последующие». */
+  const queueRows = computed(() => {
+    const p = selected.value
+    return [p, ...after(p)].map((x, k) => ({ id: x.id, status: x.status, from: x.from, to: x.to, badge: (k === 0 ? 'changing' : win.queue === 'all' ? 'affected' : null) as 'changing' | 'affected' | null }))
+  })
+  /** Сколько запланированных после выбранного — подписи вариантов окна очереди. */
+  const afterCount = computed(() => after(selected.value).length)
+
+  /* Оснастка такта 83: окно при загрузке — период и месяц черновика как данные. */
+  if (opts.open && ['apply', 'queue', 'occupied', 'conflict'].includes(opts.open)) {
+    const draft = periods.find(p => p.status === 'draft')
+    if (opts.open === 'occupied' && draft) draft.from = addMonths(now, 1)
+    if (opts.open === 'conflict' && draft) { const pl = periods.find(p => p.status === 'planned'); if (pl) draft.from = pl.from }
+    if (!opts.period) {
+      const q = queued()
+      const target = opts.open === 'apply' ? q[q.length - 1] : opts.open === 'queue' ? currentPeriod() : draft
+      if (target) selectedId.id = target.id
+    }
+    ui.open = opts.open
+    if (opts.queue) win.queue = opts.queue
+    if (opts.choice === 'overwrite') win.occupied = 'overwrite'
+    if (opts.choice === 'replace') win.conflict = 'replace'
+  }
   if (opts.open === 'plan') openPlan()
+
+  /** Прежнее имя операции П1 — «Сохранить изменения» идёт через окна 6.4 (такт 83). */
+  const applyChanges = () => requestSave()
 
   /* ------------------------------ вычисления для страницы ------------------------------ */
   /** Счётчики вкладок (№ 8): типов объектов и схем выбранного периода. */
@@ -786,7 +973,7 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   function dump() {
     return JSON.stringify({
       now, selected: selectedId.id, periods: periods.map(p => ({ id: p.id, status: p.status, from: p.from, to: p.to, dirty: !!p.pending })),
-      plan: { year: plan.year, month: plan.month }, view: view.value, save: save.state, writes: save.writes, apply: apply.state, applied: apply.count, ui: { tab: ui.tab, open: ui.open, expanded: ui.expanded, panel: ui.panel },
+      plan: { year: plan.year, month: plan.month }, win: { ...win }, loading, view: view.value, save: save.state, writes: save.writes, apply: apply.state, applied: apply.count, ui: { tab: ui.tab, open: ui.open, expanded: ui.expanded, panel: ui.panel },
       errors: { base: scaleErrors('base.scale') },
     })
   }
@@ -802,6 +989,7 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     customizeTypes, resetTypes, schemePickerTypes, addSchemeType,
     selectPeriod, periodList, plan, planYears, planMonths, openPlan, setPlanYear, setPlanMonth, confirmPlan, startLabel, periodSpan,
     openDeleteDraft, confirmDeleteDraft,
+    canSave, loading, win, requestSave, closeWindow, confirmApply, confirmQueue, confirmOccupied, confirmConflict, queueRows, afterCount,
   }
 }
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { RegressStep, ScaleForm } from '~/components/ui/regress-scale'
 import { computed, nextTick, ref, watch } from 'vue'
-import { createModel, TABS, type Dataset, type GroupMode, type PeriodStatus, type Price, type RowBadge, type SaveState, type SchemeMode, type TabId } from '~/stands/tariffs/model'
+import { addMonths, createModel, monthLabel, TABS, type Dataset, type GroupMode, type PeriodStatus, type Price, type RowBadge, type SaveState, type SchemeMode, type TabId } from '~/stands/tariffs/model'
 import demo from '~/stands/tariffs/demo-data.json'
 
 /**
@@ -38,6 +38,10 @@ import demo from '~/stands/tariffs/demo-data.json'
  * tone="warning"` с «Удалить черновик» и окном подтверждения (№ 10, 46); архив — только просмотр: оси `readonly` у полей,
  * пар, шкал, рубильников и режимов, действия правки закрыты `inert`, плашка «Архивный тариф — только просмотр», статуса
  * сохранения и «Сохранить изменения» нет (№ 47).
+ * П6.2 (такт 83): «Сохранить изменения» через окна 6.4 — «Применить изменения?» (№ 48), «Тариф находится в очереди» со
+ * списком периодов и метками «Изменяется», «Затронет» (№ 49), «Дата занята действующим тарифом» со значком в шапке и
+ * необратимым вариантом тоном ошибки (№ 50), «На эту дату уже запланирован тариф» с заметкой (№ 51) — `ModalCard` center;
+ * загрузка страницы — `Skeleton` по блокам (№ 54); отказ применения — уведомление об ошибке, правки на месте (№ 55).
  *
  * ## Поведение — модель `~/stands/tariffs/model.ts`
  *
@@ -68,6 +72,14 @@ import demo from '~/stands/tariffs/demo-data.json'
  * | `?open=periods` | открыт список периодов (такт 82) |
  * | `?open=plan` | открыто окно «Планирование новых тарифов»; выбран месяц после текущего (такт 82) |
  * | `?open=delete-draft` | открыто окно «Удалить черновик?»; без `?period=` выбран черновик (такт 82) |
+ * | `?open=apply` | открыто окно «Применить изменения?»; без `?period=` выбран последний тариф очереди (такт 83) |
+ * | `?open=queue` | открыто окно «Тариф находится в очереди»; без `?period=` выбран текущий (такт 83) |
+ * | `?queue=this` · `all` | выбор в окне очереди (такт 83) |
+ * | `?open=occupied` | окно «Дата занята действующим тарифом»: черновик — со следующего месяца, внутри текущего тарифа (такт 83) |
+ * | `?open=conflict` | окно «На эту дату уже запланирован тариф»: черновик — с месяца запланированного (такт 83) |
+ * | `?choice=overwrite` · `replace` | второй вариант окна «Дата занята» или «Уже запланирован» (такт 83) |
+ * | `?state=loading` | загрузка страницы: скелетон вместо блоков (такт 83) |
+ * | `?save=fail` | «Сохранить изменения» отказывает: уведомление, правки на месте (такт 83) |
  */
 definePageMeta({ layout: false })
 useHead({ title: 'Тарификация — стенд' })
@@ -75,7 +87,7 @@ useHead({ title: 'Тарификация — стенд' })
 const route = useRoute()
 const q = (k: string) => String(route.query[k] ?? '')
 
-const OPEN_AT_LOAD = ['help', 'type-picker', 'group', 'scheme', 'periods', 'plan', 'delete-draft']
+const OPEN_AT_LOAD = ['help', 'type-picker', 'group', 'scheme', 'periods', 'plan', 'delete-draft', 'apply', 'queue', 'occupied', 'conflict']
 const openAtLoad = OPEN_AT_LOAD.find(s => s === q('open'))
 const expandAtLoad = q('expand') ? q('expand').split(',').filter(Boolean) : []
 /* Выбор типа и раскрытая строка живут на «Типах объектов»: без `?tab=` оснастка такта 79 открывает эту вкладку. */
@@ -97,6 +109,10 @@ const m = createModel(demo as unknown as Dataset, {
   scheme: q('scheme') || undefined,
   panel: q('panel') === 'types' ? 'types' : q('panel') === 'pricing' ? 'pricing' : undefined,
   period: periodAtLoad,
+  queue: q('queue') === 'this' ? 'this' : q('queue') === 'all' ? 'all' : undefined,
+  choice: q('choice') === 'overwrite' ? 'overwrite' : q('choice') === 'replace' ? 'replace' : undefined,
+  loading: q('state') === 'loading',
+  saveFail: q('save') === 'fail',
 })
 
 const tab = computed<string>({ get: () => m.ui.tab, set: v => m.setTab(v as TabId) })
@@ -374,6 +390,24 @@ const banner = computed(() => status.value === 'draft' || status.value === 'arch
 const draftStart = computed(() => m.startLabel(m.selected.value.from))
 const archiveTerm = computed(() => m.periodSpan(m.selected.value.id))
 
+/* ------------------------------ окна «Сохранить изменения» — П6.2, такт 83 ------------------------------ */
+const applyOpen = surface('apply')
+const queueOpen = surface('queue')
+const occupiedOpen = surface('occupied')
+const conflictOpen = surface('conflict')
+const queueChoice = computed<string>({ get: () => m.win.queue, set: (v) => { m.win.queue = v === 'this' ? 'this' : 'all' } })
+const occupiedChoice = computed<string>({ get: () => m.win.occupied, set: (v) => { m.win.occupied = v === 'overwrite' ? 'overwrite' : 'plan' } })
+const conflictChoice = computed<string>({ get: () => m.win.conflict, set: (v) => { m.win.conflict = v === 'replace' ? 'replace' : 'keep' } })
+/** «1 запланированный тариф останется», «2 запланированных тарифа останутся», «5 запланированных тарифов останутся». */
+function plannedLeft(n: number) {
+  const d = n % 10
+  const h = n % 100
+  if (d === 1 && h !== 11) return `${n} запланированный тариф останется без изменений`
+  return `${n} запланированных ${d >= 2 && d <= 4 && (h < 12 || h > 14) ? 'тарифа' : 'тарифов'} останутся без изменений`
+}
+/** Начало черновика и месяц перед ним — подписи окон пересечений (№ 50, 51; дата с 1-го числа — стр. 18). */
+const draftBefore = computed(() => monthLabel(addMonths(m.selected.value.from, -1)))
+
 if (import.meta.client) {
   /* Прогону — состояние модели для сравнения «до / после»; оснастка приёмки. */
   ;(window as unknown as { __tariffs: unknown }).__tariffs = m
@@ -391,6 +425,7 @@ if (import.meta.client) {
     :data-period-id="m.selectedId.id"
     :data-scale="base.scale.on ? 'on' : 'off'"
     :data-open="m.ui.open || undefined"
+    :data-state="m.loading ? 'loading' : undefined"
   >
     <NuxtLayout name="admin">
       <!-- Шапка — Figma `30957:7809` в `30980:7926`; закреплена сверху (§11) — слот `header` каркаса. -->
@@ -408,7 +443,10 @@ if (import.meta.client) {
                 Тарификация
               </Heading>
               <!-- Переключатель тарифного периода — Figma `30957:7855`, список `31089:12090` (№ 4, 5). -->
+              <!-- Загрузка (№ 54): срок периода ещё неизвестен — скелетон на месте переключателя. -->
+              <Skeleton v-if="m.loading" class="h-7 w-56" data-skeleton="period" />
               <PeriodSwitcher
+                v-else
                 v-model="periodId"
                 v-model:open="periodsOpen"
                 :periods="m.periodList.value"
@@ -419,14 +457,14 @@ if (import.meta.client) {
             </div>
 
             <!-- Архив — только просмотр (№ 47): статуса сохранения и «Сохранить изменения» нет (стр. 49). -->
-            <div v-if="!ro" class="flex shrink-0 items-center gap-4">
+            <div v-if="!ro && !m.loading" class="flex shrink-0 items-center gap-4">
               <AppBarStatus surface="light" retryable :state="m.save.state" @retry="m.retry()" />
               <Button
                 show-icon
-                :disabled="!m.dirty.value"
+                :disabled="!m.canSave.value"
                 :loading="m.apply.state === 'applying'"
                 data-act="apply"
-                @click="m.applyChanges()"
+                @click="m.requestSave()"
               >
                 <template #icon>
                   <Icon name="save" :size="20" />
@@ -443,7 +481,7 @@ if (import.meta.client) {
         <!-- Строка вкладок — Figma `30912:245547`: вкладки слева, «Как считается стоимость» справа (`30912:245571`). -->
         <div class="flex items-center justify-between gap-6">
           <TabsList>
-            <TabsTrigger v-for="t in TABS" :key="t.id" :value="t.id" :count="countOf(t.id)" :data-tab-trigger="t.id">
+            <TabsTrigger v-for="t in TABS" :key="t.id" :value="t.id" :count="m.loading ? undefined : countOf(t.id)" :data-tab-trigger="t.id">
               <Icon :name="t.icon" :size="16" />
               {{ t.label }}
             </TabsTrigger>
@@ -485,8 +523,25 @@ if (import.meta.client) {
           </Popover>
         </div>
 
+        <!--
+          Загрузка страницы (№ 54, стр. 47): макета нет — три блока `Card` со скелетоном заголовка, подписи и двух плиток, как у
+          «Базовых настроек». Оснастка `?state=loading`.
+        -->
+        <div v-if="m.loading" class="flex flex-col gap-2 pt-6" data-loading>
+          <Card v-for="k in 3" :key="k" as="section" class="flex flex-col gap-6" :data-skeleton-block="k">
+            <div class="flex flex-col gap-2">
+              <Skeleton class="h-6 w-1/3" />
+              <Skeleton class="h-4 w-2/3" />
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <Skeleton class="h-24" />
+              <Skeleton class="h-24" />
+            </div>
+          </Card>
+        </div>
+
         <!-- Плашка черновика — Figma `30857:2704` (№ 10); архива — № 47, макета нет (стр. 49). Стоит над блоками всех вкладок. -->
-        <div class="flex flex-col gap-2 pt-6">
+        <div v-else class="flex flex-col gap-2 pt-6">
           <Callout v-if="status === 'draft'" tone="warning" title="Вы редактируете черновик будущих тарифов" data-banner="draft">
             <p>Текущие цены для клиентов остаются без изменений. Тарифы вступят в силу {{ draftStart }}</p>
             <template #actions>
@@ -1206,6 +1261,161 @@ if (import.meta.client) {
             </Button>
             <Button variant="destructive" data-act="delete-draft-confirm" @click="m.confirmDeleteDraft()">
               Удалить черновик
+            </Button>
+          </ModalCardFooter>
+        </ModalCardContent>
+      </ModalCard>
+
+      <!--
+        «Применить изменения?» — Figma `31246:7335` (№ 48): текущий или запланированный без очереди после него. «Оставить в
+        черновике» — окно закрыто, правки остаются (6.4); вторичная кнопка контуром, как в макете (`Button outline`).
+      -->
+      <ModalCard v-model:open="applyOpen">
+        <ModalCardContent size="sm" data-modal="apply">
+          <ModalCardHeader title="Применить изменения?" subtitle="Если не сохранить — они переместятся в черновик" />
+          <ModalCardFooter>
+            <Button variant="outline" data-act="apply-keep" @click="m.closeWindow()">
+              Оставить в черновике
+            </Button>
+            <Button data-act="apply-confirm" @click="m.confirmApply()">
+              Применить
+            </Button>
+          </ModalCardFooter>
+        </ModalCardContent>
+      </ModalCard>
+
+      <!--
+        «Тариф находится в очереди» — Figma `31246:7348`, `31246:7394` (№ 49): выбранный и запланированные после него —
+        `PeriodSwitcherItem` с меткой в слоте `badge`; по умолчанию «Этот и все последующие» (§8, стр. 39).
+      -->
+      <ModalCard v-model:open="queueOpen">
+        <ModalCardContent size="sm" data-modal="queue">
+          <ModalCardHeader title="Тариф находится в очереди" subtitle="Вы изменили тариф. Как применить изменения к последующим тарифам?" />
+          <ModalCardBody class="flex flex-col gap-6">
+            <div class="flex flex-col" data-queue-list>
+              <PeriodSwitcherItem v-for="(row, k) in m.queueRows.value" :key="row.id" :period="row" :selected="k === 0" :data-queue-row="row.id">
+                <template v-if="row.badge" #badge>
+                  <Badge v-if="row.badge === 'changing'" appearance="outline" variant="success" data-queue-badge="changing">
+                    Изменяется
+                  </Badge>
+                  <Badge v-else appearance="outline" data-queue-badge="affected">
+                    Затронет
+                  </Badge>
+                </template>
+              </PeriodSwitcherItem>
+            </div>
+            <Field label="Применить изменения">
+              <RadioGroup v-model="queueChoice" class="flex flex-col gap-2" data-field="queue-choice">
+                <RadioGroupItem value="this" variant="card" :checked="queueChoice === 'this'" data-choice="this">
+                  Только к этому тарифу
+                  <template #description>
+                    {{ plannedLeft(m.afterCount.value) }}
+                  </template>
+                </RadioGroupItem>
+                <RadioGroupItem value="all" variant="card" :checked="queueChoice === 'all'" data-choice="all">
+                  Этот и все последующие тарифы
+                  <template #description>
+                    Изменения применятся ко всем {{ m.afterCount.value + 1 }} тарифам в очереди
+                  </template>
+                </RadioGroupItem>
+              </RadioGroup>
+            </Field>
+          </ModalCardBody>
+          <ModalCardFooter>
+            <Button variant="secondary" data-act="queue-cancel" @click="m.closeWindow()">
+              Отмена
+            </Button>
+            <Button data-act="queue-confirm" @click="m.confirmQueue()">
+              Сохранить изменения
+            </Button>
+          </ModalCardFooter>
+        </ModalCardContent>
+      </ModalCard>
+
+      <!--
+        «Дата занята действующим тарифом» — Figma `31246:7445`, `31246:7479` (№ 50): значок календаря в шапке (слот `icon`),
+        «Перезаписать» — необратимо: метка «Необратимо», карточка тоном ошибки (`RadioGroupItem tone`), главная кнопка следует
+        выбору — «Запланировать» или «Перезаписать» тоном `destructive` (решение оркестратора 3, строка 105).
+      -->
+      <ModalCard v-model:open="occupiedOpen">
+        <ModalCardContent size="sm" data-modal="occupied">
+          <ModalCardHeader title="Дата занята действующим тарифом" :subtitle="`Новый тариф начнётся ${draftStart} — эта дата уже входит в период текущего тарифа`">
+            <template #icon>
+              <Icon name="calendar-month" :size="20" data-modal-icon="calendar-month" />
+            </template>
+          </ModalCardHeader>
+          <ModalCardBody>
+            <Field label="Как поступить с текущим тарифом?">
+              <RadioGroup v-model="occupiedChoice" class="flex flex-col gap-2" data-field="occupied-choice">
+                <RadioGroupItem value="plan" variant="card" :checked="occupiedChoice === 'plan'" data-choice="plan">
+                  Запланировать изменение
+                  <template #description>
+                    Текущий тариф продолжится до {{ draftBefore }}, затем сменится новым
+                  </template>
+                </RadioGroupItem>
+                <RadioGroupItem value="overwrite" variant="card" tone="destructive" :checked="occupiedChoice === 'overwrite'" data-choice="overwrite">
+                  <span class="inline-flex flex-wrap items-center gap-2">
+                    Перезаписать текущий тариф
+                    <Badge appearance="outline" variant="destructive" data-irreversible>
+                      Необратимо
+                    </Badge>
+                  </span>
+                  <template #description>
+                    Текущий тариф будет завершён. Новый начнётся {{ draftStart }}
+                  </template>
+                </RadioGroupItem>
+              </RadioGroup>
+            </Field>
+          </ModalCardBody>
+          <ModalCardFooter>
+            <Button variant="secondary" data-act="occupied-cancel" @click="m.closeWindow()">
+              Отмена
+            </Button>
+            <Button :variant="occupiedChoice === 'overwrite' ? 'destructive' : 'default'" data-act="occupied-confirm" @click="m.confirmOccupied()">
+              {{ occupiedChoice === 'overwrite' ? 'Перезаписать' : 'Запланировать' }}
+            </Button>
+          </ModalCardFooter>
+        </ModalCardContent>
+      </ModalCard>
+
+      <!--
+        «На эту дату уже запланирован тариф» — Figma `31246:7514`, `31246:7549` (№ 51): значок `error` в шапке, два варианта,
+        заметка — `Callout tone="neutral"` (у `Callout` значка нет — строка 87); дата с 1-го числа (стр. 18).
+      -->
+      <ModalCard v-model:open="conflictOpen">
+        <ModalCardContent size="sm" data-modal="conflict">
+          <ModalCardHeader title="На эту дату уже запланирован тариф" :subtitle="`С ${draftStart} не могут начаться два тарифа одновременно. Выберите, какой оставить в очереди.`">
+            <template #icon>
+              <Icon name="error" :size="20" data-modal-icon="error" />
+            </template>
+          </ModalCardHeader>
+          <ModalCardBody class="flex flex-col gap-3">
+            <Field label="Какой тариф оставить в очереди?">
+              <RadioGroup v-model="conflictChoice" class="flex flex-col gap-2" data-field="conflict-choice">
+                <RadioGroupItem value="keep" variant="card" :checked="conflictChoice === 'keep'" data-choice="keep">
+                  Оставить запланированный тариф
+                  <template #description>
+                    Новый тариф будет сохранён в черновиках — его можно использовать позже
+                  </template>
+                </RadioGroupItem>
+                <RadioGroupItem value="replace" variant="card" :checked="conflictChoice === 'replace'" data-choice="replace">
+                  Поставить в очередь новый тариф
+                  <template #description>
+                    Запланированный тариф перейдёт в черновики — его можно использовать позже
+                  </template>
+                </RadioGroupItem>
+              </RadioGroup>
+            </Field>
+            <Callout tone="neutral" data-conflict-note>
+              <p>Тариф, перемещённый в черновики, не удаляется. Вы сможете вернуть его в очередь в любой момент.</p>
+            </Callout>
+          </ModalCardBody>
+          <ModalCardFooter>
+            <Button variant="secondary" data-act="conflict-cancel" @click="m.closeWindow()">
+              Отмена
+            </Button>
+            <Button data-act="conflict-confirm" @click="m.confirmConflict()">
+              Подтвердить
             </Button>
           </ModalCardFooter>
         </ModalCardContent>

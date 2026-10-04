@@ -49,6 +49,8 @@ const draftPrice = ref('50000')
 /* Слот panel у RadioGroupItem — такт 80. */
 const draftMode = ref('fixed')
 const draftPair = ref({ client: 900 as number | null, nonClient: 1100 as number | null, linked: false })
+/* Тон выбора у RadioGroupItem — такт 83. */
+const draftChoice = ref('overwrite')
 /** Такт 81: уведомление с «Отменить» поверх модального окна. */
 const toastModalOpen = ref(false)
 const toastList = ref<number[]>([])
@@ -218,6 +220,46 @@ const ro = ref({ name: 'КАСКО — осмотр', text: 'Осмотр авт
                 <span class="text-xs">size="sm", tone="muted"</span>
               </Card>
             </div>
+          </template>
+          <template v-else-if="c.id === 'modal-card-icon'">
+            <div class="relative h-60 overflow-hidden rounded-md border border-border-soft bg-background">
+              <ModalCard :open="true" :modal="false">
+                <ModalCardContent inline size="sm">
+                  <ModalCardHeader title="Дата занята действующим тарифом" subtitle="Новый тариф начнётся 1 мая 2026 — эта дата уже входит в период текущего тарифа">
+                    <template #icon>
+                      <Icon name="calendar-month" :size="20" />
+                    </template>
+                  </ModalCardHeader>
+                </ModalCardContent>
+              </ModalCard>
+            </div>
+            <span class="text-xs text-muted-foreground">значок над заголовком; без слота шапка прежняя</span>
+          </template>
+          <template v-else-if="c.id === 'radio-tone'">
+            <RadioGroup v-model="draftChoice" class="flex flex-col gap-2">
+              <RadioGroupItem value="plan" variant="card" :checked="draftChoice === 'plan'">
+                Запланировать изменение
+                <template #description>
+                  Текущий тариф продолжится до апреля 2026, затем сменится новым
+                </template>
+              </RadioGroupItem>
+              <RadioGroupItem value="overwrite" variant="card" tone="destructive" :checked="draftChoice === 'overwrite'">
+                <span class="inline-flex items-center gap-2">Перезаписать текущий тариф <Badge appearance="outline" variant="destructive">Необратимо</Badge></span>
+                <template #description>
+                  Текущий тариф будет завершён. Новый начнётся 1 мая 2026
+                </template>
+              </RadioGroupItem>
+            </RadioGroup>
+            <span class="text-xs text-muted-foreground">второй вариант — tone="destructive"; первый — без пропа, прежний</span>
+          </template>
+          <template v-else-if="c.id === 'icon-error'">
+            <span class="flex items-center gap-4 text-xs">
+              <Icon name="error" :size="16" />
+              <Icon name="error" :size="20" />
+              <Icon name="error" :size="24" />
+              <code>error</code>
+            </span>
+            <span class="text-xs text-muted-foreground">20 — в значке окна, белым в круге 28</span>
           </template>
           <template v-else-if="c.id === 'icon-save'">
             <span class="flex items-center gap-4 text-xs">

@@ -17,6 +17,9 @@ import { ref } from 'vue'
  *
  * П6.1 (такт 82): `PeriodSwitcher` с частью `PeriodSwitcherItem` (карточка 3, раздел 8) — четыре вида триггера (Figma
  * `30957:7855`), список периодов (`31089:12090`), пункт с меткой в слоте `badge` (окно очереди, П6.2).
+ *
+ * П6.2 (такт 83): слот `icon` у `ModalCardHeader` (Figma `31246:7448`, `31246:7517`), проп `tone="destructive"` у
+ * `RadioGroupItem` (`31246:7501`), глиф `error` у `Icon` (`ic_error` `31246:7518`).
  */
 definePageMeta({ layout: false })
 useHead({ title: 'Тарификация — матрицы' })
@@ -133,6 +136,22 @@ const PERIODS = [
 /** Живой переключатель: выбор периода и «Запланировать изменение цен». */
 const livePeriod = ref('p-current')
 const planned = ref(0)
+/* ------------------------------ П6.2 — такт 83 ------------------------------ */
+
+/** Живой выбор с необратимым вариантом. */
+const overwrite = ref('plan')
+const TONE_EXAMPLE = `<RadioGroup v-model="choice">
+  <RadioGroupItem value="plan" variant="card" :checked="choice === 'plan'">Запланировать изменение</RadioGroupItem>
+  <RadioGroupItem value="overwrite" variant="card" tone="destructive" :checked="choice === 'overwrite'">
+    Перезаписать текущий тариф <Badge appearance="outline" variant="destructive">Необратимо</Badge>
+  </RadioGroupItem>
+</RadioGroup>   <!-- отмеченная destructive: заливка --destructive-surface, рамка, кольцо и точка --destructive -->`
+const ICON_EXAMPLE = `<ModalCardHeader title="Дата занята действующим тарифом" subtitle="…">
+  <template #icon>
+    <Icon name="calendar-month" :size="20" />
+  </template>
+</ModalCardHeader>   <!-- круг 28 --destructive, глиф 20 белый, до заголовка 16 -->`
+
 const PERIOD_EXAMPLE = `<PeriodSwitcher
   v-model="selectedPeriodId"
   v-model:open="periodsOpen"
@@ -478,17 +497,83 @@ const FIELD_EXAMPLE = `<Field orientation="split" label="Базовая стои
         <SelectContent :width="432" max-height="none" data-case="period-item-badge">
           <PeriodSwitcherItem :period="PERIODS[1]!">
             <template #badge>
-              <Badge appearance="outline">Изменяется</Badge>
+              <Badge appearance="outline" variant="success">Изменяется</Badge>
             </template>
           </PeriodSwitcherItem>
           <PeriodSwitcherItem :period="PERIODS[2]!">
             <template #badge>
-              <Badge appearance="outline" variant="neutral">Затронет</Badge>
+              <Badge appearance="outline">Затронет</Badge>
             </template>
           </PeriodSwitcherItem>
         </SelectContent>
       </div>
       <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ PERIOD_EXAMPLE }}</pre>
+    </section>
+
+    <section class="flex flex-col gap-4" data-matrix="modal-card-icon">
+      <Heading>ModalCardHeader · слот icon — значок окна (Figma `31246:7448`, `31246:7517`)</Heading>
+      <div class="grid grid-cols-3 gap-6 text-xs">
+        <div v-for="c in [{ id: 'calendar', icon: 'calendar-month', title: 'Дата занята действующим тарифом' }, { id: 'error', icon: 'error', title: 'На эту дату уже запланирован тариф' }, { id: 'none', icon: '', title: 'Без значка — шапка прежняя' }]" :key="c.id" class="relative h-56 overflow-hidden rounded-md border border-border">
+          <ModalCard :open="true" :modal="false">
+            <ModalCardContent inline size="sm" :data-case="`modal-icon-${c.id}`">
+              <ModalCardHeader :title="c.title" subtitle="Новый тариф начнётся 1 мая 2026">
+                <template v-if="c.icon" #icon>
+                  <Icon :name="c.icon" :size="20" />
+                </template>
+              </ModalCardHeader>
+            </ModalCardContent>
+          </ModalCard>
+        </div>
+      </div>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ ICON_EXAMPLE }}</pre>
+    </section>
+
+    <section class="flex flex-col gap-4" data-matrix="radio-tone">
+      <Heading>RadioGroupItem · tone="destructive" — необратимый выбор (Figma `31246:7501`)</Heading>
+      <div class="grid grid-cols-2 gap-6 text-xs">
+        <div class="flex flex-col gap-2">
+          <span>не отмечена · отмечена · только чтение · выключена</span>
+          <RadioGroup model-value="x">
+            <RadioGroupItem value="a" variant="card" tone="destructive" data-case="tone-idle">Перезаписать текущий тариф</RadioGroupItem>
+          </RadioGroup>
+          <RadioGroup model-value="a">
+            <RadioGroupItem value="a" variant="card" tone="destructive" checked data-case="tone-checked">
+              Перезаписать текущий тариф
+              <template #description>Текущий тариф будет завершён. Новый начнётся 1 мая 2026</template>
+            </RadioGroupItem>
+          </RadioGroup>
+          <RadioGroup model-value="a" readonly>
+            <RadioGroupItem value="a" variant="card" tone="destructive" checked data-case="tone-readonly">Перезаписать текущий тариф</RadioGroupItem>
+          </RadioGroup>
+          <RadioGroup model-value="a">
+            <RadioGroupItem value="a" variant="card" tone="destructive" checked disabled data-case="tone-disabled">Перезаписать текущий тариф</RadioGroupItem>
+          </RadioGroup>
+        </div>
+        <div class="flex flex-col gap-2">
+          <span>живой: выбор {{ overwrite }}</span>
+          <RadioGroup v-model="overwrite" class="flex flex-col gap-2">
+            <RadioGroupItem value="plan" variant="card" :checked="overwrite === 'plan'" data-case="tone-live-plan">
+              Запланировать изменение
+              <template #description>Текущий тариф продолжится до апреля 2026, затем сменится новым</template>
+            </RadioGroupItem>
+            <RadioGroupItem value="overwrite" variant="card" tone="destructive" :checked="overwrite === 'overwrite'" data-case="tone-live-overwrite">
+              <span class="inline-flex items-center gap-2">Перезаписать текущий тариф <Badge appearance="outline" variant="destructive">Необратимо</Badge></span>
+              <template #description>Текущий тариф будет завершён. Новый начнётся 1 мая 2026</template>
+            </RadioGroupItem>
+          </RadioGroup>
+        </div>
+      </div>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ TONE_EXAMPLE }}</pre>
+    </section>
+
+    <section class="flex flex-col gap-4" data-matrix="icon-error">
+      <Heading>Icon · error — значок ошибки (`ic_error` `31246:7518`)</Heading>
+      <div class="flex items-center gap-6 text-xs">
+        <Icon name="error" :size="16" data-case="error-16" />
+        <Icon name="error" :size="20" data-case="error-20" />
+        <Icon name="error" :size="24" data-case="error-24" />
+        <span>16 · 20 · 24; в значке окна — 20 белым в круге 28</span>
+      </div>
     </section>
   </main>
 </template>

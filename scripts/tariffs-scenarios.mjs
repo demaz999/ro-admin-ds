@@ -232,6 +232,10 @@ const Q = {
   deleteDraft: `document.querySelector('[data-act=delete-draft]')`,
   deleteDraftCancel: `document.querySelector('[data-act=delete-draft-cancel]')`,
   deleteDraftConfirm: `document.querySelector('[data-act=delete-draft-confirm]')`,
+  /* Такт 83, П6.2: окна «Сохранить изменения» — выбор по `data-choice` строки (ловушка такта 69), кнопки подвала, крестик. */
+  act: a => `document.querySelector('[data-act=${a}]')`,
+  choice: v => `document.querySelector('[data-choice=${v}] [data-slot=choice-control]')`,
+  windowClose: w => `[...document.querySelectorAll('[data-modal=${w}] [data-slot=modal-card-header] button')].find(b => b.getAttribute('aria-label') === 'Закрыть')`,
 }
 
 function kit(page) {
@@ -514,6 +518,26 @@ function kit(page) {
             const cell = b => t(b.textContent) + (b.disabled ? ' ×' : '') + (b.getAttribute('aria-pressed') === 'true' ? ' ✓' : '')
             return { title: t(d.querySelector('[data-slot=modal-card-title]')?.textContent), subtitle: t(d.querySelector('[data-slot=modal-card-subtitle]')?.textContent),
               months: [...d.querySelectorAll('[data-plan-month]')].map(cell), years: [...d.querySelectorAll('[data-plan-year]')].map(cell) } })(),
+          /* Такт 83: окна «Сохранить изменения» (6.4), загрузка страницы, сроки и правки периодов модели. */
+          saveModal: (() => { const d = document.querySelector('[data-modal=apply], [data-modal=queue], [data-modal=occupied], [data-modal=conflict]'); if (!d) return null
+            const variant = b => ['destructive', 'primary', 'secondary'].find(x => b.classList.contains('bg-' + x))?.replace('primary', 'default') ?? (b.classList.contains('border-primary') ? 'outline' : '?')
+            const checked = [...d.querySelectorAll('[data-choice]')].find(c => c.querySelector('[data-slot=choice-control]')?.getAttribute('data-state') === 'checked')
+            return { kind: d.dataset.modal, icon: d.querySelector('[data-slot=modal-card-icon] [data-modal-icon]')?.dataset.modalIcon ?? null,
+              iconSurface: (() => { const c = d.querySelector('[data-slot=modal-card-icon]'); return c ? getComputedStyle(c).backgroundColor + ' ' + c.getBoundingClientRect().width : null })(),
+              title: t(d.querySelector('[data-slot=modal-card-title]')?.textContent), subtitle: t(d.querySelector('[data-slot=modal-card-subtitle]')?.textContent),
+              list: [...d.querySelectorAll('[data-queue-row]')].map(r => leaf(r) + (r.querySelector('[data-selected]') || r.matches('[data-selected]') ? ' ✓' : '')),
+              listBadges: badgesOf(d.querySelector('[data-queue-list]')),
+              label: t(d.querySelector('[data-slot=field-wrapper] > label')?.textContent) || null,
+              choices: [...d.querySelectorAll('[data-choice]')].map(c => (c.querySelector('[data-slot=choice-control]')?.getAttribute('data-state') === 'checked' ? '● ' : '○ ')
+                + leaf(c.querySelector('[data-slot=choice-title]')) + ' — ' + leaf(c.querySelector('[data-slot=choice-description]')) + (c.dataset.tone ? ' | ' + c.dataset.tone : '')),
+              choiceBadges: badgesOf(d.querySelector('[data-slot=radio-group], [role=radiogroup]')),
+              checkedSurface: checked ? getComputedStyle(checked).backgroundColor : null,
+              note: leaf(d.querySelector('[data-conflict-note]')),
+              buttons: [...d.querySelectorAll('[data-slot=modal-card-footer] button')].map(b => t(b.textContent) + ' | ' + variant(b)) } })(),
+          loading: { state: root.dataset.state ?? null, skeletons: document.querySelectorAll('[data-slot=skeleton]').length, blocks: document.querySelectorAll('[data-block]').length,
+            switcher: !!document.querySelector('[data-act=periods]'), tabs: document.querySelectorAll('[data-tab-trigger]').length },
+          /* Период: id, минимальная сумма и цена клиента в применённых настройках, есть ли неприменённые правки. */
+          periodMins: M.periods.map(p => [p.id, p.settings.base.minPayment, p.settings.base.price.client, !!p.pending]),
           deleteModal: (() => { const d = document.querySelector('[data-modal=delete-draft]'); return d ? { title: t(d.querySelector('[data-slot=modal-card-title]')?.textContent), text: t(d.querySelector('[data-slot=modal-card-text]')?.textContent) } : null })(),
           /* Правка доступна: поля без «только чтения», рубильники и выбор режима без aria-readonly, действия правки вне inert. */
           editable: {
@@ -625,6 +649,29 @@ const PLAN = (y, m, off) => ({ title: 'Планирование новых та�
 /** Модель типов вкладки «Типы объектов» по демо-данным. */
 const MT_START = [['t-car', 300, 300, true, false, 'single', 1], ['t-special', 800, 1000, false, true, 'roles', 2], ['t-flat', 600, 600, true, false, 'single', 1]]
 
+/* Такт 83, П6.2: окна «Сохранить изменения» при часах «апрель 2026» (6.4). */
+const APPLY_LOG_OK = [{ state: 'applying', busy: true, disabled: true, spinner: true, sameWidth: true }, { state: 'idle', busy: false, disabled: true, spinner: false, sameWidth: true }]
+const MINS_START = [['p-archive', 15000, 450, false], ['p-current', 20000, 500, false], ['p-planned', 20000, 550, false], ['p-draft', 25000, 500, false]]
+/** Правка текущего без применения: применённые значения прежние, у текущего — неприменённые правки. */
+const MINS_EDITED = [['p-archive', 15000, 450, false], ['p-current', 20000, 500, true], ['p-planned', 20000, 550, false], ['p-draft', 25000, 500, false]]
+const QUEUE_LIST = ['Текущие тарифы Изменяется до июня 2026 ✓', 'Запланировано Затронет с июля 2026']
+const QUEUE_ALL = ['○ Только к этому тарифу — 1 запланированный тариф останется без изменений', '● Этот и все последующие тарифы — Изменения применятся ко всем 2 тарифам в очереди']
+const QUEUE_THIS = ['● Только к этому тарифу — 1 запланированный тариф останется без изменений', '○ Этот и все последующие тарифы — Изменения применятся ко всем 2 тарифам в очереди']
+const OCC = (choice, month, before) => [
+  `${choice === 'plan' ? '●' : '○'} Запланировать изменение — Текущий тариф продолжится до ${before}, затем сменится новым`,
+  `${choice === 'overwrite' ? '●' : '○'} Перезаписать текущий тариф Необратимо — Текущий тариф будет завершён. Новый начнётся ${month} | destructive`]
+const CONFLICT = choice => [
+  `${choice === 'keep' ? '●' : '○'} Оставить запланированный тариф — Новый тариф будет сохранён в черновиках — его можно использовать позже`,
+  `${choice === 'replace' ? '●' : '○'} Поставить в очередь новый тариф — Запланированный тариф перейдёт в черновики — его можно использовать позже`]
+const CONFLICT_NOTE = 'Тариф, перемещённый в черновики, не удаляется. Вы сможете вернуть его в очередь в любой момент.'
+/** Новый черновик из окна планирования: месяц `m` 2026 (5 — внутри текущего, 7 — месяц запланированного). */
+async function planDraft(K, m) { await K.click(Q.periods); await K.click(Q.periodPlan); await K.click(Q.planMonth(m)); await K.click(Q.planConfirm) }
+const DESTRUCTIVE_SURFACE = 'rgb(255, 240, 241)'
+const SELECTED_SURFACE = 'rgb(237, 243, 252)'
+/** Частичное ожидание — сверяются только перечисленные поля. */
+const P = o => ({ __partial: true, ...o })
+const DESTRUCTIVE_ICON = 'rgb(250, 57, 72) 28'
+
 const SCENARIOS = {
   'ТФ-01': ['«Назад» ведёт к карточке компании; вход вне скоупа — уведомление-заглушка (§11 «Вход»; scope, «Вне скоупа»)', [
     ['старт', null, { title: 'Тарификация', tab: 'base', period: 'current', save: 'saved', saveText: 'Все изменения сохранены', saveSurface: 'light', applyButton: 'Сохранить изменения', applyIcon: true, notices: [] }],
@@ -661,9 +708,10 @@ const SCENARIOS = {
       { dirty: false, applyDisabled: true, viewMin: 20000 }],
     ['снова правка — кнопка включена', async (K) => { await K.setMin('24000'); await K.settled() },
       { dirty: true, applyDisabled: false }],
-    ['«Сохранить изменения» — загрузка, затем применено', async (K) => { await K.apply(); await K.applied() },
-      { applyLog: [{ state: 'applying', busy: true, disabled: true, spinner: true, sameWidth: true }, { state: 'idle', busy: false, disabled: true, spinner: false, sameWidth: true }],
-        notices: ['Изменения применены'], dirty: false, applyDisabled: true, applyLoading: false, appliedMin: 24000, viewMin: 24000, minPayment: '24 000', applied: 1 }],
+    ['«Сохранить изменения» — у текущего есть очередь: окно очереди (такт 83, 6.4)', K => K.apply(), { saveModal: P({ kind: 'queue' }), applyLog: [], applied: 0, dirty: true }],
+    ['«Сохранить изменения» в окне — загрузка кнопки, затем применено', async (K) => { await K.click(Q.act('queue-confirm')); await K.applied() },
+      { saveModal: null, applyLog: APPLY_LOG_OK, notices: ['Изменения применены к этому и последующим тарифам — 2'], dirty: false, applyDisabled: true, applyLoading: false,
+        appliedMin: 24000, viewMin: 24000, minPayment: '24 000', applied: 1 }],
   ]],
 
   /* ------------------------------ П2 — такт 78: «Базовые настройки», пара цен, регресс-шкала ------------------------------ */
@@ -1061,10 +1109,111 @@ const SCENARIOS = {
     ['список без черновиков', K => K.click(Q.periods), { periodList: [['Текущие тарифы до июня 2026 ✓', 'Запланировано с июля 2026'], ['Архив до декабря 2025'], ['+ Запланировать изменение цен']] }],
     ['`?open=delete-draft` — окно открыто на черновике', K => K.start('open=delete-draft'), { period: 'draft', deleteModal: DELETE_MODAL }],
   ], { query: 'period=draft' }],
+
+  /* ------------------------------ П6.2 — такт 83: «Сохранить изменения» с выбором периода ------------------------------ */
+  'ТФ-29': ['последний в очереди (запланированный — у текущего демо очередь есть всегда): окно «Применить изменения?» — «Применить»; повтор — «Оставить в черновике», правки остаются (§8; 6.4)', [
+    ['`?period=planned` — после запланированного очереди нет', null, { switcher: 'Запланировано с июля 2026 | planned', applyDisabled: true, saveModal: null }],
+    ['правка минимальной суммы', async (K) => { await K.setMin('24000'); await K.settled() }, { dirty: true, applyDisabled: false }],
+    ['«Сохранить изменения» — окно «Применить изменения?»', K => K.apply(), { saveModal: {
+      kind: 'apply', icon: null, iconSurface: null, title: 'Применить изменения?', subtitle: 'Если не сохранить — они переместятся в черновик', list: [], listBadges: null, label: null,
+      choices: [], choiceBadges: null, checkedSurface: null, note: null, buttons: ['Оставить в черновике | outline', 'Применить | default'] }, applyLog: [], applied: 0 }],
+    ['«Применить» — загрузка кнопки, применено', async (K) => { await K.click(Q.act('apply-confirm')); await K.applied() }, {
+      saveModal: null, applyLog: APPLY_LOG_OK, notices: ['Изменения применены'], dirty: false, appliedMin: 24000, applied: 1 }],
+    ['снова правка и «Сохранить изменения»', async (K) => { await K.setMin('26000'); await K.settled(); await K.apply() }, { saveModal: P({ kind: 'apply' }), dirty: true }],
+    ['«Оставить в черновике» — окно закрыто, правки на месте, не применены', K => K.click(Q.act('apply-keep')), {
+      saveModal: null, dirty: true, applyDisabled: false, viewMin: 26000, appliedMin: 24000, applied: 1, applyLog: [], notices: [], focus: 'apply' }],
+  ], { query: 'period=planned' }],
+  'ТФ-30': ['текущий с очередью: окно «Тариф находится в очереди»; по умолчанию «Этот и все последующие»; метки следуют выбору (§8; стр. 39)', [
+    ['правка минимальной суммы текущего', async (K) => { await K.setMin('24000'); await K.settled() }, { dirty: true, periodMins: MINS_EDITED }],
+    ['«Сохранить изменения» — окно очереди: список, «Изменяется», «Затронет», выбран «Этот и все последующие»', K => K.apply(), { saveModal: {
+      kind: 'queue', icon: null, iconSurface: null, title: 'Тариф находится в очереди', subtitle: 'Вы изменили тариф. Как применить изменения к последующим тарифам?',
+      list: QUEUE_LIST, listBadges: ['Изменяется | outline success', 'Затронет | outline primary'], label: 'Применить изменения', choices: QUEUE_ALL,
+      choiceBadges: [], checkedSurface: SELECTED_SURFACE, note: null, buttons: ['Отмена | secondary', 'Сохранить изменения | default'] } }],
+    ['«Только к этому тарифу» — «Затронет» снята', K => K.click(Q.choice('this')), { saveModal: P({
+      list: ['Текущие тарифы Изменяется до июня 2026 ✓', 'Запланировано с июля 2026'], listBadges: ['Изменяется | outline success'], choices: QUEUE_THIS }) }],
+    ['«Сохранить изменения» в окне — правки только текущему; у запланированного — свои', async (K) => { await K.click(Q.act('queue-confirm')); await K.applied() }, {
+      saveModal: null, notices: ['Изменения применены только к этому тарифу'], dirty: false,
+      periodMins: [['p-archive', 15000, 450, false], ['p-current', 24000, 500, false], ['p-planned', 20000, 550, false], ['p-draft', 25000, 500, false]] }],
+    ['снова правка; окно — по умолчанию «Этот и все последующие»', async (K) => { await K.setMin('27000'); await K.settled(); await K.apply() }, {
+      saveModal: P({ list: QUEUE_LIST, choices: QUEUE_ALL }) }],
+    ['«Сохранить изменения» — та же правка и запланированному, его цена прежняя', async (K) => { await K.click(Q.act('queue-confirm')); await K.applied() }, {
+      saveModal: null, notices: ['Изменения применены к этому и последующим тарифам — 2'],
+      periodMins: [['p-archive', 15000, 450, false], ['p-current', 27000, 500, false], ['p-planned', 27000, 550, false], ['p-draft', 25000, 500, false]] }],
+    ['запланированный: правка и «Сохранить изменения» — после него очереди нет, окно «Применить изменения?»', async (K) => {
+      await K.click(Q.periods); await K.click(Q.periodOption('p-planned')); await K.setMin('28000'); await K.settled(); await K.apply() }, { saveModal: P({ kind: 'apply' }) }],
+  ]],
+  'ТФ-31': ['черновик с месяцем внутри текущего тарифа: окно «Дата занята действующим тарифом» — «Запланировать» или «Перезаписать» (§8; стр. 43)', [
+    ['черновик с мая 2026 — окном планирования; «Сохранить изменения» активна сразу', K => planDraft(K, 5), { period: 'draft', periodId: 'p-draft-new-1', dirty: false, applyDisabled: false }],
+    ['«Сохранить изменения» — окно «Дата занята»: значок календаря, выбран «Запланировать изменение»', K => K.apply(), { saveModal: {
+      kind: 'occupied', icon: 'calendar-month', iconSurface: DESTRUCTIVE_ICON, title: 'Дата занята действующим тарифом',
+      subtitle: 'Новый тариф начнётся 1 мая 2026 — эта дата уже входит в период текущего тарифа', list: [], listBadges: null, label: 'Как поступить с текущим тарифом?',
+      choices: OCC('plan', '1 мая 2026', 'апреля 2026'), choiceBadges: ['Необратимо | outline destructive'], checkedSurface: SELECTED_SURFACE, note: null,
+      buttons: ['Отмена | secondary', 'Запланировать | default'] } }],
+    ['«Перезаписать текущий тариф» — карточка тоном ошибки, кнопка «Перезаписать»', K => K.click(Q.choice('overwrite')), { saveModal: P({
+      choices: OCC('overwrite', '1 мая 2026', 'апреля 2026'), checkedSurface: DESTRUCTIVE_SURFACE, buttons: ['Отмена | secondary', 'Перезаписать | destructive'] }) }],
+    ['снова «Запланировать изменение»', K => K.click(Q.choice('plan')), { saveModal: P({ choices: OCC('plan', '1 мая 2026', 'апреля 2026'), checkedSurface: SELECTED_SURFACE, buttons: ['Отмена | secondary', 'Запланировать | default'] }) }],
+    ['«Запланировать» — черновик в очереди с мая, текущий до апреля', async (K) => { await K.click(Q.act('occupied-confirm')); await K.applied() }, {
+      saveModal: null, notices: ['Тариф запланирован с 1 мая 2026'], switcher: 'Запланировано с мая 2026 | planned', period: 'planned',
+      modelPeriods: [['p-archive', 'archive', '2025-01', '2025-12'], ['p-current', 'current', '2026-01', '2026-04'], ['p-planned', 'planned', '2026-07', null],
+        ['p-draft', 'draft', '2026-10', null], ['p-draft-new-1', 'planned', '2026-05', '2026-06']] }],
+    ['заново: черновик с мая, «Перезаписать»', async (K) => { await K.start(); await planDraft(K, 5); await K.apply(); await K.click(Q.choice('overwrite')); await K.click(Q.act('occupied-confirm')); await K.applied() }, {
+      saveModal: null, notices: ['Черновик создан: тарифы вступят в силу 1 мая 2026', 'Текущий тариф завершён. Новый начнётся с 1 мая 2026'], switcher: 'Запланировано с мая 2026 | planned',
+      modelPeriods: [['p-archive', 'archive', '2025-01', '2025-12'], ['p-current', 'current', '2026-01', '2026-04'], ['p-planned', 'planned', '2026-07', null],
+        ['p-draft', 'draft', '2026-10', null], ['p-draft-new-1', 'planned', '2026-05', '2026-06']] }],
+  ]],
+  'ТФ-32': ['черновик на месяц запланированного: окно «На эту дату уже запланирован тариф» — вытесненный уходит в черновики; черновик со свободным месяцем — в очередь без окна (§8; стр. 43)', [
+    ['черновик с июля 2026 — месяц запланированного', K => planDraft(K, 7), { period: 'draft', periodId: 'p-draft-new-1' }],
+    ['«Сохранить изменения» — окно «Уже запланирован»: значок ошибки, выбран «Оставить запланированный», заметка', K => K.apply(), { saveModal: {
+      kind: 'conflict', icon: 'error', iconSurface: DESTRUCTIVE_ICON, title: 'На эту дату уже запланирован тариф',
+      subtitle: 'С 1 июля 2026 не могут начаться два тарифа одновременно. Выберите, какой оставить в очереди.', list: [], listBadges: null, label: 'Какой тариф оставить в очереди?',
+      choices: CONFLICT('keep'), choiceBadges: [], checkedSurface: SELECTED_SURFACE, note: CONFLICT_NOTE, buttons: ['Отмена | secondary', 'Подтвердить | default'] } }],
+    ['«Подтвердить» — новый остаётся черновиком, очередь прежняя', async (K) => { await K.click(Q.act('conflict-confirm')); await K.applied() }, {
+      saveModal: null, notices: ['Новый тариф сохранён в черновиках'], period: 'draft', modelPeriods: [...PERIODS_START, ['p-draft-new-1', 'draft', '2026-07', null]] }],
+    ['снова — «Поставить в очередь новый тариф», «Подтвердить»', async (K) => { await K.apply(); await K.click(Q.choice('replace')); await K.click(Q.act('conflict-confirm')); await K.applied() }, {
+      saveModal: null, notices: ['Тариф запланирован с 1 июля 2026. Прежний перемещён в черновики'], switcher: 'Запланировано с июля 2026 | planned',
+      modelPeriods: [['p-archive', 'archive', '2025-01', '2025-12'], ['p-current', 'current', '2026-01', '2026-06'], ['p-planned', 'draft', '2026-07', null],
+        ['p-draft', 'draft', '2026-10', null], ['p-draft-new-1', 'planned', '2026-07', null]] }],
+    ['список: вытесненный — в черновиках', K => K.click(Q.periods), { periodList: [
+      ['Текущие тарифы до июня 2026', 'Запланировано с июля 2026 ✓', 'Черновик с июля 2026', 'Черновик с октября 2026'], ['Архив до декабря 2025'], ['+ Запланировать изменение цен']] }],
+    ['черновик с октября — месяц свободен: в очередь без окна, запланированный до сентября', async (K) => { await K.start('period=draft'); await K.apply(); await K.applied() }, {
+      saveModal: null, notices: ['Тариф запланирован с 1 октября 2026'], switcher: 'Запланировано с октября 2026 | planned',
+      modelPeriods: [['p-archive', 'archive', '2025-01', '2025-12'], ['p-current', 'current', '2026-01', '2026-06'], ['p-planned', 'planned', '2026-07', '2026-09'], ['p-draft', 'planned', '2026-10', null]] }],
+  ]],
+  'ТФ-33': ['любое окно: «Отмена», крестик, Esc — закрыто без изменений, фокус на «Сохранить изменения» (§8; 6.4)', [
+    ['правка; окно очереди; «Отмена»', async (K) => { await K.setMin('24000'); await K.settled(); await K.apply(); await K.click(Q.act('queue-cancel')) }, {
+      saveModal: null, focus: 'apply', dirty: true, applied: 0, periodMins: MINS_EDITED, modelPeriods: PERIODS_START }],
+    ['окно очереди; крестик', async (K) => { await K.apply(); await K.click(Q.windowClose('queue')) }, { saveModal: null, focus: 'apply', applied: 0, periodMins: MINS_EDITED }],
+    ['окно очереди, выбор «Только к этому»; Esc — выбор не применён', async (K) => { await K.apply(); await K.click(Q.choice('this')); await K.escape() }, { saveModal: null, focus: 'apply', applied: 0, periodMins: MINS_EDITED }],
+    ['снова окно очереди — выбор по умолчанию', K => K.apply(), { saveModal: P({ choices: QUEUE_ALL }) }],
+    ['черновик с мая: окно «Дата занята»; «Отмена»', async (K) => { await K.escape(); await planDraft(K, 5); await K.apply(); await K.click(Q.act('occupied-cancel')) }, {
+      saveModal: null, focus: 'apply', period: 'draft', modelPeriods: [...PERIODS_START, ['p-draft-new-1', 'draft', '2026-05', null]] }],
+    ['черновик с июля: окно «Уже запланирован»; крестик', async (K) => { await planDraft(K, 7); await K.apply(); await K.click(Q.windowClose('conflict')) }, {
+      saveModal: null, focus: 'apply', modelPeriods: [...PERIODS_START, ['p-draft-new-1', 'draft', '2026-05', null], ['p-draft-new-2', 'draft', '2026-07', null]] }],
+    ['запланированный: окно «Применить изменения?»; Esc', async (K) => { await K.start('period=planned'); await K.setMin('24000'); await K.settled(); await K.apply(); await K.escape() }, {
+      saveModal: null, focus: 'apply', dirty: true, applied: 0 }],
+  ]],
+  'ТФ-34': ['загрузка страницы: каркас со скелетоном вместо блоков (§10, §11; стр. 47)', [
+    ['`?state=loading` — скелетон: переключатель и три блока, вкладки без счётчиков, главной кнопки нет', null, {
+      loading: { state: 'loading', skeletons: 13, blocks: 0, switcher: false, tabs: 3 }, counts: { base: null, types: null, schemes: null }, applyShown: false, statusShown: false, banner: null }],
+    ['без оснастки — данные на месте', K => K.start(), { loading: { state: null, skeletons: 0, blocks: 3, switcher: true, tabs: 3 }, counts: { base: null, types: '3', schemes: '7' }, applyShown: true }],
+  ], { query: 'state=loading' }],
+  'ТФ-35': ['отказ «Сохранить изменения»: уведомление об ошибке, кнопка активна, правки на месте (§8; стр. 48)', [
+    ['правка минимальной суммы', async (K) => { await K.setMin('24000'); await K.settled() }, { dirty: true, saveLog: ['saving', 'saved'] }],
+    ['«Сохранить изменения» — окно очереди; «Сохранить изменения» в окне — загрузка, отказ', async (K) => { await K.apply(); await K.click(Q.act('queue-confirm')); await K.applied() }, {
+      saveModal: null, applyLog: [APPLY_LOG_OK[0], { ...APPLY_LOG_OK[1], disabled: false }], notices: ['Не удалось сохранить изменения. Правки на месте — попробуйте ещё раз'],
+      dirty: true, applyDisabled: false, viewMin: 24000, minPayment: '24 000', appliedMin: 20000, applied: 0, periodMins: [['p-archive', 15000, 450, false], ['p-current', 20000, 500, true], ['p-planned', 20000, 550, false], ['p-draft', 25000, 500, false]] }],
+    ['черновик — тоже отказ, черновик остаётся черновиком', async (K) => { await K.click(Q.periods); await K.click(Q.periodOption('p-draft')); await K.apply(); await K.applied() }, {
+      notices: ['Не удалось сохранить изменения. Правки на месте — попробуйте ещё раз'], period: 'draft', applyDisabled: false, modelPeriods: PERIODS_START }],
+  ], { query: 'save=fail' }],
 }
 
 /* ------------------------------ прогон ------------------------------ */
 function diff(a, b, path = '') {
+  /* Частичное ожидание (такт 83): объект с меткой `__partial` сверяет только свои поля — окно, у которого меняется выбор. */
+  if (a && typeof a === 'object' && a.__partial) {
+    if (!b || typeof b !== 'object') return [`${path}: ожидание объект · кит ${JSON.stringify(b)}`]
+    return Object.keys(a).filter(k => k !== '__partial').flatMap(k => diff(a[k], b[k], `${path}.${k}`))
+  }
   if (JSON.stringify(a) === JSON.stringify(b)) return []
   if (a && b && typeof a === 'object' && typeof b === 'object' && !Array.isArray(a)) {
     return [...new Set([...Object.keys(a), ...Object.keys(b)])].flatMap(k => diff(a[k], b[k], path ? `${path}.${k}` : k))

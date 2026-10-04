@@ -42,13 +42,20 @@ const props = withDefaults(defineProps<{
    * остаются (`aria-readonly`); бренд заменён нейтральным `--foreground-secondary`.
    */
   readonly?: boolean
+  /**
+   * Тон выбора — такт 83: `destructive` у необратимого варианта (Figma `31246:7501`): отмеченная карточка
+   * `--destructive-surface`, рамка и кольцо `--destructive`, кольцо и точка контрола `--destructive`. Без пропа — бренд.
+   */
+  tone?: 'default' | 'destructive'
 }>(), {
   subtitle: '',
   disabled: false,
   checked: false,
   variant: 'row',
   readonly: false,
+  tone: 'default',
 })
+const danger = computed(() => props.tone === 'destructive' && !ro.value)
 
 const ro = useReadonly(() => props.readonly, () => props.disabled)
 const guard = choiceReadonlyGuard(ro)
@@ -68,7 +75,8 @@ const [DefineChoice, ReuseChoice] = createReusableTemplate()
     data-slot="choice"
     :data-variant="props.variant"
     :data-readonly="ro ? '' : undefined"
-    :class="props.variant === 'card' ? cn(choiceCardVariants({ disabled, readonly: ro }), framed && 'relative') : choiceRowVariants({ disabled, readonly: ro })"
+    :data-tone="props.tone === 'default' ? undefined : props.tone"
+    :class="props.variant === 'card' ? cn(choiceCardVariants({ disabled, readonly: ro, tone: props.tone }), framed && 'relative') : choiceRowVariants({ disabled, readonly: ro })"
     @click.capture="guard.onClickCapture"
     @keydown.capture="guard.onKeydownCapture"
   >
@@ -78,7 +86,7 @@ const [DefineChoice, ReuseChoice] = createReusableTemplate()
         data-slot="choice-control"
         :aria-readonly="ro ? 'true' : undefined"
         class="group/radio flex size-4 items-center justify-center rounded-full border-2 bg-transparent outline-none"
-        :class="ro ? 'border-foreground-secondary' : 'border-primary'"
+        :class="ro ? 'border-foreground-secondary' : danger ? 'border-primary data-[state=checked]:border-destructive' : 'border-primary'"
       >
         <!--
           Традиционная анатомия: кольцо остаётся тонким и в отмеченном состоянии,
@@ -86,7 +94,7 @@ const [DefineChoice, ReuseChoice] = createReusableTemplate()
           целиком, а точка внутри белая. Сознательное отклонение, решение
           Михаила; запись в docs/figma-fixes.md.
         -->
-        <span class="hidden size-2 rounded-full group-data-[state=checked]/radio:block" :class="ro ? 'bg-foreground-secondary' : 'bg-primary'" />
+        <span class="hidden size-2 rounded-full group-data-[state=checked]/radio:block" :class="ro ? 'bg-foreground-secondary' : danger ? 'bg-destructive' : 'bg-primary'" />
       </RadioGroupItem>
     </span>
 

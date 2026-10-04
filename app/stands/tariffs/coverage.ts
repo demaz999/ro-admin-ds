@@ -25,4 +25,10 @@ export const TARIFFS_COVERAGE_STATES = [
   'open=periods', 'open=plan', 'period=planned', 'period=draft', 'open=delete-draft',
   'period=archive', 'period=archive&expand=t-special', 'period=archive&tab=schemes', 'period=archive&open=group&group=g-realty',
   'period=archive&open=scheme', 'period=archive&open=scheme&scheme=s-flat&panel=types',
+  /*
+   * Такт 83, П6.2: окна «Сохранить изменения» — «Применить изменения?», очередь в обоих выборах, «Дата занята» в обоих выборах
+   * (второй — тоном ошибки), «Уже запланирован» в обоих; загрузка страницы; отказ применения.
+   */
+  'open=apply', 'open=queue', 'open=queue&queue=this', 'open=occupied', 'open=occupied&choice=overwrite', 'open=conflict',
+  'open=conflict&choice=replace', 'state=loading', 'save=fail',
 ] as const
