@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { RegressStep, ScaleForm } from '~/components/ui/regress-scale'
 import { computed, nextTick, ref, watch } from 'vue'
-import { createModel, TABS, type Dataset, type GroupMode, type Price, type RowBadge, type SaveState, type TabId } from '~/stands/tariffs/model'
+import { createModel, TABS, type Dataset, type GroupMode, type Price, type RowBadge, type SaveState, type SchemeMode, type TabId } from '~/stands/tariffs/model'
 import demo from '~/stands/tariffs/demo-data.json'
 
 /**
@@ -28,7 +28,11 @@ import demo from '~/stands/tariffs/demo-data.json'
  * «Настроить группу» (№ 27–29); строки схем — `Card tone="muted" size="sm"`, устаревшая — `dimmed` (№ 30, 31); пустая
  * группа — `Empty` (№ 57). Панель группы — `ModalCard` edge (№ 32): режимы — `RadioGroupItem variant="card"` со слотом
  * `panel` (№ 33), фиксированная цена — `PricePair` (№ 34), шкала — `RegressScale` (№ 35), «Схемы в группе» — `Table`
- * только для чтения (№ 36). Панель схемы (шестерёнка строки) — порция П5: уведомление-заглушка. Переключатель периода — П6.1.
+ * только для чтения (№ 36). Переключатель периода — П6.1.
+ * П5 (такт 81): панель схемы — шестерёнка строки схемы (№ 37): шапка с именем группы, имя схемы, идентификатор с
+ * копированием, вкладки панели; «Ценообразование» — режимы схемы с телом выбранного (№ 38–40) и «Процессы» с ценами
+ * повторяемых процессов (№ 41); «Типы объектов» — глобальные цены только для чтения с «Настроить индивидуально» (№ 42),
+ * индивидуальные цены с «Сбросить к глобальным» и «Добавить тип объекта» (№ 43, 56).
  *
  * ## Поведение — модель `~/stands/tariffs/model.ts`
  *
@@ -51,6 +55,10 @@ import demo from '~/stands/tariffs/demo-data.json'
  * | `?open=group` | открыта панель группы; без `?tab=` — вкладка «Схемы осмотра» (такт 80) |
  * | `?group=<id группы>` | какая группа открыта: `g-kasko`, `g-osago`, `g-realty`; без параметра — первая (такт 80) |
  * | `?mode=company` · `fixed` · `scale` | режим открытой группы — как данные, правка не пишется (такт 80) |
+ * | `?open=scheme` | открыта панель схемы; без `?tab=` — вкладка «Схемы осмотра» (такт 81) |
+ * | `?scheme=<id схемы>` | какая схема открыта: `s-car`, `s-moto`, `s-pre`, `s-vehicle`, `s-trailer`, `s-flat`, `s-house`; без параметра — первая (такт 81) |
+ * | `?panel=pricing` · `types` | вкладка панели схемы (такт 81) |
+ * | `?mode=group` · `individual` · `scale` | режим открытой схемы — как данные, правка не пишется (такт 81) |
  */
 definePageMeta({ layout: false })
 useHead({ title: 'Тарификация — стенд' })
@@ -58,13 +66,13 @@ useHead({ title: 'Тарификация — стенд' })
 const route = useRoute()
 const q = (k: string) => String(route.query[k] ?? '')
 
-const OPEN_AT_LOAD = ['help', 'type-picker', 'group']
+const OPEN_AT_LOAD = ['help', 'type-picker', 'group', 'scheme']
 const openAtLoad = OPEN_AT_LOAD.find(s => s === q('open'))
 const expandAtLoad = q('expand') ? q('expand').split(',').filter(Boolean) : []
 /* Выбор типа и раскрытая строка живут на «Типах объектов»: без `?tab=` оснастка такта 79 открывает эту вкладку. */
 const tabAtLoad = TABS.find(t => t.id === q('tab'))?.id
-  ?? (openAtLoad === 'type-picker' || expandAtLoad.length ? 'types' : openAtLoad === 'group' ? 'schemes' : undefined)
-const MODES: GroupMode[] = ['company', 'fixed', 'scale']
+  ?? (openAtLoad === 'type-picker' || expandAtLoad.length ? 'types' : openAtLoad === 'group' || openAtLoad === 'scheme' ? 'schemes' : undefined)
+const MODES: (GroupMode | SchemeMode)[] = ['company', 'fixed', 'scale', 'group', 'individual']
 const saveAtLoad = (['saving', 'error'] as SaveState[]).find(s => s === q('save'))
 const m = createModel(demo as unknown as Dataset, {
   data: q('data') === 'empty' ? 'empty' : 'main',
@@ -76,6 +84,8 @@ const m = createModel(demo as unknown as Dataset, {
   expand: expandAtLoad,
   group: q('group') || undefined,
   mode: MODES.find(x => x === q('mode')),
+  scheme: q('scheme') || undefined,
+  panel: q('panel') === 'types' ? 'types' : q('panel') === 'pricing' ? 'pricing' : undefined,
 })
 
 const tab = computed<string>({ get: () => m.ui.tab, set: v => m.setTab(v as TabId) })
@@ -212,8 +222,6 @@ const groupRows = computed(() => m.view.value.groups.map(g => ({
     outdated: x.flags.includes('outdated'),
   })),
 })))
-/** Вход в панель схемы — порция П5 (решение оркестратора 2 промпта такта 80): уведомление-заглушка. */
-const openScheme = () => m.pendingPortion('Панель схемы', 'П5')
 
 /** Панель группы (№ 32–36): открыта — `ui.open === 'group'`; закрытие — Esc, крестик, клик мимо. */
 const groupOpen = computed({
@@ -240,6 +248,97 @@ function setGroupScale(patch: { steps?: RegressStep[], form?: ScaleForm }) {
 function groupStepRemoved(previous: RegressStep[]) {
   const path = panelGroup.value && m.groupPath(panelGroup.value.id)
   if (path) m.stepRemoved(`${path}.scale`, previous)
+}
+
+/* ------------------------------ панель схемы — П5, такт 81 ------------------------------ */
+/** Панель схемы (№ 37–43): открыта — `ui.open === 'scheme'`; закрытие — Esc, крестик, клик мимо. */
+const schemeOpen = computed({
+  get: () => m.ui.open === 'scheme' && m.ui.panel?.kind === 'scheme',
+  set: (v: boolean) => { if (!v) m.closePanel() },
+})
+const panelScheme = computed(() => (m.ui.panel?.kind === 'scheme' ? m.schemeOf(m.ui.panel.id) : undefined))
+const panelSchemeGroup = computed(() => (panelScheme.value ? m.groupOf(panelScheme.value.groupId) : undefined))
+const panelTab = computed<string>({
+  get: () => m.ui.panel?.tab ?? 'pricing',
+  set: v => m.setPanelTab(v === 'types' ? 'types' : 'pricing'),
+})
+const schemeMode = computed({
+  get: () => panelScheme.value?.mode ?? 'group',
+  set: (v: string) => { if (panelScheme.value) m.setSchemeMode(panelScheme.value.id, v as SchemeMode) },
+})
+/** Вилка группы в описании режима «По группе» — 6.5, как вилка компании в панели группы (стр. 77). */
+const panelGroupRange = computed(() => (panelScheme.value ? m.groupRange(panelScheme.value.groupId) : { min: null, max: null }))
+/** Копирование идентификатора (ТФ-20): кнопка `CopyableId` — уведомление «Скопировано». */
+function onIdClick(e: MouseEvent) {
+  if ((e.target as Element | null)?.closest('button')) m.notify('Скопировано')
+}
+/** Пара и шкала схемы — `setPrice`, `setScale` модели по пути схемы; правки сразу в черновик (стр. 53). */
+function setSchemePrice(patch: Partial<Price>) {
+  const path = panelScheme.value && m.schemePath(panelScheme.value.id)
+  if (path) m.setPrice(`${path}.price`, patch)
+}
+function setSchemeScale(patch: { steps?: RegressStep[], form?: ScaleForm }) {
+  const path = panelScheme.value && m.schemePath(panelScheme.value.id)
+  if (path) m.setScale(`${path}.scale`, patch)
+}
+function schemeStepRemoved(previous: RegressStep[]) {
+  const path = panelScheme.value && m.schemePath(panelScheme.value.id)
+  if (path) m.stepRemoved(`${path}.scale`, previous)
+}
+/** «Процессы» (№ 41): только повторяемые — синглы своей цены не имеют (§1, §6). */
+const panelProcesses = computed(() => (panelScheme.value ? m.repeatableOf(panelScheme.value.id) : []))
+function setProcessPrice(processId: string, patch: Partial<Price>) {
+  const path = panelScheme.value && m.processPath(panelScheme.value.id, processId)
+  if (path) m.setPrice(path, patch)
+}
+/**
+ * Подпись цен типов в схеме — по алгоритму VA-11467: цена типа заменяет цену уровня выше (ждут людей, п. 1; строка 13
+ * реестра, решение оркестратора 4 промпта такта 81). Макет `30959:25654`: «Дополнительно к базовой цене».
+ */
+const TYPES_REPLACE = 'Заменяет цену схемы для осмотров с этим типом'
+/** Глобальные цены типов (№ 42): только чтение; «Шкала» — у типа включена регресс-шкала. */
+const panelGlobalTypes = computed(() => m.view.value.objectTypes.map(t => ({
+  id: t.typeId,
+  name: m.typeOf(t.typeId)?.name ?? t.typeId,
+  scale: t.scale.on,
+  range: m.globalTypeRange(t.typeId),
+})))
+/** Индивидуальные цены типов схемы (№ 43): пара у каждого, шкалы нет (ждут людей, п. 9; строка 17). */
+const panelSchemeTypes = computed(() => (panelScheme.value?.types ?? []).map(t => ({
+  id: t.typeId,
+  name: m.typeOf(t.typeId)?.name ?? t.typeId,
+  price: t.price,
+})))
+function setSchemeTypePrice(typeId: string, patch: Partial<Price>) {
+  const path = panelScheme.value && m.schemeTypePath(panelScheme.value.id, typeId)
+  if (path) m.setPrice(path, patch)
+}
+/** Выбор типа в панели схемы (№ 43 → № 24): тот же состав, что на вкладке «Типы объектов». */
+const schemePickerOpen = computed({
+  get: () => m.ui.schemePicker,
+  set: (v: boolean) => { m.ui.schemePicker = v },
+})
+const schemeTypeQuery = ref('')
+const activeSchemeType = ref(-1)
+const schemePickerList = computed(() => (panelScheme.value ? m.schemePickerTypes(panelScheme.value.id, schemeTypeQuery.value) : []))
+watch(schemePickerOpen, (v) => { if (v) { schemeTypeQuery.value = ''; activeSchemeType.value = -1 } })
+watch(schemeTypeQuery, () => { activeSchemeType.value = -1 })
+function pickSchemeType(id: string) {
+  if (panelScheme.value) m.addSchemeType(panelScheme.value.id, id)
+  schemePickerOpen.value = false
+}
+function onSchemePickerKeydown(e: KeyboardEvent) {
+  const n = schemePickerList.value.length
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault()
+    if (!n) return
+    activeSchemeType.value = e.key === 'ArrowDown' ? (activeSchemeType.value + 1) % n : (activeSchemeType.value - 1 + n) % n
+    nextTick(() => document.querySelector(`[data-scheme-type-option="${schemePickerList.value[activeSchemeType.value]?.id}"]`)?.scrollIntoView({ block: 'nearest' }))
+  }
+  else if (e.key === 'Enter' && activeSchemeType.value >= 0 && schemePickerList.value[activeSchemeType.value]) {
+    e.preventDefault()
+    pickSchemeType(schemePickerList.value[activeSchemeType.value]!.id)
+  }
 }
 
 if (import.meta.client) {
@@ -634,7 +733,7 @@ if (import.meta.client) {
                     </div>
                   </div>
                   <PriceRange label="Вилка цен" :min="x.range.min" :max="x.range.max" class="shrink-0" data-scheme-range />
-                  <IconButton variant="ghost" :label="`Настроить схему: ${x.name}`" data-act="scheme-settings" @click="openScheme">
+                  <IconButton variant="ghost" :label="`Настроить схему: ${x.name}`" data-act="scheme-settings" @click="m.openScheme(x.id)">
                     <Icon name="settings" :size="16" />
                   </IconButton>
                 </Card>
@@ -729,6 +828,234 @@ if (import.meta.client) {
               </Table>
               <Empty v-else title="В группе пока нет схем" data-group-schemes-empty />
             </section>
+          </ModalCardBody>
+        </ModalCardContent>
+      </ModalCard>
+
+      <!--
+        Панель схемы — Figma `30959:20090`, `30959:20839`, `30959:22398` («Ценообразование»), `30959:25013`, `30959:24395`
+        («Типы объектов»), `31556:10935`: сайд 642, шапка — имя группы, правки сразу в черновик (стр. 53), подвала нет.
+      -->
+      <ModalCard v-model:open="schemeOpen">
+        <ModalCardContent placement="edge" data-side="scheme">
+          <ModalCardHeader :title="panelSchemeGroup?.name ?? ''" />
+          <ModalCardBody v-if="panelScheme" class="flex flex-col gap-6">
+            <!-- Имя схемы и идентификатор с копированием — Figma `30959:23011`; идентификатор вымышленный (scope, п. 8). -->
+            <div class="flex flex-col gap-1" data-panel-name>
+              <Heading level="page">
+                {{ panelScheme.name }}
+              </Heading>
+              <div class="flex">
+                <CopyableId :value="panelScheme.code" data-scheme-code @click="onIdClick" />
+              </div>
+            </div>
+
+            <!-- Вкладки панели — Figma `32021:3950`: «Ценообразование», «Типы объектов». -->
+            <Tabs v-model="panelTab">
+              <TabsList>
+                <TabsTrigger value="pricing" data-panel-tab="pricing">
+                  Ценообразование
+                </TabsTrigger>
+                <TabsTrigger value="types" data-panel-tab="types">
+                  Типы объектов
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="pricing">
+                <div class="flex flex-col gap-8 pt-6" data-panel-pricing>
+                  <!-- Режимы — Figma `30959:23023`: названия по §11 (стр. 06); тело выбранного — в рамке карточки (стр. 36). -->
+                  <RadioGroup v-model="schemeMode" class="flex flex-col gap-2" data-field="scheme-mode">
+                    <RadioGroupItem value="group" variant="card" :checked="schemeMode === 'group'" data-scheme-mode="group">
+                      По группе
+                      <template #description>
+                        Наследует цену из общих настроек группы или компании:
+                        <PriceRange size="sm" layout="dash" :min="panelGroupRange.min" :max="panelGroupRange.max" data-scheme-group-range />
+                      </template>
+                    </RadioGroupItem>
+                    <RadioGroupItem value="individual" variant="card" :checked="schemeMode === 'individual'" data-scheme-mode="individual">
+                      Индивидуальная цена
+                      <template #description>
+                        Фиксированная цена только для этой схемы
+                      </template>
+                      <template #panel>
+                        <PricePair
+                          stretch
+                          :client="panelScheme.price.client"
+                          :non-client="panelScheme.price.nonClient"
+                          :linked="panelScheme.price.linked"
+                          data-field="scheme-price"
+                          @update:client="v => setSchemePrice({ client: v })"
+                          @update:non-client="v => setSchemePrice({ nonClient: v })"
+                          @update:linked="v => setSchemePrice({ linked: v })"
+                        />
+                      </template>
+                    </RadioGroupItem>
+                    <RadioGroupItem value="scale" variant="card" :checked="schemeMode === 'scale'" data-scheme-mode="scale">
+                      Регресс-шкала
+                      <template #description>
+                        Цена снижается при росте объёма осмотров
+                      </template>
+                      <template #panel>
+                        <RegressScale
+                          label=""
+                          :steps="panelScheme.scale.steps"
+                          :form="panelScheme.scale.form"
+                          data-field="scheme-scale"
+                          @update:steps="v => setSchemeScale({ steps: v })"
+                          @update:form="v => setSchemeScale({ form: v })"
+                          @remove-step="e => schemeStepRemoved(e.previous)"
+                        />
+                      </template>
+                    </RadioGroupItem>
+                  </RadioGroup>
+
+                  <!--
+                    «Процессы» — Figma `31099:5331`: цены повторяемых процессов в панели схемы (ждут людей, п. 4; строка 16),
+                    итог осмотра — больше из цены осмотра и суммы процессов (ждут людей, п. 2; строка 14).
+                  -->
+                  <section class="flex flex-col gap-4" data-scheme-processes data-awaiting="2 4">
+                    <Heading level="group" description="Цены повторяемых процессов. В итог осмотра идёт большее из цены осмотра и суммы цен процессов">
+                      Процессы
+                    </Heading>
+                    <div v-if="panelProcesses.length" class="flex flex-col gap-1">
+                      <Card v-for="p in panelProcesses" :key="p.id" tone="muted" size="sm" class="flex flex-col gap-3" :data-process="p.id">
+                        <Heading data-process-name>
+                          {{ p.name }}
+                        </Heading>
+                        <PricePair
+                          stretch
+                          variant="elevated"
+                          :client="p.price.client"
+                          :non-client="p.price.nonClient"
+                          :linked="p.price.linked"
+                          data-field="process-price"
+                          @update:client="v => setProcessPrice(p.id, { client: v })"
+                          @update:non-client="v => setProcessPrice(p.id, { nonClient: v })"
+                          @update:linked="v => setProcessPrice(p.id, { linked: v })"
+                        />
+                      </Card>
+                    </div>
+                    <Empty
+                      v-else
+                      title="В схеме нет повторяемых процессов"
+                      description="Цену получают только повторяемые процессы — стоимость остальных входит в цену осмотра"
+                      data-processes-empty
+                    />
+                  </section>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="types">
+                <!-- Глобальные цены — Figma `30959:25631`: полоса с «Настроить индивидуально», список только для чтения. -->
+                <div v-if="!panelScheme.individualTypes" class="flex flex-col gap-4 pt-6" data-scheme-types="global">
+                  <Callout tone="neutral" title="Цены из раздела «Типы объектов»" data-awaiting="1">
+                    <p>{{ TYPES_REPLACE }}</p>
+                    <template #actions>
+                      <ButtonAction data-act="customize-types" @click="m.customizeTypes(panelScheme.id)">
+                        <template #icon>
+                          <Icon name="settings" :size="16" />
+                        </template>
+                        Настроить индивидуально
+                      </ButtonAction>
+                    </template>
+                  </Callout>
+                  <Table v-if="panelGlobalTypes.length">
+                    <TableRow v-for="t in panelGlobalTypes" :key="t.id" :data-global-type="t.id">
+                      <TableCell class="min-w-0 flex-1 pl-6" data-global-type-name>
+                        {{ t.name }}
+                      </TableCell>
+                      <TableCell variant="slot">
+                        <Badge v-if="t.scale" appearance="outline" data-global-type-scale>
+                          Шкала
+                        </Badge>
+                      </TableCell>
+                      <TableCell variant="slot" class="justify-end">
+                        <PriceRange layout="dash" :min="t.range.min" :max="t.range.max" data-global-type-range />
+                      </TableCell>
+                    </TableRow>
+                  </Table>
+                  <Empty
+                    v-else
+                    title="Типов объектов пока нет"
+                    description="Глобальные цены типов задаются на вкладке «Типы объектов»"
+                    data-global-types-empty
+                  />
+                </div>
+
+                <!-- Индивидуальные цены — Figma `30959:25692`: полоса предупреждения с «Сбросить к глобальным», плитки с парой цен. -->
+                <div v-else class="flex flex-col gap-4 pt-6" data-scheme-types="individual">
+                  <Callout tone="warning" title="Индивидуальные цены для этой схемы" data-awaiting="1 9">
+                    <p>{{ TYPES_REPLACE }}</p>
+                    <template #actions>
+                      <ButtonAction data-act="reset-types" @click="m.resetTypes(panelScheme.id)">
+                        <template #icon>
+                          <Icon name="refresh" :size="16" />
+                        </template>
+                        Сбросить к глобальным
+                      </ButtonAction>
+                    </template>
+                  </Callout>
+                  <Popover v-model:open="schemePickerOpen">
+                    <div class="flex">
+                      <PopoverTrigger as-child>
+                        <ButtonAction data-act="add-scheme-type">
+                          <template #icon>
+                            <Icon name="add" :size="16" />
+                          </template>
+                          Добавить тип объекта
+                        </ButtonAction>
+                      </PopoverTrigger>
+                    </div>
+                    <PopoverContent as-child align="start" :side-offset="4" :width="320">
+                      <SelectContent data-scheme-type-picker @keydown="onSchemePickerKeydown">
+                        <template #search>
+                          <Input v-model="schemeTypeQuery" placeholder="Поиск типа объекта" clearable data-field="scheme-type-search" />
+                        </template>
+                        <SelectItem
+                          v-for="(t, k) in schemePickerList"
+                          :key="t.id"
+                          :selected="k === activeSchemeType"
+                          :data-scheme-type-option="t.id"
+                          @click="pickSchemeType(t.id)"
+                        >
+                          {{ t.name }}
+                        </SelectItem>
+                        <Empty
+                          v-if="!schemePickerList.length"
+                          :title="schemeTypeQuery.trim() ? 'Ничего не найдено' : 'Все типы справочника добавлены'"
+                          class="px-4 py-6"
+                          data-scheme-type-picker-empty
+                        />
+                      </SelectContent>
+                    </PopoverContent>
+                  </Popover>
+                  <div v-if="panelSchemeTypes.length" class="flex flex-col gap-1">
+                    <Card v-for="t in panelSchemeTypes" :key="t.id" tone="muted" size="sm" class="flex flex-col gap-3" :data-scheme-type="t.id">
+                      <Heading data-scheme-type-name>
+                        {{ t.name }}
+                      </Heading>
+                      <PricePair
+                        stretch
+                        variant="elevated"
+                        :client="t.price.client"
+                        :non-client="t.price.nonClient"
+                        :linked="t.price.linked"
+                        data-field="scheme-type-price"
+                        @update:client="v => setSchemeTypePrice(t.id, { client: v })"
+                        @update:non-client="v => setSchemeTypePrice(t.id, { nonClient: v })"
+                        @update:linked="v => setSchemeTypePrice(t.id, { linked: v })"
+                      />
+                    </Card>
+                  </div>
+                  <Empty
+                    v-else
+                    title="Индивидуальных цен типов пока нет"
+                    description="Добавьте тип из справочника компании, чтобы задать ему цену в этой схеме"
+                    data-scheme-types-empty
+                  />
+                </div>
+              </TabsContent>
+            </Tabs>
           </ModalCardBody>
         </ModalCardContent>
       </ModalCard>

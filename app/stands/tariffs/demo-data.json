@@ -89,7 +89,11 @@
         "flags": [], "mode": "group",
         "price": { "client": null, "nonClient": null, "linked": true },
         "scale": { "on": false, "form": "single", "steps": [{ "from": 1, "to": null, "price": { "client": null, "nonClient": null, "linked": true } }] },
-        "processes": [], "individualTypes": false, "types": []
+        "processes": [
+          { "id": "pr-body", "name": "Осмотр кузова", "repeatable": false, "price": { "client": null, "nonClient": null, "linked": true } },
+          { "id": "pr-damage", "name": "Повреждение", "repeatable": true, "price": { "client": 200, "nonClient": 250, "linked": false } },
+          { "id": "pr-wheel", "name": "Колесо", "repeatable": true, "price": { "client": null, "nonClient": null, "linked": true } }
+        ], "individualTypes": false, "types": []
       },
       {
         "id": "s-moto", "groupId": "g-kasko", "name": "Осмотр мотоцикла", "code": "100102",
@@ -131,7 +135,7 @@
         "flags": ["multi"], "mode": "group",
         "price": { "client": null, "nonClient": null, "linked": true },
         "scale": { "on": false, "form": "single", "steps": [{ "from": 1, "to": null, "price": { "client": null, "nonClient": null, "linked": true } }] },
-        "processes": [{ "id": "pr-room", "name": "Комната", "price": { "client": 300, "nonClient": 350, "linked": false } }],
+        "processes": [{ "id": "pr-room", "name": "Комната", "repeatable": true, "price": { "client": 300, "nonClient": 350, "linked": false } }],
         "individualTypes": true,
         "types": [{ "typeId": "t-flat", "price": { "client": 700, "nonClient": 700, "linked": true } }]
       },
@@ -140,7 +144,7 @@
         "flags": ["nested"], "mode": "individual",
         "price": { "client": 1500, "nonClient": 1500, "linked": true },
         "scale": { "on": false, "form": "single", "steps": [{ "from": 1, "to": null, "price": { "client": null, "nonClient": null, "linked": true } }] },
-        "processes": [{ "id": "pr-building", "name": "Постройка на участке", "price": { "client": 500, "nonClient": 500, "linked": true } }],
+        "processes": [{ "id": "pr-building", "name": "Постройка на участке", "repeatable": true, "price": { "client": 500, "nonClient": 500, "linked": true } }],
         "individualTypes": false, "types": []
       }
     ]

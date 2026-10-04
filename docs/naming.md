@@ -651,6 +651,31 @@ License), 800×600, 4:3 — кроп на стороне Unsplash; файлы и
 | **`disabled` сильнее `readonly`** | выключенное поле не получает вид «только чтения» |
 | **Текст значения внутри кнопки мышью не выделяется** — у `Select` в «только чтении» корень — блок `role="combobox"` | строка 110 раздела 11 |
 
+### Такт 81: страница «Тарификация», П5 — панель схемы
+
+Итог — `tariffs.md`, раздел 17. Новых компонентов, осей и токенов нет: панель схемы — композиция из кита по образцу панели
+группы такта 80. Исправление переданного составного `Toast` — с метками правила 23б: раздел «Изменения после передачи» в
+`ui/toast/index.ts`, «Исправлено» в черновике `CHANGELOG.md`, «Передано фронтам» в `chat-protocol.md`; пример — `/kit-changes`.
+
+| Правило | Почему |
+|---|---|
+| **Панель сущности с вкладками — `ModalCard` edge с `Tabs` line в теле**: шапка — родитель сущности (группа), имя — `Heading level="page"`, идентификатор — `CopyableId` под именем; вкладки панели — свои, вкладка страницы не меняется | Figma `30959:20090`, `32021:3950`; строка 37 реестра покрытия `tariffs.md` |
+| **Наследование в описании режима — с вилкой источника**: «Наследует цену из общих настроек группы или компании: X–Y ₽» — `PriceRange size="sm" layout="dash"`, как у группы | строка 84 реестра; прецедент — строка 77 |
+| **Список цен для правки на тоне — плитки `Card tone="muted" size="sm"`** с `Heading` 17/24 и `PricePair stretch variant="elevated"`; список для чтения — `Table` (строка 74) | строки 85, 88 реестра |
+| **Режим «глобальные / индивидуальные» — полоса `Callout` с действием в слоте `actions`**: `neutral` — чужие значения только для чтения и «Настроить индивидуально», `warning` — свои значения и «Сбросить к глобальным» с «Отменить» | Figma `30959:25648`, `30959:25709`; строка 87 реестра |
+| **Пометка «Ждут людей» на странице — атрибут `data-awaiting="N …"`** с номерами пунктов журнала; глазом не видна, список — реестр расхождений | решение оркестратора 4 промпта такта 81; строка 91 реестра |
+| **Уведомление с действием поверх модального слоя нажимается** — область `Toaster` принимает нажатия при открытом окне; отдельной обвязки страница не ставит | строка 92 реестра; ловушка такта 81 в `handoff.md` |
+| **Якоря прогона П5** — `data-side="scheme"`, `data-panel-name`, `data-scheme-code`, `data-panel-tab` (`pricing`, `types`), `data-panel-pricing`, `data-field` (`scheme-mode`, `scheme-price`, `scheme-scale`, `process-price`, `scheme-type-price`, `scheme-type-search`), `data-scheme-mode`, `data-scheme-group-range`, `data-scheme-processes`, `data-process`, `data-process-name`, `data-processes-empty`, `data-scheme-types` (`global`, `individual`), `data-global-type`, `data-global-type-name`, `data-global-type-scale`, `data-global-type-range`, `data-global-types-empty`, `data-scheme-type`, `data-scheme-type-name`, `data-scheme-types-empty`, `data-scheme-type-picker`, `data-scheme-type-option`, `data-scheme-type-picker-empty`, `data-act` (`customize-types`, `reset-types`, `add-scheme-type`), `data-awaiting` | адаптер прогона ищет элементы по ним; `data-slot` ставят компоненты |
+
+**Оснастка приёмки `/tariffs` — такт 81:**
+
+| Параметр | Значения | С такта | Что показывает |
+|---|---|---|---|
+| `?open=` | `scheme` | 81 | открыта панель схемы; без `?tab=` — вкладка «Схемы осмотра» |
+| `?scheme=` | id схемы: `s-car`, `s-moto`, `s-pre`, `s-vehicle`, `s-trailer`, `s-flat`, `s-house` | 81 | какая схема открыта при `?open=scheme`; без параметра — первая |
+| `?panel=` | `pricing` · `types` | 81 | вкладка панели схемы |
+| `?mode=` | `group` · `individual` · `scale` | 81 | режим открытой схемы во всех периодах — как данные, правка не пишется; у группы — значения такта 80 |
+
 ### Такт 80: страница «Тарификация», П4 — схемы осмотра и панель группы
 
 Итог — `tariffs.md`, раздел 16. `PriceRange` — по воротам оркестратора 2026-10-04 (карточка 4, `tariffs.md`, раздел 8); оси —

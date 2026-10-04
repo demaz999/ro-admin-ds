@@ -49,6 +49,11 @@ const draftPrice = ref('50000')
 /* Слот panel у RadioGroupItem — такт 80. */
 const draftMode = ref('fixed')
 const draftPair = ref({ client: 900 as number | null, nonClient: 1100 as number | null, linked: false })
+/** Такт 81: уведомление с «Отменить» поверх модального окна. */
+const toastModalOpen = ref(false)
+const toastList = ref<number[]>([])
+let toastSeq = 0
+const toastUndone = ref(0)
 /** Такт 72: пример закрываемой плашки — закрытие помнит страница. */
 const calloutClosed = ref(false)
 /* Ось readonly — такт 68: обычное, только чтение, выключено рядом. */
@@ -298,6 +303,25 @@ const ro = ref({ name: 'КАСКО — осмотр', text: 'Осмотр авт
               Выключен без причины
             </Checkbox>
             <span class="text-xs text-muted-foreground">disabled с reason: флажок и подпись на 0.48, причина полным контрастом; без reason — прежний</span>
+          </template>
+          <template v-else-if="c.id === 'toast-over-modal'">
+            <Button variant="outline" size="sm" class="self-start" data-kc="toast-modal-open" @click="toastModalOpen = true">
+              Открыть окно
+            </Button>
+            <ModalCard v-model:open="toastModalOpen">
+              <ModalCardContent placement="center" size="sm">
+                <ModalCardHeader title="Окно поверх страницы" />
+                <ModalCardBody>
+                  <ModalCardText>Покажите уведомление и нажмите «Отменить» — окно остаётся открытым. Отменено: {{ toastUndone }}</ModalCardText>
+                </ModalCardBody>
+                <ModalCardFooter>
+                  <Button data-kc="toast-modal-show" @click="toastList.push(++toastSeq)">
+                    Показать уведомление
+                  </Button>
+                </ModalCardFooter>
+              </ModalCardContent>
+            </ModalCard>
+            <span class="text-xs text-muted-foreground">модальное окно открыто — действие уведомления нажимается; раньше нажатие не доходило</span>
           </template>
           <template v-else-if="c.id === 'input-box-focus'">
             <Input v-model="inputBox" placeholder="Продающее название" :show-icon="false" />
@@ -761,5 +785,24 @@ const ro = ref({ name: 'КАСКО — осмотр', text: 'Осмотр авт
         </div>
       </div>
     </section>
+
+    <!-- Такт 81: уведомления примера «Toast поверх модального окна». -->
+    <Toaster>
+      <Toast
+        v-for="n in toastList"
+        :key="n"
+        :open="true"
+        :duration="6000"
+        show-action
+        data-kc="toast-modal-toast"
+        @update:open="toastList = toastList.filter(x => x !== n)"
+        @action="toastUndone++; toastList = toastList.filter(x => x !== n)"
+      >
+        Тип удалён
+        <template #action>
+          Отменить
+        </template>
+      </Toast>
+    </Toaster>
   </main>
 </template>

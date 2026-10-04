@@ -43,6 +43,17 @@ import { chainSteps, stepErrors } from '~/components/ui/regress-scale/rules'
  * `setScale` по пути `groups.<номер>`, номер — `groupPath`. Правки панели пишутся сразу (автосохранение §8, стр. 53).
  * Оснастка `?open=group`, `?group=<id>`, `?mode=company|fixed|scale` — режим открытой группы как данные. Сценарии
  * ТФ-17–ТФ-19, ТФ-24 (группа).
+ *
+ * ## Что добавлено в П5 — такт 81
+ *
+ * Панель схемы (уровни 4а, 4б и повторяемые процессы, §3, §6, §11): открыть — `openScheme`, вкладка панели —
+ * `setPanelTab`; режим схемы — `setSchemeMode` («По группе» · «Индивидуальная цена» · «Регресс-шкала»; шкала схемы
+ * включена ровно в режиме шкалы); пара, шкала, цены процессов и типов схемы — `setPrice`, `setScale` по пути
+ * `schemes.<номер>`, номер — `schemePath`. Типы объектов в схеме: глобальные цены только для чтения —
+ * `globalTypeRange`; «Настроить индивидуально» — `customizeTypes` (копия глобальных цен); «Сбросить к глобальным» —
+ * `resetTypes` с «Отменить» (стр. 52); добавление типа — `schemePickerTypes`, `addSchemeType`. Шкалы у типов в схеме
+ * нет (ждут людей, п. 9, стр. 17). Оснастка `?open=scheme`, `?scheme=<id>`, `?panel=pricing|types`,
+ * `?mode=group|individual|scale` — режим открытой схемы как данные. Сценарии ТФ-20–ТФ-23, ТФ-24 (схема).
  */
 
 /* ------------------------------ данные ------------------------------ */
@@ -65,8 +76,11 @@ export interface GroupSettings { id: string, name: string, mode: GroupMode, pric
 export type SchemeMode = 'group' | 'individual' | 'scale'
 /** Признаки схемы для меток строки — 6.6. */
 export type SchemeFlag = 'new' | 'outdated' | 'multi' | 'nested'
-/** Повторяемый процесс — §6: цена у каждого, шкалы нет. */
-export interface ProcessRate { id: string, name: string, price: Price }
+/**
+ * Процесс схемы — §1, §6: цена только у повторяемого (`repeatable`), шкалы нет; синглы своей цены не имеют — их стоимость
+ * входит в цену осмотра, в блок «Процессы» они не выводятся (такт 81).
+ */
+export interface ProcessRate { id: string, name: string, repeatable: boolean, price: Price }
 /** Уровень 4б — цена типа объекта в схеме: заменяет глобальную цену уровня 2 (§3). */
 export interface SchemeTypeRate { typeId: string, price: Price }
 export interface SchemeSettings {
@@ -150,8 +164,15 @@ export interface ModelOptions {
   expand?: string[]
   /** Открытая панель группы при загрузке — оснастка `?open=group&group=<id>` (такт 80); без `group` — первая группа. */
   group?: string
-  /** Режим открытой группы при загрузке — оснастка `?mode=` (такт 80): во всех периодах, как данные — правка не пишется. */
-  mode?: GroupMode
+  /**
+   * Режим открытой панели при загрузке — оснастка `?mode=`: у группы `company` · `fixed` · `scale` (такт 80), у схемы
+   * `group` · `individual` · `scale` (такт 81); во всех периодах, как данные — правка не пишется.
+   */
+  mode?: GroupMode | SchemeMode
+  /** Открытая панель схемы при загрузке — оснастка `?open=scheme&scheme=<id>` (такт 81); без `scheme` — первая схема. */
+  scheme?: string
+  /** Вкладка панели схемы при загрузке — оснастка `?panel=pricing|types` (такт 81). */
+  panel?: 'pricing' | 'types'
 }
 
 /** Сколько длится запись черновика на стенде. */
@@ -229,7 +250,12 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   if (opts.scale) base.base.scale.on = true
   /* Оснастка `?mode=` (такт 80): режим открытой группы — как данные; шкала группы включена ровно в режиме шкалы. */
   const groupAtLoad = opts.open === 'group' ? (base.groups.find(g => g.id === opts.group) ?? base.groups[0]) : undefined
-  if (groupAtLoad && opts.mode) { groupAtLoad.mode = opts.mode; groupAtLoad.scale.on = opts.mode === 'scale' }
+  const GROUP_MODES: string[] = ['company', 'fixed', 'scale']
+  const SCHEME_MODES: string[] = ['group', 'individual', 'scale']
+  if (groupAtLoad && opts.mode && GROUP_MODES.includes(opts.mode)) { groupAtLoad.mode = opts.mode as GroupMode; groupAtLoad.scale.on = opts.mode === 'scale' }
+  /* Оснастка такта 81: панель схемы и режим открытой схемы — как данные. */
+  const schemeAtLoad = opts.open === 'scheme' ? (base.schemes.find(x => x.id === opts.scheme) ?? base.schemes[0]) : undefined
+  if (schemeAtLoad && opts.mode && SCHEME_MODES.includes(opts.mode)) { schemeAtLoad.mode = opts.mode as SchemeMode; schemeAtLoad.scale.on = opts.mode === 'scale' }
   const fromOf = (f: FromSpec) => 'ahead' in f ? addMonths(now, f.ahead) : ym(parseYm(now).y + f.year, f.month)
   const periods = reactive<Period[]>(data.periods.map((p) => {
     const settings = clone(base)
@@ -304,7 +330,11 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     /** Открытая поверхность — порции П2–П6.2: подсказка (`help`, такт 78), список периодов, окна, панели (6.9, `?open=`). */
     open: (opts.open ?? '') as string,
     /** Открытая панель группы или схемы — порции П4, П5. */
-    panel: (groupAtLoad ? { kind: 'group', id: groupAtLoad.id, tab: 'pricing' } : null) as null | { kind: 'group' | 'scheme', id: string, tab: 'pricing' | 'types' },
+    panel: (groupAtLoad
+      ? { kind: 'group', id: groupAtLoad.id, tab: 'pricing' }
+      : schemeAtLoad ? { kind: 'scheme', id: schemeAtLoad.id, tab: opts.panel === 'types' ? 'types' : 'pricing' } : null) as null | { kind: 'group' | 'scheme', id: string, tab: 'pricing' | 'types' },
+    /** Выбор типа в панели схемы открыт — такт 81 (№ 43 → № 24). */
+    schemePicker: false,
     /** Раскрытые строки типов — порция П3 (такт 79), оснастка `?expand=`. */
     expanded: [...(opts.expand ?? [])] as string[],
   })
@@ -523,6 +553,7 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   /** Закрыть панель — Esc, крестик, клик мимо (ТФ-24): правки панели уже записаны автосохранением. */
   function closePanel() {
     ui.panel = null
+    ui.schemePicker = false
     if (ui.open === 'group' || ui.open === 'scheme') ui.open = ''
   }
   /**
@@ -538,6 +569,110 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     next.mode = mode
     next.scale.on = mode === 'scale'
     return set(path, next)
+  }
+
+  /* ------------------------------ операции П5 — такт 81: панель схемы ------------------------------ */
+  /** Путь схемы в выбранном периоде — `schemes.<номер>`. */
+  function schemePath(id: string): string | null {
+    const k = view.value.schemes.findIndex(x => x.id === id)
+    return k < 0 ? null : `schemes.${k}`
+  }
+  /** Открыть панель схемы (№ 37): шестерёнка строки схемы; вкладка — «Ценообразование». */
+  function openScheme(id: string) {
+    if (!schemeOf(id)) return
+    ui.panel = { kind: 'scheme', id, tab: 'pricing' }
+    ui.schemePicker = false
+    ui.open = 'scheme'
+  }
+  /** Вкладка панели схемы (№ 37): «Ценообразование» · «Типы объектов». */
+  function setPanelTab(tab: 'pricing' | 'types') {
+    if (ui.panel?.kind === 'scheme') ui.panel = { ...ui.panel, tab }
+  }
+  /**
+   * Режим схемы (№ 38, §11; VA-14951): «По группе» · «Индивидуальная цена» · «Регресс-шкала». Шкала схемы включена ровно в
+   * режиме шкалы — режим сам исключает индивидуальную цену (§5). Пара и ступени не стираются (как у группы, стр. 78).
+   */
+  function setSchemeMode(id: string, mode: SchemeMode): boolean {
+    const path = schemePath(id)
+    const x = schemeOf(id)
+    if (!path || !x) return false
+    const next = clone(x)
+    next.mode = mode
+    next.scale.on = mode === 'scale'
+    return set(path, next)
+  }
+  /** Повторяемые процессы схемы с ценой (№ 41, §6): синглы своей цены не имеют и в блок не выводятся. */
+  const repeatableOf = (id: string) => (schemeOf(id)?.processes ?? []).filter(p => p.repeatable)
+  /** Путь цены процесса — `schemes.<номер>.processes.<номер>.price`. */
+  function processPath(id: string, processId: string): string | null {
+    const path = schemePath(id)
+    const k = schemeOf(id)?.processes.findIndex(p => p.id === processId) ?? -1
+    return path && k >= 0 ? `${path}.processes.${k}.price` : null
+  }
+  /** Путь цены типа в схеме — `schemes.<номер>.types.<номер>.price`. */
+  function schemeTypePath(id: string, typeId: string): string | null {
+    const path = schemePath(id)
+    const k = schemeOf(id)?.types.findIndex(t => t.typeId === typeId) ?? -1
+    return path && k >= 0 ? `${path}.types.${k}.price` : null
+  }
+  /**
+   * Глобальная цена типа (уровень 2) для списка «только для чтения» панели схемы (№ 42): при включённой шкале типа —
+   * мин–макс шкалы, иначе пара; цены нет — «—» (6.5).
+   */
+  function globalTypeRange(typeId: string): Range {
+    const t = view.value.objectTypes.find(x => x.typeId === typeId)
+    if (!t) return { min: null, max: null }
+    return bounds(t.scale.on ? scaleValues(t.scale) : pairValues(t.price))
+  }
+  /**
+   * «Настроить индивидуально» (№ 42 → № 43, §11): индивидуальные цены типов схемы — копия глобальных пар (уровень 2);
+   * шкалы у типов в схеме нет (ждут людей, п. 9, стр. 17). Метка строки схемы — «Индивидуальные типы» (6.6).
+   */
+  function customizeTypes(id: string): boolean {
+    const path = schemePath(id)
+    const x = schemeOf(id)
+    if (!path || !x || x.individualTypes) return false
+    const next = clone(x)
+    next.individualTypes = true
+    next.types = view.value.objectTypes.map(t => ({ typeId: t.typeId, price: clone(t.price) }))
+    return set(path, next)
+  }
+  /** «Сбросить к глобальным» (№ 43, 56): индивидуальные цены типов убраны; уведомление с «Отменить» возвращает их (стр. 52). */
+  function resetTypes(id: string): boolean {
+    const path = schemePath(id)
+    const x = schemeOf(id)
+    if (!path || !x || !x.individualTypes) return false
+    const before = { individualTypes: x.individualTypes, types: clone(x.types) }
+    const next = clone(x)
+    next.individualTypes = false
+    next.types = []
+    if (!set(path, next)) return false
+    ui.schemePicker = false
+    notify('Цены типов сброшены к глобальным', 'ok', () => {
+      const p = schemePath(id)
+      const cur = schemeOf(id)
+      if (!p || !cur || cur.individualTypes) return
+      set(p, { ...clone(cur), ...clone(before) })
+    })
+    return true
+  }
+  /** Выбор типа в панели схемы (№ 43 → № 24): справочник без типов схемы, поиск — как на вкладке «Типы объектов». */
+  function schemePickerTypes(id: string, query = ''): CatalogType[] {
+    const q = query.trim().toLowerCase()
+    const added = new Set((schemeOf(id)?.types ?? []).map(t => t.typeId))
+    return data.catalog.filter(t => !added.has(t.id) && (!q || t.name.toLowerCase().includes(q)))
+  }
+  /**
+   * Добавить тип в индивидуальные цены схемы (№ 43): в конец списка; цена — копия глобальной пары типа, если тип есть на
+   * вкладке «Типы объектов», иначе не задана, пара связана (стр. 51).
+   */
+  function addSchemeType(id: string, typeId: string): boolean {
+    const path = schemePath(id)
+    const x = schemeOf(id)
+    if (!path || !x || !x.individualTypes || !typeOf(typeId) || x.types.some(t => t.typeId === typeId)) return false
+    const global = view.value.objectTypes.find(t => t.typeId === typeId)
+    const price: Price = global ? clone(global.price) : { client: null, nonClient: null, linked: true }
+    return set(`${path}.types`, [...clone(x.types), { typeId, price }])
   }
 
   /* ------------------------------ вычисления для страницы ------------------------------ */
@@ -560,6 +695,8 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     typeOf, typePath, pickerTypes, addType, removeType, toggleExpand, setTypeScaleOn,
     companyRange, groupRange, schemeRange, schemesOf, schemesWord, groupBadges, schemeBadges, inheritingCount, groupPath, groupOf, schemeOf,
     openGroup, closePanel, setGroupMode,
+    schemePath, openScheme, setPanelTab, setSchemeMode, repeatableOf, processPath, schemeTypePath, globalTypeRange,
+    customizeTypes, resetTypes, schemePickerTypes, addSchemeType,
   }
 }
 

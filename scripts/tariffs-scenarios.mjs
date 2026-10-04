@@ -203,6 +203,24 @@ const Q = {
   groupStepTo: k => `document.querySelectorAll('[data-field=group-scale] [data-slot=regress-scale-step]')[${k}]?.querySelector('[data-slot=regress-scale-to] input')`,
   groupStepPrice: k => `document.querySelectorAll('[data-field=group-scale] [data-slot=regress-scale-step]')[${k}]?.querySelector('[data-slot=regress-scale-price] input')`,
   panelClose: `[...document.querySelectorAll('[data-side=group] [data-slot=modal-card-header] button')].find(b => b.getAttribute('aria-label') === 'Закрыть')`,
+  /* Такт 81, П5: панель схемы. */
+  schemeClose: `[...document.querySelectorAll('[data-side=scheme] [data-slot=modal-card-header] button')].find(b => b.getAttribute('aria-label') === 'Закрыть')`,
+  schemeCopy: `document.querySelector('[data-side=scheme] [data-slot=copyable-id] button')`,
+  panelTab: v => `document.querySelector('[data-side=scheme] [data-panel-tab=${v}]')`,
+  schemeMode: v => `document.querySelector('[data-side=scheme] [data-scheme-mode=${v}] [data-slot=choice-control]')`,
+  schemeClient: `document.querySelector('[data-field=scheme-price] [data-slot=price-pair-client] input')`,
+  schemeNonClient: `document.querySelector('[data-field=scheme-price] [data-slot=price-pair-non-client] input')`,
+  schemeLock: `document.querySelector('[data-field=scheme-price] [data-pair-lock]')`,
+  schemeStepTo: k => `document.querySelectorAll('[data-field=scheme-scale] [data-slot=regress-scale-step]')[${k}]?.querySelector('[data-slot=regress-scale-to] input')`,
+  schemeStepRemove: k => `document.querySelectorAll('[data-field=scheme-scale] [data-slot=regress-scale-step]')[${k}]?.querySelector('[data-step-remove]')`,
+  schemeStepPrice: k => `document.querySelectorAll('[data-field=scheme-scale] [data-slot=regress-scale-step]')[${k}]?.querySelector('[data-slot=regress-scale-price] input')`,
+  processClient: id => `document.querySelector('[data-process=${id}] [data-slot=price-pair-client] input')`,
+  processLock: id => `document.querySelector('[data-process=${id}] [data-pair-lock]')`,
+  customizeTypes: `document.querySelector('[data-act=customize-types]')`,
+  resetTypes: `document.querySelector('[data-act=reset-types]')`,
+  addSchemeType: `document.querySelector('[data-act=add-scheme-type]')`,
+  schemeTypeOption: id => `document.querySelector('[data-scheme-type-option=${id}]')`,
+  schemeTypeClient: id => `document.querySelector('[data-scheme-type=${id}] [data-slot=price-pair-client] input')`,
 }
 
 function kit(page) {
@@ -285,6 +303,11 @@ function kit(page) {
         const side = document.querySelector('[data-side=group]')
         const gpair = side?.querySelector('[data-field=group-price]')
         const gscale = side?.querySelector('[data-field=group-scale]')
+        const sside = document.querySelector('[data-side=scheme]')
+        const spair = sside?.querySelector('[data-field=scheme-price]')
+        const sscale = sside?.querySelector('[data-field=scheme-scale]')
+        const stypes = sside?.querySelector('[data-scheme-types]')
+        const spicker = document.querySelector('[data-scheme-type-picker]')
         const base = M.view.value.base
         /* Где фокус: поле пары, замок, часть ступени шкалы, кнопка подсказки. */
         const where = (() => {
@@ -431,6 +454,42 @@ function kit(page) {
           } : null,
           modelGroups: M.view.value.groups.map(g => [g.id, g.mode, g.price.client, g.price.nonClient, g.price.linked, g.scale.on, g.scale.steps.map(x => [x.from, x.to, x.price.client])]),
           focusGroup: document.activeElement?.closest('[data-group]')?.dataset.group ?? null,
+          /* Такт 81: панель схемы — шапка, вкладки, режимы с телом, процессы, типы объектов; строка открытой схемы на странице. */
+          schemePanel: sside ? {
+            title: t(sside.querySelector('[data-slot=modal-card-title]')?.textContent),
+            name: t(sside.querySelector('[data-panel-name] [data-slot=heading]')?.textContent),
+            code: t(sside.querySelector('[data-slot=copyable-id-value]')?.textContent),
+            tab: sside.querySelector('[data-panel-tab][data-state=active]')?.dataset.panelTab ?? null,
+            modes: sside.querySelector('[data-panel-pricing]') ? [...sside.querySelectorAll('[data-scheme-mode]')].map(x => ({
+              value: x.dataset.schemeMode,
+              checked: x.querySelector('[data-slot=choice-control]')?.getAttribute('data-state') === 'checked',
+              title: t(x.querySelector('[data-slot=choice-title]')?.textContent),
+              description: leaf(x.querySelector('[data-slot=choice-description]')),
+              body: x.querySelector('[data-slot=choice-panel]') ? (x.querySelector('[data-field=scheme-price]') ? 'pair' : x.querySelector('[data-field=scheme-scale]') ? 'scale' : 'other') : null,
+            })) : null,
+            pair: spair ? { client: val(pinput(spair, 'client')), nonClient: val(pinput(spair, 'non-client')), linked: spair.hasAttribute('data-linked') } : null,
+            steps: sscale ? stepsOf(sscale) : null,
+            processes: sside.querySelector('[data-scheme-processes]') ? [...sside.querySelectorAll('[data-process]')].map((p) => {
+              const pp = p.querySelector('[data-slot=price-pair]')
+              return t(p.querySelector('[data-process-name]')?.textContent) + ' | ' + val(pinput(pp, 'client')) + ' / ' + val(pinput(pp, 'non-client')) + (pp.hasAttribute('data-linked') ? ' | связано' : '')
+            }) : null,
+            processesEmpty: t(sside.querySelector('[data-processes-empty] [data-slot=empty-title]')?.textContent) || null,
+            types: stypes ? stypes.dataset.schemeTypes : null,
+            callout: stypes ? leaf(stypes.querySelector('[data-slot=callout]')) : null,
+            globalTypes: stypes && stypes.dataset.schemeTypes === 'global' ? [...stypes.querySelectorAll('[data-global-type]')].map(r => t(r.querySelector('[data-global-type-name]')?.textContent) + ' | ' + (t(r.querySelector('[data-global-type-scale]')?.textContent) || '—') + ' | ' + leaf(r.querySelector('[data-global-type-range]'))) : null,
+            globalControls: stypes ? stypes.querySelectorAll('[data-slot=table] :is(button, input, a, [tabindex])').length : null,
+            schemeTypes: stypes && stypes.dataset.schemeTypes === 'individual' ? [...stypes.querySelectorAll('[data-scheme-type]')].map((r) => {
+              const pp = r.querySelector('[data-slot=price-pair]')
+              return t(r.querySelector('[data-scheme-type-name]')?.textContent) + ' | ' + val(pinput(pp, 'client')) + ' / ' + val(pinput(pp, 'non-client')) + (pp.hasAttribute('data-linked') ? ' | связано' : '')
+            }) : null,
+            /* Шкалы у типов в схеме нет (ждут людей, п. 9): ни рубильника, ни ступеней во вкладке. */
+            typesScale: stypes ? stypes.querySelectorAll('[data-slot=regress-scale], [data-slot=switch], [role=switch]').length : null,
+            picker: spicker ? [...spicker.querySelectorAll('[data-scheme-type-option]')].map(o => t(o.textContent)) : null,
+          } : null,
+          schemeRow: sside && M.ui.panel ? (() => { const r = document.querySelector('[data-scheme=' + M.ui.panel.id + ']'); return r ? { badges: badgesOf(r.querySelector('[data-badges]')), range: leaf(r.querySelector('[data-scheme-range]')) } : null })() : null,
+          modelSchemes: M.view.value.schemes.map(x => [x.id, x.mode, x.price.client, x.price.nonClient, x.price.linked, x.scale.on, x.scale.steps.map(s => [s.from, s.to, s.price.client]),
+            x.individualTypes, x.types.map(y => [y.typeId, y.price.client, y.price.nonClient, y.price.linked]), x.processes.map(p => [p.id, p.repeatable, p.price.client, p.price.nonClient, p.price.linked])]),
+          focusScheme: document.activeElement?.closest('[data-scheme]')?.dataset.scheme ?? null,
           focus: where,
           notices,
         })
@@ -485,6 +544,41 @@ const PANEL_OSAGO = mode => ({
 const MG_KASKO = ['g-kasko', 'company', null, null, true, false, [[1, null, null]]]
 const MG_OSAGO = ['g-osago', 'fixed', 900, 1100, false, false, [[1, null, null]]]
 const MG_REALTY = ['g-realty', 'scale', null, null, true, true, [[1, 500, 1200], [501, null, 1000]]]
+
+/* Такт 81, П5: ожидания панели схемы по демо-данным (6.7). */
+const S_DESC = range => `Наследует цену из общих настроек группы или компании: ${range}`
+/** Режимы схемы: отмечен `checked`, у него тело `body` (`pair`, `scale`; у «По группе» тела нет). */
+const SMODES = (checked, body, range = '500–700 ₽') => [
+  { value: 'group', checked: checked === 'group', title: 'По группе', description: S_DESC(range), body: null },
+  { value: 'individual', checked: checked === 'individual', title: 'Индивидуальная цена', description: 'Фиксированная цена только для этой схемы', body: checked === 'individual' ? body : null },
+  { value: 'scale', checked: checked === 'scale', title: 'Регресс-шкала', description: 'Цена снижается при росте объёма осмотров', body: checked === 'scale' ? body : null },
+]
+const TYPES_REPLACE = 'Заменяет цену схемы для осмотров с этим типом'
+const NO_TYPES_TAB = { types: null, callout: null, globalTypes: null, globalControls: null, schemeTypes: null, typesScale: null, picker: null }
+const NO_PRICING_TAB = { modes: null, pair: null, steps: null, processes: null, processesEmpty: null }
+/** Процессы «Осмотра легкового автомобиля»: сингл «Осмотр кузова» в блок не выводится. */
+const PROC_CAR = ['Повреждение | 200 / 250', 'Колесо |  /  | связано']
+/** Панель «Осмотра легкового автомобиля» на «Ценообразовании» в режиме «По группе». */
+const SP_CAR = { title: 'КАСКО', name: 'Осмотр легкового автомобиля', code: '100101', tab: 'pricing', modes: SMODES('group', null), pair: null, steps: null, processes: PROC_CAR, processesEmpty: null, ...NO_TYPES_TAB }
+const GLOBAL_TYPES = ['Легковой автомобиль | — | 300 ₽', 'Спецтехника | Шкала | 700–1 000 ₽', 'Квартира | — | 600 ₽']
+const CALLOUT_GLOBAL = `Цены из раздела «Типы объектов» ${TYPES_REPLACE} Настроить индивидуально`
+const CALLOUT_INDIVIDUAL = `Индивидуальные цены для этой схемы ${TYPES_REPLACE} Сбросить к глобальным`
+/** Вкладка «Типы объектов» панели: глобальные цены только для чтения. */
+const TYPES_GLOBAL = { ...NO_PRICING_TAB, tab: 'types', types: 'global', callout: CALLOUT_GLOBAL, globalTypes: GLOBAL_TYPES, globalControls: 0, schemeTypes: null, typesScale: 0, picker: null }
+const TYPES_IND = list => ({ ...NO_PRICING_TAB, tab: 'types', types: 'individual', callout: CALLOUT_INDIVIDUAL, globalTypes: null, globalControls: 0, schemeTypes: list, typesScale: 0, picker: null })
+/** Модель схем по порядку данных: правки — объектом `{ id: запись }`. */
+const MS_START = {
+  's-car': ['s-car', 'group', null, null, true, false, [[1, null, null]], false, [], [['pr-body', false, null, null, true], ['pr-damage', true, 200, 250, false], ['pr-wheel', true, null, null, true]]],
+  's-moto': ['s-moto', 'individual', 450, 650, false, false, [[1, null, null]], false, [], []],
+  's-pre': ['s-pre', 'scale', null, null, true, true, [[1, 300, 700], [301, null, 600]], false, [], []],
+  's-vehicle': ['s-vehicle', 'group', null, null, true, false, [[1, null, null]], false, [], []],
+  's-trailer': ['s-trailer', 'group', null, null, true, false, [[1, null, null]], false, [], []],
+  's-flat': ['s-flat', 'group', null, null, true, false, [[1, null, null]], true, [['t-flat', 700, 700, true]], [['pr-room', true, 300, 350, false]]],
+  's-house': ['s-house', 'individual', 1500, 1500, true, false, [[1, null, null]], false, [], [['pr-building', true, 500, 500, true]]],
+}
+const MS = (patch = {}) => Object.keys(MS_START).map(id => patch[id] ?? MS_START[id])
+const CAR = (mode, client, nonClient, linked, on, steps, ind = false, types = [], proc = MS_START['s-car'][9]) => ['s-car', mode, client, nonClient, linked, on, steps, ind, types, proc]
+const ROW = (badges, range) => ({ badges: badges.map(([x, tone]) => B(x, tone)), range: `Вилка цен ${range}` })
 
 const SCENARIOS = {
   'ТФ-01': ['«Назад» ведёт к карточке компании; вход вне скоупа — уведомление-заглушка (§11 «Вход»; scope, «Вне скоупа»)', [
@@ -717,7 +811,8 @@ const SCENARIOS = {
   /* ------------------------------ П4 — такт 80: «Схемы осмотра» и панель группы ------------------------------ */
   'ТФ-17': ['вкладка «Схемы осмотра»: группы со схемами, метки по 6.6, вилки по 6.5, устаревшая приглушена, пустая группа (§11; стр. 25, 45, 46, 55, 56)', [
     ['старт — три группы, семь схем', null, { counts: { base: null, types: '3', schemes: '7' }, groups: SCHEMES_START }],
-    ['шестерёнка схемы — панель схемы в порции П5', K => K.click(Q.schemeSettings('s-car')), { notices: ['Панель схемы — порция П5'], panel: null, dirty: false }],
+    ['шестерёнка схемы — панель схемы (П5, такт 81)', K => K.click(Q.schemeSettings('s-car')), { notices: [], panel: null, schemePanel: SP_CAR, dirty: false }],
+    ['крестик панели — назад к списку', K => K.click(Q.schemeClose), { schemePanel: null, focus: 'scheme-settings', focusScheme: 's-car' }],
     ['набор `?data=empty` — группа «Недвижимость» без схем', K => K.start('tab=schemes&data=empty'), { counts: { base: null, types: '0', schemes: '5' }, groups: [
       SCHEMES_START[0], SCHEMES_START[1],
       { id: 'g-realty', name: 'Недвижимость', badges: ['0 схем | outline foreground-secondary', 'Регресс-шкала | outline primary'], range: G('1 000–1 200 ₽'), schemes: [], empty: 'В группе пока нет схем' }] }],
@@ -766,7 +861,7 @@ const SCENARIOS = {
       inheriting: '0 по группе', schemes: [], schemesEmpty: 'В группе пока нет схем', schemesControls: 0 } }],
     ['`?mode=fixed` — режим открытой группы как данные, правки нет', K => K.start('open=group&mode=fixed'), { dirty: false, writes: 0, panel: { ...PANEL_KASKO, modes: MODES('fixed', 'pair'), pair: { client: '', nonClient: '', linked: true }, schemes: ['Осмотр легкового автомобиля | —', 'Осмотр мотоцикла | 450–650 ₽', 'Предстраховой осмотр автомобиля | 600–900 ₽'] } }],
   ], { query: 'open=group' }],
-  'ТФ-24': ['панель группы: Esc и крестик закрывают, фокус на открывателе, правки панели остались (§8; стр. 53)', [
+  'ТФ-24': ['панели группы и схемы: Esc и крестик закрывают, фокус на открывателе, правки панели остались (§8; стр. 53)', [
     ['открыть панель ОСАГО', K => K.click(Q.groupSettings('g-osago')), { panel: PANEL_OSAGO('fixed') }],
     ['режим «Базовая цена компании» — пишется сразу', async (K) => { await K.click(Q.groupMode('company')); await K.settled() }, { dirty: true, saveLog: ['saving', 'saved'], panel: PANEL_OSAGO('company') }],
     ['Esc — панель закрыта, фокус на «Настроить группу» ОСАГО, вилка группы — компании', K => K.escape(), {
@@ -775,7 +870,89 @@ const SCENARIOS = {
       modelGroups: [MG_KASKO, ['g-osago', 'company', 900, 1100, false, false, [[1, null, null]]], MG_REALTY] }],
     ['открыть снова — режим сохранён', K => K.click(Q.groupSettings('g-osago')), { panel: PANEL_OSAGO('company') }],
     ['крестик — панель закрыта, фокус на открывателе', K => K.click(Q.panelClose), { panel: null, focus: 'group-settings', focusGroup: 'g-osago' }],
+    /* Такт 81: то же у панели схемы. */
+    ['шестерёнка «Осмотра мотоцикла» — панель схемы', K => K.click(Q.schemeSettings('s-moto')), { schemePanel: { ...SP_CAR, name: 'Осмотр мотоцикла', code: '100102', modes: SMODES('individual', 'pair'), pair: { client: '450', nonClient: '650', linked: false }, processes: [], processesEmpty: 'В схеме нет повторяемых процессов' } }],
+    ['режим «Регресс-шкала» — пишется сразу', async (K) => { await K.click(Q.schemeMode('scale')); await K.settled() }, { saveLog: ['saving', 'saved'], schemeRow: ROW([['Регресс-шкала', 'primary'], ['Новая', 'warning']], '—') }],
+    ['Esc — панель схемы закрыта, фокус на шестерёнке «Осмотра мотоцикла», метка строки — «Регресс-шкала»', K => K.escape(), {
+      schemePanel: null, focus: 'scheme-settings', focusScheme: 's-moto',
+      modelSchemes: MS({ 's-moto': ['s-moto', 'scale', 450, 650, false, true, [[1, null, null]], false, [], []] }) }],
+    ['открыть снова — режим сохранён', K => K.click(Q.schemeSettings('s-moto')), { schemePanel: { ...SP_CAR, name: 'Осмотр мотоцикла', code: '100102', modes: SMODES('scale', 'scale'), steps: [{ from: '1', to: '', price: '', error: null, removable: false }], processes: [], processesEmpty: 'В схеме нет повторяемых процессов' } }],
+    ['крестик — панель схемы закрыта, фокус на открывателе', K => K.click(Q.schemeClose), { schemePanel: null, focus: 'scheme-settings', focusScheme: 's-moto' }],
   ], { query: 'tab=schemes' }],
+
+  /* ------------------------------ П5 — такт 81: панель схемы ------------------------------ */
+  'ТФ-20': ['панель схемы: вход шестерёнкой строки; шапка — группа, имя, идентификатор с копированием, вкладки (§11; стр. 06)', [
+    ['шестерёнка «Осмотра легкового автомобиля»', K => K.click(Q.schemeSettings('s-car')), { schemePanel: SP_CAR, notices: [], dirty: false }],
+    ['копировать идентификатор — «Скопировано»', K => K.click(Q.schemeCopy), { notices: ['Скопировано'], schemePanel: SP_CAR, dirty: false }],
+    ['вкладка панели «Типы объектов»', K => K.click(Q.panelTab('types')), { schemePanel: { ...SP_CAR, ...TYPES_GLOBAL } }],
+    ['крестик, шестерёнка «Осмотра прицепа» ОСАГО — шапка другой группы, вкладка «Ценообразование»', async (K) => { await K.click(Q.schemeClose); await K.click(Q.schemeSettings('s-trailer')) }, {
+      schemePanel: { ...SP_CAR, title: 'ОСАГО', name: 'Осмотр прицепа', code: '100202', modes: SMODES('group', null, '900–1 100 ₽'), processes: [], processesEmpty: 'В схеме нет повторяемых процессов' } }],
+    ['`?open=scheme&scheme=s-flat&panel=types` — индивидуальные цены типов', K => K.start('open=scheme&scheme=s-flat&panel=types'), {
+      tab: 'schemes', schemePanel: { ...SP_CAR, title: 'Недвижимость', name: 'Осмотр квартиры', code: '100301', ...TYPES_IND(['Квартира | 700 / 700 | связано']) } }],
+  ], { query: 'tab=schemes' }],
+  'ТФ-21': ['режимы схемы «По группе» → «Индивидуальная цена» → «Регресс-шкала»: вилка и метка строки схемы следуют (§11, §3, §5; стр. 06, 36, 53, 56)', [
+    ['`?open=scheme` — «По группе», вилка группы', null, { tab: 'schemes', schemePanel: SP_CAR, schemeRow: ROW([['По группе', 'primary']], 'от 500 ₽ до 700 ₽'), dirty: false }],
+    ['«Индивидуальная цена» — тело с парой, вилка строки пустая', async (K) => { await K.click(Q.schemeMode('individual')); await K.settled() }, {
+      dirty: true, saveLog: ['saving', 'saved'], schemePanel: { ...SP_CAR, modes: SMODES('individual', 'pair'), pair: { client: '', nonClient: '', linked: true } },
+      schemeRow: ROW([['Индивид. цены', 'primary']], '—') }],
+    ['«Клиент» 900 — пара связана, одна цена', async (K) => { await K.fill(Q.schemeClient, '900'); await K.settled() }, {
+      schemePanel: { ...SP_CAR, modes: SMODES('individual', 'pair'), pair: { client: '900', nonClient: '900', linked: true } }, schemeRow: ROW([['Индивид. цены', 'primary']], '900 ₽') }],
+    ['развязать и «Не клиент» 1200 — вилка «от … до …»', async (K) => { await K.click(Q.schemeLock); await K.fill(Q.schemeNonClient, '1200'); await K.settled() }, {
+      schemePanel: { ...SP_CAR, modes: SMODES('individual', 'pair'), pair: { client: '900', nonClient: '1 200', linked: false } }, schemeRow: ROW([['Индивид. цены', 'primary']], 'от 900 ₽ до 1 200 ₽') }],
+    ['«Регресс-шкала» — тело со шкалой, метка «Регресс-шкала»', async (K) => { await K.click(Q.schemeMode('scale')); await K.settled() }, {
+      schemePanel: { ...SP_CAR, modes: SMODES('scale', 'scale'), steps: [{ from: '1', to: '', price: '', error: null, removable: false }] },
+      schemeRow: ROW([['Регресс-шкала', 'primary']], '—'), modelSchemes: MS({ 's-car': CAR('scale', 900, 1200, false, true, [[1, null, null]]) }) }],
+    ['ступени: цена 800, «До» 50, цена второй 600 — вилка мин–макс', async (K) => {
+      await K.fill(Q.schemeStepPrice(0), '800'); await K.settled()
+      await K.fill(Q.schemeStepTo(0), '50'); await K.settled()
+      await K.fill(Q.schemeStepPrice(1), '600'); await K.settled() }, {
+      schemePanel: { ...SP_CAR, modes: SMODES('scale', 'scale'), steps: [{ from: '1', to: '50', price: '800', error: null, removable: true }, { from: '51', to: '', price: '600', error: null, removable: true }] },
+      schemeRow: ROW([['Регресс-шкала', 'primary']], 'от 600 ₽ до 800 ₽') }],
+    ['удалить вторую ступень — уведомление с «Отменить», панель открыта', async (K) => { await K.click(Q.schemeStepRemove(1)); await K.settled() }, {
+      notices: ['Ступень удалена'], schemePanel: { ...SP_CAR, modes: SMODES('scale', 'scale'), steps: [{ from: '1', to: '', price: '800', error: null, removable: false }] },
+      schemeRow: ROW([['Регресс-шкала', 'primary']], '800 ₽') }],
+    ['«Отменить» поверх панели — ступени вернулись', async (K) => { await K.undo(); await K.settled() }, {
+      schemePanel: { ...SP_CAR, modes: SMODES('scale', 'scale'), steps: [{ from: '1', to: '50', price: '800', error: null, removable: true }, { from: '51', to: '', price: '600', error: null, removable: true }] },
+      schemeRow: ROW([['Регресс-шкала', 'primary']], 'от 600 ₽ до 800 ₽') }],
+    ['снова «По группе» — вилка группы; пара и ступени схемы сохранены', async (K) => { await K.click(Q.schemeMode('group')); await K.settled() }, {
+      schemePanel: SP_CAR, schemeRow: ROW([['По группе', 'primary']], 'от 500 ₽ до 700 ₽'),
+      modelSchemes: MS({ 's-car': CAR('group', 900, 1200, false, false, [[1, 50, 800], [51, null, 600]]) }) }],
+    ['`?mode=individual` — режим открытой схемы как данные, правки нет', K => K.start('open=scheme&mode=individual'), {
+      dirty: false, writes: 0, schemePanel: { ...SP_CAR, modes: SMODES('individual', 'pair'), pair: { client: '', nonClient: '', linked: true } } }],
+  ], { query: 'open=scheme' }],
+  'ТФ-22': ['«Процессы»: цены повторяемых процессов пишутся в модель; синглов в списке нет (§1, §6; ждут людей, п. 2 и 4 — стр. 14, 16)', [
+    ['`?open=scheme` — два повторяемых процесса, сингл «Осмотр кузова» не выводится', null, { schemePanel: SP_CAR, modelSchemes: MS() }],
+    ['«Колесо»: «Клиент» 150 — пара связана; вилка схемы не меняется', async (K) => { await K.fill(Q.processClient('pr-wheel'), '150'); await K.settled() }, {
+      dirty: true, saveLog: ['saving', 'saved'], schemePanel: { ...SP_CAR, processes: ['Повреждение | 200 / 250', 'Колесо | 150 / 150 | связано'] },
+      schemeRow: ROW([['По группе', 'primary']], 'от 500 ₽ до 700 ₽'),
+      modelSchemes: MS({ 's-car': CAR('group', null, null, true, false, [[1, null, null]], false, [], [['pr-body', false, null, null, true], ['pr-damage', true, 200, 250, false], ['pr-wheel', true, 150, 150, true]]) }) }],
+    ['«Повреждение»: связать — «Не клиент» принимает «Клиент»', async (K) => { await K.click(Q.processLock('pr-damage')); await K.settled() }, {
+      schemePanel: { ...SP_CAR, processes: ['Повреждение | 200 / 200 | связано', 'Колесо | 150 / 150 | связано'] },
+      modelSchemes: MS({ 's-car': CAR('group', null, null, true, false, [[1, null, null]], false, [], [['pr-body', false, null, null, true], ['pr-damage', true, 200, 200, true], ['pr-wheel', true, 150, 150, true]]) }) }],
+    ['схема без повторяемых процессов — пустое состояние', K => K.start('open=scheme&scheme=s-moto'), {
+      schemePanel: { ...SP_CAR, name: 'Осмотр мотоцикла', code: '100102', modes: SMODES('individual', 'pair'), pair: { client: '450', nonClient: '650', linked: false }, processes: [], processesEmpty: 'В схеме нет повторяемых процессов' } }],
+  ], { query: 'open=scheme' }],
+  'ТФ-23': ['«Типы объектов» панели: глобальные — только чтение; «Настроить индивидуально» — копия глобальных; «Сбросить к глобальным» с «Отменить»; шкалы нет (§3, §11; ждут людей, п. 1 и 9 — стр. 13, 17, 52)', [
+    ['`?open=scheme&panel=types` — глобальные цены только для чтения', null, { schemePanel: { ...SP_CAR, ...TYPES_GLOBAL }, schemeRow: ROW([['По группе', 'primary']], 'от 500 ₽ до 700 ₽') }],
+    ['«Настроить индивидуально» — копия глобальных пар, метка «Индивидуальные типы»', async (K) => { await K.click(Q.customizeTypes); await K.settled() }, {
+      dirty: true, saveLog: ['saving', 'saved'],
+      schemePanel: { ...SP_CAR, ...TYPES_IND(['Легковой автомобиль | 300 / 300 | связано', 'Спецтехника | 800 / 1 000', 'Квартира | 600 / 600 | связано']) },
+      schemeRow: ROW([['По группе', 'primary'], ['Индивидуальные типы', 'primary']], 'от 500 ₽ до 700 ₽') }],
+    ['«Квартира»: «Клиент» 650 — пишется в цены схемы', async (K) => { await K.fill(Q.schemeTypeClient('t-flat'), '650'); await K.settled() }, {
+      schemePanel: { ...SP_CAR, ...TYPES_IND(['Легковой автомобиль | 300 / 300 | связано', 'Спецтехника | 800 / 1 000', 'Квартира | 650 / 650 | связано']) } }],
+    ['«Добавить тип объекта» — справочник без типов схемы', K => K.click(Q.addSchemeType), {
+      schemePanel: { ...SP_CAR, ...TYPES_IND(['Легковой автомобиль | 300 / 300 | связано', 'Спецтехника | 800 / 1 000', 'Квартира | 650 / 650 | связано']), picker: TYPES_FREE } }],
+    ['выбрать «Мотоцикл» — в конец списка, цена не задана', async (K) => { await K.click(Q.schemeTypeOption('t-moto')); await K.settled() }, {
+      schemePanel: { ...SP_CAR, ...TYPES_IND(['Легковой автомобиль | 300 / 300 | связано', 'Спецтехника | 800 / 1 000', 'Квартира | 650 / 650 | связано', 'Мотоцикл |  /  | связано']) },
+      modelSchemes: MS({ 's-car': CAR('group', null, null, true, false, [[1, null, null]], true, [['t-car', 300, 300, true], ['t-special', 800, 1000, false], ['t-flat', 650, 650, true], ['t-moto', null, null, true]]) }) }],
+    ['«Сбросить к глобальным» — глобальные цены, уведомление с «Отменить»', async (K) => { await K.click(Q.resetTypes); await K.settled() }, {
+      notices: ['Цены типов сброшены к глобальным'], schemePanel: { ...SP_CAR, ...TYPES_GLOBAL }, schemeRow: ROW([['По группе', 'primary']], 'от 500 ₽ до 700 ₽'),
+      modelSchemes: MS() }],
+    ['«Отменить» — индивидуальные цены вернулись с правками', async (K) => { await K.undo(); await K.settled() }, {
+      schemePanel: { ...SP_CAR, ...TYPES_IND(['Легковой автомобиль | 300 / 300 | связано', 'Спецтехника | 800 / 1 000', 'Квартира | 650 / 650 | связано', 'Мотоцикл |  /  | связано']) },
+      schemeRow: ROW([['По группе', 'primary'], ['Индивидуальные типы', 'primary']], 'от 500 ₽ до 700 ₽'),
+      modelSchemes: MS({ 's-car': CAR('group', null, null, true, false, [[1, null, null]], true, [['t-car', 300, 300, true], ['t-special', 800, 1000, false], ['t-flat', 650, 650, true], ['t-moto', null, null, true]]) }) }],
+  ], { query: 'open=scheme&panel=types' }],
 }
 
 /* ------------------------------ прогон ------------------------------ */

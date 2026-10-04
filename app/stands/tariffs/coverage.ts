@@ -12,4 +12,10 @@ export const TARIFFS_COVERAGE_STATES = [
   'expand=t-car,t-special', 'open=type-picker', 'tab=types&data=empty',
   /* Такт 80, П4: вкладка «Схемы осмотра» с пустой группой; панель группы в трёх режимах; панель пустой группы. */
   'tab=schemes&data=empty', 'open=group', 'open=group&mode=fixed', 'open=group&mode=scale', 'open=group&group=g-realty&data=empty',
+  /*
+   * Такт 81, П5: панель схемы — «Ценообразование» в трёх режимах (шкала «По ролям» у `s-pre`), схема без повторяемых
+   * процессов; «Типы объектов» — глобальные, индивидуальные, глобальных нет.
+   */
+  'open=scheme', 'open=scheme&mode=individual', 'open=scheme&scheme=s-pre', 'open=scheme&scheme=s-moto',
+  'open=scheme&panel=types', 'open=scheme&scheme=s-flat&panel=types', 'open=scheme&panel=types&data=empty',
 ] as const
