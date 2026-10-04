@@ -154,9 +154,9 @@ const WATCH = `(() => {
     if (n.matches?.('[data-slot=toast]')) take(n); else n.querySelectorAll?.('[data-slot=toast]').forEach(take) }))).observe(document.body, { childList: true, subtree: true })
   const root = document.querySelector('[data-tariffs]')
   const btn = () => document.querySelector('[data-act=apply]')
-  window.__applyRestWidth = Math.round(btn().getBoundingClientRect().width)
+  window.__applyRestWidth = Math.round(btn()?.getBoundingClientRect().width ?? 0)
   new MutationObserver(() => { const s = root.dataset.save; if (window.__saveLog[window.__saveLog.length - 1] !== s) window.__saveLog.push(s) }).observe(root, { attributes: true, attributeFilter: ['data-save'] })
-  new MutationObserver(() => { const b = btn()
+  new MutationObserver(() => { const b = btn(); if (!b) return
     window.__applyLog.push({ state: root.dataset.apply, busy: b.getAttribute('aria-busy') === 'true', disabled: b.disabled, spinner: !!b.querySelector('[data-slot=spinner]'),
       sameWidth: Math.round(b.getBoundingClientRect().width) === window.__applyRestWidth }) }).observe(root, { attributes: true, attributeFilter: ['data-apply'] })
   return 1 })()`
@@ -221,13 +221,24 @@ const Q = {
   addSchemeType: `document.querySelector('[data-act=add-scheme-type]')`,
   schemeTypeOption: id => `document.querySelector('[data-scheme-type-option=${id}]')`,
   schemeTypeClient: id => `document.querySelector('[data-scheme-type=${id}] [data-slot=price-pair-client] input')`,
+  /* Такт 82, П6.1: переключатель периода, окно планирования, плашка черновика, окно удаления. */
+  periods: `document.querySelector('[data-act=periods]')`,
+  periodOption: id => `document.querySelector('[data-period-option=${id}]')`,
+  periodPlan: `document.querySelector('[data-period-plan]')`,
+  planMonth: k => `document.querySelector('[data-modal=plan] [data-plan-month="${k}"]')`,
+  planYear: y => `document.querySelector('[data-modal=plan] [data-plan-year="${y}"]')`,
+  planConfirm: `document.querySelector('[data-act=plan-confirm]')`,
+  planCancel: `document.querySelector('[data-act=plan-cancel]')`,
+  deleteDraft: `document.querySelector('[data-act=delete-draft]')`,
+  deleteDraftCancel: `document.querySelector('[data-act=delete-draft-cancel]')`,
+  deleteDraftConfirm: `document.querySelector('[data-act=delete-draft-confirm]')`,
 }
 
 function kit(page) {
   return {
     page,
     async start(query = '') {
-      const qs = [`now=${NOW}`, query].filter(Boolean).join('&')
+      const qs = [/(^|&)now=/.test(query) ? '' : `now=${NOW}`, query].filter(Boolean).join('&')
       await page.goto(`${KIT_URL}?${qs}`, 1500)
       await until(page, `!!${Q.root} && !!window.__tariffs`, 20000)
       await page.evaluate(`(async () => { await document.fonts.ready; return 1 })()`)
@@ -490,6 +501,27 @@ function kit(page) {
           modelSchemes: M.view.value.schemes.map(x => [x.id, x.mode, x.price.client, x.price.nonClient, x.price.linked, x.scale.on, x.scale.steps.map(s => [s.from, s.to, s.price.client]),
             x.individualTypes, x.types.map(y => [y.typeId, y.price.client, y.price.nonClient, y.price.linked]), x.processes.map(p => [p.id, p.repeatable, p.price.client, p.price.nonClient, p.price.linked])]),
           focusScheme: document.activeElement?.closest('[data-scheme]')?.dataset.scheme ?? null,
+          /* Такт 82: периоды — триггер, список, плашка, окна планирования и удаления, правка в архиве. */
+          periodId: root.dataset.periodId,
+          switcher: (() => { const b = document.querySelector('[data-act=periods]'); return b ? leaf(b) + ' | ' + b.dataset.periodStatus : null })(),
+          periodList: (() => { const l = document.querySelector('[data-period-list]'); return l ? [...l.querySelectorAll('[data-slot=list-group]')].map(g => [
+            ...[...g.querySelectorAll('[data-period-option]')].map(o => leaf(o) + (o.getAttribute('aria-current') === 'true' ? ' ✓' : '')),
+            ...(g.querySelector('[data-period-plan]') ? ['+ ' + t(g.querySelector('[data-period-plan]').textContent)] : [])]) : null })(),
+          banner: (() => { const b = document.querySelector('[data-banner]'); return b ? { kind: b.dataset.banner, text: leaf(b) } : null })(),
+          applyShown: !!btn,
+          statusShown: !!status,
+          planModal: (() => { const d = document.querySelector('[data-modal=plan]'); if (!d) return null
+            const cell = b => t(b.textContent) + (b.disabled ? ' ×' : '') + (b.getAttribute('aria-pressed') === 'true' ? ' ✓' : '')
+            return { title: t(d.querySelector('[data-slot=modal-card-title]')?.textContent), subtitle: t(d.querySelector('[data-slot=modal-card-subtitle]')?.textContent),
+              months: [...d.querySelectorAll('[data-plan-month]')].map(cell), years: [...d.querySelectorAll('[data-plan-year]')].map(cell) } })(),
+          deleteModal: (() => { const d = document.querySelector('[data-modal=delete-draft]'); return d ? { title: t(d.querySelector('[data-slot=modal-card-title]')?.textContent), text: t(d.querySelector('[data-slot=modal-card-text]')?.textContent) } : null })(),
+          /* Правка доступна: поля без «только чтения», рубильники и выбор режима без aria-readonly, действия правки вне inert. */
+          editable: {
+            inputs: [...document.querySelectorAll('input')].filter(i => i.type !== 'radio' && !i.readOnly && !i.disabled && !i.closest('[data-type-picker], [data-scheme-type-picker]')).length,
+            controls: [...document.querySelectorAll('[role=switch], [role=radio]')].filter(b => b.getAttribute('aria-readonly') !== 'true' && !b.disabled && !b.hasAttribute('data-disabled')).length,
+            actions: [...document.querySelectorAll('[data-act=add-type], [data-act=type-remove], [data-act=customize-types], [data-act=reset-types], [data-act=add-scheme-type], [data-step-remove], [data-pair-lock]')].filter(b => !b.closest('[inert]') && !b.disabled).length,
+          },
+          modelPeriods: M.periods.map(p => [p.id, p.status, p.from, p.to]),
           focus: where,
           notices,
         })
@@ -579,6 +611,19 @@ const MS_START = {
 const MS = (patch = {}) => Object.keys(MS_START).map(id => patch[id] ?? MS_START[id])
 const CAR = (mode, client, nonClient, linked, on, steps, ind = false, types = [], proc = MS_START['s-car'][9]) => ['s-car', mode, client, nonClient, linked, on, steps, ind, types, proc]
 const ROW = (badges, range) => ({ badges: badges.map(([x, tone]) => B(x, tone)), range: `Вилка цен ${range}` })
+
+/* Такт 82, П6.1: периоды при часах «апрель 2026» (6.4). */
+const PERIODS_START = [['p-archive', 'archive', '2025-01', '2025-12'], ['p-current', 'current', '2026-01', '2026-06'], ['p-planned', 'planned', '2026-07', null], ['p-draft', 'draft', '2026-10', null]]
+const LIST_START = [['Текущие тарифы до июня 2026 ✓', 'Запланировано с июля 2026', 'Черновик с октября 2026'], ['Архив до декабря 2025'], ['+ Запланировать изменение цен']]
+const ARCHIVE_TEXT = 'Архивный тариф — только просмотр Тариф действовал с 1 января 2025 по 31 декабря 2025. Цены архивного периода не меняются'
+const DRAFT_TEXT = date => `Вы редактируете черновик будущих тарифов Текущие цены для клиентов остаются без изменений. Тарифы вступят в силу ${date} Удалить черновик`
+const DELETE_MODAL = { title: 'Удалить черновик?', text: 'Черновик тарифов с 1 октября 2026 будет удалён вместе с правками. Текущие цены не изменятся.' }
+const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
+/** Окно планирования: выбран год `y` и месяц `m`, выключены первые `off` месяцев года; годы 2026–2029. */
+const PLAN = (y, m, off) => ({ title: 'Планирование новых тарифов', subtitle: 'Создание черновика будущей версии цен',
+  months: MONTHS.map((x, k) => x + (k < off ? ' ×' : '') + (k + 1 === m ? ' ✓' : '')), years: [2026, 2027, 2028, 2029].map(x => String(x) + (x === y ? ' ✓' : '')) })
+/** Модель типов вкладки «Типы объектов» по демо-данным. */
+const MT_START = [['t-car', 300, 300, true, false, 'single', 1], ['t-special', 800, 1000, false, true, 'roles', 2], ['t-flat', 600, 600, true, false, 'single', 1]]
 
 const SCENARIOS = {
   'ТФ-01': ['«Назад» ведёт к карточке компании; вход вне скоупа — уведомление-заглушка (§11 «Вход»; scope, «Вне скоупа»)', [
@@ -953,6 +998,69 @@ const SCENARIOS = {
       schemeRow: ROW([['По группе', 'primary'], ['Индивидуальные типы', 'primary']], 'от 500 ₽ до 700 ₽'),
       modelSchemes: MS({ 's-car': CAR('group', null, null, true, false, [[1, null, null]], true, [['t-car', 300, 300, true], ['t-special', 800, 1000, false], ['t-flat', 650, 650, true], ['t-moto', null, null, true]]) }) }],
   ], { query: 'open=scheme&panel=types' }],
+  'ТФ-25': ['переключатель периода: группы списка, выбор, данные периода; правки периода остаются при нём (§8)', [
+    ['старт — текущий тариф', null, { switcher: 'Текущие тарифы до июня 2026 | current', periodId: 'p-current', period: 'current', periodList: null, banner: null,
+      applyShown: true, statusShown: true, modelPeriods: PERIODS_START }],
+    ['открыть список', K => K.click(Q.periods), { periodList: LIST_START }],
+    ['выбрать «Запланировано» — данные запланированного, список закрыт', K => K.click(Q.periodOption('p-planned')), {
+      switcher: 'Запланировано с июля 2026 | planned', period: 'planned', periodId: 'p-planned', periodList: null, banner: null,
+      minPayment: '20 000', modelPrice: { client: 550, nonClient: 750, linked: false } }],
+    ['правка минимальной суммы на запланированном', async (K) => { await K.setMin('26000'); await K.settled() }, { minPayment: '26 000', dirty: true, saveLog: ['saving', 'saved'], writes: 1 }],
+    ['выбрать текущий — свои данные, правок нет', async (K) => { await K.click(Q.periods); await K.click(Q.periodOption('p-current')) }, {
+      switcher: 'Текущие тарифы до июня 2026 | current', minPayment: '20 000', dirty: false, applyDisabled: true, modelPrice: { client: 500, nonClient: 700, linked: false } }],
+    ['снова запланированный — правка на месте', async (K) => { await K.click(Q.periods); await K.click(Q.periodOption('p-planned')) }, {
+      switcher: 'Запланировано с июля 2026 | planned', minPayment: '26 000', dirty: true, applyDisabled: false }],
+    ['список — выбран запланированный; Esc закрывает, фокус на триггере', async (K) => { await K.click(Q.periods); await K.escape() }, { periodList: null, focus: 'periods' }],
+    ['панель группы следует периоду: «Недвижимость» в архиве — та же шкала, только просмотр', async (K) => {
+      await K.click(Q.periods); await K.click(Q.periodOption('p-archive')); await K.tab('schemes'); await K.click(Q.groupSettings('g-realty')) }, {
+      switcher: 'Архив до декабря 2025 | archive', period: 'archive', banner: { kind: 'archive', text: ARCHIVE_TEXT },
+      editable: { inputs: 0, controls: 0, actions: 0 } }],
+  ]],
+  'ТФ-26': ['архив — только просмотр: поля «только чтение», «Сохранить изменения» нет, плашка (§8; стр. 49)', [
+    ['`?period=archive` — плашка, кнопки и статуса нет, правка закрыта', null, {
+      switcher: 'Архив до декабря 2025 | archive', period: 'archive', banner: { kind: 'archive', text: ARCHIVE_TEXT }, applyShown: false, statusShown: false,
+      minPayment: '15 000', viewMin: 15000, editable: { inputs: 0, controls: 0, actions: 0 } }],
+    ['набор в минимальной сумме — значение прежнее', K => K.fill(Q.minInput, '9'), { minPayment: '15 000', viewMin: 15000, writes: 0, dirty: false, saveLog: [] }],
+    ['рубильник общей шкалы — не переключается', K => K.click(Q.scaleSwitch), { scaleSwitch: 'unchecked', scale: 'off', writes: 0, dirty: false }],
+    ['учёт прогресса — выбор прежний', K => K.click(Q.counter('individual')), { counterChecked: 'global', modelCounter: 'global', writes: 0 }],
+    ['вкладка «Типы объектов» — только просмотр, раскрытие доступно', async (K) => { await K.tab('types'); await K.click(Q.typeExpand('t-car')) }, {
+      tab: 'types', editable: { inputs: 0, controls: 0, actions: 0 }, expanded: ['t-car'], modelTypes: MT_START }],
+    ['удаление типа закрыто', K => K.click(Q.typeRemove('t-flat')), { modelTypes: MT_START, notices: [], writes: 0 }, { blind: true }],
+    ['панель схемы — режимы, процессы и типы только для просмотра', async (K) => {
+      await K.tab('schemes'); await K.click(Q.schemeSettings('s-car')) }, { editable: { inputs: 0, controls: 0, actions: 0 }, writes: 0 }],
+    ['вкладка «Типы объектов» панели — «Настроить индивидуально» закрыто', async (K) => { await K.click(Q.panelTab('types')); await K.click(Q.customizeTypes) }, {
+      editable: { inputs: 0, controls: 0, actions: 0 }, writes: 0, notices: [] }, { blind: true }],
+  ], { query: 'period=archive' }],
+  'ТФ-27': ['«Запланировать изменение цен»: месяц и год, прошедшие и текущий выключены; «Сохранить» — черновик с 1-го числа (§8; стр. 18, 19)', [
+    ['старт', null, { modelPeriods: PERIODS_START }],
+    ['список — «Запланировать изменение цен»: окно, выбран май 2026', async (K) => { await K.click(Q.periods); await K.click(Q.periodPlan) }, {
+      periodList: null, planModal: PLAN(2026, 5, 4) }],
+    ['апрель (текущий месяц) — не выбирается', K => K.click(Q.planMonth(4)), { planModal: PLAN(2026, 5, 4) }, { blind: true }],
+    ['2027 — все месяцы доступны, май остаётся', K => K.click(Q.planYear(2027)), { planModal: PLAN(2027, 5, 0) }],
+    ['март 2027', K => K.click(Q.planMonth(3)), { planModal: PLAN(2027, 3, 0) }],
+    ['снова 2026 — март недоступен, выбран первый доступный — май', K => K.click(Q.planYear(2026)), { planModal: PLAN(2026, 5, 4) }],
+    ['август 2026, «Сохранить» — черновик с 1 августа, копия текущего, плашка', async (K) => { await K.click(Q.planMonth(8)); await K.click(Q.planConfirm) }, {
+      planModal: null, switcher: 'Черновик с августа 2026 | draft', period: 'draft', periodId: 'p-draft-new-1',
+      modelPeriods: [...PERIODS_START, ['p-draft-new-1', 'draft', '2026-08', null]],
+      banner: { kind: 'draft', text: DRAFT_TEXT('1 августа 2026') }, notices: ['Черновик создан: тарифы вступят в силу 1 августа 2026'],
+      minPayment: '20 000', dirty: false, applyShown: true }],
+    ['список — два черновика по дате, выбран новый', K => K.click(Q.periods), { periodList: [
+      ['Текущие тарифы до июня 2026', 'Запланировано с июля 2026', 'Черновик с августа 2026 ✓', 'Черновик с октября 2026'], ['Архив до декабря 2025'], ['+ Запланировать изменение цен']] }],
+    ['«Запланировать» снова; «Отмена» — окно закрыто, периодов прежнее число', async (K) => { await K.click(Q.periodPlan); await K.click(Q.planCancel) }, {
+      planModal: null, modelPeriods: [...PERIODS_START, ['p-draft-new-1', 'draft', '2026-08', null]] }],
+    ['часы «декабрь 2026» (`?now=2026-12&open=plan`) — 2026 выключен, выбран январь 2027', K => K.start('now=2026-12&open=plan'), { planModal: {
+      ...PLAN(2027, 1, 0), years: ['2026 ×', '2027 ✓', '2028', '2029'] } }],
+  ]],
+  'ТФ-28': ['«Удалить черновик» с подтверждением: черновик удалён, выбран текущий (§8; стр. 44)', [
+    ['`?period=draft` — плашка черновика', null, { switcher: 'Черновик с октября 2026 | draft', period: 'draft', banner: { kind: 'draft', text: DRAFT_TEXT('1 октября 2026') }, minPayment: '25 000', deleteModal: null }],
+    ['«Удалить черновик» — окно подтверждения', K => K.click(Q.deleteDraft), { deleteModal: DELETE_MODAL }],
+    ['«Отмена» — черновик на месте', K => K.click(Q.deleteDraftCancel), { deleteModal: null, period: 'draft', modelPeriods: PERIODS_START }],
+    ['снова и подтвердить — черновик удалён, выбран текущий', async (K) => { await K.click(Q.deleteDraft); await K.click(Q.deleteDraftConfirm) }, {
+      deleteModal: null, switcher: 'Текущие тарифы до июня 2026 | current', period: 'current', banner: null, minPayment: '20 000', notices: ['Черновик удалён'],
+      modelPeriods: PERIODS_START.filter(p => p[0] !== 'p-draft') }],
+    ['список без черновиков', K => K.click(Q.periods), { periodList: [['Текущие тарифы до июня 2026 ✓', 'Запланировано с июля 2026'], ['Архив до декабря 2025'], ['+ Запланировать изменение цен']] }],
+    ['`?open=delete-draft` — окно открыто на черновике', K => K.start('open=delete-draft'), { period: 'draft', deleteModal: DELETE_MODAL }],
+  ], { query: 'period=draft' }],
 }
 
 /* ------------------------------ прогон ------------------------------ */

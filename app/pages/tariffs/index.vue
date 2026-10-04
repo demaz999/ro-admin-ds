@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { RegressStep, ScaleForm } from '~/components/ui/regress-scale'
 import { computed, nextTick, ref, watch } from 'vue'
-import { createModel, TABS, type Dataset, type GroupMode, type Price, type RowBadge, type SaveState, type SchemeMode, type TabId } from '~/stands/tariffs/model'
+import { createModel, TABS, type Dataset, type GroupMode, type PeriodStatus, type Price, type RowBadge, type SaveState, type SchemeMode, type TabId } from '~/stands/tariffs/model'
 import demo from '~/stands/tariffs/demo-data.json'
 
 /**
@@ -33,6 +33,11 @@ import demo from '~/stands/tariffs/demo-data.json'
  * копированием, вкладки панели; «Ценообразование» — режимы схемы с телом выбранного (№ 38–40) и «Процессы» с ценами
  * повторяемых процессов (№ 41); «Типы объектов» — глобальные цены только для чтения с «Настроить индивидуально» (№ 42),
  * индивидуальные цены с «Сбросить к глобальным» и «Добавить тип объекта» (№ 43, 56).
+ * П6.1 (такт 82): переключатель периода `PeriodSwitcher` в шапке со списком периодов и «Запланировать изменение цен» (№ 4,
+ * 5); окно планирования — `ModalCard` center с сеткой месяцев и лет на `Button` (№ 44, 45); плашка черновика — `Callout
+ * tone="warning"` с «Удалить черновик» и окном подтверждения (№ 10, 46); архив — только просмотр: оси `readonly` у полей,
+ * пар, шкал, рубильников и режимов, действия правки закрыты `inert`, плашка «Архивный тариф — только просмотр», статуса
+ * сохранения и «Сохранить изменения» нет (№ 47).
  *
  * ## Поведение — модель `~/stands/tariffs/model.ts`
  *
@@ -59,6 +64,10 @@ import demo from '~/stands/tariffs/demo-data.json'
  * | `?scheme=<id схемы>` | какая схема открыта: `s-car`, `s-moto`, `s-pre`, `s-vehicle`, `s-trailer`, `s-flat`, `s-house`; без параметра — первая (такт 81) |
  * | `?panel=pricing` · `types` | вкладка панели схемы (такт 81) |
  * | `?mode=group` · `individual` · `scale` | режим открытой схемы — как данные, правка не пишется (такт 81) |
+ * | `?period=current` · `planned` · `draft` · `archive` | выбранный период при загрузке (такт 82) |
+ * | `?open=periods` | открыт список периодов (такт 82) |
+ * | `?open=plan` | открыто окно «Планирование новых тарифов»; выбран месяц после текущего (такт 82) |
+ * | `?open=delete-draft` | открыто окно «Удалить черновик?»; без `?period=` выбран черновик (такт 82) |
  */
 definePageMeta({ layout: false })
 useHead({ title: 'Тарификация — стенд' })
@@ -66,7 +75,7 @@ useHead({ title: 'Тарификация — стенд' })
 const route = useRoute()
 const q = (k: string) => String(route.query[k] ?? '')
 
-const OPEN_AT_LOAD = ['help', 'type-picker', 'group', 'scheme']
+const OPEN_AT_LOAD = ['help', 'type-picker', 'group', 'scheme', 'periods', 'plan', 'delete-draft']
 const openAtLoad = OPEN_AT_LOAD.find(s => s === q('open'))
 const expandAtLoad = q('expand') ? q('expand').split(',').filter(Boolean) : []
 /* Выбор типа и раскрытая строка живут на «Типах объектов»: без `?tab=` оснастка такта 79 открывает эту вкладку. */
@@ -74,6 +83,7 @@ const tabAtLoad = TABS.find(t => t.id === q('tab'))?.id
   ?? (openAtLoad === 'type-picker' || expandAtLoad.length ? 'types' : openAtLoad === 'group' || openAtLoad === 'scheme' ? 'schemes' : undefined)
 const MODES: (GroupMode | SchemeMode)[] = ['company', 'fixed', 'scale', 'group', 'individual']
 const saveAtLoad = (['saving', 'error'] as SaveState[]).find(s => s === q('save'))
+const periodAtLoad = (['current', 'planned', 'draft', 'archive'] as PeriodStatus[]).find(s => s === q('period'))
 const m = createModel(demo as unknown as Dataset, {
   data: q('data') === 'empty' ? 'empty' : 'main',
   tab: tabAtLoad,
@@ -86,6 +96,7 @@ const m = createModel(demo as unknown as Dataset, {
   mode: MODES.find(x => x === q('mode')),
   scheme: q('scheme') || undefined,
   panel: q('panel') === 'types' ? 'types' : q('panel') === 'pricing' ? 'pricing' : undefined,
+  period: periodAtLoad,
 })
 
 const tab = computed<string>({ get: () => m.ui.tab, set: v => m.setTab(v as TabId) })
@@ -341,6 +352,28 @@ function onSchemePickerKeydown(e: KeyboardEvent) {
   }
 }
 
+/* ------------------------------ периоды — П6.1, такт 82 ------------------------------ */
+/** Выбранный период (№ 4, 5): данные всех вкладок и панелей следуют ему. */
+const periodId = computed({ get: () => m.selectedId.id, set: (v: string) => m.selectPeriod(v) })
+/** Поверхность модели: открыта, когда `ui.open` равно имени; закрытие снимает только её. */
+function surface(name: string) {
+  return computed({
+    get: () => m.ui.open === name,
+    set: (v: boolean) => { if (v) m.setOpen(name); else if (m.ui.open === name) m.setOpen('') },
+  })
+}
+const periodsOpen = surface('periods')
+const planOpen = surface('plan')
+const deleteDraftOpen = surface('delete-draft')
+/** Архив — только просмотр (№ 47): оси `readonly` у контролов, действия правки закрыты `inert`. */
+const ro = computed(() => m.readonly.value)
+const status = computed(() => m.selected.value.status)
+/** Плашка над блоками вкладок: у черновика (№ 10) и архива (№ 47); блоки под ней — через 8 (Figma `30857:2650`). */
+const banner = computed(() => status.value === 'draft' || status.value === 'archive')
+/** «1 октября 2026» — начало интервала черновика с 1-го числа (стр. 18). */
+const draftStart = computed(() => m.startLabel(m.selected.value.from))
+const archiveTerm = computed(() => m.periodSpan(m.selected.value.id))
+
 if (import.meta.client) {
   /* Прогону — состояние модели для сравнения «до / после»; оснастка приёмки. */
   ;(window as unknown as { __tariffs: unknown }).__tariffs = m
@@ -355,6 +388,7 @@ if (import.meta.client) {
     :data-dirty="m.dirty.value ? '1' : '0'"
     :data-apply="m.apply.state"
     :data-period="m.selected.value.status"
+    :data-period-id="m.selectedId.id"
     :data-scale="base.scale.on ? 'on' : 'off'"
     :data-open="m.ui.open || undefined"
   >
@@ -373,10 +407,19 @@ if (import.meta.client) {
               <Heading level="page" as="h1" data-tariffs-title>
                 Тарификация
               </Heading>
-              <!-- Переключатель тарифного периода `PeriodSwitcher` (№ 4, 5) — порция П6.1. -->
+              <!-- Переключатель тарифного периода — Figma `30957:7855`, список `31089:12090` (№ 4, 5). -->
+              <PeriodSwitcher
+                v-model="periodId"
+                v-model:open="periodsOpen"
+                :periods="m.periodList.value"
+                data-period-switcher
+                data-act="periods"
+                @plan="m.openPlan()"
+              />
             </div>
 
-            <div class="flex shrink-0 items-center gap-4">
+            <!-- Архив — только просмотр (№ 47): статуса сохранения и «Сохранить изменения» нет (стр. 49). -->
+            <div v-if="!ro" class="flex shrink-0 items-center gap-4">
               <AppBarStatus surface="light" retryable :state="m.save.state" @retry="m.retry()" />
               <Button
                 show-icon
@@ -442,312 +485,335 @@ if (import.meta.client) {
           </Popover>
         </div>
 
-        <TabsContent value="base">
-          <!-- Блоки вкладки — Figma `30912:245513`: зазор между блоками 8. -->
-          <div class="flex flex-col gap-2 pt-6">
-            <!-- «Базовая минимальная стоимость» — Figma `30912:245578`: две плитки через 8. -->
-            <Card as="section" class="flex flex-col gap-6" data-block="base">
-              <Heading level="group" description="Минимальные пороги биллинга и базовые цены, применяемые к схемам осмотра по умолчанию.">
-                Базовая минимальная стоимость
-              </Heading>
-              <div class="grid grid-cols-2 gap-2">
-                <!-- Плитка — Figma `31767:8590`: подпись, поле 160 с «₽», подсказка во всю ширину. -->
-                <Card tone="muted" size="sm" class="flex flex-col">
-                  <Field
-                    orientation="split"
-                    class="flex-1"
-                    label="Минимальная сумма списания за один расчётный период"
-                    hint="Если итоговая сумма за период оказывается ниже этого порога — выставляется минимальная сумма"
-                  >
-                    <div class="w-price-input">
-                      <Input v-model="minPayment" numeric unit="₽" variant="elevated" placeholder="" :show-icon="false" data-field="min-payment" />
-                    </div>
-                  </Field>
-                </Card>
-                <!-- Плитка — Figma `31649:3835`, при шкале — `31767:8605`: пара цен с замком; подсказка тоном предупреждения. -->
-                <Card tone="muted" size="sm" class="flex flex-col">
-                  <Field
-                    orientation="split"
-                    class="flex-1"
-                    label="Базовая стоимость схемы осмотра"
-                    :hint="base.scale.on ? SCALE_HINT : BASE_HINT"
-                    :hint-tone="base.scale.on ? 'warning' : 'default'"
-                    data-field="base-price-field"
-                  >
-                    <PricePair
-                      variant="elevated"
-                      :client="base.price.client"
-                      :non-client="base.price.nonClient"
-                      :linked="base.price.linked"
-                      :disabled="base.scale.on"
-                      data-field="base-price"
-                      @update:client="v => setBasePrice({ client: v })"
-                      @update:non-client="v => setBasePrice({ nonClient: v })"
-                      @update:linked="v => setBasePrice({ linked: v })"
-                    />
-                  </Field>
-                </Card>
-              </div>
-            </Card>
+        <!-- Плашка черновика — Figma `30857:2704` (№ 10); архива — № 47, макета нет (стр. 49). Стоит над блоками всех вкладок. -->
+        <div class="flex flex-col gap-2 pt-6">
+          <Callout v-if="status === 'draft'" tone="warning" title="Вы редактируете черновик будущих тарифов" data-banner="draft">
+            <p>Текущие цены для клиентов остаются без изменений. Тарифы вступят в силу {{ draftStart }}</p>
+            <template #actions>
+              <Button variant="destructive" show-icon data-act="delete-draft" @click="m.openDeleteDraft()">
+                <template #icon>
+                  <Icon name="delete" :size="20" />
+                </template>
+                Удалить черновик
+              </Button>
+            </template>
+          </Callout>
+          <Callout v-else-if="status === 'archive'" tone="neutral" title="Архивный тариф — только просмотр" data-banner="archive">
+            <p>Тариф действовал {{ archiveTerm }}. Цены архивного периода не меняются</p>
+          </Callout>
 
-            <!-- «Общая регресс-шкала компании» — Figma `30912:245618`, включённая — `30956:102261`. -->
-            <Card as="section" class="flex flex-col gap-6" data-block="scale">
-              <div class="flex items-start justify-between gap-6">
-                <Heading level="group" description="Применяется ко всем осмотрам, где типовая регресс-шкала не активна.">
-                  Общая регресс-шкала компании
+          <TabsContent value="base">
+            <!-- Блоки вкладки — Figma `30912:245513`: зазор между блоками 8. -->
+            <div class="flex flex-col gap-2">
+              <!-- «Базовая минимальная стоимость» — Figma `30912:245578`: две плитки через 8. -->
+              <Card as="section" class="flex flex-col gap-6" data-block="base">
+                <Heading level="group" description="Минимальные пороги биллинга и базовые цены, применяемые к схемам осмотра по умолчанию.">
+                  Базовая минимальная стоимость
                 </Heading>
-                <Switch v-model="scaleOn" aria-label="Общая регресс-шкала компании" data-field="scale-switch" />
-              </div>
-              <RegressScale
-                v-if="base.scale.on"
-                v-model:steps="scaleSteps"
-                v-model:form="scaleForm"
-                data-field="base-scale"
-                @remove-step="e => m.stepRemoved('base.scale', e.previous)"
-              />
-            </Card>
-
-            <!-- «Учет прогресса в регресс-шкалах» — Figma `30912:245625`: две карточки выбора 544 через 8. -->
-            <Card as="section" class="flex flex-col gap-6" data-block="counter">
-              <!-- Сброс счётчика 1-го числа месяца — реализация 29.06.2026: ждут людей, п. 3 (строка 15 реестра). -->
-              <Heading level="group" data-awaiting="3" description="Счётчик осмотров обнуляется 1-го числа каждого месяца.">
-                Учет прогресса в регресс-шкалах
-              </Heading>
-              <RadioGroup v-model="counter" class="grid grid-cols-2 gap-2" data-field="counter">
-                <RadioGroupItem value="global" variant="card" :checked="counter === 'global'" data-counter="global">
-                  Сквозной учет
-                  <template #description>
-                    Любой выполненный осмотр увеличивает счётчик во всех активных шкалах компании
-                  </template>
-                </RadioGroupItem>
-                <RadioGroupItem value="individual" variant="card" :checked="counter === 'individual'" data-counter="individual">
-                  Раздельный учет
-                  <template #description>
-                    Каждый уровень считает свои осмотры: шкала уровня снижает цену по объёму осмотров этого уровня
-                  </template>
-                </RadioGroupItem>
-              </RadioGroup>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="types">
-          <div class="flex flex-col gap-2 pt-6">
-            <!-- Блок «Типы объектов» — Figma `30863:3843`: шапка с «Добавить тип объекта», колонки, строки типов. -->
-            <Card as="section" class="flex flex-col gap-6" data-block="types">
-              <!-- Один выбор типа на блок (№ 24): открыватель — кнопка шапки либо действие пустого списка. -->
-              <Popover v-model:open="pickerOpen">
-                <div class="flex items-start justify-between gap-6">
-                  <Heading level="group" :description="TYPES_DESCRIPTION">
-                    Типы объектов
-                  </Heading>
-                  <PopoverTrigger v-if="typeRows.length" as-child>
-                    <ButtonAction data-act="add-type">
-                      <template #icon>
-                        <Icon name="add" :size="16" />
-                      </template>
-                      Добавить тип объекта
-                    </ButtonAction>
-                  </PopoverTrigger>
-                </div>
-
-                <!-- Таблица типов — Figma `30863:3850`, `30863:3857`: колонки «Тип объекта», «Клиент, ₽», «Не клиент, ₽», «Регресс-шкала». -->
-                <Table v-if="typeRows.length" data-types-table>
-                  <TableRow>
-                    <TableHead variant="expand" aria-hidden="true" />
-                    <TableHead class="min-w-0 flex-1">
-                      Тип объекта
-                    </TableHead>
-                    <TableHead class="w-46">
-                      Клиент, ₽
-                    </TableHead>
-                    <TableHead class="w-46">
-                      Не клиент, ₽
-                    </TableHead>
-                    <TableHead class="w-40">
-                      Регресс-шкала
-                    </TableHead>
-                    <TableHead class="w-16" aria-hidden="true" />
-                  </TableRow>
-
-                  <template v-for="row in typeRows" :key="row.id">
-                    <TableRow :data-type-row="row.id" :data-expanded="row.expanded ? '' : undefined">
-                      <TableCell variant="slot" class="w-16 justify-center px-0">
-                        <IconButton
-                          variant="ghost"
-                          :label="row.expanded ? `Свернуть: ${row.name}` : `Раскрыть шкалу: ${row.name}`"
-                          :aria-expanded="row.expanded ? 'true' : 'false'"
-                          data-act="type-expand"
-                          @click="m.toggleExpand(row.id)"
-                        >
-                          <Icon :name="row.expanded ? 'chevron-up' : 'chevron-down'" :size="16" />
-                        </IconButton>
-                      </TableCell>
-                      <TableCell variant="slot" class="min-w-0 flex-1">
-                        <TableCellIdentity :icon="row.icon" data-type-name>
-                          {{ row.name }}
-                        </TableCellIdentity>
-                      </TableCell>
-                      <!-- Пара цен типа: при включённой шкале выключена (§5, стр. 08). -->
-                      <TableCell variant="slot">
-                        <PricePair
-                          :labels="false"
-                          :client="row.price.client"
-                          :non-client="row.price.nonClient"
-                          :linked="row.price.linked"
-                          :disabled="row.scale.on"
-                          data-field="type-price"
-                          @update:client="v => setTypePrice(row.id, { client: v })"
-                          @update:non-client="v => setTypePrice(row.id, { nonClient: v })"
-                          @update:linked="v => setTypePrice(row.id, { linked: v })"
-                        />
-                      </TableCell>
-                      <TableCell variant="slot" class="w-40">
-                        <Switch
-                          :model-value="row.scale.on"
-                          :aria-label="`Регресс-шкала: ${row.name}`"
-                          data-field="type-scale-switch"
-                          @update:model-value="v => m.setTypeScaleOn(row.id, !!v)"
-                        />
-                      </TableCell>
-                      <TableCell variant="slot" class="w-16 justify-center px-0">
-                        <IconButton variant="destructive" :label="`Удалить тип: ${row.name}`" data-act="type-remove" @click="m.removeType(row.id)">
-                          <Icon name="delete" :size="16" />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                    <!-- Раскрытая строка — Figma `30863:3894`: шкала типа на всю ширину таблицы; при выключенной шкале — выключена (стр. 69). -->
-                    <TableRow v-if="row.expanded" :data-type-body="row.id">
-                      <TableCell variant="slot" class="h-auto min-w-0 flex-1 py-4 pl-16">
-                        <RegressScale
-                          :steps="row.scale.steps"
-                          :form="row.scale.form"
-                          :disabled="!row.scale.on"
-                          class="w-full"
-                          data-field="type-scale"
-                          @update:steps="v => setTypeScale(row.id, { steps: v })"
-                          @update:form="v => setTypeScale(row.id, { form: v })"
-                          @remove-step="e => typeStepRemoved(row.id, e.previous)"
-                        />
-                      </TableCell>
-                    </TableRow>
-                  </template>
-                </Table>
-
-                <!-- Пустой список (№ 26, стр. 46): действие закрывает пустоту — тот же выбор типа. -->
-                <Empty
-                  v-else
-                  title="Типов объектов пока нет"
-                  description="Добавьте тип из справочника компании, чтобы задать ему цену и регресс-шкалу"
-                  data-types-empty
-                >
-                  <template #action>
-                    <PopoverTrigger as-child>
-                      <Button variant="secondary" data-act="add-type">
-                        Добавить тип объекта
-                      </Button>
-                    </PopoverTrigger>
-                  </template>
-                </Empty>
-
-                <!-- Выбор типа — Figma `31488:258091`: плашка с поиском и списком справочника; добавленные типы из списка ушли. -->
-                <PopoverContent as-child align="end" :side-offset="4" :width="320">
-                  <SelectContent data-type-picker @keydown="onPickerKeydown">
-                    <template #search>
-                      <Input v-model="typeQuery" placeholder="Поиск типа объекта" clearable data-field="type-search" />
-                    </template>
-                    <SelectItem
-                      v-for="(t, k) in pickerList"
-                      :key="t.id"
-                      :selected="k === activeType"
-                      :data-type-option="t.id"
-                      @click="pickType(t.id)"
+                <div class="grid grid-cols-2 gap-2">
+                  <!-- Плитка — Figma `31767:8590`: подпись, поле 160 с «₽», подсказка во всю ширину. -->
+                  <Card tone="muted" size="sm" class="flex flex-col">
+                    <Field
+                      orientation="split"
+                      class="flex-1"
+                      label="Минимальная сумма списания за один расчётный период"
+                      hint="Если итоговая сумма за период оказывается ниже этого порога — выставляется минимальная сумма"
                     >
-                      {{ t.name }}
-                    </SelectItem>
-                    <Empty
-                      v-if="!pickerList.length"
-                      :title="typeQuery.trim() ? 'Ничего не найдено' : 'Все типы справочника добавлены'"
-                      class="px-4 py-6"
-                      data-type-picker-empty
-                    />
-                  </SelectContent>
-                </PopoverContent>
-              </Popover>
-            </Card>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="schemes">
-          <!-- Вкладка «Схемы осмотра» — Figma `30875:127755`: блоки групп через 4. -->
-          <div class="flex flex-col gap-1 pt-6" data-block="schemes">
-            <Card v-for="g in groupRows" :key="g.id" as="section" class="flex flex-col gap-6" :data-group="g.id">
-              <!-- Строка группы — Figma `30875:127808`: имя и метки, вилка группы, «Настроить группу». -->
-              <div class="flex items-baseline gap-6" data-group-head>
-                <div class="flex shrink-0 items-center gap-3">
-                  <Heading level="group" data-group-name>
-                    {{ g.name }}
-                  </Heading>
-                  <div class="flex items-center gap-0.5" data-badges>
-                    <Badge v-for="b in g.badges" :key="b.id" appearance="outline" :variant="BADGE_TONE[b.kind]" :data-badge="b.id">
-                      {{ b.text }}
-                    </Badge>
-                  </div>
+                      <div class="w-price-input">
+                        <Input v-model="minPayment" numeric unit="₽" variant="elevated" placeholder="" :show-icon="false" :readonly="ro" data-field="min-payment" />
+                      </div>
+                    </Field>
+                  </Card>
+                  <!-- Плитка — Figma `31649:3835`, при шкале — `31767:8605`: пара цен с замком; подсказка тоном предупреждения. -->
+                  <Card tone="muted" size="sm" class="flex flex-col">
+                    <Field
+                      orientation="split"
+                      class="flex-1"
+                      label="Базовая стоимость схемы осмотра"
+                      :hint="base.scale.on ? SCALE_HINT : BASE_HINT"
+                      :hint-tone="base.scale.on ? 'warning' : 'default'"
+                      data-field="base-price-field"
+                    >
+                      <PricePair
+                        :readonly="ro"
+                        variant="elevated"
+                        :client="base.price.client"
+                        :non-client="base.price.nonClient"
+                        :linked="base.price.linked"
+                        :disabled="base.scale.on"
+                        data-field="base-price"
+                        @update:client="v => setBasePrice({ client: v })"
+                        @update:non-client="v => setBasePrice({ nonClient: v })"
+                        @update:linked="v => setBasePrice({ linked: v })"
+                      />
+                    </Field>
+                  </Card>
                 </div>
-                <PriceRange
-                  layout="dash"
-                  label="Стоимость осмотров группы по умолчанию:"
-                  note="наследуется схемами без индивидуальной цены"
-                  :min="g.range.min"
-                  :max="g.range.max"
-                  class="flex-1"
-                  data-group-range
-                />
-                <ButtonAction class="shrink-0" data-act="group-settings" @click="m.openGroup(g.id)">
-                  <template #icon>
-                    <Icon name="settings" :size="16" />
-                  </template>
-                  Настроить группу
-                </ButtonAction>
-              </div>
+              </Card>
 
-              <!-- Строки схем — Figma `30875:127821`: имя с метками, вилка «от … до …», шестерёнка; устаревшая приглушена (§11). -->
-              <div v-if="g.schemes.length" class="flex flex-col gap-1">
-                <Card
-                  v-for="x in g.schemes"
-                  :key="x.id"
-                  tone="muted"
-                  size="sm"
-                  :dimmed="x.outdated"
-                  class="flex items-center gap-5"
-                  :data-scheme="x.id"
-                >
-                  <div class="flex min-w-0 flex-1 items-center gap-3">
-                    <Heading data-scheme-name>
-                      {{ x.name }}
+              <!-- «Общая регресс-шкала компании» — Figma `30912:245618`, включённая — `30956:102261`. -->
+              <Card as="section" class="flex flex-col gap-6" data-block="scale">
+                <div class="flex items-start justify-between gap-6">
+                  <Heading level="group" description="Применяется ко всем осмотрам, где типовая регресс-шкала не активна.">
+                    Общая регресс-шкала компании
+                  </Heading>
+                  <Switch v-model="scaleOn" :readonly="ro" aria-label="Общая регресс-шкала компании" data-field="scale-switch" />
+                </div>
+                <RegressScale
+                  v-if="base.scale.on"
+                  :readonly="ro"
+                  v-model:steps="scaleSteps"
+                  v-model:form="scaleForm"
+                  data-field="base-scale"
+                  @remove-step="e => m.stepRemoved('base.scale', e.previous)"
+                />
+              </Card>
+
+              <!-- «Учет прогресса в регресс-шкалах» — Figma `30912:245625`: две карточки выбора 544 через 8. -->
+              <Card as="section" class="flex flex-col gap-6" data-block="counter">
+                <!-- Сброс счётчика 1-го числа месяца — реализация 29.06.2026: ждут людей, п. 3 (строка 15 реестра). -->
+                <Heading level="group" data-awaiting="3" description="Счётчик осмотров обнуляется 1-го числа каждого месяца.">
+                  Учет прогресса в регресс-шкалах
+                </Heading>
+                <RadioGroup :readonly="ro" v-model="counter" class="grid grid-cols-2 gap-2" data-field="counter">
+                  <RadioGroupItem value="global" variant="card" :checked="counter === 'global'" data-counter="global">
+                    Сквозной учет
+                    <template #description>
+                      Любой выполненный осмотр увеличивает счётчик во всех активных шкалах компании
+                    </template>
+                  </RadioGroupItem>
+                  <RadioGroupItem value="individual" variant="card" :checked="counter === 'individual'" data-counter="individual">
+                    Раздельный учет
+                    <template #description>
+                      Каждый уровень считает свои осмотры: шкала уровня снижает цену по объёму осмотров этого уровня
+                    </template>
+                  </RadioGroupItem>
+                </RadioGroup>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="types">
+            <div class="flex flex-col gap-2">
+              <!-- Блок «Типы объектов» — Figma `30863:3843`: шапка с «Добавить тип объекта», колонки, строки типов. -->
+              <Card as="section" class="flex flex-col gap-6" data-block="types">
+                <!-- Один выбор типа на блок (№ 24): открыватель — кнопка шапки либо действие пустого списка. -->
+                <Popover v-model:open="pickerOpen">
+                  <div class="flex items-start justify-between gap-6">
+                    <Heading level="group" :description="TYPES_DESCRIPTION">
+                      Типы объектов
+                    </Heading>
+                    <PopoverTrigger v-if="typeRows.length" as-child>
+                      <ButtonAction :inert="ro" data-act="add-type">
+                        <template #icon>
+                          <Icon name="add" :size="16" />
+                        </template>
+                        Добавить тип объекта
+                      </ButtonAction>
+                    </PopoverTrigger>
+                  </div>
+
+                  <!-- Таблица типов — Figma `30863:3850`, `30863:3857`: колонки «Тип объекта», «Клиент, ₽», «Не клиент, ₽», «Регресс-шкала». -->
+                  <Table v-if="typeRows.length" data-types-table>
+                    <TableRow>
+                      <TableHead variant="expand" aria-hidden="true" />
+                      <TableHead class="min-w-0 flex-1">
+                        Тип объекта
+                      </TableHead>
+                      <TableHead class="w-46">
+                        Клиент, ₽
+                      </TableHead>
+                      <TableHead class="w-46">
+                        Не клиент, ₽
+                      </TableHead>
+                      <TableHead class="w-40">
+                        Регресс-шкала
+                      </TableHead>
+                      <TableHead class="w-16" aria-hidden="true" />
+                    </TableRow>
+
+                    <template v-for="row in typeRows" :key="row.id">
+                      <TableRow :data-type-row="row.id" :data-expanded="row.expanded ? '' : undefined">
+                        <TableCell variant="slot" class="w-16 justify-center px-0">
+                          <IconButton
+                            variant="ghost"
+                            :label="row.expanded ? `Свернуть: ${row.name}` : `Раскрыть шкалу: ${row.name}`"
+                            :aria-expanded="row.expanded ? 'true' : 'false'"
+                            data-act="type-expand"
+                            @click="m.toggleExpand(row.id)"
+                          >
+                            <Icon :name="row.expanded ? 'chevron-up' : 'chevron-down'" :size="16" />
+                          </IconButton>
+                        </TableCell>
+                        <TableCell variant="slot" class="min-w-0 flex-1">
+                          <TableCellIdentity :icon="row.icon" data-type-name>
+                            {{ row.name }}
+                          </TableCellIdentity>
+                        </TableCell>
+                        <!-- Пара цен типа: при включённой шкале выключена (§5, стр. 08). -->
+                        <TableCell variant="slot">
+                          <PricePair
+                            :readonly="ro"
+                            :labels="false"
+                            :client="row.price.client"
+                            :non-client="row.price.nonClient"
+                            :linked="row.price.linked"
+                            :disabled="row.scale.on"
+                            data-field="type-price"
+                            @update:client="v => setTypePrice(row.id, { client: v })"
+                            @update:non-client="v => setTypePrice(row.id, { nonClient: v })"
+                            @update:linked="v => setTypePrice(row.id, { linked: v })"
+                          />
+                        </TableCell>
+                        <TableCell variant="slot" class="w-40">
+                          <Switch
+                            :readonly="ro"
+                            :model-value="row.scale.on"
+                            :aria-label="`Регресс-шкала: ${row.name}`"
+                            data-field="type-scale-switch"
+                            @update:model-value="v => m.setTypeScaleOn(row.id, !!v)"
+                          />
+                        </TableCell>
+                        <TableCell variant="slot" class="w-16 justify-center px-0">
+                          <IconButton :inert="ro" variant="destructive" :label="`Удалить тип: ${row.name}`" data-act="type-remove" @click="m.removeType(row.id)">
+                            <Icon name="delete" :size="16" />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                      <!-- Раскрытая строка — Figma `30863:3894`: шкала типа на всю ширину таблицы; при выключенной шкале — выключена (стр. 69). -->
+                      <TableRow v-if="row.expanded" :data-type-body="row.id">
+                        <TableCell variant="slot" class="h-auto min-w-0 flex-1 py-4 pl-16">
+                          <RegressScale
+                            :readonly="ro"
+                            :steps="row.scale.steps"
+                            :form="row.scale.form"
+                            :disabled="!row.scale.on"
+                            class="w-full"
+                            data-field="type-scale"
+                            @update:steps="v => setTypeScale(row.id, { steps: v })"
+                            @update:form="v => setTypeScale(row.id, { form: v })"
+                            @remove-step="e => typeStepRemoved(row.id, e.previous)"
+                          />
+                        </TableCell>
+                      </TableRow>
+                    </template>
+                  </Table>
+
+                  <!-- Пустой список (№ 26, стр. 46): действие закрывает пустоту — тот же выбор типа. -->
+                  <Empty
+                    v-else
+                    title="Типов объектов пока нет"
+                    description="Добавьте тип из справочника компании, чтобы задать ему цену и регресс-шкалу"
+                    data-types-empty
+                  >
+                    <template #action>
+                      <PopoverTrigger as-child>
+                        <Button :inert="ro" variant="secondary" data-act="add-type">
+                          Добавить тип объекта
+                        </Button>
+                      </PopoverTrigger>
+                    </template>
+                  </Empty>
+
+                  <!-- Выбор типа — Figma `31488:258091`: плашка с поиском и списком справочника; добавленные типы из списка ушли. -->
+                  <PopoverContent as-child align="end" :side-offset="4" :width="320">
+                    <SelectContent data-type-picker @keydown="onPickerKeydown">
+                      <template #search>
+                        <Input v-model="typeQuery" placeholder="Поиск типа объекта" clearable data-field="type-search" />
+                      </template>
+                      <SelectItem
+                        v-for="(t, k) in pickerList"
+                        :key="t.id"
+                        :selected="k === activeType"
+                        :data-type-option="t.id"
+                        @click="pickType(t.id)"
+                      >
+                        {{ t.name }}
+                      </SelectItem>
+                      <Empty
+                        v-if="!pickerList.length"
+                        :title="typeQuery.trim() ? 'Ничего не найдено' : 'Все типы справочника добавлены'"
+                        class="px-4 py-6"
+                        data-type-picker-empty
+                      />
+                    </SelectContent>
+                  </PopoverContent>
+                </Popover>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="schemes">
+            <!-- Вкладка «Схемы осмотра» — Figma `30875:127755`: блоки групп через 4. -->
+            <div class="flex flex-col gap-1" data-block="schemes">
+              <Card v-for="g in groupRows" :key="g.id" as="section" class="flex flex-col gap-6" :data-group="g.id">
+                <!-- Строка группы — Figma `30875:127808`: имя и метки, вилка группы, «Настроить группу». -->
+                <div class="flex items-baseline gap-6" data-group-head>
+                  <div class="flex shrink-0 items-center gap-3">
+                    <Heading level="group" data-group-name>
+                      {{ g.name }}
                     </Heading>
                     <div class="flex items-center gap-0.5" data-badges>
-                      <Badge v-for="b in x.badges" :key="b.id" appearance="outline" :variant="BADGE_TONE[b.kind]" :data-badge="b.id">
+                      <Badge v-for="b in g.badges" :key="b.id" appearance="outline" :variant="BADGE_TONE[b.kind]" :data-badge="b.id">
                         {{ b.text }}
                       </Badge>
                     </div>
                   </div>
-                  <PriceRange label="Вилка цен" :min="x.range.min" :max="x.range.max" class="shrink-0" data-scheme-range />
-                  <IconButton variant="ghost" :label="`Настроить схему: ${x.name}`" data-act="scheme-settings" @click="m.openScheme(x.id)">
-                    <Icon name="settings" :size="16" />
-                  </IconButton>
-                </Card>
-              </div>
-              <!-- Пустая группа (№ 57, стр. 46): схемы добавляются в конструкторе схем — действия на странице нет. -->
-              <Empty
-                v-else
-                title="В группе пока нет схем"
-                description="Цена группы применится к схемам, когда они появятся в группе"
-                data-group-empty
-              />
-            </Card>
-          </div>
-        </TabsContent>
+                  <PriceRange
+                    layout="dash"
+                    label="Стоимость осмотров группы по умолчанию:"
+                    note="наследуется схемами без индивидуальной цены"
+                    :min="g.range.min"
+                    :max="g.range.max"
+                    class="flex-1"
+                    data-group-range
+                  />
+                  <ButtonAction class="shrink-0" data-act="group-settings" @click="m.openGroup(g.id)">
+                    <template #icon>
+                      <Icon name="settings" :size="16" />
+                    </template>
+                    Настроить группу
+                  </ButtonAction>
+                </div>
+
+                <!-- Строки схем — Figma `30875:127821`: имя с метками, вилка «от … до …», шестерёнка; устаревшая приглушена (§11). -->
+                <div v-if="g.schemes.length" class="flex flex-col gap-1">
+                  <Card
+                    v-for="x in g.schemes"
+                    :key="x.id"
+                    tone="muted"
+                    size="sm"
+                    :dimmed="x.outdated"
+                    class="flex items-center gap-5"
+                    :data-scheme="x.id"
+                  >
+                    <div class="flex min-w-0 flex-1 items-center gap-3">
+                      <Heading data-scheme-name>
+                        {{ x.name }}
+                      </Heading>
+                      <div class="flex items-center gap-0.5" data-badges>
+                        <Badge v-for="b in x.badges" :key="b.id" appearance="outline" :variant="BADGE_TONE[b.kind]" :data-badge="b.id">
+                          {{ b.text }}
+                        </Badge>
+                      </div>
+                    </div>
+                    <PriceRange label="Вилка цен" :min="x.range.min" :max="x.range.max" class="shrink-0" data-scheme-range />
+                    <IconButton variant="ghost" :label="`Настроить схему: ${x.name}`" data-act="scheme-settings" @click="m.openScheme(x.id)">
+                      <Icon name="settings" :size="16" />
+                    </IconButton>
+                  </Card>
+                </div>
+                <!-- Пустая группа (№ 57, стр. 46): схемы добавляются в конструкторе схем — действия на странице нет. -->
+                <Empty
+                  v-else
+                  title="В группе пока нет схем"
+                  description="Цена группы применится к схемам, когда они появятся в группе"
+                  data-group-empty
+                />
+              </Card>
+            </div>
+          </TabsContent>
+        </div>
       </Tabs>
 
       <!-- Панель группы — Figma `32021:6684`, `32021:6756`, `32021:6829`: сайд 642, правки сразу в черновик (стр. 53), подвала нет. -->
@@ -761,7 +827,7 @@ if (import.meta.client) {
             </Heading>
 
             <!-- Режимы — Figma `32021:6693`: названия по §11 (стр. 29); тело выбранного — в общей рамке с карточкой (стр. 36). -->
-            <RadioGroup v-model="groupMode" class="flex flex-col gap-2" data-field="group-mode">
+            <RadioGroup :readonly="ro" v-model="groupMode" class="flex flex-col gap-2" data-field="group-mode">
               <RadioGroupItem value="company" variant="card" :checked="groupMode === 'company'" data-group-mode="company">
                 Базовая цена компании
                 <template #description>
@@ -776,6 +842,7 @@ if (import.meta.client) {
                 </template>
                 <template #panel>
                   <PricePair
+                    :readonly="ro"
                     stretch
                     :client="panelGroup.price.client"
                     :non-client="panelGroup.price.nonClient"
@@ -794,6 +861,7 @@ if (import.meta.client) {
                 </template>
                 <template #panel>
                   <RegressScale
+                    :readonly="ro"
                     label=""
                     :steps="panelGroup.scale.steps"
                     :form="panelGroup.scale.form"
@@ -864,7 +932,7 @@ if (import.meta.client) {
               <TabsContent value="pricing">
                 <div class="flex flex-col gap-8 pt-6" data-panel-pricing>
                   <!-- Режимы — Figma `30959:23023`: названия по §11 (стр. 06); тело выбранного — в рамке карточки (стр. 36). -->
-                  <RadioGroup v-model="schemeMode" class="flex flex-col gap-2" data-field="scheme-mode">
+                  <RadioGroup :readonly="ro" v-model="schemeMode" class="flex flex-col gap-2" data-field="scheme-mode">
                     <RadioGroupItem value="group" variant="card" :checked="schemeMode === 'group'" data-scheme-mode="group">
                       По группе
                       <template #description>
@@ -879,6 +947,7 @@ if (import.meta.client) {
                       </template>
                       <template #panel>
                         <PricePair
+                          :readonly="ro"
                           stretch
                           :client="panelScheme.price.client"
                           :non-client="panelScheme.price.nonClient"
@@ -897,6 +966,7 @@ if (import.meta.client) {
                       </template>
                       <template #panel>
                         <RegressScale
+                          :readonly="ro"
                           label=""
                           :steps="panelScheme.scale.steps"
                           :form="panelScheme.scale.form"
@@ -923,6 +993,7 @@ if (import.meta.client) {
                           {{ p.name }}
                         </Heading>
                         <PricePair
+                          :readonly="ro"
                           stretch
                           variant="elevated"
                           :client="p.price.client"
@@ -951,7 +1022,7 @@ if (import.meta.client) {
                   <Callout tone="neutral" title="Цены из раздела «Типы объектов»" data-awaiting="1">
                     <p>{{ TYPES_REPLACE }}</p>
                     <template #actions>
-                      <ButtonAction data-act="customize-types" @click="m.customizeTypes(panelScheme.id)">
+                      <ButtonAction :inert="ro" data-act="customize-types" @click="m.customizeTypes(panelScheme.id)">
                         <template #icon>
                           <Icon name="settings" :size="16" />
                         </template>
@@ -987,7 +1058,7 @@ if (import.meta.client) {
                   <Callout tone="warning" title="Индивидуальные цены для этой схемы" data-awaiting="1 9">
                     <p>{{ TYPES_REPLACE }}</p>
                     <template #actions>
-                      <ButtonAction data-act="reset-types" @click="m.resetTypes(panelScheme.id)">
+                      <ButtonAction :inert="ro" data-act="reset-types" @click="m.resetTypes(panelScheme.id)">
                         <template #icon>
                           <Icon name="refresh" :size="16" />
                         </template>
@@ -998,7 +1069,7 @@ if (import.meta.client) {
                   <Popover v-model:open="schemePickerOpen">
                     <div class="flex">
                       <PopoverTrigger as-child>
-                        <ButtonAction data-act="add-scheme-type">
+                        <ButtonAction :inert="ro" data-act="add-scheme-type">
                           <template #icon>
                             <Icon name="add" :size="16" />
                           </template>
@@ -1035,6 +1106,7 @@ if (import.meta.client) {
                         {{ t.name }}
                       </Heading>
                       <PricePair
+                        :readonly="ro"
                         stretch
                         variant="elevated"
                         :client="t.price.client"
@@ -1057,6 +1129,85 @@ if (import.meta.client) {
               </TabsContent>
             </Tabs>
           </ModalCardBody>
+        </ModalCardContent>
+      </ModalCard>
+
+      <!--
+        Окно «Планирование новых тарифов» — Figma `31246:7272` (№ 44): окно вместо сайда `32021:4063` (стр. 19), 440 и кнопки
+        40 (стр. 20, 21). Месяцы и годы — сетка `Button` (№ 45): выбранный — `default`, прочие — `outline`, прошедшие и
+        текущий — `disabled` (решение оркестратора 4). Интервал — с 1-го числа (стр. 18).
+      -->
+      <ModalCard v-model:open="planOpen">
+        <ModalCardContent size="sm" data-modal="plan">
+          <ModalCardHeader title="Планирование новых тарифов" subtitle="Создание черновика будущей версии цен" />
+          <ModalCardBody class="flex flex-col gap-4">
+            <ModalCardText>
+              Укажите дату, с которой вступят в силу новые цены. До этого момента будут действовать текущие тарифы.
+            </ModalCardText>
+            <Callout tone="neutral">
+              <p>Все текущие настройки, цены и регресс-шкалы будут скопированы в черновик. Вы меняете только то, что изменится.</p>
+            </Callout>
+            <Field label="Дата вступления в силу">
+              <div class="flex flex-col gap-3">
+                <div class="grid grid-cols-4 gap-1" data-plan-months>
+                  <Button
+                    v-for="x in m.planMonths.value"
+                    :key="x.month"
+                    :variant="x.month === m.plan.month ? 'default' : 'outline'"
+                    wide
+                    :disabled="x.disabled"
+                    :aria-pressed="x.month === m.plan.month ? 'true' : 'false'"
+                    :data-plan-month="x.month"
+                    @click="m.setPlanMonth(x.month)"
+                  >
+                    {{ x.label }}
+                  </Button>
+                </div>
+                <div class="grid grid-cols-4 gap-1" data-plan-years>
+                  <Button
+                    v-for="x in m.planYears.value"
+                    :key="x.year"
+                    :variant="x.year === m.plan.year ? 'default' : 'outline'"
+                    wide
+                    :disabled="x.disabled"
+                    :aria-pressed="x.year === m.plan.year ? 'true' : 'false'"
+                    :data-plan-year="x.year"
+                    @click="m.setPlanYear(x.year)"
+                  >
+                    {{ x.year }}
+                  </Button>
+                </div>
+              </div>
+            </Field>
+          </ModalCardBody>
+          <ModalCardFooter>
+            <Button variant="secondary" data-act="plan-cancel" @click="planOpen = false">
+              Отмена
+            </Button>
+            <Button data-act="plan-confirm" @click="m.confirmPlan()">
+              Сохранить
+            </Button>
+          </ModalCardFooter>
+        </ModalCardContent>
+      </ModalCard>
+
+      <!-- «Удалить черновик?» — № 46: окна в макете нет, прецедент «Сбросить черновик?» страницы схемы (стр. 44). -->
+      <ModalCard v-model:open="deleteDraftOpen">
+        <ModalCardContent size="sm" data-modal="delete-draft">
+          <ModalCardHeader title="Удалить черновик?" />
+          <ModalCardBody>
+            <ModalCardText>
+              Черновик тарифов с {{ draftStart }} будет удалён вместе с правками. Текущие цены не изменятся.
+            </ModalCardText>
+          </ModalCardBody>
+          <ModalCardFooter>
+            <Button variant="secondary" data-act="delete-draft-cancel" @click="deleteDraftOpen = false">
+              Отмена
+            </Button>
+            <Button variant="destructive" data-act="delete-draft-confirm" @click="m.confirmDeleteDraft()">
+              Удалить черновик
+            </Button>
+          </ModalCardFooter>
         </ModalCardContent>
       </ModalCard>
 

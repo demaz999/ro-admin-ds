@@ -54,6 +54,17 @@ import { chainSteps, stepErrors } from '~/components/ui/regress-scale/rules'
  * `resetTypes` с «Отменить» (стр. 52); добавление типа — `schemePickerTypes`, `addSchemeType`. Шкалы у типов в схеме
  * нет (ждут людей, п. 9, стр. 17). Оснастка `?open=scheme`, `?scheme=<id>`, `?panel=pricing|types`,
  * `?mode=group|individual|scale` — режим открытой схемы как данные. Сценарии ТФ-20–ТФ-23, ТФ-24 (схема).
+ *
+ * ## Что добавлено в П6.1 — такт 82
+ *
+ * Периоды (6.4): выбор периода — `selectPeriod` (данные всех вкладок и панелей следуют выбранному); список периодов —
+ * `setOpen('periods')`. Планирование (№ 44, 45) — `openPlan`, `setPlanYear`, `setPlanMonth`, `confirmPlan`: месяцы до
+ * часов модели и текущий выключены, интервал — с 1-го числа (стр. 18); «Сохранить» создаёт черновик с копией применённых
+ * настроек текущего тарифа и выбирает его. Удаление черновика (№ 46) — `openDeleteDraft`, `confirmDeleteDraft`: окно
+ * подтверждения (стр. 44), после удаления выбран текущий. Архив (№ 47) — только просмотр: `readonly`, `set` отказывает.
+ * «Отменить» у уведомления возвращает выбор периода, в котором была правка. «Сохранить изменения» на черновике и
+ * запланированном — прежнее применение без окон (окна очереди и пересечений — П6.2). Оснастка `?period=`,
+ * `?open=periods` · `plan` · `delete-draft`. Сценарии ТФ-25–ТФ-28.
  */
 
 /* ------------------------------ данные ------------------------------ */
@@ -173,6 +184,8 @@ export interface ModelOptions {
   scheme?: string
   /** Вкладка панели схемы при загрузке — оснастка `?panel=pricing|types` (такт 81). */
   panel?: 'pricing' | 'types'
+  /** Выбранный период при загрузке — оснастка `?period=current|planned|draft|archive` (такт 82): первый период статуса. */
+  period?: PeriodStatus
 }
 
 /** Сколько длится запись черновика на стенде. */
@@ -277,8 +290,10 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   }
   restatus()
 
-  /** Выбранный период — по умолчанию текущий (переключатель — порция П6.1). */
-  const selectedId = reactive({ id: periods.find(p => p.status === 'current')?.id ?? periods[0]!.id })
+  /** Выбранный период — по умолчанию текущий; оснастка `?period=` (такт 82); окно удаления черновика открывается на черновике. */
+  const currentId = () => periods.find(p => p.status === 'current')?.id ?? periods[0]!.id
+  const periodAtLoad = opts.period ?? (opts.open === 'delete-draft' ? 'draft' : undefined)
+  const selectedId = reactive({ id: (periodAtLoad && periods.find(p => p.status === periodAtLoad)?.id) || currentId() })
   const selected = computed(() => periods.find(p => p.id === selectedId.id)!)
   /** Показываемые настройки выбранного периода: неприменённые правки поверх применённых. */
   const view = computed<TariffSettings>(() => selected.value.pending ?? selected.value.settings)
@@ -342,12 +357,15 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   /* ------------------------------ уведомления ------------------------------ */
   const notices = reactive<Notice[]>([])
   let noticeSeq = 0
-  /** Отмена по уведомлению — такт 78 (строка 52 реестра): действие «Отменить» у уведомления с этим номером. */
-  const undos = new Map<number, () => void>()
+  /**
+   * Отмена по уведомлению — такт 78 (строка 52 реестра): действие «Отменить» у уведомления с этим номером. С такта 82
+   * отмена помнит период правки: если выбран другой, сначала возвращается выбор периода.
+   */
+  const undos = new Map<number, { act: () => void, period: string }>()
   function notify(text: string, kind: 'ok' | 'err' = 'ok', undo?: () => void) {
     while (notices.length > 2) undos.delete(notices.shift()!.id)
     const id = ++noticeSeq
-    if (undo) undos.set(id, undo)
+    if (undo) undos.set(id, { act: undo, period: selectedId.id })
     notices.push({ id, text, kind, undo: !!undo })
   }
   function dismissNotice(id: number) {
@@ -357,9 +375,11 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   }
   /** «Отменить» у уведомления: действие выполняется один раз, уведомление уходит. */
   function undo(id: number) {
-    const act = undos.get(id)
+    const u = undos.get(id)
     dismissNotice(id)
-    act?.()
+    if (!u) return
+    if (periods.some(p => p.id === u.period)) selectedId.id = u.period
+    u.act()
   }
 
   /* ------------------------------ операции П1 ------------------------------ */
@@ -675,6 +695,89 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     return set(`${path}.types`, [...clone(x.types), { typeId, price }])
   }
 
+  /* ------------------------------ операции П6.1 — такт 82: периоды, планирование, черновик ------------------------------ */
+  /** Выбор периода (№ 4, 5, §8): данные всех вкладок и панелей — настройки выбранного; список закрывается. */
+  function selectPeriod(id: string) {
+    if (!periods.some(p => p.id === id)) return
+    selectedId.id = id
+    if (ui.open === 'periods') ui.open = ''
+  }
+  /** Периоды для переключателя: `id`, статус, начало и конец интервала. */
+  const periodList = computed(() => periods.map(p => ({ id: p.id, status: p.status, from: p.from, to: p.to })))
+
+  /** Год и месяц окна планирования (№ 44, 45). */
+  const plan = reactive({ year: 0, month: 0 })
+  const nowYm = parseYm(now)
+  const MONTH_NUMBERS = Array.from({ length: 12 }, (_, i) => i + 1)
+  /** Месяц доступен: позже текущего месяца часов модели — прошедшие и текущий выключены (§8, решение оркестратора 4). */
+  const monthOpen = (y: number, m: number) => ym(y, m) > now
+  /** Годы окна — четыре, от года часов модели (Figma `31246:7322`); год без доступных месяцев выключен. */
+  const planYears = computed(() => [0, 1, 2, 3].map((k) => {
+    const y = nowYm.y + k
+    return { year: y, disabled: !MONTH_NUMBERS.some(m => monthOpen(y, m)) }
+  }))
+  /** Месяцы выбранного года — двенадцать ячеек (Figma `31246:7294`). */
+  const PLAN_MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
+  const planMonths = computed(() => PLAN_MONTHS.map((label, i) => ({ month: i + 1, label, disabled: !monthOpen(plan.year, i + 1) })))
+  /** Открыть окно планирования: выбран первый доступный месяц — следующий за текущим. */
+  function openPlan() {
+    const next = parseYm(addMonths(now, 1))
+    plan.year = next.y
+    plan.month = next.m
+    ui.open = 'plan'
+  }
+  /** Год окна: месяц прежний, если доступен; иначе первый доступный месяц года. */
+  function setPlanYear(y: number) {
+    if (!planYears.value.some(x => x.year === y && !x.disabled)) return
+    plan.year = y
+    if (!monthOpen(y, plan.month)) plan.month = MONTH_NUMBERS.find(m => monthOpen(y, m)) ?? plan.month
+  }
+  function setPlanMonth(m: number) {
+    if (monthOpen(plan.year, m)) plan.month = m
+  }
+  /** «1 октября 2026» — начало интервала с 1-го числа (стр. 18). */
+  function startLabel(from: string) { return `1 ${monthLabel(from)}` }
+  /**
+   * «Сохранить» в окне планирования (6.4): новый черновик с началом 1-го числа выбранного месяца (стр. 18), настройки —
+   * копия применённых настроек текущего тарифа (Figma `31246:7290`: «Все текущие настройки… будут скопированы»).
+   * Переключатель — «Черновик с <месяц год>», плашка черновика. Пересечения с очередью — при сохранении черновика (П6.2).
+   */
+  let draftSeq = 0
+  function confirmPlan(): boolean {
+    if (!monthOpen(plan.year, plan.month)) return false
+    const from = ym(plan.year, plan.month)
+    const cur = periods.find(p => p.status === 'current') ?? selected.value
+    const id = `p-draft-new-${++draftSeq}`
+    periods.push({ id, status: 'draft', from, to: null, settings: clone(cur.settings), pending: null })
+    selectedId.id = id
+    ui.open = ''
+    notify(`Черновик создан: тарифы вступят в силу ${startLabel(from)}`)
+    return true
+  }
+  /** «с 1 января 2025 по 31 декабря 2025» — интервал периода по дням (плашка архива, № 47); без конца — «с 1 <месяца> <года>». */
+  function periodSpan(id: string): string {
+    const p = periods.find(x => x.id === id)
+    if (!p) return ''
+    if (!p.to) return `с ${startLabel(p.from)}`
+    const { y, m } = parseYm(p.to)
+    return `с ${startLabel(p.from)} по ${new Date(y, m, 0).getDate()} ${monthLabel(p.to)}`
+  }
+  /** «Удалить черновик» (№ 46): окно подтверждения (стр. 44). */
+  function openDeleteDraft() {
+    if (selected.value.status === 'draft') ui.open = 'delete-draft'
+  }
+  /** Подтверждение удаления: черновик удалён, выбран текущий тариф. */
+  function confirmDeleteDraft(): boolean {
+    const k = periods.findIndex(p => p.id === selectedId.id && p.status === 'draft')
+    if (k < 0) return false
+    periods.splice(k, 1)
+    selectedId.id = currentId()
+    ui.open = ''
+    notify('Черновик удалён')
+    return true
+  }
+  if (opts.open === 'plan') openPlan()
+
   /* ------------------------------ вычисления для страницы ------------------------------ */
   /** Счётчики вкладок (№ 8): типов объектов и схем выбранного периода. */
   const counts = computed(() => ({ types: view.value.objectTypes.length, schemes: view.value.schemes.length }))
@@ -683,7 +786,7 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   function dump() {
     return JSON.stringify({
       now, selected: selectedId.id, periods: periods.map(p => ({ id: p.id, status: p.status, from: p.from, to: p.to, dirty: !!p.pending })),
-      view: view.value, save: save.state, writes: save.writes, apply: apply.state, applied: apply.count, ui: { tab: ui.tab, open: ui.open, expanded: ui.expanded, panel: ui.panel },
+      plan: { year: plan.year, month: plan.month }, view: view.value, save: save.state, writes: save.writes, apply: apply.state, applied: apply.count, ui: { tab: ui.tab, open: ui.open, expanded: ui.expanded, panel: ui.panel },
       errors: { base: scaleErrors('base.scale') },
     })
   }
@@ -697,6 +800,8 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     openGroup, closePanel, setGroupMode,
     schemePath, openScheme, setPanelTab, setSchemeMode, repeatableOf, processPath, schemeTypePath, globalTypeRange,
     customizeTypes, resetTypes, schemePickerTypes, addSchemeType,
+    selectPeriod, periodList, plan, planYears, planMonths, openPlan, setPlanYear, setPlanMonth, confirmPlan, startLabel, periodSpan,
+    openDeleteDraft, confirmDeleteDraft,
   }
 }
 

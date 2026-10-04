@@ -14,6 +14,9 @@ import { ref } from 'vue'
  *
  * П4 (такт 80): `PriceRange` (карточка 4, раздел 8); оси `Badge appearance="outline"`, слот `panel` у `RadioGroupItem`,
  * `Card dimmed` (раздел 9).
+ *
+ * П6.1 (такт 82): `PeriodSwitcher` с частью `PeriodSwitcherItem` (карточка 3, раздел 8) — четыре вида триггера (Figma
+ * `30957:7855`), список периодов (`31089:12090`), пункт с меткой в слоте `badge` (окно очереди, П6.2).
  */
 definePageMeta({ layout: false })
 useHead({ title: 'Тарификация — матрицы' })
@@ -117,6 +120,29 @@ const PANEL_EXAMPLE = `<RadioGroup v-model="group.mode">
 
 const DIMMED_EXAMPLE = `<Card tone="muted" size="sm" :dimmed="scheme.outdated"> … </Card>
 <!-- содержимое на 0.48, подложка прежняя; нажатия остаются -->`
+
+/* ------------------------------ П6.1 — такт 82 ------------------------------ */
+
+/** Периоды демо: архив, текущий, запланированный, черновик — сроки по 6.4 при часах «апрель 2026». */
+const PERIODS = [
+  { id: 'p-archive', status: 'archive' as const, from: '2025-01', to: '2025-12' },
+  { id: 'p-current', status: 'current' as const, from: '2026-01', to: '2026-06' },
+  { id: 'p-planned', status: 'planned' as const, from: '2026-07', to: null },
+  { id: 'p-draft', status: 'draft' as const, from: '2026-10', to: null },
+]
+/** Живой переключатель: выбор периода и «Запланировать изменение цен». */
+const livePeriod = ref('p-current')
+const planned = ref(0)
+const PERIOD_EXAMPLE = `<PeriodSwitcher
+  v-model="selectedPeriodId"
+  v-model:open="periodsOpen"
+  :periods="periods"   <!-- { id, status: 'current' | 'planned' | 'draft' | 'archive', from: 'ГГГГ-ММ', to: 'ГГГГ-ММ' | null }[] -->
+  @plan="openPlanDialog"
+/>   <!-- срок выводит сам: «до <месяц год>» у текущего и архива, «с <месяц год>» у запланированного и черновика -->
+
+<PeriodSwitcherItem :period="period">   <!-- пункт вне списка, например в окне очереди -->
+  <template #badge><Badge appearance="outline">Изменяется</Badge></template>
+</PeriodSwitcherItem>`
 
 const FIELD_EXAMPLE = `<Field orientation="split" label="Базовая стоимость схемы осмотра" :hint="hint" :hint-tone="scale.on ? 'warning' : 'default'">
   <PricePair … />
@@ -420,6 +446,49 @@ const FIELD_EXAMPLE = `<Field orientation="split" label="Базовая стои
         </IconButton>
         <span>sm · md · lg · выключено; наведение — `--destructive-surface`</span>
       </div>
+    </section>
+
+    <section class="flex flex-col gap-4" data-matrix="period-switcher">
+      <Heading>PeriodSwitcher — переключатель тарифного периода (Figma `30957:7855`, `31089:12090`)</Heading>
+      <div class="grid grid-cols-[10rem_auto] items-center justify-start gap-x-6 gap-y-3 text-xs">
+        <template v-for="p in PERIODS" :key="p.id">
+          <span>{{ p.status }}</span>
+          <div class="flex">
+            <PeriodSwitcher :model-value="p.id" :periods="PERIODS" :data-case="`period-${p.status}`" />
+          </div>
+        </template>
+        <span>живой</span>
+        <div class="flex items-center gap-4">
+          <PeriodSwitcher v-model="livePeriod" :periods="PERIODS" data-case="period-live" @plan="planned++" />
+          <span>выбран {{ livePeriod }}; «Запланировать» — {{ planned }}</span>
+        </div>
+      </div>
+      <Heading>Список периодов и пункт с меткой — PeriodSwitcherItem</Heading>
+      <div class="flex items-start gap-8">
+        <SelectContent :width="280" max-height="none" data-case="period-list">
+          <SelectGroup>
+            <PeriodSwitcherItem :period="PERIODS[1]!" selected />
+            <PeriodSwitcherItem :period="PERIODS[2]!" />
+            <PeriodSwitcherItem :period="PERIODS[3]!" />
+          </SelectGroup>
+          <SelectGroup>
+            <PeriodSwitcherItem :period="PERIODS[0]!" />
+          </SelectGroup>
+        </SelectContent>
+        <SelectContent :width="432" max-height="none" data-case="period-item-badge">
+          <PeriodSwitcherItem :period="PERIODS[1]!">
+            <template #badge>
+              <Badge appearance="outline">Изменяется</Badge>
+            </template>
+          </PeriodSwitcherItem>
+          <PeriodSwitcherItem :period="PERIODS[2]!">
+            <template #badge>
+              <Badge appearance="outline" variant="neutral">Затронет</Badge>
+            </template>
+          </PeriodSwitcherItem>
+        </SelectContent>
+      </div>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ PERIOD_EXAMPLE }}</pre>
     </section>
   </main>
 </template>

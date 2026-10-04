@@ -18,4 +18,11 @@ export const TARIFFS_COVERAGE_STATES = [
    */
   'open=scheme', 'open=scheme&mode=individual', 'open=scheme&scheme=s-pre', 'open=scheme&scheme=s-moto',
   'open=scheme&panel=types', 'open=scheme&scheme=s-flat&panel=types', 'open=scheme&panel=types&data=empty',
+  /*
+   * Такт 82, П6.1: список периодов, окно планирования; запланированный, черновик с плашкой, окно удаления черновика; архив —
+   * только просмотр на трёх вкладках и в панелях.
+   */
+  'open=periods', 'open=plan', 'period=planned', 'period=draft', 'open=delete-draft',
+  'period=archive', 'period=archive&expand=t-special', 'period=archive&tab=schemes', 'period=archive&open=group&group=g-realty',
+  'period=archive&open=scheme', 'period=archive&open=scheme&scheme=s-flat&panel=types',
 ] as const
