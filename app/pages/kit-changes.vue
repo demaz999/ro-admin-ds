@@ -314,6 +314,25 @@ const ro = ref({ name: 'КАСКО — осмотр', text: 'Осмотр авт
             </ActionBar>
             <span class="text-xs text-muted-foreground">панель в потоке; плавающая полоса — layout="float", прежняя</span>
           </template>
+          <template v-else-if="c.id === 'input-trailing'">
+            <Input model-value="фото" placeholder="Поиск по настройкам схемы" clearable>
+              <template #trailing>
+                <ToolbarText>2 из 7</ToolbarText>
+                <IconButton variant="service" size="sm" label="Предыдущее совпадение">
+                  <Icon name="chevron-up" :size="16" />
+                </IconButton>
+                <IconButton variant="service" size="sm" label="Следующее совпадение">
+                  <Icon name="chevron-down" :size="16" />
+                </IconButton>
+              </template>
+            </Input>
+            <Input model-value="" placeholder="Поиск по настройкам схемы" clearable>
+              <template #trailing>
+                <ToolbarText>0 из 0</ToolbarText>
+              </template>
+            </Input>
+            <span class="text-xs text-muted-foreground">слот виден и у пустого поля; крестик очистки стоит после слота</span>
+          </template>
           <template v-else-if="c.id === 'input-end'">
             <Input v-model="draftSearch" placeholder="Поиск по настройкам схемы" clearable>
               <template #end>

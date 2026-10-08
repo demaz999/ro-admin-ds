@@ -431,6 +431,11 @@
     --color-list-selected: var(--list-selected);
     --color-popover-scroll-thumb: var(--popover-scroll-thumb);
 
+    /* Совпадение поиска — такт 86: подложка совпавшего фрагмента в выдаче (`HighlightText`) и на странице
+       (`::highlight(search-match)`); текущее совпадение режима «найдено» — ступень плотнее. */
+    --color-search-match: var(--search-match);
+    --color-search-match-current: var(--search-match-current);
+
     /* Расширения темы как утилиты: bg-primary-hover, text-foreground-secondary… */
     --color-foreground-hover: var(--foreground-hover);
     --color-foreground-disabled: var(--foreground-disabled);
@@ -673,6 +678,10 @@
     --shadow-elevated-pressed: 0 4px 16px 0 #0c101814; /* 8% */
     --list-hover: var(--accent);                    /* решение: bg/surface_hover — роль совпадает буквально */
     --list-selected: var(--surface-selected);       /* решение: bg/surface_selected — то же */
+    /* Совпадение поиска — такт 86 (`docs/scheme-edit.md`, раздел 11): маркер найденного тёплой ступенью, как у поиска IDE и
+       браузера — синяя подложка читалась бы выделением текста. Текст на обеих ступенях — `--foreground`, контраст 14.8:1 и 10.3:1. */
+    --search-match: var(--warning-surface);         /* решение: service/warning-surface — все совпадения */
+    --search-match-current: var(--warning-disabled); /* решение: service/warning-disabled — ступень плотнее, текущее совпадение */
     --popover-scroll-thumb: var(--border-neutral);  /* решение: border/neutral_soft — серый бегунок на белой плашке */
     --tag: var(--secondary);                        /* решение: accent/surface_soft — подложка неактивного тега */
     /* Чип — компонент кита 1, мастер `badge` 747:2464. Заливка привязана там к
@@ -941,5 +950,17 @@
        рендерингом, а не подгонкой значений. */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    }
+
+  /* Подсветка совпадений на странице — CSS Custom Highlight API, такт 86 (решение 2 оркестратора 2026-10-08): диапазоны
+     ставит `highlightMatches` (`ui/highlight-text/index.ts`), разметку страницы подсветка не трогает. Браузер без API
+     правило пропускает — подсветки нет, остальное работает. */
+  ::highlight(search-match) {
+    background-color: var(--search-match);
+    color: var(--foreground);
+    }
+  ::highlight(search-match-current) {
+    background-color: var(--search-match-current);
+    color: var(--foreground);
     }
 }

@@ -12,7 +12,9 @@ const props = withDefaults(defineProps<{
   label: string
   /** Статус раздела — единая система индикаторов: `none` — точки нет. */
   status?: SectionNavStatus
-}>(), { status: 'none' })
+  /** Счётчик раздела — такт 86: число совпадений поиска в режиме «найдено»; 0 показывается. Не задан — счётчика нет. */
+  count?: number
+}>(), { status: 'none', count: undefined })
 
 const ctx = inject(SECTION_NAV_KEY, { model: ref(''), select: () => {} })
 const active = computed(() => ctx.model.value === props.value)
@@ -39,6 +41,12 @@ const STATUS_CLASS: Record<SectionNavStatus, string> = { none: '', on: 'bg-succe
       <span v-if="props.status !== 'none'" data-slot="section-nav-status" class="size-1.5 shrink-0 rounded-full" :class="STATUS_CLASS[props.status]">
         <span class="sr-only">{{ STATUS_TEXT[props.status] }}</span>
       </span>
+      <!-- Счётчик — у правого края строки; пилюля счётчика вкладки (`TabsTrigger count`) на подложке `--card`: навигатор сам стоит на `--accent`. -->
+      <span
+        v-if="props.count !== undefined"
+        data-slot="section-nav-count"
+        class="ml-auto inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-card px-1.5 text-xs font-bold text-foreground-secondary"
+      >{{ props.count }}</span>
     </button>
     <div v-if="active && $slots.default" data-slot="section-nav-anchors" class="flex flex-col pl-4">
       <slot />

@@ -23,4 +23,9 @@ export const SCHEME_COVERAGE_STATES = [
   /* Такт 72, П8: «Витрина» — статусы карточки, новая схема, просмотр версии; пустые «Форма» и «Процессы» сохранённой новой схемы. */
   'tab=showcase&card=needs', 'tab=showcase&card=published', 'data=new&tab=showcase', 'view=v1&tab=showcase',
   'data=new&saved=1&tab=form', 'data=new&saved=1&tab=processes',
+  /*
+   * Такт 86, поиск как в IDE: выдача с охватом, значениями и переключателями, повтор в другой раскладке, «Недавние»,
+   * фильтр «Изменено в черновике», режим «найдено» на «Настройках», «Форме» и по изменённому.
+   */
+  'q=фото', 'q=фото&scope=settings', 'q=hfpvsn', 'recent=demo', 'modified=list', 'find=фото', 'find=госномер', 'modified=1',
 ] as const

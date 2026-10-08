@@ -4,7 +4,10 @@ import {
   type ShowcaseMetric, type ShowcaseProblem, type StepFlag,
 } from './catalogs'
 import { diffConfigs, formatDate, plural, summarize, validateConfig } from './diff'
-import { QUICK_LINKS, searchSettings, type SearchItem } from './search'
+import {
+  buildSearchIndex, groupHits, modifiedKeys, QUICK_LINKS, READONLY_REASON, runSearch, SEARCH_SCOPES, toggleNotice,
+  type ActionKey, type SearchEntry, type SearchScope,
+} from './search'
 
 export * from './catalogs'
 
@@ -49,7 +52,11 @@ export * from './catalogs'
  * после публикации схемы), теги каскадом (`setIndustry`), «Зачем нужен осмотр» с шаблоном по типу объекта (`applyTemplate`),
  * метрики, модули «Из схемы» (`hideModule`, `schemeModules`) и статусы «Как устроена схема» (`schemeFlow`); двухфазность
  * новой схемы (`phaseLocked`, `tabLocked`); плашка автосохранения (`closeHint`); поля витрины входят в поиск. Порции —
- * `scheme-edit.md`, раздел 10.
+ * `scheme-edit.md`, раздел 10. **Такт 86 — поиск как в IDE** (`scheme-edit-review.md`, раздел 3): индекс страницы и действий
+ * (`searchIndex`), выдача по охвату (`search`, `searchGroups`, `setScope`, `cycleScope`, `expand`), переключение булевой
+ * настройки из выдачи с отменой (`toggleFromSearch`), действия (`runAction`), «Недавние» (`recentPlaces`, `setRecent`), режим
+ * «найдено» (`openResult`, `findHits`, `findStep`, `exitFind`, счётчики `findCounts`), фильтр «Изменено в черновике»
+ * (`setModified`, `changedKeys`). Индекс и сопоставление — `search.ts`.
  */
 
 export type TabId = 'settings' | 'form' | 'processes' | 'showcase'
@@ -402,6 +409,8 @@ export type SectionStatus = 'none' | 'on' | 'off' | 'attention'
 
 /** Открытая поверхность — r2 §7: сайд, модалка-гейт, оверлей; стек — снизу вверх. */
 export interface Surface { kind: 'side' | 'modal' | 'overlay', id: string }
+/** Сайд, который открывает страница по действию из выдачи поиска (такт 86): его черновик живёт на странице. */
+export type ActionSide = 'field' | 'group' | 'process'
 
 /** Набор демо-данных: у набора с версиями черновик задан правками поверх current, у новой схемы — конфигурацией. */
 export interface Dataset {
@@ -550,8 +559,22 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     viewing: (opts.viewing && data.snapshots.some(v => v.id === opts.viewing) ? opts.viewing : '') as string,
     /** Версия, открытая вторым слоем сайда истории. */
     historyVersion: '',
-    /** Найденное: цель на странице и счётчик перехода — страница прокручивает к цели и подсвечивает её. */
-    found: { target: '', n: 0 },
+    /**
+     * Найденное: цель на странице и счётчик перехода — страница прокручивает к цели и подсвечивает её. `focus` — фокус уходит
+     * на цель (переход из выдачи и F3 со страницы); переход из поля поиска фокус оставляет в поле (такт 86).
+     */
+    found: { target: '', n: 0, focus: true },
+    /* ---------- поиск как в IDE — такт 86 ---------- */
+    /** Охват выдачи — 3.2, п. 6. */
+    scope: 'all' as SearchScope,
+    /** Группы выдачи, раскрытые «ещё N». */
+    expanded: [] as string[],
+    /** Фильтр «Изменено в черновике» — 3.2, п. 17. */
+    modified: false,
+    /** Режим «найдено»: включён и текущее совпадение — ключ индекса (3.2, пп. 14–18). */
+    find: { on: false, current: '' },
+    /** «Недавние» — запросы и места переходов, свежие первыми (3.2, п. 11); страница помнит их в сессии вкладки. */
+    recent: { queries: [] as string[], places: [] as string[] },
   })
 
   /** Конфигурация на экране: открытый снимок либо черновик. */
@@ -1198,35 +1221,198 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   /** Плашка «Сохранение теперь автоматическое» — одноразовая ориентация: закрытая не возвращается (СС-56). */
   function closeHint() { ui.hintClosed = true }
 
-  /* ------------------------------ поиск — П5 ------------------------------ */
-  /** Выдача по текущему запросу: группы по пути «Настройки → Раздел», поля формы — «Форма → Группа» (такт 69). */
-  const results = computed(() => searchSettings(ui.query, shown.value.form, shown.value.processes, true))
-  function setQuery(q: string) { ui.query = q }
+  /* ------------------------------ поиск как в IDE — такт 86 ------------------------------ */
   /**
-   * Переход к найденному — `spec-audit.md`, «Требования к поиску»: таб → раздел → якорь; цель для прокрутки и
-   * подсветки страница берёт из `ui.found`. Запрос очищается, выдача снимается.
+   * Индекс страницы — `search.ts`: настройки, группы и поля, процессы и шаги, поля витрины, действия; значения и причины
+   * погашения — по конфигурации на экране (черновик либо открытый снимок).
    */
-  function goTo(item: SearchItem) {
-    if (item.group) {
-      /* Поле формы (такт 69): таб «Форма», его группа; цель — строка поля. */
+  const searchIndex = computed<SearchEntry[]>(() => buildSearchIndex({
+    config: shown.value, rules: rules.value, viewing: !!ui.viewing, phaseLocked: phaseLocked.value, phaseReason: PHASE_REASON,
+    hasCurrent: !!current.value, dirty: dirty.value,
+  }))
+  /** «Изменено в черновике» доступно, когда есть с чем сравнить: опубликованная версия, черновик на экране. */
+  const modifiedAvailable = computed(() => !!current.value && !ui.viewing)
+  /** Места, изменённые в черновике против текущей версии (3.2, п. 17). */
+  const changedKeys = computed(() => (modifiedAvailable.value ? modifiedKeys(current.value!.config, draft.config) : new Set<string>()))
+  /** Выдача по запросу, охватам и фильтру; при равенстве уровня недавнее выше. */
+  const search = computed(() => runSearch(searchIndex.value, ui.query, { recent: ui.recent.places, only: ui.modified ? changedKeys.value : null }))
+  /** Выдача группами по пути в текущем охвате, «ещё N» у длинных групп. */
+  const searchGroups = computed(() => groupHits(search.value.hits, ui.scope, ui.expanded))
+  const entry = (key: string) => searchIndex.value.find(e => e.key === key) ?? null
+
+  /** Запрос в поле: смена запроса снимает режим «найдено» и раскрытие групп. */
+  function setQuery(q: string) {
+    if (q === ui.query) return
+    ui.query = q
+    ui.expanded = []
+    if (ui.find.on) ui.find = { on: false, current: '' }
+  }
+  function setScope(scope: SearchScope) { ui.scope = scope }
+  /** Tab и Shift+Tab в поле — соседний охват по кругу. */
+  function cycleScope(dir: 1 | -1) {
+    const k = SEARCH_SCOPES.findIndex(s => s.id === ui.scope)
+    ui.scope = SEARCH_SCOPES[(k + dir + SEARCH_SCOPES.length) % SEARCH_SCOPES.length]!.id
+  }
+  /** «ещё N» — группа выдачи целиком. */
+  function expand(path: string) { if (!ui.expanded.includes(path)) ui.expanded.push(path) }
+  /** Фильтр «Изменено в черновике»: недоступен без опубликованной версии и в просмотре прошлой. */
+  function setModified(on: boolean) {
+    if (on && !modifiedAvailable.value) return
+    ui.modified = on
+    ui.expanded = []
+    if (ui.find.on) ui.find = { on: false, current: '' }
+  }
+
+  /**
+   * Переход к месту — `spec-audit.md`, «Требования к поиску»: таб → раздел → якорь; цель для прокрутки и подсветки страница
+   * берёт из `ui.found`. `focus` — фокус уходит на цель.
+   */
+  function goTo(item: Pick<SearchEntry, 'tab' | 'section' | 'anchor' | 'group' | 'target'>, focus = true) {
+    if (item.tab === 'form') {
+      /* Поле и группа формы (такт 69, 86): таб «Форма», группа места. */
       ui.tab = 'form'
-      selectGroup(item.group)
+      if (item.group) selectGroup(item.group)
     }
-    else if (item.process) {
-      /* Шаг процесса (такт 70): таб «Процессы и шаги»; цель — строка шага. */
-      ui.tab = 'processes'
-    }
-    else if (item.showcase) {
-      /* Поле витрины (такт 72): таб «Витрина»; цель — поле карточки. */
-      ui.tab = 'showcase'
-    }
+    else if (item.tab === 'processes') ui.tab = 'processes'
+    else if (item.tab === 'showcase') ui.tab = 'showcase'
     else {
       ui.tab = 'settings'
-      setSection(item.section as SectionId, item.anchor)
+      if (item.section) setSection(item.section as SectionId, item.anchor)
     }
-    ui.found = { target: item.target, n: ui.found.n + 1 }
-    ui.query = ''
+    ui.found = { target: item.target, n: ui.found.n + 1, focus }
   }
+
+  /* «Недавние» — 3.2, п. 11: запросы и места, по пять, свежие первыми. */
+  const RECENT_LIMIT = 5
+  function remember(query: string, key: string) {
+    const q = query.trim()
+    if (q) ui.recent.queries = [q, ...ui.recent.queries.filter(x => x !== q)].slice(0, RECENT_LIMIT)
+    ui.recent.places = [key, ...ui.recent.places.filter(x => x !== key)].slice(0, RECENT_LIMIT)
+  }
+  function setRecent(r: { queries?: string[], places?: string[] }) {
+    ui.recent.queries = (r.queries ?? []).filter(x => typeof x === 'string').slice(0, RECENT_LIMIT)
+    ui.recent.places = (r.places ?? []).filter(x => typeof x === 'string').slice(0, RECENT_LIMIT)
+  }
+  /** Недавние места, которые есть в индексе: удалённое из «Недавних» выпадает. */
+  const recentPlaces = computed(() => ui.recent.places.map(entry).filter((e): e is SearchEntry => !!e))
+
+  /**
+   * Выбор строки выдачи — 3.2, п. 14: место — переход и режим «найдено» с этим совпадением текущим, запрос остаётся в поле;
+   * действие — выполняется, запрос очищается. Возвращает сайд, который откроет страница (новое поле, группа, процесс).
+   */
+  function openResult(key: string): ActionSide | null {
+    const e = entry(key)
+    if (!e) return null
+    remember(ui.query, key)
+    if (e.type === 'action') {
+      ui.find = { on: false, current: '' }
+      return runAction(e.key.replace(/^action\./, '') as ActionKey)
+    }
+    ui.find = { on: true, current: key }
+    goTo(e, true)
+    return null
+  }
+
+  /** Совпадения режима «найдено» в порядке страницы: места без действий (3.2, п. 14). */
+  const findHits = computed<SearchEntry[]>(() => (ui.find.on
+    ? search.value.hits.map(h => h.entry).filter(e => e.type !== 'action').sort((a, b) => a.order - b.order)
+    : []))
+  /** Номер текущего совпадения с единицы; 0 — текущее выпало из списка. */
+  const findPos = computed(() => findHits.value.findIndex(e => e.key === ui.find.current) + 1)
+  /**
+   * Следующее и предыдущее совпадение — Enter и Shift+Enter в поле, F3 и Shift+F3 на странице, стрелки поля; по кругу,
+   * через разделы и табы.
+   */
+  function findStep(dir: 1 | -1, focus = false) {
+    const list = findHits.value
+    if (!ui.find.on || !list.length) return
+    const k = list.findIndex(e => e.key === ui.find.current)
+    const next = list[k < 0 ? (dir > 0 ? 0 : list.length - 1) : (k + dir + list.length) % list.length]!
+    ui.find.current = next.key
+    goTo(next, focus)
+  }
+  /** Счёт совпадений: табы, разделы «Настроек», число разделов для плашки (раздел «Настроек» либо таб). */
+  const findCounts = computed(() => {
+    const tabs: Record<TabId, number> = { settings: 0, form: 0, processes: 0, showcase: 0 }
+    const sections = Object.fromEntries(SECTIONS.map(s => [s.id, 0])) as Record<SectionId, number>
+    const areas = new Set<string>()
+    for (const e of findHits.value) {
+      if (!e.tab) continue
+      tabs[e.tab] += 1
+      if (e.tab === 'settings') sections[e.section as SectionId] += 1
+      areas.add(e.tab === 'settings' ? `settings:${e.section}` : e.tab)
+    }
+    return { tabs, sections, areas: areas.size }
+  })
+  /** Плашка над содержимым — 3.2, п. 16: «7 совпадений в 3 разделах»; у фильтра без запроса — «Изменено в черновике: …». */
+  const findSummary = computed(() => {
+    const n = findHits.value.length
+    const m = findCounts.value.areas
+    const where = `в ${m} ${plural(m, 'разделе', 'разделах', 'разделах')}`
+    if (ui.modified && !search.value.effective) return `Изменено в черновике: ${n} ${plural(n, 'правка', 'правки', 'правок')} ${where}`
+    return `${n} ${plural(n, 'совпадение', 'совпадения', 'совпадений')}${ui.modified ? ' среди изменённого' : ''} ${where}`
+  })
+  /** Набор в поле в режиме «найдено» — режим снят, запрос и фильтр прежние: снова выдача. */
+  function leaveFind() {
+    if (ui.find.on) ui.find = { on: false, current: '' }
+  }
+  /** Esc в поле и «Сбросить» — режим снят, запрос и фильтр очищены (3.2, п. 18). */
+  function exitFind() {
+    ui.find = { on: false, current: '' }
+    ui.query = ''
+    ui.modified = false
+    ui.expanded = []
+  }
+  /** Режим «найдено» без выбора строки: первое совпадение в порядке страницы — оснастка `?find=`, `?modified=1`. */
+  function startFind() {
+    ui.find = { on: true, current: '' }
+    const first = findHits.value[0]
+    if (!first) { ui.find.on = false; return }
+    ui.find.current = first.key
+    goTo(first, false)
+  }
+
+  /**
+   * Переключение булевой настройки из выдачи — 3.2, п. 9; решение 4 оркестратора 2026-10-08: та же операция модели, что
+   * клик на странице (`set`: автосохранение, дифф), и уведомление «Настройка «…» выключена · Отменить». Погашенная
+   * зависимостью отказывает с причиной.
+   */
+  function toggleFromSearch(key: string): boolean {
+    const e = entry(key)
+    if (!e?.toggle) return false
+    if (ui.viewing) { notify(READONLY_REASON, 'err'); return false }
+    if (e.reason) { notify(e.reason, 'err'); return false }
+    const before = e.checked
+    if (!set(e.setPath, !before)) return false
+    notify(toggleNotice(e.label, !before), 'ok', true, () => set(e.setPath, before))
+    return true
+  }
+
+  /**
+   * Действия страницы из выдачи — 3.2, п. 10: те же операции, что кнопки страницы. Новое поле, группа и процесс — сайд, его
+   * черновик держит страница: модель открывает нужный таб и отдаёт, какой сайд открыть.
+   */
+  function runAction(key: ActionKey): ActionSide | null {
+    ui.query = ''
+    switch (key) {
+      case 'publish': openPublish(); return null
+      case 'preview': preview(); return null
+      case 'history': openHistory(); return null
+      case 'reset': openReset(); return null
+      case 'copy': copy(); return null
+      case 'add-field':
+        if (!canEdit() || !setTab('form')) return null
+        if (!formGroup.value) { notify('В форме нет групп — сначала добавьте группу', 'err'); return null }
+        return 'field'
+      case 'add-group': return canEdit() && setTab('form') ? 'group' : null
+      case 'add-process': return canEdit() && setTab('processes') ? 'process' : null
+      case 'fill-images':
+        if (canEdit() && setTab('processes')) fillImages()
+        return null
+      default: return null
+    }
+  }
+
   /** «Быстрый переход» пустой выдачи: раздел либо таб. */
   function quick(index: number) {
     const link = QUICK_LINKS[index]
@@ -1337,13 +1523,16 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
       draft: draft.config, author: draft.author, versions: snapshots.map(s => s.id), current: current.value?.id ?? null,
       publish: publishState.value, save: save.state, writes: save.writes,
       ui: { tab: ui.tab, hintClosed: ui.hintClosed, section: ui.section, anchor: ui.anchor, scroll: ui.scroll, viewing: ui.viewing, surfaces: ui.surfaces.map(x => x.id), historyVersion: ui.historyVersion, group: ui.group, selectedFields: ui.selectedFields, selectedSteps: ui.selectedSteps },
+      search: { query: ui.query, scope: ui.scope, modified: ui.modified, find: ui.find, recent: ui.recent },
     })
   }
 
   return {
     snapshots, current, draft, dirty, publishState, save, ui, notices,
     rules, rule, approvalCount, sectionStatus, variables, variableSamples, topSurface,
-    results, setQuery, goTo, quick,
+    searchIndex, search, searchGroups, setQuery, setScope, cycleScope, expand, setModified, modifiedAvailable, changedKeys, goTo, quick,
+    openResult, findHits, findPos, findStep, findCounts, findSummary, leaveFind, exitFind, startFind, toggleFromSearch, runAction,
+    recentPlaces, setRecent, remember,
     shown, draftDiff, warnings, blocked, summary, draftDate, history, versionDiff, versionShown, viewingText,
     openPublish, confirmPublish, openReset, confirmReset, copy, preview, menu, confirmDelete, openHistory, openVersion, closeVersion, view, leaveView,
     set, setTab, setSection, rememberScroll, back, retry, notify, dismissNotice, dump,

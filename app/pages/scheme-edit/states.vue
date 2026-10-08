@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onBeforeUnmount, ref } from 'vue'
 import { formulaPreview } from '~/components/ui/formula-input'
+import { clearMatches, highlightMatches, queryWords } from '~/components/ui/highlight-text'
 
 /**
  * Матрицы компонентов страницы «Редактирование схемы осмотра» — стенд, такты 61–62. Примеры вызова для фронтов.
@@ -193,6 +194,42 @@ const FORMULA_EXAMPLE = `<Field label="Тема письма оповещени�
   <FormulaInput v-model="formula" :variables="[{ value: 'Car:vin', label: 'VIN', group: 'Автомобиль' }, …]" label="Тема письма оповещения" />
 </Field>
 <FormulaPreview :value="formulaPreview(formula, { 'Car:vin': 'DEMO0000000001024' })" />   <!-- превью считает страница -->`
+
+/* ------------------------------ Такт 86: поиск как в IDE ------------------------------ */
+const resultOn = ref(true)
+const resultLog = ref('—')
+const SEARCH_RESULT_EXAMPLE = `<!-- строка выдачи: иконка типа, подпись с подсвеченным совпадением, пояснение, значение справа -->
+<SearchResult type="setting" label="Разрешение фото" query="фото" value="Среднее — 2 Мп" :active="active === key" @select="open(key)" />
+<!-- булева настройка: переключатель справа; нажатие по нему — событие toggle, строку оно не выбирает -->
+<SearchResult type="setting" label="Детектор «Размытые изображения»" query="размыт фото" hint="по запросу «размытые фото»" toggle :checked="on" @toggle="toggle(key)" />
+<!-- погашенная зависимостью: всё на 0.48, причина второй строкой полным контрастом, переключатель выключен -->
+<SearchResult type="setting" label="Разрешить принимать осмотр одной кнопкой" toggle reason="Доступно только для стандартной схемы" />
+<!-- действие — своя иконка -->
+<SearchResult type="action" icon="visibility" label="Предпросмотр" query="пред" />`
+
+const HIGHLIGHT_TEXT_EXAMPLE = `<!-- каждое слово запроса — начало слова в тексте, иначе — с середины слова от трёх знаков; регистр и «ё» не важны -->
+<HighlightText text="Детектор «Размытые изображения»" query="размыт изоб" />
+
+<!-- подсветка на странице — CSS Custom Highlight API: разметку страницы не трогает -->
+highlightMatches([{ el: row, words: queryWords('фото'), current: true }, { el: other, words: queryWords('фото') }])
+clearMatches()`
+
+const SECTION_NAV_COUNT_EXAMPLE = `<!-- режим «найдено» страницы схемы: число совпадений раздела у правого края строки; 0 показывается -->
+<SectionNavItem value="anomalies" label="Аномалии" status="on" :count="2" />`
+
+/** Подсветка на странице — пример `highlightMatches` на узлах матрицы: все совпадения и текущее. */
+const pagePainted = ref('—')
+function paintDemo() {
+  const rows = [...document.querySelectorAll('[data-matrix="page-highlight"] [data-demo-row]')]
+  const words = queryWords('фото')
+  const r = highlightMatches(rows.map((el, k) => ({ el, words, current: k === 1 })))
+  pagePainted.value = `${r.all} + ${r.current}`
+}
+function clearDemo() {
+  clearMatches()
+  pagePainted.value = '—'
+}
+onBeforeUnmount(() => clearMatches())
 </script>
 
 <template>
@@ -679,6 +716,91 @@ const FORMULA_EXAMPLE = `<Field label="Тема письма оповещени�
         </template>
       </div>
       <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ READONLY_EXAMPLE }}</pre>
+    </section>
+    <!-- ============================ Такт 86: поиск как в IDE ============================ -->
+    <section class="flex flex-col gap-4" data-matrix="search-result">
+      <Heading>SearchResult — строка выдачи поиска: иконка типа, подпись с подсвеченным совпадением, пояснение, значение либо переключатель</Heading>
+      <div class="grid grid-cols-2 items-start gap-6">
+        <div class="flex flex-col gap-2">
+          <ToolbarText>Типы и значение справа</ToolbarText>
+          <div class="flex w-160 flex-col rounded-lg bg-popover p-1 shadow-dropdown" role="listbox">
+            <SearchResult type="setting" label="Разрешение фото" query="фото" value="Среднее — 2 Мп" data-case="setting-value" @select="resultLog = 'select: setting'" />
+            <SearchResult type="setting" label="Детектор «Размытые изображения»" query="размыт фото" hint="по запросу «размытые фото»" toggle :checked="resultOn" data-case="setting-toggle" @toggle="resultOn = !resultOn; resultLog = 'toggle'" @select="resultLog = 'select: toggle row'" />
+            <SearchResult type="field" label="Госномер" query="regnum" hint="алиас regnum" value="Текст" data-case="field" />
+            <SearchResult type="group" label="Автомобиль" query="авто" value="4 поля" data-case="group" />
+            <SearchResult type="step" label="VIN под стеклом" query="фото" hint="Сфотографируйте VIN-номер через лобовое стекло" value="Основной" data-case="step" />
+            <SearchResult type="process" label="Осмотр документов" query="осмотр док" value="1 шаг" data-case="process" />
+            <SearchResult type="showcase" label="Продающее название" query="прод" value="не задано" data-case="showcase" />
+            <SearchResult type="action" icon="visibility" label="Предпросмотр" query="пред" data-case="action" />
+          </div>
+        </div>
+        <div class="flex flex-col gap-2">
+          <ToolbarText>Состояния: активная, недоступная с причиной, служебные строки</ToolbarText>
+          <div class="flex w-160 flex-col rounded-lg bg-popover p-1 shadow-dropdown" role="listbox">
+            <SearchResult type="setting" label="Блокировать осмотр при проверке" query="блок" toggle checked active data-case="active" />
+            <SearchResult type="setting" label="Разрешить принимать осмотр одной кнопкой" query="одной" toggle reason="Доступно только для стандартной схемы" data-case="reason-toggle" />
+            <SearchResult type="action" icon="refresh" label="Сбросить черновик" query="сброс" reason="Черновик совпадает с текущей версией" data-case="reason-action" />
+            <SearchResult type="query" label="размыт фото" data-case="query" />
+            <SearchResult type="more" label="ещё 10" data-case="more" />
+            <SearchResult type="filter" label="Изменено в черновике" hint="Места, которые черновик меняет против текущей версии" value="4 места" data-case="filter" />
+          </div>
+          <ToolbarText>
+            Событие строки: {{ resultLog }}
+          </ToolbarText>
+        </div>
+      </div>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ SEARCH_RESULT_EXAMPLE }}</pre>
+    </section>
+
+    <section class="flex flex-col gap-4" data-matrix="highlight-text">
+      <Heading>HighlightText — фрагмент текста с подсветкой совпадения; подсветка на странице — CSS Custom Highlight API</Heading>
+      <div class="grid grid-cols-2 items-start gap-6">
+        <div class="flex flex-col gap-2 text-sm font-medium">
+          <span data-case="word-start"><HighlightText text="Детектор «Размытые изображения»" query="размыт изоб" /></span>
+          <span data-case="any-order"><HighlightText text="Детектор «Размытые изображения»" query="изоб размыт" /></span>
+          <span data-case="mid-word"><HighlightText text="Сфотографируйте VIN-номер через лобовое стекло" query="фото" /></span>
+          <span data-case="yo"><HighlightText text="Съёмка с экрана" query="СЪЕМК" /></span>
+          <span data-case="none"><HighlightText text="Отправлять поля на согласование" query="фото" /></span>
+          <span class="text-xs text-field-placeholder" data-case="small"><HighlightText text="по запросу «размытые фото»" query="фото" /></span>
+        </div>
+        <div class="flex flex-col gap-2" data-matrix="page-highlight">
+          <p class="m-0 text-sm" data-demo-row>
+            Разрешение фото — все совпадения: подложка --search-match
+          </p>
+          <p class="m-0 text-sm" data-demo-row>
+            Фото-подсказка шага — текущее совпадение: подложка --search-match-current
+          </p>
+          <p class="m-0 text-sm" data-demo-row>
+            Строка без совпадения
+          </p>
+          <div class="flex items-center gap-3">
+            <Button variant="secondary" data-act="paint" @click="paintDemo()">
+              Подсветить «фото»
+            </Button>
+            <Button variant="outline" data-act="unpaint" @click="clearDemo()">
+              Снять
+            </Button>
+            <ToolbarText>Фрагментов: {{ pagePainted }}</ToolbarText>
+          </div>
+        </div>
+      </div>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ HIGHLIGHT_TEXT_EXAMPLE }}</pre>
+    </section>
+
+    <section class="flex flex-col gap-4" data-matrix="section-nav-count">
+      <Heading>SectionNavItem · count — число совпадений раздела в режиме «найдено»</Heading>
+      <div class="flex items-start gap-6">
+        <SectionNav model-value="mobile" title="Настройки" data-case="count">
+          <SectionNavItem value="mobile" label="Мобильное приложение" :count="1">
+            <SectionNavAnchor label="Параметры съёмки" active />
+            <SectionNavAnchor label="Поведение в мобильном приложении" />
+          </SectionNavItem>
+          <SectionNavItem value="anomalies" label="Аномалии" status="on" :count="2" />
+          <SectionNavItem value="general" label="Общие" status="attention" :count="0" />
+          <SectionNavItem value="pdf" label="PDF" :count="12" />
+        </SectionNav>
+      </div>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ SECTION_NAV_COUNT_EXAMPLE }}</pre>
     </section>
   </main>
 </template>

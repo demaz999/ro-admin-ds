@@ -212,6 +212,14 @@ function onBoxDown(event: MouseEvent) {
         </div>
       </div>
 
+      <!--
+        Слот `trailing` — такт 86: содержимое справа от значения, видно всегда — у пустого и заполненного поля (счётчик
+        совпадений «2 из 7» и стрелки ↑ ↓ режима «найдено»). Стоит до крестика очистки; части через 4.
+      -->
+      <span v-if="$slots.trailing" data-slot="field-trailing" class="flex shrink-0 items-center gap-1">
+        <slot name="trailing" />
+      </span>
+
       <span v-if="showEnd" data-slot="field-end" class="flex shrink-0 items-center">
         <slot name="end" />
       </span>

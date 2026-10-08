@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { formulaPreview } from '~/components/ui/formula-input'
+import { clearMatches, highlightMatches, queryWords, type HighlightTarget } from '~/components/ui/highlight-text'
 import { tableRowActionsColumn, type TableRowActionItem } from '~/components/ui/table'
 import { plural } from '~/stands/scheme-edit/diff'
-import { QUICK_LINKS, type SearchItem } from '~/stands/scheme-edit/search'
+import { QUICK_LINKS, SEARCH_SCOPES, type SearchEntry, type SearchHit, type SearchScope } from '~/stands/scheme-edit/search'
 import {
   ACCESS_GROUPS, ACCESS_ROLES, COMMENT_DICTIONARIES, COORDS_MODES, createModel, CREATE_SCREENS, DEADLINE_EVENTS, DETECTOR_GROUPS, DETECTOR_IDS, DURATION_MODES,
   FIELD_DEFAULTS, FIELD_TYPES, FINISH_CLASSES, GROUP_DEFAULTS, HINT_CONFIGS, MOBILE_SHOW, NETWORKS, OBJECT_TYPES, OWNERS, PDF_PROGRAMS, PDF_SIGNERS, PDF_WHEN,
@@ -47,6 +48,12 @@ import { useReorder } from '~/stands/scheme-edit/reorder'
  * пути «Настройки → Раздел» (№ 10); пустая выдача с «Быстрым переходом» (№ 11); переход к месту и подсветка
  * найденного — ось `highlighted` у `SettingRow` (№ 12). Клавиатура: `/` — фокус в поиск, стрелки — по выдаче, Enter —
  * переход, Esc — очистить и снять выдачу.
+ * **Такт 86 — поиск как в IDE** (`docs/scheme-edit-review.md`, раздел 3; эталон — JetBrains): слова запроса — начала слов в
+ * любом порядке, середина слова, другая раскладка, ранжирование; выдача — охват с числом совпадений и фильтр «Изменено в
+ * черновике» (`Toolbar`, `Tabs segmented`, `Switch`), строки `SearchResult` (иконка типа, подсветка совпадения `HighlightText`,
+ * значение либо переключатель), «ещё N», подвал клавиш, «Недавние»; режим «найдено» — счётчик и стрелки в поле (слот
+ * `trailing` у `Input`), подсветка совпадений на табе (CSS Custom Highlight API), числа на табах и в навигаторе, плашка
+ * `Callout` со «Сбросить». Хоткеи: `/`, Ctrl+F, F3, Shift+F3, Enter, Shift+Enter, Alt+Enter, Tab, Shift+Tab, Esc.
  * **П6 (такт 69).** Таб «Форма» (№ 39–42, 62, 68, 70): список групп — `Card` с `RadioGroupItem variant="card"` и настройками
  * группы парами `FrameMeta layout="stack"` (довесок 1), «Добавить группу»; панель полей — заголовок группы со счётом, «Добавить поле», «Вставить из
  * другой схемы» (заглушка), «Заполнить алиасы автоматически»; поля — `Table` с выбором строк, признаком «зависимое» и
@@ -90,7 +97,11 @@ import { useReorder } from '~/stands/scheme-edit/reorder'
  * | `?view=v1` | просмотр прошлой версии |
  * | `?presence=1` | другой редактор в схеме: «Сейчас редактирует …»; `?presence=Имя` — с этим именем (длинное имя — замер шапки, такт 67) |
  * | `?now=2026-10-03T09:00:00` | неподвижные часы стенда: дата правок и публикаций для прогона |
- * | `?q=подпис` | запрос в поиске и открытая выдача; `?q=фаыфа` — пустая выдача с «Быстрым переходом» |
+ * | `?q=подпис` | запрос в поиске и открытая выдача; `?q=фаыфа` — пустая выдача с «Быстрым переходом»; `?q=hfpvsn` — показано по «размыт» (такт 86) |
+ * | `?scope=settings` · `form` · `processes` · `showcase` · `actions` | охват выдачи при загрузке, с `?q=` (такт 86) |
+ * | `?find=фото` | режим «найдено» по запросу: первое совпадение в порядке страницы (такт 86) |
+ * | `?modified=1` · `list` | фильтр «Изменено в черновике»: режим «найдено» по правкам; `list` — открытая выдача правок (такт 86) |
+ * | `?recent=demo` | «Недавние» — демо-запросы и места, выдача открыта при пустом запросе (такт 86) |
  * | `?found=cadastreMap` | подсветка найденного: цель — значение `data-setting` |
  * | `?save=saving` | статус «Сохранение…» без завершения записи |
  * | `?save=error` | статус «Ошибка сохранения» с «Повторить» |
@@ -380,51 +391,196 @@ function saveSide() {
   m.closeSurface()
 }
 
-/* ------------------------------ поиск — П5 ------------------------------ */
+/* ------------------------------ поиск как в IDE — такт 86 ------------------------------ */
+/**
+ * Поиск — `docs/scheme-edit-review.md`, 3.2; эталон — JetBrains. Поле под шапкой, выдача — `Popover` у поля: охват с числом
+ * совпадений и фильтр «Изменено в черновике» (`Toolbar`, `Tabs segmented`, `Switch`), группы по пути (`SelectGroup`), строки —
+ * `SearchResult`, подвал клавиш (`ToolbarText`, `KbdText`). При пустом запросе — «Недавние». После перехода — режим
+ * «найдено»: счётчик и стрелки в поле (слот `trailing` у `Input`), подсветка совпадений на табе (CSS Custom Highlight API),
+ * число совпадений на табах (`TabsTrigger count`) и в навигаторе (`SectionNavItem count`), плашка над содержимым (`Callout`).
+ */
 const query = computed({ get: () => m.ui.query, set: v => m.setQuery(v) })
+const scope = computed<string>({ get: () => m.ui.scope, set: v => m.setScope(v as SearchScope) })
+const modified = computed<boolean>({ get: () => m.ui.modified, set: v => m.setModified(!!v) })
 const searchFocused = ref(false)
-/** Выдача открыта, пока в поиске есть запрос и фокус; оснастка `?q=` открывает её при загрузке. */
-const searchPinned = ref(!!q('q'))
-const searchOpen = computed(() => !!m.ui.query.trim() && (searchFocused.value || searchPinned.value))
-const flat = computed(() => m.results.value.groups.flatMap(grp => grp.items))
-/** Активная строка выдачи: стрелки двигают её, Enter переходит; по умолчанию — первая. */
-const activeResult = ref(0)
-watch(() => m.ui.query, () => { activeResult.value = 0 })
+/** Выдача открыта оснасткой адреса при загрузке: `?q=`, `?modified=list`, `?recent=demo`. */
+const searchPinned = ref(!!q('q') || q('modified') === 'list' || q('recent') === 'demo')
+/** Esc закрывает выдачу и оставляет фокус в поле; набор и новый фокус открывают её снова. */
+const listDismissed = ref(false)
+const finding = computed(() => m.ui.find.on)
+
+/** Строка выдачи: найденное, «ещё N», недавний запрос, недавнее место, фильтр «Изменено в черновике». */
+type Row =
+  | { id: string, kind: 'hit', hit: SearchHit }
+  | { id: string, kind: 'more', path: string, count: number }
+  | { id: string, kind: 'query', text: string }
+  | { id: string, kind: 'place', entry: SearchEntry }
+  | { id: string, kind: 'filter', count: number }
+interface Section { header: string, rows: Row[] }
+
+/** «Недавние» при пустом запросе — 3.2, п. 11: фильтр изменённого, последние запросы и места переходов. */
+const recentSections = computed<Section[]>(() => {
+  const out: Section[] = []
+  const changed = m.changedKeys.value.size
+  if (changed) out.push({ header: '', rows: [{ id: 'filter', kind: 'filter', count: changed }] })
+  if (m.ui.recent.queries.length) out.push({ header: 'Недавние запросы', rows: m.ui.recent.queries.map(text => ({ id: `q:${text}`, kind: 'query', text })) })
+  if (m.recentPlaces.value.length) out.push({ header: 'Недавние места', rows: m.recentPlaces.value.map(entry => ({ id: `p:${entry.key}`, kind: 'place', entry })) })
+  return out
+})
+/** Что в выдаче: найденное (запрос или фильтр), «Недавние» при пустом запросе; в режиме «найдено» выдачи нет. */
+const listMode = computed<'results' | 'recent' | 'none'>(() => {
+  if (finding.value) return 'none'
+  if (m.ui.query.trim() || m.ui.modified) return 'results'
+  return recentSections.value.length ? 'recent' : 'none'
+})
+const sections = computed<Section[]>(() => (listMode.value === 'recent'
+  ? recentSections.value
+  : m.searchGroups.value.map(g => ({
+      header: g.path,
+      rows: [
+        ...g.hits.map(hit => ({ id: hit.entry.key, kind: 'hit', hit }) as Row),
+        ...(g.more ? [{ id: `more:${g.path}`, kind: 'more', path: g.path, count: g.more } as Row] : []),
+      ],
+    }))))
+const rows = computed(() => sections.value.flatMap(s => s.rows))
+const searchOpen = computed(() => listMode.value !== 'none' && !listDismissed.value && (searchFocused.value || searchPinned.value))
+/** Активная строка: стрелки двигают её, Enter выбирает; новый запрос, охват или фильтр — снова первая. */
+const activeRow = ref(0)
+watch([() => m.ui.query, () => m.ui.scope, () => m.ui.modified, listMode], () => { activeRow.value = 0 })
+watch(() => m.ui.query, (v) => { if (v) listDismissed.value = false })
+/** Общий счёт подвала — 3.2, п. 12: найдено в охвате. */
+const totalText = computed(() => {
+  const n = m.search.value.counts[m.ui.scope]
+  return `${n} ${plural(n, 'результат', 'результата', 'результатов')}`
+})
+/** Найдено в других областях, в выбранной — ничего: подсказка про Tab вместо быстрого перехода. */
+const emptyInScope = computed(() => m.search.value.hits.length > 0)
+/** Пустая выдача — 3.2, п. 13: запрос, вариант в другой раскладке, быстрый переход; у фильтра без запроса — «изменений нет». */
+const emptyTitle = computed(() => {
+  const text = m.ui.query.trim()
+  if (emptyInScope.value) return `В области «${SEARCH_SCOPES.find(s => s.id === m.ui.scope)?.label ?? ''}» ничего не найдено`
+  if (!text) return 'Изменений в черновике нет'
+  return m.ui.modified ? `Среди изменённого ничего не найдено по «${text}»` : `Ничего не найдено по «${text}»`
+})
+const emptyDescription = computed(() => {
+  const n = m.search.value.hits.length
+  if (emptyInScope.value) return `Найдено в других областях: ${n}. Tab — следующая область`
+  if (!m.ui.query.trim()) return 'Черновик совпадает с текущей версией'
+  const alt = m.search.value.alt
+  return alt ? `В другой раскладке — «${alt}» — тоже ничего. Быстрый переход` : 'Быстрый переход'
+})
 const searchField = () => document.querySelector<HTMLInputElement>('[data-field=search] input')
-function go(item: SearchItem) {
+/** Активная строка видна: прокрутка выдачи ставит её в видимую часть (ловушка такта 63). */
+watch(activeRow, async () => {
+  await nextTick()
+  document.querySelector('[data-search-results] [data-slot=search-result][data-active]')?.scrollIntoView({ block: 'nearest' })
+})
+
+/** Выбор места либо действия; действие нового поля, группы, процесса открывает сайд — его черновик держит страница. */
+function openEntry(e: SearchEntry) {
   searchPinned.value = false
-  m.goTo(item)
+  const side = m.openResult(e.key)
   searchField()?.blur()
+  if (side === 'field') openField('')
+  if (side === 'group') openGroup('')
+  if (side === 'process') openProcess('')
+}
+function pick(row: Row) {
+  if (row.kind === 'hit') openEntry(row.hit.entry)
+  else if (row.kind === 'place') openEntry(row.entry)
+  else if (row.kind === 'more') m.expand(row.path)
+  else if (row.kind === 'query') m.setQuery(row.text)
+  else m.setModified(true)
+}
+/** Alt+Enter и переключатель строки — булева настройка переключается, выдача остаётся открытой (3.2, п. 9). */
+function toggleRow(row: Row | undefined) {
+  if (row?.kind === 'hit' && row.hit.entry.toggle) m.toggleFromSearch(row.hit.entry.key)
 }
 function goQuick(index: number) {
   searchPinned.value = false
   m.quick(index)
   searchField()?.blur()
 }
+/** Фокус в поле снова открывает выдачу, закрытую Esc. */
+function onSearchFocusIn() {
+  searchFocused.value = true
+  listDismissed.value = false
+}
+/** Набор в поле в режиме «найдено» — снова выдача: режим снят, запрос прежний (и при наборе того же текста). */
+function onSearchInput() {
+  if (finding.value) m.leaveFind()
+}
+/** Esc и «Сбросить» — режим «найдено» снят, подсветка убрана, запрос и фильтр очищены (3.2, п. 18). */
+function exitFind() {
+  m.exitFind()
+  clearMatches()
+}
 function onSearchKeydown(event: KeyboardEvent) {
+  /* Режим «найдено» — 3.2, п. 14: Enter и Shift+Enter, стрелки поля — соседнее совпадение; фокус остаётся в поле. */
+  if (finding.value) {
+    if (event.key === 'Escape') { event.preventDefault(); listDismissed.value = true; exitFind() }
+    else if (event.key === 'Enter' || event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault()
+      m.findStep(event.key === 'ArrowUp' || (event.key === 'Enter' && event.shiftKey) ? -1 : 1, false)
+    }
+    return
+  }
   if (event.key === 'Escape') {
-    /* Esc очищает запрос и снимает выдачу (аудит, «Клавиатура и фокус»). */
+    /* Esc очищает запрос и фильтр и закрывает выдачу (аудит, «Клавиатура и фокус»); фокус остаётся в поле. */
     event.preventDefault()
     searchPinned.value = false
+    listDismissed.value = true
     m.setQuery('')
+    m.setModified(false)
+    return
+  }
+  if (!searchOpen.value) return
+  if (event.key === 'Tab' && listMode.value === 'results') {
+    /* Tab и Shift+Tab — соседний охват (3.2, п. 6). */
+    event.preventDefault()
+    m.cycleScope(event.shiftKey ? -1 : 1)
   }
   else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-    if (!flat.value.length) return
+    if (!rows.value.length) return
     event.preventDefault()
-    activeResult.value = (activeResult.value + (event.key === 'ArrowDown' ? 1 : flat.value.length - 1)) % flat.value.length
+    activeRow.value = (activeRow.value + (event.key === 'ArrowDown' ? 1 : rows.value.length - 1)) % rows.value.length
   }
   else if (event.key === 'Enter') {
-    const item = flat.value[activeResult.value]
-    if (item) { event.preventDefault(); go(item) }
+    const row = rows.value[activeRow.value]
+    if (!row) return
+    event.preventDefault()
+    if (event.altKey) toggleRow(row)
+    else pick(row)
   }
 }
-/** Хоткей `/` — фокус в поиск; набор в поле ввода и в редактируемой области хоткей не перехватывает. */
+/**
+ * Хоткеи страницы. `/` — фокус в поиск; набор в поле ввода и в редактируемой области не перехватывается. Ctrl+F (Cmd+F) —
+ * первое нажатие ставит фокус в поле и выделяет запрос, второе в поле отдаётся браузеру: браузерный поиск не видит скрытых
+ * табов, поиск страницы видит (решение 3 оркестратора 2026-10-08); при открытом сайде или окне — браузеру. F3 и Shift+F3 —
+ * соседнее совпадение режима «найдено»; вне режима — браузеру.
+ */
 function onHotkey(event: KeyboardEvent) {
+  const field = searchField()
+  if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.code === 'KeyF') {
+    if (!field || document.activeElement === field || m.topSurface.value) return
+    event.preventDefault()
+    field.focus()
+    field.select()
+    return
+  }
+  if (event.key === 'F3') {
+    if (!finding.value || m.topSurface.value) return
+    event.preventDefault()
+    m.findStep(event.shiftKey ? -1 : 1, document.activeElement !== field)
+    return
+  }
   if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return
   const el = event.target as HTMLElement | null
   if (el?.closest('input, textarea, [contenteditable=true], [role=textbox]')) return
   event.preventDefault()
-  searchField()?.focus()
+  /* Запрос выделяется: набор заменяет прежний (такт 86, как у Ctrl+F; запрос остаётся в поле в режиме «найдено»). */
+  field?.focus()
+  field?.select()
 }
 
 /**
@@ -433,7 +589,7 @@ function onHotkey(event: KeyboardEvent) {
  */
 const flashed = ref({ target: '', n: 0 })
 const hl = (key: string) => (flashed.value.target === key && flashed.value.n ? flashed.value.n : null)
-/** Цель на странице: строка настройки, поле, группа выбора, формула, поле стоимости, кнопка. */
+/** Цель на странице: строка настройки, поле, группа выбора, формула, поле стоимости, кнопка; группа и карточка процесса — такт 86. */
 function findTarget(target: string): HTMLElement | null {
   const cost = target.match(/^cost-(\w+)$/)
   if (cost) return document.querySelector(`[data-cost="${cost[1]}"]`)
@@ -443,11 +599,17 @@ function findTarget(target: string): HTMLElement | null {
   /* Шаг процесса (такт 70): строка таблицы шагов; фокус встаёт на её флажок выбора. */
   const step = target.match(/^step-(.+)$/)
   if (step) return document.querySelector(`[data-step-row="${step[1]}"]`)
+  /* Группа формы и процесс (такт 86): карточка группы в списке, карточка процесса. */
+  const group = target.match(/^group-(.+)$/)
+  if (group) return document.querySelector(`[data-form-group="${group[1]}"]`)
+  const process = target.match(/^process-(.+)$/)
+  if (process) return document.querySelector(`[data-process="${process[1]}"]`)
   return document.querySelector(`[data-setting="${target}"], [data-field="${target}"], [data-radio="${target}"], [data-formula="${target}"], [data-act="${target}"]`)
 }
 /**
  * Переход к месту: раздел уже выставлен моделью; цель ждём, пока раздел отрисуется, ставим в верхнюю треть окна.
- * У строки настройки — вспышка (`highlighted`), у поля — фокус на его контроле.
+ * У строки настройки — вспышка (`highlighted`), у поля — фокус на его контроле. Переход из поля поиска (режим «найдено»,
+ * такт 86) фокус оставляет в поле.
  */
 watch(() => m.ui.found.n, async (n) => {
   if (!n || !import.meta.client) return
@@ -461,17 +623,93 @@ watch(() => m.ui.found.n, async (n) => {
   const top = el.getBoundingClientRect().top + window.scrollY - Math.round(window.innerHeight / 3)
   window.scrollTo({ top: Math.max(0, top), behavior: 'instant' })
   flashed.value = { target, n }
+  if (!m.ui.found.focus) return
   /* В просмотре версии (такт 68) поле — «только чтение»: фокус встаёт и на нём — значение читается и выделяется. */
   /* У строки таблицы (поле, шаг) первая кнопка — ручка перестановки (такт 70): фокус встаёт на флажок выбора строки. */
   const row = el.matches('[data-form-row], [data-step-row]') ? el.querySelector<HTMLElement>('[data-slot=choice-control]') : null
-  if (!el.matches('[data-setting]')) (row ?? el.querySelector<HTMLElement>('input, textarea, button, [contenteditable=true], [tabindex="0"]'))?.focus({ preventScroll: true })
+  if (el.matches('[data-setting], [data-process]')) return
+  ;(row ?? el.querySelector<HTMLElement>('input, textarea, button, [contenteditable=true], [tabindex="0"]'))?.focus({ preventScroll: true })
 })
+
+/* ---------- подсветка совпадений на табе — 3.2, п. 15 ---------- */
+/** Заголовок карточки процесса без счёта шагов в слоте `meta`. */
+const processTitle = (el: Element) => el.querySelector('[data-process-title] [data-slot=heading], [data-process-title][data-slot=heading]') ?? el.querySelector('[data-process-title]')
+/** Где искать слова совпадения: строка настройки, строка таблицы, карточка группы, заголовок процесса, обвязка поля. */
+function scopeOf(e: SearchEntry): Element | null {
+  const el = findTarget(e.target)
+  if (!el) return null
+  if (el.matches('[data-setting], [data-form-row], [data-step-row], [data-form-group]')) return el
+  if (e.type === 'process') return processTitle(el) ?? el
+  return el.closest('[data-slot=field-wrapper]') ?? el.closest('[data-formula]') ?? el
+}
+/** Фильтр без запроса — совпадение сама подпись места: подпись строки, название в таблице, подпись поля. */
+function labelOf(e: SearchEntry): Element | null {
+  const el = findTarget(e.target)
+  if (!el) return null
+  if (el.matches('[data-setting]')) return [...el.querySelectorAll('[data-slot=choice-title]')].find(x => x.closest('[data-setting]') === el) ?? el
+  if (el.matches('[data-form-row], [data-step-row]')) return el.querySelector('[data-slot=table-cell-identity]')
+  if (el.matches('[data-form-group]')) return el.querySelector('[data-slot=choice-title]')
+  if (e.type === 'process') return processTitle(el)
+  const field = el.closest('[data-slot=field-wrapper]')
+  return field?.querySelector('label') ?? el
+}
+const findWords = computed(() => queryWords(m.search.value.effective))
+/** Совпадения открытого таба: «Настройки» — раздел на экране, «Форма» — группа на экране. */
+function paint() {
+  if (!finding.value) { clearMatches(); return }
+  const words = findWords.value
+  const targets: HighlightTarget[] = []
+  for (const e of m.findHits.value) {
+    if (e.tab !== m.ui.tab || (e.tab === 'settings' && e.section !== m.ui.section) || (e.type === 'field' && e.group !== m.formGroup.value?.id)) continue
+    const el = words.length ? scopeOf(e) : labelOf(e)
+    if (el) targets.push({ el, words, current: e.key === m.ui.find.current })
+  }
+  highlightMatches(targets)
+}
+/** Содержимое таба монтируется не в тот же такт (`Presence` у `TabsContent`): подсветка ставится повторно таймером. */
+let paintTimers: ReturnType<typeof setTimeout>[] = []
+function schedulePaint() {
+  if (!import.meta.client) return
+  paintTimers.forEach(clearTimeout)
+  paintTimers = [0, 80, 250, 600].map(ms => setTimeout(paint, ms))
+}
+watch([() => m.findHits.value, () => m.ui.find.current, () => m.ui.tab, () => m.ui.section, () => m.ui.group, finding], schedulePaint, { flush: 'post' })
+
+/** Навигатор в режиме «найдено» — 3.2, п. 16: разделы с совпадениями и раздел на экране, у каждого — число. */
+const navSections = computed(() => (finding.value ? SECTIONS.filter(s => m.findCounts.value.sections[s.id] > 0 || s.id === m.ui.section) : SECTIONS))
+
+/* ---------- «Недавние» — сессия вкладки (решение 5 оркестратора 2026-10-08, прецедент строки 167) ---------- */
+const RECENT_KEY = 'scheme-edit:search-recent'
+const DEMO_RECENT = { queries: ['размыт фото', 'дедлайн'], places: ['general.behavior.cadastreMap', 'form.f-plate', 'step.s-right', 'action.history'] }
+watch(() => m.ui.recent, (r) => {
+  if (!import.meta.client || q('recent') === 'demo') return
+  try { sessionStorage.setItem(RECENT_KEY, JSON.stringify(r)) } catch {}
+}, { deep: true })
+
+/* ---------- оснастка адреса — такты 65, 86 ---------- */
+const SCOPE_AT_LOAD = SEARCH_SCOPES.find(s => s.id === q('scope'))?.id
+if (SCOPE_AT_LOAD) m.setScope(SCOPE_AT_LOAD)
+if (q('recent') === 'demo') m.setRecent(DEMO_RECENT)
+if (q('modified') === '1' || q('modified') === 'list') m.setModified(true)
 if (q('q')) m.setQuery(q('q'))
+if (q('find')) m.setQuery(q('find'))
 onMounted(() => {
   window.addEventListener('keydown', onHotkey)
-  if (q('found')) m.goTo({ key: '', label: '', section: m.ui.section, anchor: m.ui.anchor, target: q('found'), via: 'label', hint: '' })
+  if (q('recent') !== 'demo') {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(RECENT_KEY) ?? 'null')
+      if (saved && typeof saved === 'object') m.setRecent(saved)
+    }
+    catch {}
+  }
+  if (q('found')) m.goTo({ tab: 'settings', section: m.ui.section, anchor: m.ui.anchor, group: '', target: q('found') })
+  if (q('find') || q('modified') === '1') m.startFind()
 })
-onBeforeUnmount(() => window.removeEventListener('keydown', onHotkey))
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onHotkey)
+  paintTimers.forEach(clearTimeout)
+  clearMatches()
+})
 
 /* ------------------------------ публикация и версии — П4 ------------------------------ */
 /** Открытая поверхность модели как `v-model:open` окна: закрытие окна снимает её со стека. */
@@ -919,14 +1157,28 @@ if (import.meta.client) {
       Сохранение теперь автоматическое. В боевые осмотры изменения попадают по кнопке «Опубликовать схему»
     </Callout>
 
-    <!-- ============================ поиск — № 9–11: строкой под шапкой, над табами, на всех табах ============================ -->
+    <!-- ============================ поиск — № 9–11, такт 86: строкой под шапкой, над табами, на всех табах ============================ -->
     <Popover :open="searchOpen">
       <PopoverAnchor as-child>
-        <div class="max-w-settings" data-search>
-          <div data-field="search" @keydown="onSearchKeydown" @focusin="searchFocused = true" @focusout="searchFocused = false">
-            <!-- Подсказка хоткея — внутри поля справа, слотом `end` (такт 67, строка 98): при непустом значении её место занимает крестик. -->
-            <Input v-model="query" placeholder="Поиск по настройкам схемы" clearable>
-              <template #end>
+        <div class="max-w-settings" data-search :data-find="finding || undefined">
+          <div data-field="search" @keydown="onSearchKeydown" @input="onSearchInput" @focusin="onSearchFocusIn" @focusout="searchFocused = false">
+            <!--
+              Подсказка хоткея — внутри поля справа, слотом `end` (такт 67, строка 98): при непустом значении её место занимает крестик.
+              Режим «найдено» (такт 86; 3.2, п. 14): запрос остаётся в поле, справа — счётчик «2 из 7» и стрелки ↑ ↓ (слот `trailing`).
+            -->
+            <Input v-model="query" :placeholder="m.ui.modified && finding ? 'Изменено в черновике' : 'Поиск по настройкам схемы'" clearable>
+              <template v-if="finding" #trailing>
+                <ToolbarText data-find-counter>
+                  {{ m.findPos.value }} из {{ m.findHits.value.length }}
+                </ToolbarText>
+                <IconButton variant="service" size="sm" label="Предыдущее совпадение" data-act="find-prev" @click="m.findStep(-1)">
+                  <Icon name="chevron-up" :size="16" />
+                </IconButton>
+                <IconButton variant="service" size="sm" label="Следующее совпадение" data-act="find-next" @click="m.findStep(1)">
+                  <Icon name="chevron-down" :size="16" />
+                </IconButton>
+              </template>
+              <template v-else #end>
                 <Kbd surface="card" data-search-hotkey>
                   /
                 </Kbd>
@@ -935,37 +1187,85 @@ if (import.meta.client) {
           </div>
         </div>
       </PopoverAnchor>
-      <!-- Фокус остаётся в поле: выдача его не забирает; клик по выдаче не снимает фокус с поля до перехода. -->
+      <!--
+        Выдача — ширина поля 846 (`--container-settings`): охват, строки со значением справа и подвал клавиш (такт 86, строка 99).
+        Фокус остаётся в поле: выдача его не забирает; клик по выдаче не снимает фокус с поля до перехода.
+      -->
       <PopoverContent
         data-search-results
         align="start"
         :side-offset="4"
-        :width="600"
-        class="p-1"
+        :width="846"
         @open-auto-focus="$event.preventDefault()"
         @close-auto-focus="$event.preventDefault()"
         @mousedown.prevent
       >
-        <template v-if="m.results.value.count">
-          <SelectGroup v-for="grp in m.results.value.groups" :key="grp.path" :header="grp.path">
-            <SelectItem
-              v-for="item in grp.items"
-              :key="item.key"
-              :selected="flat[activeResult]?.key === item.key"
-              :subtitle="item.hint"
-              :data-result="item.key"
-              @click="go(item)"
-            >
-              {{ item.label }}
-            </SelectItem>
-          </SelectGroup>
-          <ToolbarText v-if="m.results.value.count > flat.length" class="px-4 py-2" data-search-more>
-            Показаны первые {{ flat.length }} из {{ m.results.value.count }} — уточните запрос
+        <!-- Охват с числом совпадений (3.2, п. 6) и фильтр «Изменено в черновике» (п. 17). -->
+        <Toolbar v-if="listMode === 'results'" data-search-toolbar>
+          <Tabs v-model="scope">
+            <TabsList variant="segmented">
+              <TabsTrigger v-for="s in SEARCH_SCOPES" :key="s.id" :value="s.id" variant="segmented" :count="m.search.value.counts[s.id]" :data-scope="s.id">
+                {{ s.label }}
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <Switch v-if="m.modifiedAvailable.value" v-model="modified" class="ml-auto" data-field="search-modified">
+            Изменено в черновике
+          </Switch>
+        </Toolbar>
+        <!-- Пустая выдача повторена в другой раскладке (3.2, п. 4). -->
+        <div v-if="listMode === 'results' && m.search.value.shownFor" class="flex px-4 pt-2">
+          <ToolbarText data-search-layout>
+            Показано по «{{ m.search.value.shownFor }}»
           </ToolbarText>
-        </template>
-        <!-- Пустая выдача подсказывает: «Быстрый переход» к разделам. -->
-        <Empty v-else :title="`Ничего не найдено по «${m.ui.query.trim()}»`" description="Быстрый переход" class="px-4 py-4" data-search-empty>
-          <template #action>
+        </div>
+        <div v-if="rows.length" class="max-h-96 overflow-y-auto p-1" role="listbox" aria-label="Выдача поиска">
+          <SelectGroup v-for="sec in sections" :key="sec.header || sec.rows[0]?.id" :header="sec.header">
+            <template v-for="row in sec.rows" :key="row.id">
+              <SearchResult
+                v-if="row.kind === 'hit'"
+                :type="row.hit.entry.type"
+                :icon="row.hit.entry.icon"
+                :label="row.hit.entry.label"
+                :query="m.search.value.effective"
+                :hint="row.hit.hint"
+                :value="row.hit.entry.value"
+                :toggle="row.hit.entry.toggle"
+                :checked="row.hit.entry.checked"
+                :reason="row.hit.entry.reason"
+                :active="rows[activeRow]?.id === row.id"
+                :data-result="row.id"
+                @select="pick(row)"
+                @toggle="toggleRow(row)"
+              />
+              <SearchResult
+                v-else-if="row.kind === 'place'"
+                :type="row.entry.type"
+                :icon="row.entry.icon"
+                :label="row.entry.label"
+                :hint="row.entry.path"
+                :active="rows[activeRow]?.id === row.id"
+                :data-result="row.id"
+                @select="pick(row)"
+              />
+              <SearchResult v-else-if="row.kind === 'query'" type="query" :label="row.text" :active="rows[activeRow]?.id === row.id" :data-result="row.id" @select="pick(row)" />
+              <SearchResult v-else-if="row.kind === 'more'" type="more" :label="`ещё ${row.count}`" :active="rows[activeRow]?.id === row.id" :data-result="row.id" @select="pick(row)" />
+              <SearchResult
+                v-else
+                type="filter"
+                label="Изменено в черновике"
+                hint="Места, которые черновик меняет против текущей версии"
+                :value="`${row.count} ${plural(row.count, 'место', 'места', 'мест')}`"
+                :active="rows[activeRow]?.id === row.id"
+                data-result="filter"
+                @select="pick(row)"
+              />
+            </template>
+          </SelectGroup>
+        </div>
+        <!-- Пустая выдача подсказывает: другая раскладка и «Быстрый переход» к разделам (3.2, п. 13). -->
+        <Empty v-else-if="listMode === 'results'" :title="emptyTitle" :description="emptyDescription" class="px-4 py-4" data-search-empty>
+          <template v-if="m.ui.query.trim() && !emptyInScope" #action>
             <div class="flex flex-wrap justify-center gap-2">
               <Button v-for="(link, k) in QUICK_LINKS" :key="link.label" variant="secondary" size="sm" :data-quick="k" @click="goQuick(k)">
                 {{ link.label }}
@@ -973,6 +1273,15 @@ if (import.meta.client) {
             </div>
           </template>
         </Empty>
+        <!-- Подвал — 3.2, п. 12: клавиши и общий счёт охвата. -->
+        <div class="flex items-center justify-between gap-4 px-4 pt-1 pb-3" data-search-footer>
+          <ToolbarText>
+            <KbdText :text="listMode === 'results' ? '[↑↓] выбрать · [Enter] перейти · [Alt+Enter] переключить · [Tab] область · [Esc] закрыть' : '[↑↓] выбрать · [Enter] перейти · [Esc] закрыть'" />
+          </ToolbarText>
+          <ToolbarText v-if="listMode === 'results'" data-search-total>
+            {{ totalText }}
+          </ToolbarText>
+        </div>
       </PopoverContent>
     </Popover>
 
@@ -986,13 +1295,24 @@ if (import.meta.client) {
           <TabsTrigger v-if="m.tabLocked(t.id)" :value="t.id" disabled :reason="m.PHASE_REASON" :data-tab-trigger="t.id">
             {{ t.label }}
           </TabsTrigger>
-          <TabsTrigger v-else :value="t.id" :data-tab-trigger="t.id">
+          <!-- Режим «найдено» (такт 86; 3.2, п. 16): число совпадений таба — счётчик вкладки. -->
+          <TabsTrigger v-else :value="t.id" :count="finding ? m.findCounts.value.tabs[t.id] : undefined" :data-tab-trigger="t.id">
             <!-- Звезда «Витрины» — макет `33347:6751`: глиф 12, зазор вкладки 8 (строка 13 реестра покрытия). -->
             <Icon v-if="t.id === 'showcase'" name="star" :size="12" />
             {{ t.label }}
           </TabsTrigger>
         </template>
       </TabsList>
+
+      <!-- Режим «найдено» — 3.2, пп. 16, 18: сводка над содержимым и «Сбросить». -->
+      <Callout v-if="finding" class="mt-6" data-find-bar>
+        {{ m.findSummary.value }}
+        <template #actions>
+          <ButtonAction size="sm" :show-icon="false" data-act="find-reset" @click="exitFind()">
+            Сбросить
+          </ButtonAction>
+        </template>
+      </Callout>
 
       <TabsContent value="settings">
         <!-- Каркас «Настроек»: колонка содержимого 846 и правый навигатор 266, зазор 24 — макет `33346:5470`. -->
@@ -1889,7 +2209,15 @@ if (import.meta.client) {
 
           <!-- Правый навигатор — № 14: липкий в колонке (r2 §3). -->
           <SectionNav v-model="section" title="Настройки" class="sticky top-6">
-            <SectionNavItem v-for="s in SECTIONS" :key="s.id" :value="s.id" :label="s.label" :status="m.sectionStatus.value[s.id]">
+            <!-- Режим «найдено» (такт 86; 3.2, п. 16): разделы с совпадениями и раздел на экране, у каждого — число совпадений. -->
+            <SectionNavItem
+              v-for="s in navSections"
+              :key="s.id"
+              :value="s.id"
+              :label="s.label"
+              :status="m.sectionStatus.value[s.id]"
+              :count="finding ? m.findCounts.value.sections[s.id] : undefined"
+            >
               <SectionNavAnchor v-for="a in SECTION_ANCHORS[s.id]" :key="a.id" :label="a.label" :active="m.ui.anchor === a.id" :data-anchor-link="a.id" @select="goAnchor(a.id)" />
             </SectionNavItem>
           </SectionNav>
