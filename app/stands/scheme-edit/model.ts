@@ -4,6 +4,7 @@ import {
   ALIAS_RE, DETECTOR_GROUPS, DETECTOR_IDS, DETECTORS_ON, FIELD_SAMPLES, FINISH_CLASSES, OBJECT_TYPES, showcaseTemplate, SPHERES, suggestAlias, SYSTEM_VARIABLES,
   type ShowcaseMetric, type ShowcaseProblem, type StepFlag,
 } from './catalogs'
+import { buildDemo, fieldPreview, helpPreview, type DemoEdit, type DemoSource, type HelpKey } from './demo'
 import { diffConfigs, formatDate, plural, summarize, validateConfig } from './diff'
 import { DONOR_SCHEMES, type DonorSchemeRaw } from './donors'
 import { catalogHint, categoryAtOpen, proposeHint, stepCategory, type HintProposal, type StepHint } from './hints'
@@ -14,6 +15,7 @@ import {
 } from './search'
 
 export * from './catalogs'
+export * from './demo'
 export * from './hints'
 export * from './repeat-texts'
 
@@ -70,7 +72,11 @@ export * from './repeat-texts'
  * поиск по названию), план вставки полей с разрешением конфликта алиаса (`fieldPastePlan`), вставка полей и шагов одной записью
  * с отменой (`pasteFields`, `pasteSteps`, процессы-цели `pasteTargets`); тексты повторяемого процесса (`Process.texts`) и
  * «Заполнить по типу объекта» — только пустые, с отменой (`fillTexts`). Доноры — `donors.ts`, словарь текстовок —
- * `repeat-texts.ts`.
+ * `repeat-texts.ts`. **Такт 89 — демо-осмотр и превью у «?»** (`scheme-edit-review.md`, 4.1, 4.2): экраны приложения из
+ * конфигурации на экране (`demo` — `demo.ts`, `buildDemo`), оверлей демо-осмотра — открытый экран, режим «По шагам / Карта»,
+ * обведённые элементы, история переходов (`openDemo`, `demoGo`, `demoStep`, `setDemoMode`), «Изменить» строки «Из чего
+ * собран экран» — переход поиска к настройке либо место сущности (`demoEdit`); превью у «?» — `helpView`, `fieldView`. «Предпросмотр»
+ * (`preview`) открывает демо-осмотр; до такта 89 — уведомление-заглушка.
  */
 
 export type TabId = 'settings' | 'form' | 'processes' | 'showcase'
@@ -649,6 +655,11 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     find: { on: false, current: '' },
     /** «Недавние» — запросы и места переходов, свежие первыми (3.2, п. 11); страница помнит их в сессии вкладки. */
     recent: { queries: [] as string[], places: [] as string[] },
+    /**
+     * Демо-осмотр — такт 89: открытый экран, режим «По шагам» либо «Карта», обведённые элементы перехода из «?» (до смены
+     * экрана; наведение держит страница), история переходов по кнопкам экрана — для «Вернуться к осмотру».
+     */
+    demo: { screen: '', mode: 'steps' as 'steps' | 'map', mark: [] as string[], back: [] as string[] },
   })
 
   /** Конфигурация на экране: открытый снимок либо черновик. */
@@ -1699,8 +1710,74 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   }
   /** «Сделать копию» — штатный механизм платформы; на стенде списка схем нет. */
   function copy() { notify('Копия схемы — вне стенда') }
-  /** «Предпросмотр» — вход в демо-осмотр; сам демо-осмотр — вне VA-16377 (r2 §3, §9). */
-  function preview() { notify('Демо-осмотр — вне стенда') }
+  /**
+   * «Предпросмотр» — вход в демо-осмотр (r2 §3; ревью 4.1, такт 89). До такта 89 — уведомление-заглушка: демо-осмотр был
+   * вне VA-16377 (r2 §9).
+   */
+  function preview() { openDemo() }
+
+  /* ------------------------------ демо-осмотр и превью у «?» — такт 89 ------------------------------ */
+  /**
+   * Демо-осмотр — `scheme-edit-review.md`, 4.1: экраны приложения собираются из конфигурации на экране (черновик либо
+   * открытый снимок) — правка видна при следующем открытии. Полноэкранный оверлей — поверхность `demo`; Esc закрывает.
+   */
+  const demo = computed(() => buildDemo(shown.value))
+  const demoScreen = computed(() => demo.value.byId[ui.demo.screen] ?? demo.value.byId[demo.value.order[0]!]!)
+  /** Номер экрана в порядке «По шагам» — счётчик «Экран N из M». */
+  const demoPos = computed(() => demo.value.order.indexOf(demoScreen.value.id) + 1)
+  /**
+   * Открыть демо-осмотр: экран и обведённые элементы — переход из «?»; без экрана — прежний открытый экран, если он ещё есть
+   * (правка настройки и возврат), иначе первый. Из «?» — режим «По шагам».
+   */
+  function openDemo(screen = '', mark: readonly string[] = []) {
+    const d = demo.value
+    const at = d.byId[screen] ? screen : d.byId[ui.demo.screen] && !screen ? ui.demo.screen : d.order[0]!
+    ui.demo = { screen: at, mode: screen ? 'steps' : ui.demo.mode, mark: [...mark], back: [] }
+    if (!ui.surfaces.some(x => x.id === 'demo')) ui.surfaces.push({ kind: 'overlay', id: 'demo' })
+  }
+  /** Переход по кнопке экрана, оглавлению, карте: `@back` — экран, с которого пришли («Вернуться к осмотру»). */
+  function demoGo(id: string) {
+    const d = demo.value
+    if (id === '@back') {
+      const prev = ui.demo.back.pop()
+      if (prev && d.byId[prev]) ui.demo.screen = prev
+      ui.demo.mark = []
+      return
+    }
+    if (!d.byId[id] || id === demoScreen.value.id) return
+    ui.demo.back.push(demoScreen.value.id)
+    ui.demo.screen = id
+    ui.demo.mark = []
+  }
+  /** ← → — соседний экран в порядке оглавления. */
+  function demoStep(dir: 1 | -1) {
+    const next = demo.value.order[demoPos.value - 1 + dir]
+    if (next) demoGo(next)
+  }
+  function setDemoMode(mode: 'steps' | 'map') { ui.demo.mode = mode }
+  /**
+   * «Изменить» строки «Из чего собран экран»: оверлей закрывается; настройка — переход поиска к месту (таб, раздел, якорь,
+   * вспышка), сущность — её место на странице; сайд сущности открывает страница по возвращённому `DemoEdit`. В просмотре
+   * версии сайдов правки нет (СС-53/просмотр): «Показать» — переход поиска, фокус встаёт на месте сущности.
+   */
+  function demoEdit(src: DemoSource): DemoEdit {
+    if (topSurface.value?.id === 'demo') closeSurface()
+    const e = src.edit
+    const show = !!ui.viewing
+    if (e.kind === 'setting') {
+      const it = entry(e.key)
+      if (it) goTo(it, true)
+    }
+    else if (e.kind === 'field') goTo({ tab: 'form', section: '', anchor: '', group: e.group, target: `row-${e.field}` }, show)
+    else if (e.kind === 'group') goTo({ tab: 'form', section: '', anchor: '', group: e.group, target: `group-${e.group}` }, show)
+    else if (e.kind === 'step') goTo({ tab: 'processes', section: '', anchor: '', group: '', target: `step-${e.step}` }, show)
+    else if (e.kind === 'process') goTo({ tab: 'processes', section: '', anchor: '', group: '', target: `process-${e.process}` }, show)
+    else setTab(e.tab)
+    return e
+  }
+  /** Превью у «?» настройки и «Где увидит исполнитель» поля — та же сборка демо-осмотра (4.2: один источник правды). */
+  const helpView = (key: HelpKey) => helpPreview(demo.value, shown.value, key)
+  const fieldView = (fieldId: string) => fieldPreview(demo.value, shown.value, fieldId)
   /** Меню «⋯»: экспорт, дамп, копия, сброс черновика, удаление (r2 §3). */
   function menu(action: 'export' | 'dump' | 'copy' | 'reset' | 'delete') {
     if (action === 'export') notify('Экспорт схемы — вне стенда')
@@ -1752,7 +1829,7 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     return JSON.stringify({
       draft: draft.config, author: draft.author, versions: snapshots.map(s => s.id), current: current.value?.id ?? null,
       publish: publishState.value, save: save.state, writes: save.writes,
-      ui: { tab: ui.tab, hintClosed: ui.hintClosed, section: ui.section, anchor: ui.anchor, scroll: ui.scroll, viewing: ui.viewing, surfaces: ui.surfaces.map(x => x.id), historyVersion: ui.historyVersion, group: ui.group, selectedFields: ui.selectedFields, selectedSteps: ui.selectedSteps },
+      ui: { tab: ui.tab, hintClosed: ui.hintClosed, section: ui.section, anchor: ui.anchor, scroll: ui.scroll, viewing: ui.viewing, surfaces: ui.surfaces.map(x => x.id), historyVersion: ui.historyVersion, group: ui.group, selectedFields: ui.selectedFields, selectedSteps: ui.selectedSteps, demo: ui.demo },
       search: { query: ui.query, scope: ui.scope, modified: ui.modified, find: ui.find, recent: ui.recent },
     })
   }
@@ -1765,6 +1842,7 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     recentPlaces, setRecent, remember,
     shown, draftDiff, warnings, blocked, summary, draftDate, history, versionDiff, versionShown, viewingText,
     openPublish, confirmPublish, openReset, confirmReset, copy, preview, menu, confirmDelete, openHistory, openVersion, closeVersion, view, leaveView,
+    demo, demoScreen, demoPos, openDemo, demoGo, demoStep, setDemoMode, demoEdit, helpView, fieldView,
     set, setTab, setSection, rememberScroll, back, retry, notify, dismissNotice, dump,
     neighbourSection, stepSection, goToFields, openSide, closeSurface,
     formGroups, formGroup, selectGroup, fieldApprovalReason, fieldError, saveField, removeField, toggleField, selectionState, toggleAllFields,

@@ -46,4 +46,14 @@ export const SCHEME_COVERAGE_STATES = [
   'open=paste-steps&donor=d-osago&part=dp-auto&pick=ds-rear,ds-left&target=p-docs',
   'open=overlay-texts', 'open=overlay-texts&otype=car', 'open=overlay-texts&otype=car&texts=filled', 'open=overlay-variants&otype=house',
   'view=v2&open=overlay-texts',
+  /*
+   * Такт 89, демо-осмотр и превью у «?»: оверлей «По шагам» на экранах всех видов (начало, промежуточный, анкета, шаг с отказом и
+   * обводкой, чек-лист, повторяемый процесс, подтверждение, готово, звонок, отказ), «Карта», новая схема, просмотр версии;
+   * поповеры «?» настроек и поля; фрагмент экрана в разделе текстов.
+   */
+  'open=demo', 'open=demo&app=full&screen=intro', 'open=demo&app=full&screen=form:g-body', 'open=demo&app=full&screen=step:p-auto:s-front&mark=setting:general.behavior.refuse',
+  'open=demo&app=checklist&screen=checklist:p-auto', 'open=demo&app=full&screen=repeat-list:p-damage', 'open=demo&app=full&screen=repeat-more:p-damage',
+  'open=demo&app=full&screen=confirm', 'open=demo&app=full&screen=call', 'open=demo&app=full&screen=refuse', 'open=demo&app=full&demo=map',
+  'data=new&open=demo&screen=form:none', 'data=new&open=demo&demo=map', 'view=v1&open=demo',
+  'help=refuse', 'app=full&help=confirmCheckbox', 'app=full&help=phone', 'help=startAfterCreate', 'tab=form&help=field:f-vin', 'tab=form&help=field:f-start',
 ] as const

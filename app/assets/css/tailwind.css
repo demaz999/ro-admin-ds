@@ -195,6 +195,9 @@
     --container-price-input: 160px;
     /* Поля «От» и «До» ступени регресс-шкалы — такт 78: тот же макет, узел 30961:27356 — 99. Утилита — w-scale-bound. */
     --container-scale-bound: 99px;
+    /* Телефон превью приложения — такт 89 (`ui/app-preview`): корпус 220 — макет U829JoK7KMZV8do3KNkWBh, узел 33694:3884.
+       Утилита — w-app-phone; высоты корпуса — --spacing-app-phone-*. */
+    --container-app-phone: 220px;
     --text-4xl--letter-spacing: 0;
 
     /* Вспышка шага после перехода «Показать в структуре» — спека VA-9265 §15.3,
@@ -350,6 +353,13 @@
     --spacing-preview: 65px;            /* неактивное превью */
     --spacing-preview-active: 73px;     /* активное, во всю высоту ленты */
 
+    /* Телефон превью приложения — такт 89 (`ui/app-preview`). md — корпус макета 33694:3884 (220 × 360); lg — та же ширина
+       в пропорции 375 × 812 (ревью 4.1): 220 / 375 × 812 = 476. crop — верх корпуса над телом экрана во фрагменте поповера
+       «?»: поле корпуса 6 + строка состояния 24 + шапка 32 + поле тела 10 (макет 33694:3883 — телефон с y = −71 при шапке 31). */
+    --spacing-app-phone-lg: 476px;
+    --spacing-app-phone-md: 360px;
+    --spacing-app-crop: 72px;
+
     /* Тени кита — эффект-стили, а не свободные значения.
        Button Shadow: активная плашка вкладки-таблетки.
        BigShadow: выпадающие плашки. Рамки у них при этом НЕТ. */
@@ -378,6 +388,8 @@
        Спека 309:2320, «shadow MediumShadowHover». */
     --shadow-elevated-hover: var(--shadow-elevated-hover);
     --shadow-elevated-pressed: var(--shadow-elevated-pressed);
+    /* Свечение обведённого элемента экрана приложения — такт 89; значение — в блоке темы (роли `--app-*`). */
+    --shadow-app-highlight: var(--shadow-app-highlight);
     /* Контрол, лежащий поверх изображения: чекбокс на превью, кнопка на фото.
        У Атома такого случая нет — на его поверхностях контролы всегда на плашке.
 
@@ -435,6 +447,20 @@
        (`::highlight(search-match)`); текущее совпадение режима «найдено» — ступень плотнее. */
     --color-search-match: var(--search-match);
     --color-search-match-current: var(--search-match-current);
+
+    /* Превью приложения — такт 89 (`ui/app-preview`): экран мобильного приложения исполнителя в рамке телефона. */
+    --color-app-device: var(--app-device);
+    --color-app-screen: var(--app-screen);
+    --color-app-surface: var(--app-surface);
+    --color-app-foreground: var(--app-foreground);
+    --color-app-foreground-secondary: var(--app-foreground-secondary);
+    --color-app-accent: var(--app-accent);
+    --color-app-accent-foreground: var(--app-accent-foreground);
+    --color-app-track: var(--app-track);
+    --color-app-slot: var(--app-slot);
+    --color-app-danger: var(--app-danger);
+    --color-app-note: var(--app-note);
+    --color-app-highlight: var(--app-highlight);
 
     /* Расширения темы как утилиты: bg-primary-hover, text-foreground-secondary… */
     --color-foreground-hover: var(--foreground-hover);
@@ -682,6 +708,22 @@
        браузера — синяя подложка читалась бы выделением текста. Текст на обеих ступенях — `--foreground`, контраст 14.8:1 и 10.3:1. */
     --search-match: var(--warning-surface);         /* решение: service/warning-surface — все совпадения */
     --search-match-current: var(--warning-disabled); /* решение: service/warning-disabled — ступень плотнее, текущее совпадение */
+    /* Превью приложения — такт 89 (`ui/app-preview`; макет U829JoK7KMZV8do3KNkWBh, узел 33694:3879). ДС мобильного приложения
+       в репо нет, тема viewapp пуста: роли экрана телефона стоят на ролях кита. Палитра приложения заменит их значения —
+       одной правкой здесь (ревью `docs/scheme-edit-review.md`, раздел 10). Справа — переменная макета. */
+    --app-device: var(--surface-contrast);          /* корпус — #0e1e33 (bg/contrast) */
+    --app-screen: var(--secondary-disabled);        /* экран — accent/surface_disabled */
+    --app-surface: var(--background);               /* строка состояния, шапка, поле, контурная кнопка — bg/page */
+    --app-foreground: var(--foreground);            /* fg/primary */
+    --app-foreground-secondary: var(--foreground-secondary); /* fg/secondary */
+    --app-accent: var(--primary);                   /* главная кнопка, пройденные полоски — accent/default */
+    --app-accent-foreground: var(--primary-foreground); /* bg/page на главной кнопке */
+    --app-track: var(--border);                     /* полоски впереди, линия поля — border/default */
+    --app-slot: var(--muted);                       /* слот съёмки — neutral/soft */
+    --app-danger: var(--destructive);               /* «Осмотр невозможен» — тон ошибки кита; в макете anomalies/red_default */
+    --app-note: var(--secondary);                   /* подсказка на экране — accent/surface_soft */
+    --app-highlight: var(--ring);                   /* обводка элемента — accent/default */
+    --shadow-app-highlight: 0 0 16px 0 color-mix(in srgb, var(--primary) 32%, transparent); /* 33694:3918 — 0 0 16, 32 % */
     --popover-scroll-thumb: var(--border-neutral);  /* решение: border/neutral_soft — серый бегунок на белой плашке */
     --tag: var(--secondary);                        /* решение: accent/surface_soft — подложка неактивного тега */
     /* Чип — компонент кита 1, мастер `badge` 747:2464. Заливка привязана там к

@@ -126,8 +126,18 @@ const hintClass = computed(() => [
     :data-readonly="readonly && !props.disabled ? '' : undefined"
     :class="fieldVariants({ orientation: props.orientation })"
   >
+    <!--
+      Слот `help` — такт 89: значок у подписи — «?» с превью в приложении (`HelpPreview`), через 8 справа от подписи, у раскладки
+      `top`. Кнопка — вне `label`: нажатие по ней не уводит фокус в контрол. Без слота разметка прежняя.
+    -->
+    <div v-if="props.label && $slots.help && props.orientation === 'top'" data-slot="field-label-row" class="flex items-start gap-2">
+      <label :class="fieldLabelVariants({ orientation: props.orientation, labelWidth: 'content' })">
+        <span>{{ props.label }}<span v-if="props.required" class="text-destructive"> *</span></span>
+      </label>
+      <slot name="help" />
+    </div>
     <label
-      v-if="props.label"
+      v-else-if="props.label"
       :class="fieldLabelVariants({ orientation: props.orientation, labelWidth: props.orientation === 'left' ? props.labelWidth : 'content' })"
       :style="props.orientation === 'left' ? { height: `${props.controlHeight}px` } : undefined"
     >

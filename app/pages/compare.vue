@@ -1,7 +1,24 @@
 <script setup lang="ts">
 import { SCHEME_COVERAGE_STATES } from '~/stands/scheme-edit/coverage'
+import { createModel, type Dataset } from '~/stands/scheme-edit/model'
+import schemeDemo from '~/stands/scheme-edit/demo-data.json'
 import { TARIFFS_COVERAGE_STATES } from '~/stands/tariffs/coverage'
 useHead({ title: 'Наложение — сверка с Атомом' })
+
+/**
+ * Такт 89: экраны превью приложения для автопроверок — демо-данные страницы схемы с разрешённым отказом, промежуточным экраном
+ * и телефоном (оснастка `?app=full`), той же сборкой, что демо-осмотр.
+ */
+const appModel = createModel((schemeDemo as unknown as Record<'main', Dataset>).main)
+{
+  const s = appModel.draft.config.settings
+  s.general.behavior.refuse = true
+  s.general.behavior.refuseRepeatable = true
+  s.mobile.startAfterCreate = false
+  s.mobile.phone = '+7 800 000-00-00'
+  s.mobile.phoneName = 'Служба поддержки'
+}
+const appScreens = appModel.demo.value.byId
 
 /**
  * Смещения вариантов внутри мастера сняты через Plugin API как координаты
@@ -1942,6 +1959,51 @@ const textareaVariants = [
             <Input model-value="" :show-icon="false" placeholder="" />
           </Field>
         </FieldSet>
+      </div>
+    </section>
+
+    <!--
+      Такт 89: превью приложения (`AppPreview` и части, `AppPreviewScreen`, `AppPreviewThumb` — карточка 11) и «?» с превью
+      (`HelpPreview` — карточка 12). Эталон — макет `33694:3879` (поповер «?» с экраном приложения), не мастер кита: наложения
+      нет, раздел — ради автопроверок шрифтов и оптики иконок. Матрицы — `/scheme-edit/states`.
+    -->
+    <section data-theme="rososmotr" class="space-y-3 bg-background font-sans text-foreground" data-compare="app-preview">
+      <h2 class="text-lg font-bold">
+        AppPreview · AppPreviewScreen · AppPreviewThumb · HelpPreview · SectionNavAnchor description · SelectItem multiline — без эталона кита, такт 89
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Экраны приложения исполнителя в рамке телефона — по макету <code>33694:3879</code> на ролях <code>--app-*</code>.
+        Экраны — демо-данные страницы схемы той же сборкой, что демо-осмотр.
+      </p>
+      <div class="flex flex-wrap items-start gap-6">
+        <AppPreviewScreen :screen="appScreens['step:p-auto:s-front']!" size="md" :marked="['setting:general.behavior.refuse']" />
+        <AppPreviewScreen :screen="appScreens['form:g-body']!" size="lg" />
+        <AppPreviewScreen :screen="appScreens.confirm!" size="lg" />
+        <AppPreviewScreen :screen="appScreens['repeat-more:p-damage']!" size="lg" />
+        <AppPreviewThumb :screen="appScreens.call!" label="Звонок в поддержку" :gaps="['нет текста']" />
+        <div class="w-70">
+          <AppPreviewScreen :screen="appScreens.refuse!" size="md" fragment />
+        </div>
+      </div>
+      <div class="flex flex-wrap items-start gap-6">
+        <SectionNav model-value="p" title="Экраны">
+          <SectionNavItem value="p" label="Осмотр автомобиля" status="attention">
+            <SectionNavAnchor label="Шаг 2: VIN на металле" description="нет фото-подсказки" tone="warning" active />
+          </SectionNavItem>
+        </SectionNav>
+        <div class="flex w-80 flex-col">
+          <SelectItem multiline subtitle="разрешён — кнопка «Осмотр невозможен» на экранах съёмки">
+            Запустить осмотр сразу после создания
+          </SelectItem>
+        </div>
+        <SettingRow>
+          <Checkbox :model-value="true">
+            Разрешить отказываться с отметкой «Осмотр невозможен»
+          </Checkbox>
+          <template #help>
+            <HelpPreview title="Отказ от осмотра" value="Сейчас: разрешён" />
+          </template>
+        </SettingRow>
       </div>
     </section>
 

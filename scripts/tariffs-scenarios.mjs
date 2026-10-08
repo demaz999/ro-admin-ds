@@ -1205,6 +1205,11 @@ const SCENARIOS = {
     ['черновик — тоже отказ, черновик остаётся черновиком', async (K) => { await K.click(Q.periods); await K.click(Q.periodOption('p-draft')); await K.apply(); await K.applied() }, {
       notices: ['Не удалось сохранить изменения. Правки на месте — попробуйте ещё раз'], period: 'draft', applyDisabled: false, modelPeriods: PERIODS_START }],
   ], { query: 'save=fail' }],
+  /* ------------------------------ такт 89: исправление переданного `Input` (решение 1 оркестратора 2026-10-08) ------------------------------ */
+  'ТФ-37': ['Tab из пустого поиска типов объекта: крестик очистки — не остановка Tab, фокус остаётся на странице (такт 89; до него — уходил на body, найдено тактом 88)', [
+    ['«Добавить тип объекта» — фокус в пустом поиске, крестик виден', K => K.click(Q.addType), { picker: { options: TYPES_FREE, active: null, empty: null }, focus: 'type-search' }],
+    ['Tab — фокус в поиске, плашка открыта; до такта 89 — на body', K => K.tabKey(), { focus: 'type-search', picker: { options: TYPES_FREE, active: null, empty: null } }],
+  ], { query: 'tab=types' }],
 }
 
 /* ------------------------------ прогон ------------------------------ */

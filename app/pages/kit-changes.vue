@@ -44,6 +44,9 @@ const DRAFT_ROLES = ['Администратор', 'Эксперт', 'Опера
 const draftRoles = ref(['Администратор', 'Эксперт'])
 /* Слот end у Input — такт 67. */
 const draftSearch = ref('')
+/* Такт 89: Tab из пустого поля с крестиком; действия шапки окна. */
+const draftClearTab = ref('')
+const draftDemoMode = ref('steps')
 /* Числовой ввод у Input — такт 78. */
 const draftPrice = ref('50000')
 /* Слот panel у RadioGroupItem — такт 80. */
@@ -99,7 +102,68 @@ const ro = ref({ name: 'КАСКО — осмотр', text: 'Осмотр авт
           </p>
         </div>
         <div data-example class="flex min-w-0 flex-col items-stretch gap-3">
-          <template v-if="c.id === 'badge-outline'">
+          <template v-if="c.id === 'input-clear-tab'">
+            <Input v-model="draftClearTab" placeholder="Поиск типа объекта" clearable />
+            <Button variant="outline">
+              Следующий элемент
+            </Button>
+            <span class="text-xs text-muted-foreground">фокус в пустом поле — крестик виден; Tab ведёт к кнопке ниже (до такта 89 фокус уходил на body)</span>
+          </template>
+          <template v-else-if="c.id === 'field-help'">
+            <Field label="Телефон для звонка" hint="Номер, на который будет совершён звонок из мобильного приложения">
+              <Input model-value="+7 800 000-00-00" placeholder="+7 900 000 00 00" :show-icon="false" />
+              <template #help>
+                <HelpPreview title="Телефон для звонка" description="Кнопка звонка в поддержку на экране «Осмотр отправлен»" value="Сейчас: Служба поддержки · +7 800 000-00-00" action-label="" />
+              </template>
+            </Field>
+            <span class="text-xs text-muted-foreground">значок у подписи через 8; нажатие по нему фокус в поле не ставит</span>
+          </template>
+          <template v-else-if="c.id === 'select-item-multiline'">
+            <div class="flex w-80 flex-col">
+              <SelectItem multiline subtitle="выключено — после «Начать» экран «Осмотр создан»">
+                Запустить осмотр сразу после создания
+                <template #trailing>
+                  <ButtonAction size="sm" :show-icon="false">
+                    Изменить
+                  </ButtonAction>
+                </template>
+              </SelectItem>
+              <SelectItem subtitle="выключено — после «Начать» экран «Осмотр создан»">
+                Запустить осмотр сразу после создания
+              </SelectItem>
+            </div>
+            <span class="text-xs text-muted-foreground">сверху — с переносом, снизу — прежняя строка с многоточием</span>
+          </template>
+          <template v-else-if="c.id === 'modal-card-header-actions'">
+            <div class="relative h-60 overflow-hidden rounded-md border border-border-soft bg-background">
+              <ModalCard :open="true" :modal="false">
+                <ModalCardContent inline placement="full">
+                  <ModalCardHeader title="Демо-осмотр — КАСКО" subtitle="По черновику · логика не выполняется">
+                    <template #actions>
+                      <Tabs v-model="draftDemoMode">
+                        <TabsList variant="segmented">
+                          <TabsTrigger value="steps" variant="segmented">
+                            По шагам
+                          </TabsTrigger>
+                          <TabsTrigger value="map" variant="segmented">
+                            Карта
+                          </TabsTrigger>
+                        </TabsList>
+                      </Tabs>
+                      <Button variant="secondary">
+                        Вернуться к схеме
+                      </Button>
+                    </template>
+                  </ModalCardHeader>
+                  <ModalCardBody>
+                    <ModalCardText>Действия — справа от заголовка до крестика</ModalCardText>
+                  </ModalCardBody>
+                </ModalCardContent>
+              </ModalCard>
+            </div>
+            <span class="text-xs text-muted-foreground">слот actions у ModalCardHeader; без слота шапка прежняя</span>
+          </template>
+          <template v-else-if="c.id === 'badge-outline'">
             <div class="flex flex-wrap items-center gap-2">
               <Badge appearance="outline" variant="neutral">2 схемы</Badge>
               <Badge appearance="outline">Регресс-шкала</Badge>

@@ -13,6 +13,7 @@ import {
   INDUSTRIES, SHOWCASE_IMAGE, SHOWCASE_OBJECTS, SHOWCASE_STATUS, SPHERES,
   catalogCounts, catalogHint, catalogLabel, HINT_CATEGORIES, HINT_MATCH_LABEL, hintLabel, hintSrc, hintStatus, searchCatalog,
   fillRepeatTexts, knownObjectType, REPEAT_TEXT_FIELDS, textVariants, variantChips, variantGroups,
+  buildDemo, type DemoSource, type HelpKey, type HelpPreviewView,
   type BehaviorSettings, type Dataset, type DonorScheme, type FieldDraft, type FillRow, type FormulaSettings, type GroupDraft, type HintCategoryFilter, type HintMatch,
   type NetworkState, type PdfTemplate, type PdfTemplateDraft, type ProcessDraft, type ProcessStep, type RepeatTextKey, type SaveState, type SectionId, type StepDraft,
   type StepHint, type TabId,
@@ -87,6 +88,14 @@ import { useReorder } from '~/stands/scheme-edit/reorder'
  * вставки; «←» и Esc — уровень назад; подвал «Вставить N … в …». В оверлее повторяемого процесса — раздел «Тексты в
  * приложении»: шесть полей `Autocomplete` с вариантами словаря по типу объекта, до трёх вариантов чипами (`Chip pressable`),
  * «Все варианты» — поповер с поиском и группами по типу объекта; «Заполнить по типу объекта» — только пустые, с «Отменить».
+ * **Такт 89 — демо-осмотр и превью у «?»** (`docs/scheme-edit-review.md`, 4.1, 4.2): «Предпросмотр» и действие поиска открывают
+ * демо-осмотр — `ModalCard placement="full"`: шапка с «По шагам / Карта» и «Вернуться к схеме» (слот `actions`), слева оглавление
+ * экранов по этапам с пробелами (`SectionNav`, вторая строка якоря), в центре телефон (`AppPreviewScreen`: переходы по кнопкам
+ * экрана, ← → и счётчик) либо карта (`AppPreviewThumb` рядами по этапам), справа «Из чего собран экран» (`SelectItem multiline`,
+ * «Изменить» — переход поиска либо сайд сущности); наведение на элемент телефона подсвечивает строку, на строку — обводит элемент.
+ * «?» с превью (`HelpPreview`, слот `help` у `SettingRow` и `Field`) — у отказа от осмотра, промежуточного экрана, блока
+ * дополнительных файлов, режима выполнения, телефона, подсказки и галочки экрана подтверждения; в строке поля «Формы» — «Где
+ * увидит исполнитель»; в разделе «Тексты в приложении» оверлея — фрагмент экрана списка повторов.
  *
  * ## Поведение — модель `~/stands/scheme-edit/model.ts`
  *
@@ -145,6 +154,9 @@ import { useReorder } from '~/stands/scheme-edit/reorder'
  * | `?pasteq=квартир` · `?donor=d-osago` · `?part=dg-lead` · `?pick=df-number,df-date` | сайд вставки: запрос списка схем; схема-донор — второй уровень; группа или процесс донора — третий; выбранные поля или шаги (такт 88) |
  * | `?open=overlay-texts` · `overlay-variants` | оверлей повторяемого процесса, раздел «Тексты в приложении» в окне; `overlay-variants` — открыт поповер «Все варианты» у названия повтора (такт 88) |
  * | `?otype=car` · `?texts=filled` | тип объекта процесса в черновике оверлея; тексты заполнены основным набором типа (такт 88) |
+ * | `?open=demo` · `?screen=step:p-auto:s-front` · `?demo=map` · `?mark=setting:general.behavior.refuse` | демо-осмотр: экран, режим «Карта», обведённый элемент (такт 89) |
+ * | `?app=full` · `checklist` | настройки приложения в черновике: отказ разрешён, промежуточный экран, телефон поддержки; `checklist` — и режим «Чек-лист» (такт 89) |
+ * | `?help=refuse` · `confirmHint` · `confirmCheckbox` · `mobileMode` · `phone` · `startAfterCreate` · `forbidExtraFiles` · `field:f-vin` | открытый поповер «?» с превью (такт 89) |
  */
 definePageMeta({ layout: 'admin' })
 useHead({ title: 'Редактирование схемы осмотра — стенд' })
@@ -1253,6 +1265,116 @@ function pickText(key: RepeatTextKey, value: string) {
   od.value.texts[key] = value
   if (variantsOpen.value === key) variantsOpen.value = ''
 }
+/**
+ * Фрагмент экрана приложения у раздела текстов — такт 89 (решение 7 оркестратора): экран списка повторов на текстах черновика
+ * оверлея, тем же механизмом, что демо-осмотр. Поле в фокусе выбирает экран, где его текст виден, и обводит текст: название
+ * повтора и подсказка — экран повтора, «Есть ещё?» и кнопка завершения — экран вопроса, остальное — список.
+ */
+const textFocus = ref<RepeatTextKey | ''>('')
+const TEXT_SCREEN: Record<RepeatTextKey, 'repeat-list' | 'repeat-item' | 'repeat-more'> = {
+  empty: 'repeat-list', add: 'repeat-list', item: 'repeat-item', before: 'repeat-item', more: 'repeat-more', finish: 'repeat-more',
+}
+const textsPreview = computed(() => {
+  const p = { ...od.value, id: od.value.id || 'draft', repeatable: true, hidden: false }
+  const d = buildDemo({ ...m.shown.value, processes: [p] })
+  return d.byId[`${textFocus.value ? TEXT_SCREEN[textFocus.value] : 'repeat-list'}:${p.id}`] ?? null
+})
+const textsMark = computed(() => (textFocus.value ? [`texts:${od.value.id || 'draft'}:${textFocus.value}`] : []))
+function onTextFocus(event: FocusEvent) {
+  const key = (event.target as HTMLElement | null)?.closest<HTMLElement>('[data-text]')?.dataset.text as RepeatTextKey | undefined
+  if (key) textFocus.value = key
+}
+
+/* ------------------------------ демо-осмотр — такт 89, 4.1 ------------------------------ */
+/**
+ * Демо-осмотр (решения 5, 6 оркестратора 2026-10-08): полноэкранный оверлей — слева оглавление экранов по этапам с пробелами
+ * (`SectionNav`), в центре телефон с переходами по кнопкам экрана, ← → и счётчиком либо карта — ряды миниатюр по этапам;
+ * справа «Из чего собран экран» со ссылками «Изменить». Наведение на элемент телефона подсвечивает строку справа, наведение
+ * на строку обводит элемент. Экраны — модель (`m.demo`, `~/stands/scheme-edit/demo.ts`).
+ */
+const demoOpen = surface('demo')
+const demoMode = computed<string>({ get: () => m.ui.demo.mode, set: v => m.setDemoMode(v === 'map' ? 'map' : 'steps') })
+/** Этап открытого экрана — раздел оглавления; выбор этапа ведёт на его первый экран. */
+const demoStage = computed<string>({
+  get: () => m.demoScreen.value.stage,
+  set: (v) => { const st = m.demo.value.stages.find(x => x.id === v); if (st && st.id !== m.demoScreen.value.stage) m.demoGo(st.screens[0]!) },
+})
+/**
+ * Обводка элемента телефона и подсветка строки «Из чего собран экран»: переход из «?» (модель, до смены экрана) и наведение —
+ * на элемент телефона либо на строку (страница).
+ */
+const demoHover = ref('')
+const demoMarked = computed(() => (demoHover.value ? [...m.ui.demo.mark, demoHover.value] : m.ui.demo.mark))
+watch(() => m.ui.demo.screen, () => { demoHover.value = '' })
+const demoTitle = computed(() => `Демо-осмотр — ${general.value.name || 'Новая схема осмотра'}`)
+const demoSubtitle = computed(() => (ro.value ? `По версии от ${m.history.value.find(v => v.id === m.ui.viewing)?.date ?? ''} · логика не выполняется` : 'По черновику · логика не выполняется'))
+/** Якоря этапа в оглавлении: у этапа из нескольких экранов и у экрана с пробелом. */
+const tocAnchors = (stageId: string) => {
+  const st = m.demo.value.stages.find(x => x.id === stageId)
+  return st && (st.screens.length > 1 || m.demo.value.byId[st.screens[0]!]!.gaps.length) ? st.screens.map(id => m.demo.value.byId[id]!) : []
+}
+/** Миниатюра карты — экран «По шагам». */
+function openFromMap(id: string) {
+  m.demoGo(id)
+  m.setDemoMode('steps')
+}
+/** ← → в оверлее — соседний экран; в поле ввода и на карте стрелки свои. */
+function onDemoKey(event: KeyboardEvent) {
+  if (m.ui.demo.mode !== 'steps' || event.altKey || event.ctrlKey || event.metaKey) return
+  if ((event.target as HTMLElement | null)?.closest('input, textarea, [contenteditable=true], [role=tablist]')) return
+  if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+    event.preventDefault()
+    m.demoStep(event.key === 'ArrowLeft' ? -1 : 1)
+  }
+}
+/**
+ * «Изменить» строки «Из чего собран экран»: оверлей закрывается, страница ведёт к месту (настройка — переходом поиска,
+ * сущность — к своему месту), сущность открывает свой сайд — после того как оверлей вернул фокус открывателю. В просмотре
+ * версии — «Показать»: только переход, сайдов правки в просмотре нет (СС-53/просмотр).
+ */
+function editDemo(src: DemoSource) {
+  const e = m.demoEdit(src)
+  const open = () => {
+    if (e.kind === 'field') openField(e.field)
+    else if (e.kind === 'group') openGroup(e.group)
+    else if (e.kind === 'step') openStep(e.process, e.step, false, e.section)
+    else if (e.kind === 'process') {
+      if (!e.repeatable) { openProcess(e.process); return }
+      openOverlay(e.process)
+      if (e.texts) nextTick(() => setTimeout(() => document.querySelector('[data-overlay-texts]')?.scrollIntoView({ block: 'start' }), 120))
+    }
+  }
+  if (e.kind !== 'setting' && e.kind !== 'tab' && !ro.value) nextTick(() => setTimeout(open, 60))
+}
+
+/* ---------- превью у «?» — такт 89, 4.2 ---------- */
+/**
+ * «?» с превью (решение 7 оркестратора): у настроек с проявлением в приложении — поповер по нажатию с фрагментом экрана,
+ * названием, пояснением и значением; «Открыть в демо-осмотре» — на этот экран с обведённым элементом. Открытый — один.
+ */
+const helpOpen = ref('')
+function setHelp(key: string, open: boolean) {
+  if (open) helpOpen.value = key
+  else if (helpOpen.value === key) helpOpen.value = ''
+}
+const help = (key: HelpKey) => m.helpView(key)
+const fieldHelp = (id: string) => m.fieldView(id)
+/** Пропы «?» настройки: название, пояснение, значение, открытость; метка `data-help` — оснастка и прогон. */
+function helpBind(key: HelpKey) {
+  const v = help(key)
+  return { 'title': v.title, 'description': v.description, 'value': v.value, 'open': helpOpen.value === key, 'data-help': key }
+}
+/** «Где увидит исполнитель» у поля формы — тот же поповер (решение 7). */
+function fieldBind(id: string) {
+  const v = fieldHelp(id)
+  return { 'title': v?.title ?? '', 'description': v?.description ?? '', 'value': v?.value ?? '', 'open': helpOpen.value === `field:${id}`, 'data-help': `field:${id}`, 'label': 'Где увидит исполнитель' }
+}
+/** «Открыть в демо-осмотре»: экран превью и обведённый элемент; места нет (поле только web) — первый экран анкеты. */
+function demoFromHelp(view: HelpPreviewView | null) {
+  helpOpen.value = ''
+  const anketa = m.demo.value.stages.find(st => st.kind === 'form')?.screens[0] ?? ''
+  m.openDemo(view?.screen?.id ?? anketa, view?.mark ?? [])
+}
 
 /**
  * Сайд шага — № 63 (пробел макета): шесть секций аудита — «Основное», «Поведение», «Съёмка», «Нейросети», «Подсказки»,
@@ -1425,6 +1547,44 @@ const afterMount = (fn: () => void) => onMounted(() => { setTimeout(fn, 120) })
       document.querySelector('[data-overlay-texts]')?.scrollIntoView({ block: 'start' })
       if (q('open') === 'overlay-variants') openVariants('item', true)
     })
+  }
+}
+
+/*
+ * Оснастка приёмки (такт 89): настройки приложения в черновике, демо-осмотр — экран, режим, обведённый элемент; открытый «?».
+ * `?app=full` — отказ разрешён (и от повторяемых), промежуточный экран, телефон поддержки; `?app=checklist` — то же и режим
+ * «Чек-лист».
+ */
+const HELP_KEYS: HelpKey[] = ['refuse', 'confirmHint', 'confirmCheckbox', 'mobileMode', 'phone', 'startAfterCreate', 'forbidExtraFiles']
+const HELP_MOBILE: HelpKey[] = ['mobileMode', 'phone', 'startAfterCreate']
+{
+  if (q('app') === 'full' || q('app') === 'checklist') {
+    const s = m.draft.config.settings
+    s.general.behavior.refuse = true
+    s.general.behavior.refuseRepeatable = true
+    s.mobile.startAfterCreate = false
+    s.mobile.phone = '+7 800 000-00-00'
+    s.mobile.phoneName = 'Служба поддержки'
+    s.mobile.callConfirm = 'Позвонить в службу поддержки осмотров?'
+    if (q('app') === 'checklist') s.mobile.mode = 'checklist'
+  }
+  if (q('open') === 'demo') {
+    m.openDemo(q('screen'), q('mark') ? q('mark').split(',') : [])
+    if (q('demo') === 'map') m.setDemoMode('map')
+  }
+  const key = q('help')
+  const reveal = () => document.querySelector(`[data-help="${key}"]`)?.scrollIntoView({ block: 'center', behavior: 'instant' })
+  if ((HELP_KEYS as string[]).includes(key)) {
+    if (HELP_MOBILE.includes(key as HelpKey)) m.setSection('mobile')
+    afterMount(() => { reveal(); helpOpen.value = key })
+  }
+  else if (key.startsWith('field:')) {
+    const grp = m.formGroups.value.find(g => g.fields.some(f => f.id === key.slice(6)))
+    if (grp) {
+      m.setTab('form')
+      m.selectGroup(grp.id)
+      afterMount(() => { reveal(); helpOpen.value = key })
+    }
   }
 }
 
@@ -1849,10 +2009,18 @@ if (import.meta.client) {
                     <Heading level="group">
                       Отказ от осмотра
                     </Heading>
-                    <SettingRow data-setting="refuse" :highlighted="hl('refuse')" help="Исполнитель сможет завершить осмотр без съёмки, указав причину">
+                    <!-- «?» с превью в приложении — такт 89 (ревью 4.2, решение 7): фрагмент экрана шага с кнопкой «Осмотр невозможен». -->
+                    <SettingRow data-setting="refuse" :highlighted="hl('refuse')">
                       <Checkbox :readonly="ro" :model-value="beh.refuse" @update:model-value="setB('refuse', $event)">
                         Разрешить отказываться с отметкой «Осмотр невозможен»
                       </Checkbox>
+                      <template #help>
+                        <HelpPreview v-bind="helpBind('refuse')" @update:open="setHelp('refuse', $event)" @action="demoFromHelp(help('refuse'))">
+                          <template v-if="help('refuse').screen" #default>
+                            <AppPreviewScreen fragment size="md" :screen="help('refuse').screen" :marked="help('refuse').mark" />
+                          </template>
+                        </HelpPreview>
+                      </template>
                       <template #children>
                         <SettingRow v-slot="{ disabled }" data-setting="refuseRepeatable" :highlighted="hl('refuseRepeatable')" :reason="m.rule('refuseRepeatable').reason">
                           <Checkbox :readonly="ro" :model-value="beh.refuseRepeatable" :disabled="disabled" @update:model-value="setB('refuseRepeatable', $event)">
@@ -1916,6 +2084,13 @@ if (import.meta.client) {
                       <Checkbox :readonly="ro" :model-value="beh.forbidExtraFiles" subtitle="Пользователь не сможет прикрепить файлы за пределами обязательных полей" @update:model-value="setB('forbidExtraFiles', $event)">
                         Запретить использовать блок дополнительных файлов
                       </Checkbox>
+                      <template #help>
+                        <HelpPreview v-bind="helpBind('forbidExtraFiles')" @update:open="setHelp('forbidExtraFiles', $event)" @action="demoFromHelp(help('forbidExtraFiles'))">
+                          <template v-if="help('forbidExtraFiles').screen" #default>
+                            <AppPreviewScreen fragment size="md" :screen="help('forbidExtraFiles').screen" :marked="help('forbidExtraFiles').mark" />
+                          </template>
+                        </HelpPreview>
+                      </template>
                     </SettingRow>
                   </Card>
                 </div>
@@ -2029,9 +2204,23 @@ if (import.meta.client) {
                 <Card class="grid grid-cols-2 items-start gap-6">
                   <Field :readonly="ro" label="Подсказка клиенту" hint="Текст подсказки на экране подтверждения">
                     <Input v-model="confirmHint" placeholder="Введите подсказку для экрана подтверждения" :show-icon="false" data-field="confirmHint" />
+                    <template #help>
+                      <HelpPreview v-bind="helpBind('confirmHint')" @update:open="setHelp('confirmHint', $event)" @action="demoFromHelp(help('confirmHint'))">
+                        <template v-if="help('confirmHint').screen" #default>
+                          <AppPreviewScreen fragment size="md" :screen="help('confirmHint').screen" :marked="help('confirmHint').mark" />
+                        </template>
+                      </HelpPreview>
+                    </template>
                   </Field>
                   <Field :readonly="ro" label="Текст галочки" hint="Текст рядом с чекбоксом подтверждения">
                     <Input v-model="confirmCheckbox" placeholder="Информация напротив галочки подтверждения" :show-icon="false" data-field="confirmCheckbox" />
+                    <template #help>
+                      <HelpPreview v-bind="helpBind('confirmCheckbox')" @update:open="setHelp('confirmCheckbox', $event)" @action="demoFromHelp(help('confirmCheckbox'))">
+                        <template v-if="help('confirmCheckbox').screen" #default>
+                          <AppPreviewScreen fragment size="md" :screen="help('confirmCheckbox').screen" :marked="help('confirmCheckbox').mark" />
+                        </template>
+                      </HelpPreview>
+                    </template>
                   </Field>
                 </Card>
               </section>
@@ -2045,6 +2234,13 @@ if (import.meta.client) {
                 </Heading>
                 <Card class="flex flex-col gap-4">
                   <Field :readonly="ro" label="Режим выполнения">
+                    <template #help>
+                      <HelpPreview v-bind="helpBind('mobileMode')" @update:open="setHelp('mobileMode', $event)" @action="demoFromHelp(help('mobileMode'))">
+                        <template v-if="help('mobileMode').screen" #default>
+                          <AppPreviewScreen fragment size="md" :screen="help('mobileMode').screen" :marked="help('mobileMode').mark" />
+                        </template>
+                      </HelpPreview>
+                    </template>
                     <RadioGroup v-model="mobileMode" class="grid grid-cols-2" data-radio="mobileMode">
                       <RadioGroupItem variant="card" value="regular" :checked="mobileMode === 'regular'">
                         Обычный
@@ -2068,6 +2264,13 @@ if (import.meta.client) {
                   </Field>
                   <Field :readonly="ro" label="Телефон для звонка" hint="Номер, на который будет совершён звонок из мобильного приложения">
                     <Input v-model="mobilePhone" placeholder="+7 900 000 00 00" :show-icon="false" data-field="phone" />
+                    <template #help>
+                      <HelpPreview v-bind="helpBind('phone')" @update:open="setHelp('phone', $event)" @action="demoFromHelp(help('phone'))">
+                        <template v-if="help('phone').screen" #default>
+                          <AppPreviewScreen fragment size="md" :screen="help('phone').screen" :marked="help('phone').mark" />
+                        </template>
+                      </HelpPreview>
+                    </template>
                   </Field>
                   <Field :readonly="ro" label="Название телефона" hint="Отображаемое имя контакта, которое увидит пользователь при звонке">
                     <Input v-model="mobilePhoneName" placeholder="Например, «Служба поддержки»" :show-icon="false" data-field="phoneName" />
@@ -2087,6 +2290,13 @@ if (import.meta.client) {
                     <Checkbox :readonly="ro" :model-value="mob.startAfterCreate" subtitle="Пользователь сразу переходит к выполнению без промежуточного экрана" @update:model-value="setS('mobile.startAfterCreate', $event)">
                       Запустить осмотр сразу после создания
                     </Checkbox>
+                    <template #help>
+                      <HelpPreview v-bind="helpBind('startAfterCreate')" @update:open="setHelp('startAfterCreate', $event)" @action="demoFromHelp(help('startAfterCreate'))">
+                        <template v-if="help('startAfterCreate').screen" #default>
+                          <AppPreviewScreen fragment size="md" :screen="help('startAfterCreate').screen" :marked="help('startAfterCreate').mark" />
+                        </template>
+                      </HelpPreview>
+                    </template>
                   </SettingRow>
                   <SettingRow data-setting="hideHints" :highlighted="hl('hideHints')">
                     <Checkbox :readonly="ro" :model-value="mob.hideHints" subtitle="Опытные пользователи — те, кто проходил осмотр минимум три раза по данной схеме" @update:model-value="setS('mobile.hideHints', $event)">
@@ -2820,6 +3030,12 @@ if (import.meta.client) {
                     <TableCellIdentity class="flex-initial">
                       {{ f.title }}
                     </TableCellIdentity>
+                    <!-- «Где увидит исполнитель» — такт 89 (решение 7): «?» с превью — экран анкеты с обведённым полем. -->
+                    <HelpPreview v-bind="fieldBind(f.id)" @update:open="setHelp(`field:${f.id}`, $event)" @action="demoFromHelp(fieldHelp(f.id))">
+                      <template v-if="fieldHelp(f.id)?.screen" #default>
+                        <AppPreviewScreen fragment size="md" :screen="fieldHelp(f.id)?.screen" :marked="fieldHelp(f.id)?.mark" />
+                      </template>
+                    </HelpPreview>
                     <Badge v-if="f.required" size="sm" data-badge="required">
                       Обязательное
                     </Badge>
@@ -3657,8 +3873,15 @@ if (import.meta.client) {
                   </Button>
                 </Field>
               </div>
+              <!--
+                Фрагмент экрана приложения — такт 89 (решение 7): экран списка повторов на текстах черновика оверлея; поле в фокусе
+                выбирает экран, где его текст виден, и обводит текст. Тот же механизм, что демо-осмотр.
+              -->
+              <div v-if="textsPreview" class="flex" data-texts-preview>
+                <AppPreviewScreen fragment size="md" :screen="textsPreview" :marked="textsMark" />
+              </div>
               <!-- Поля с чипами — через 16: при шаге группы полей 8 подсказка поля сливалась с подписью следующего. -->
-              <div class="flex flex-col gap-4">
+              <div class="flex flex-col gap-4" @focusin="onTextFocus">
                 <Field v-for="f in REPEAT_TEXT_FIELDS" :key="f.key" :readonly="ro" :label="f.label" :hint="f.hint" :data-text="f.key">
                   <div class="flex flex-col gap-2">
                     <Autocomplete v-model="od.texts[f.key]" :items="textItems(f.key)" :placeholder="f.placeholder" :show-icon="false" />
@@ -3798,6 +4021,145 @@ if (import.meta.client) {
             </Button>
           </template>
         </ModalCardFooter>
+      </ModalCardContent>
+    </ModalCard>
+
+    <!--
+      ============================ демо-осмотр — № 98–102, такт 89: `ModalCard placement="full"` (ревью 4.1; решения 5, 6) ============================
+      Шапка — «Демо-осмотр · по черновику · логика не выполняется», «По шагам / Карта», «Вернуться к схеме»; слева оглавление
+      экранов по этапам с пробелами, в центре телефон (переходы по кнопкам экрана, ← → и счётчик) либо карта, справа «Из чего
+      собран экран» со ссылками «Изменить». Esc закрывает.
+    -->
+    <ModalCard v-model:open="demoOpen">
+      <ModalCardContent placement="full" data-overlay="demo" :data-mode="m.ui.demo.mode" :data-screen="m.demoScreen.value.id" @keydown="onDemoKey">
+        <ModalCardHeader :title="demoTitle" :subtitle="demoSubtitle">
+          <template #actions>
+            <Tabs v-model="demoMode">
+              <TabsList variant="segmented">
+                <TabsTrigger value="steps" variant="segmented" data-demo-mode="steps">
+                  По шагам
+                </TabsTrigger>
+                <TabsTrigger value="map" variant="segmented" data-demo-mode="map">
+                  Карта
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <Button variant="secondary" data-act="demo-close" @click="m.closeSurface()">
+              Вернуться к схеме
+            </Button>
+          </template>
+        </ModalCardHeader>
+        <ModalCardBody class="flex items-start gap-6">
+          <!-- Оглавление экранов по этапам — № 100: `SectionNav`, у экрана с пробелом — метка тоном предупреждения. -->
+          <SectionNav v-model="demoStage" title="Экраны" class="sticky top-0" data-demo-toc>
+            <SectionNavItem
+              v-for="st in m.demo.value.stages"
+              :key="st.id"
+              :value="st.id"
+              :label="st.label"
+              :status="st.gaps ? 'attention' : 'none'"
+              :data-stage="st.id"
+            >
+              <SectionNavAnchor
+                v-for="s in tocAnchors(st.id)"
+                :key="s.id"
+                :label="s.label"
+                :description="s.gaps.join(' · ')"
+                tone="warning"
+                :active="s.id === m.demoScreen.value.id"
+                :data-screen="s.id"
+                @select="m.demoGo(s.id)"
+              />
+            </SectionNavItem>
+          </SectionNav>
+
+          <!-- Центр — № 99, 101: телефон «По шагам» либо карта экранов. -->
+          <div v-if="m.ui.demo.mode === 'steps'" class="sticky top-0 flex min-w-0 flex-1 flex-col items-center gap-4" data-demo-center>
+            <AppPreviewScreen
+              :screen="m.demoScreen.value"
+              size="lg"
+              :scale="1.4"
+              interactive
+              :marked="demoMarked"
+              data-demo-phone
+              @go="m.demoGo($event)"
+              @enter="demoHover = $event"
+              @leave="demoHover = ''"
+            />
+            <div class="flex items-center gap-3" data-demo-nav>
+              <IconButton variant="secondary" size="md" label="Предыдущий экран" :disabled="m.demoPos.value <= 1" data-act="demo-prev" @click="m.demoStep(-1)">
+                <Icon name="chevron-left" :size="16" />
+              </IconButton>
+              <ToolbarText data-demo-counter>
+                Экран {{ m.demoPos.value }} из {{ m.demo.value.order.length }}
+              </ToolbarText>
+              <IconButton variant="secondary" size="md" label="Следующий экран" :disabled="m.demoPos.value >= m.demo.value.order.length" data-act="demo-next" @click="m.demoStep(1)">
+                <Icon name="chevron-right" :size="16" />
+              </IconButton>
+            </div>
+          </div>
+          <div v-else class="flex min-w-0 flex-1 flex-col gap-8" data-demo-map>
+            <section v-for="st in m.demo.value.stages" :key="st.id" class="flex flex-col gap-3" :data-map-stage="st.id">
+              <Heading>
+                {{ st.label }}
+                <template #meta>
+                  {{ st.hint }} · {{ st.screens.length }} {{ plural(st.screens.length, 'экран', 'экрана', 'экранов') }}
+                </template>
+              </Heading>
+              <div class="flex flex-wrap items-start gap-3">
+                <template v-for="(id, k) in st.screens" :key="id">
+                  <span v-if="k" class="flex pt-28">
+                    <Icon name="arrow-forward" :size="16" />
+                  </span>
+                  <AppPreviewThumb
+                    :screen="m.demo.value.byId[id]"
+                    :label="m.demo.value.byId[id]?.label ?? ''"
+                    :gaps="m.demo.value.byId[id]?.gaps"
+                    :current="id === m.demoScreen.value.id"
+                    :data-thumb="id"
+                    @click="openFromMap(id)"
+                  />
+                </template>
+              </div>
+              <ToolbarText v-if="st.kind === 'refuse'">
+                Ветка — кнопка «Осмотр невозможен» на экранах съёмки; «Вернуться к осмотру» ведёт обратно
+              </ToolbarText>
+              <ToolbarText v-else-if="st.kind === 'done' && st.screens.length > 1">
+                Звонок — кнопка на экране «Осмотр отправлен»
+              </ToolbarText>
+            </section>
+          </div>
+
+          <!-- «Из чего собран экран» — № 102: наведение на строку обводит элемент телефона, «Изменить» ведёт к месту. -->
+          <div class="flex w-80 shrink-0 flex-col gap-3" data-demo-sources>
+            <Heading>
+              Из чего собран экран
+            </Heading>
+            <ToolbarText>
+              {{ m.demoScreen.value.label }}
+            </ToolbarText>
+            <SelectGroup>
+              <SelectItem
+                v-for="src in m.demoScreen.value.sources"
+                :key="src.id"
+                multiline
+                :subtitle="src.value"
+                :selected="demoMarked.includes(src.id)"
+                :data-source="src.id"
+                :data-gap="src.gap || undefined"
+                @mouseenter="demoHover = src.id"
+                @mouseleave="demoHover = ''"
+              >
+                {{ src.label }}
+                <template #trailing>
+                  <ButtonAction size="sm" :show-icon="false" data-act="demo-edit" @click="editDemo(src)">
+                    {{ ro ? 'Показать' : 'Изменить' }}
+                  </ButtonAction>
+                </template>
+              </SelectItem>
+            </SelectGroup>
+          </div>
+        </ModalCardBody>
       </ModalCardContent>
     </ModalCard>
 

@@ -11,6 +11,7 @@ import { MODAL_CARD_KEY } from '.'
  * мастера: `close` `864:2745` — крестик справа; `back` `864:2746` — стрелка «назад» слева от заголовка (такт 64).
  * Подзаголовок 15/20 — из «Экспорта в Excel»: у мастера шапки его нет. У заблокированного окна крестика нет.
  * Слот `icon` — такт 83: значок окна в круге 28 тона ошибки над заголовком, через 16 (Figma `31246:7448`, `31246:7517`).
+ * Слот `actions` — такт 89: действия справа от заголовка до крестика (демо-осмотр: «По шагам / Карта», «Вернуться к схеме»).
  * Разбор — в `index.ts`.
  */
 const props = withDefaults(defineProps<{
@@ -55,6 +56,13 @@ const ctx = inject(MODAL_CARD_KEY, { closable: computed(() => true) })
       <VisuallyHidden v-else as-child>
         <DialogDescription>{{ props.title }}</DialogDescription>
       </VisuallyHidden>
+    </div>
+    <!--
+      Действия шапки — такт 89: переключатель вида и кнопки полноэкранного слоя (демо-осмотр страницы схемы) справа от
+      заголовка через 16, до крестика; по центру блока заголовка и подзаголовка. Без слота шапка прежняя.
+    -->
+    <div v-if="$slots.actions" data-slot="modal-card-header-actions" class="flex shrink-0 items-center gap-4 self-center">
+      <slot name="actions" />
     </div>
     <!-- Строка 28, бокс крестика 24 — по центру строки. Глиф 13: видимый размер `24_close`. -->
     <DialogClose v-if="ctx.closable.value && !props.back" as-child>

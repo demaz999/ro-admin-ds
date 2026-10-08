@@ -7,7 +7,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../too
 
 /**
  * Строка настройки: контрол с названием и пояснением, «?», причина недоступности, счётчик с переходом, вложенные
- * параметры. Разбор — `index.ts`.
+ * параметры. Разбор — `index.ts`. Такт 89 — слот `help`: «?» с превью в приложении вместо текстового.
  *
  * Пример:
  * `<SettingRow v-slot="{ disabled }" help="…" :reason="причина"><Checkbox v-model="x" :disabled="disabled" subtitle="…">Название</Checkbox></SettingRow>`
@@ -67,7 +67,12 @@ onBeforeUnmount(() => clearTimeout(timer))
         <div class="min-w-0">
           <slot :disabled="!!props.reason" />
         </div>
-        <Tooltip v-if="props.help">
+        <!--
+          Слот `help` — такт 89: «?» с превью в приложении (`HelpPreview`, поповер по нажатию) на месте текстового «?» — тот
+          же зазор 8 и подъём на 2. Со слотом проп `help` не рисуется.
+        -->
+        <slot v-if="$slots.help" name="help" />
+        <Tooltip v-else-if="props.help">
           <TooltipTrigger as-child>
             <!-- Кнопка 24 в строке заголовка 20: поднята на 2, чтобы глиф встал по центру первой строки. -->
             <IconButton data-setting-help variant="ghost" size="sm" rounded label="Пояснение" class="-my-0.5 shrink-0">

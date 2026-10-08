@@ -107,6 +107,11 @@ async function openPage(width = 1440) {
       page.blind.push(sel.length > 110 ? `${sel.slice(0, 107)}…` : sel)
       return p
     },
+    /** Курсор в точку окна реальным вводом — такт 89: увести курсор с элементов с наведением. */
+    async mouseTo(x, y) {
+      await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x, y })
+      await sleep(150)
+    },
     /** Курсор на элемент реальным вводом — такт 87: кнопки плитки и миниатюры видны на наведении. */
     async hover(sel) {
       const p = await this.point(sel)
@@ -405,6 +410,30 @@ function kit(page) {
     textVariants: key => page.click(`document.querySelector('[data-overlay-texts] [data-text=${key}] [data-act=text-variants]')`),
     /** Вариант в поповере «Все варианты». */
     variantPick: v => page.click(`document.querySelector('[data-variants] [data-variant="${v}"]')`),
+    /* ---------- такт 89: демо-осмотр и превью у «?» ---------- */
+    /**
+     * «Предпросмотр» и курсор в пустой угол оверлея: оверлей встаёт под неподвижный курсор, и Chrome шлёт наведение элементу под
+     * ним — строке «Из чего собран экран» у кнопки шапки. Наведение в слепке даёт только действие шага.
+     */
+    async preview() { await page.click(Q.act('preview')); await page.mouseTo(8, 892) },
+    /** Часть телефона демо-осмотра — кнопка или строка с переходом. */
+    demoPart: id => page.click(`document.querySelector('[data-demo-phone] [data-part="${id}"]')`),
+    /** Наведение курсора на часть телефона либо строку «Из чего собран экран» — реальным вводом. */
+    demoHoverPart: id => page.hover(`document.querySelector('[data-demo-phone] [data-part="${id}"]')`),
+    demoHoverSource: id => page.hover(`document.querySelector('[data-demo-sources] [data-source="${id}"]')`),
+    /** Раздел оглавления (этап) и якорь (экран). */
+    demoStage: id => page.click(`document.querySelector('[data-demo-toc] [data-slot=section-nav-item][data-value="${id}"]')`),
+    demoAnchor: id => page.click(`document.querySelector('[data-demo-toc] [data-screen="${id}"]')`),
+    /** «По шагам» либо «Карта». */
+    demoMode: mode => page.click(`document.querySelector('[data-demo-mode=${mode}]')`),
+    /** Миниатюра карты. */
+    demoThumb: id => page.click(`document.querySelector('[data-thumb="${id}"]')`),
+    /** «Изменить» строки «Из чего собран экран». */
+    demoEdit: id => page.click(`document.querySelector('[data-demo-sources] [data-source="${id}"] [data-act=demo-edit]')`),
+    /** «?» с превью у настройки либо поля («field:…»). */
+    helpOpen: key => page.click(`document.querySelector('[data-help="${key}"] [data-help-preview]')`),
+    /** «Открыть в демо-осмотре» в открытом поповере «?». */
+    helpAction: () => page.click(`document.querySelector('[data-slot=help-preview] [data-help-action]')`),
     /* ---------- П8, такт 72: «Витрина», новая схема, плашка ---------- */
     /** Клик по элементу из выражения. */
     clickEl: sel => page.click(sel),
@@ -939,6 +968,42 @@ function kit(page) {
                 + [...g.querySelectorAll('[data-slot=list-item]')].map(i => t(i.textContent) + (i.hasAttribute('data-selected') ? ' *' : '')).join(', ')),
               marks: [...el.querySelectorAll('[data-slot=highlight-text-match]')].map(x => t(x.textContent)),
               empty: t(el.querySelector('[data-variants-empty] [data-slot=empty-title]')?.textContent) || null } })(),
+          /* ---------- такт 89: демо-осмотр, превью у «?», фрагмент экрана в разделе текстов ---------- */
+          /* Часть телефона: «ключ · текст», «◉» — обведена. */
+          /* Текст части — innerText: Vue сжимает пробел между элементами, textContent склеил бы подпись и заполнитель (ловушка такта 64). */
+          ...(() => { const parts = root => [...(root?.querySelectorAll('[data-part]') ?? [])].map(p => p.dataset.part + (t(p.innerText) ? ' · ' + t(p.innerText) : '') + (p.dataset.highlighted ? ' ◉' : ''))
+            const el = document.querySelector('[data-overlay=demo]')
+            const help = document.querySelector('[data-slot=help-preview]')
+            const texts = document.querySelector('[data-texts-preview]')
+            return {
+              demo: el ? {
+                title: t(el.querySelector('[data-slot=modal-card-title]')?.textContent), sub: t(el.querySelector('[data-slot=modal-card-subtitle]')?.textContent),
+                mode: el.dataset.mode, screen: el.dataset.screen,
+                counter: t(el.querySelector('[data-demo-counter]')?.textContent) || null,
+                /* Этапы оглавления: «id», «!» — есть экран с пробелом; текущий этап; якоря — «подпись пробелы», «*» — текущий экран. */
+                stages: [...el.querySelectorAll('[data-demo-toc] [data-slot=section-nav-item]')].map(b => b.dataset.value + (b.dataset.status === 'attention' ? ' !' : '')),
+                stage: el.querySelector('[data-demo-toc] [data-slot=section-nav-item][aria-current=true]')?.dataset.value ?? null,
+                anchors: [...el.querySelectorAll('[data-demo-toc] [data-slot=section-nav-anchor]')].map(a => [t(a.querySelector('span')?.textContent),
+                  t(a.querySelector('[data-slot=section-nav-anchor-description]')?.textContent)].filter(Boolean).join(' | ') + (a.getAttribute('aria-current') ? ' *' : '')),
+                phoneTitle: t(el.querySelector('[data-demo-phone] [data-slot=app-preview-title]')?.textContent) || null,
+                phone: el.querySelector('[data-demo-phone]') ? parts(el.querySelector('[data-demo-phone]')) : null,
+                /* «Из чего собран экран»: «источник · подпись | значение», «*» — подсвечена. */
+                sources: [...el.querySelectorAll('[data-demo-sources] [data-source]')].map(r => r.dataset.source + ' · ' + t(r.querySelector('[data-slot=list-item-title]')?.textContent)
+                  + ' | ' + t(r.querySelector('[data-slot=list-item-subtitle]')?.textContent) + (r.hasAttribute('data-selected') ? ' *' : '')),
+                map: el.querySelector('[data-demo-map]') ? [...el.querySelectorAll('[data-map-stage]')].map(s => s.dataset.mapStage + ': '
+                  + [...s.querySelectorAll('[data-thumb]')].map(x => x.dataset.thumb + (x.dataset.current ? ' *' : '') + (x.querySelector('[data-slot=app-preview-thumb-gap]') ? ' !' : '')).join(', ')) : null,
+                prevOff: el.querySelector('[data-act=demo-prev]')?.disabled ?? null, nextOff: el.querySelector('[data-act=demo-next]')?.disabled ?? null,
+                /* Подпись перехода у строк: «Изменить», в просмотре версии — «Показать». */
+                edit: t(el.querySelector('[data-demo-sources] [data-act=demo-edit]')?.textContent) || null,
+              } : null,
+              help: help ? {
+                title: t(help.querySelector('[data-slot=help-preview-title]')?.textContent), description: t(help.querySelector('[data-slot=help-preview-description]')?.textContent),
+                value: t(help.querySelector('[data-slot=help-preview-value]')?.textContent), fragment: !!help.querySelector('[data-slot=app-preview][data-fragment]'),
+                marked: [...help.querySelectorAll('[data-part][data-highlighted]')].map(p => p.dataset.part),
+                parts: help.querySelector('[data-slot=help-preview-media]') ? parts(help.querySelector('[data-slot=help-preview-media]')) : [],
+              } : null,
+              textsPreview: texts ? { parts: parts(texts), marked: [...texts.querySelectorAll('[data-part][data-highlighted]')].map(p => p.dataset.part) } : null,
+            } })(),
           /* ---------- такт 72: выделение в поле ввода — решение чата, внешняя проверка тактов 67–70 ---------- */
           selRange: (() => { const a = document.activeElement; return a?.matches?.('input, textarea') ? [a.selectionStart, a.selectionEnd] : null })(),
           /* ---------- П8, такт 72: «Витрина», пустые состояния, новая схема, плашка ---------- */
@@ -1211,8 +1276,10 @@ const SCENARIOS = {
       { 'status.text': 'Черновик: правки Анна Смирнова от 03.10.2026, 09:00', 'status.clickable': true, writes: 1 }],
     ['клик по индикатору открывает дифф', K => K.statusOpen(), { surface: 'publish', modalTitle: 'Публикация схемы', 'diff.areas.0': { id: 'settings', count: '2 изменения', tone: 'changed' }, versions: 2 }],
   ], { query: 'now=2026-10-03T09:00:00' }],
-  'СС-04': ['«Предпросмотр» открывает заглушку демо-осмотра (r2 §3, §9)', [
-    ['«Предпросмотр»', K => K.act('preview'), { notices: ['Демо-осмотр — вне стенда'], surface: '', writes: 0, versions: 2 }],
+  'СС-04': ['«Предпросмотр» открывает демо-осмотр — полноэкранный оверлей по черновику (r2 §3; ревью 4.1, такт 89; до такта 89 — уведомление-заглушка)', [
+    ['«Предпросмотр» — демо-осмотр на первом экране, «По шагам»', K => K.act('preview'),
+      { surface: 'demo', notices: [], 'demo.title': 'Демо-осмотр — КАСКО — осмотр легкового автомобиля', 'demo.sub': 'По черновику · логика не выполняется',
+        'demo.mode': 'steps', 'demo.screen': 'start', 'demo.counter': 'Экран 1 из 14', writes: 0, versions: 2 }],
   ]],
   'СС-05': ['публикация: дифф-гейт — сводка по четырём областям, «Требует внимания» сверху, детали свёрнуты, подтверждение рождает снимок, current меняется, индикатор «Всё опубликовано» (r2 §2; аудит, «Как устроен дифф», «Масштабируемость диффа»)', [
     ['«Опубликовать схему» — гейт с диффом, детали свёрнуты', K => K.publish(), { surface: 'publish', modalTitle: 'Публикация схемы', modalSub: 'Эти изменения войдут в новую версию и будут применяться к новым осмотрам',
@@ -2290,6 +2357,135 @@ const SCENARIOS = {
     ['«Заполнить» — пустые из основного набора документа: «Дефект» не из словаря типа', K => K.act('texts-fill'),
       { notices: ['Заполнено 5 текстов по типу «Документ»'], 'texts.values': { item: 'Дефект', add: 'Добавить документ', before: 'Снимите документ целиком, без бликов',
         more: 'Есть ещё документы?', finish: 'Документов больше нет', empty: 'Документы ещё не добавлены' } }],
+  ], { query: 'tab=processes' }],
+  /* ============================ такт 89: демо-осмотр и превью у «?» ============================ */
+  'СС-93': ['демо-осмотр «По шагам»: переходы по кнопкам экрана, ← → и кнопки-стрелки, оглавление по этапам; Esc закрывает, фокус — на «Предпросмотр» (ревью 4.1; решения 5, 6 оркестратора 2026-10-08)', [
+    ['«Предпросмотр» — «Начало»: название схемы, компания, «Начать»; «Из чего собран экран»', K => K.preview(),
+      { surface: 'demo', 'demo.screen': 'start', 'demo.stage': 'start', 'demo.counter': 'Экран 1 из 14', 'demo.prevOff': true,
+        'demo.stages': ['start', 'form', 'process:p-auto !', 'process:p-docs !', 'process:p-damage !', 'confirm !', 'done'],
+        'demo.phone': ['name · КАСКО — осмотр легкового автомобиля', 'owner · Демо Страхование', 'start · Начать'],
+        'demo.sources': ['setting:general.name · Наименование | КАСКО — осмотр легкового автомобиля', 'setting:general.owner · Компания-владелец | Демо Страхование',
+          'setting:mobile.startAfterCreate · Запустить осмотр сразу после создания | включено — сразу к выполнению'], writes: 0 }],
+    ['«Начать» — «Анкета», экран группы «Заявка»: поля без «только web», обязательность, заполнитель', K => K.demoPart('start'),
+      { 'demo.screen': 'form:g-lead', 'demo.stage': 'form', 'demo.counter': 'Экран 2 из 14', 'demo.prevOff': false,
+        'demo.anchors': ['Заявка *', 'Автомобиль', 'Кузов и комплектация'],
+        'demo.phone': ['progress', 'group · Заявка', 'field-f-number · Номер полиса * Номер полиса', 'field-f-insurer · Страхователь * ФИО или название организации', 'next · Продолжить'] }],
+    ['→ с клавиатуры — «Автомобиль»; ← — снова «Заявка»', async (K) => { await K.key('ArrowRight'); await K.key('ArrowRight'); await K.key('ArrowLeft') },
+      { 'demo.screen': 'form:g-car', 'demo.counter': 'Экран 3 из 14' }],
+    ['этап «Осмотр автомобиля» в оглавлении — экран первого шага; у шагов без подсказки — метка пробела', K => K.demoStage('process:p-auto'),
+      { 'demo.screen': 'step:p-auto:s-vin-glass', 'demo.stage': 'process:p-auto', 'demo.counter': 'Экран 5 из 14',
+        'demo.anchors': ['Шаг 1: VIN под стеклом *', 'Шаг 2: VIN на металле | нет фото-подсказки', 'Шаг 3: Передняя часть', 'Шаг 4: Вид справа | нет фото-подсказки'],
+        'demo.phone': ['progress', 'title · Шаг 1: VIN под стеклом', 'description · Сфотографируйте VIN-номер через лобовое стекло, номер должен быть чётко виден',
+          'shot · Нажмите для съёмки 1 фото', 'next · Продолжить'] }],
+    ['«Продолжить» — следующий шаг; кнопки-стрелки «→» и «←»', async (K) => { await K.demoPart('next'); await K.act('demo-next'); await K.act('demo-prev') },
+      { 'demo.screen': 'step:p-auto:s-vin-metal', 'demo.counter': 'Экран 6 из 14' }],
+    ['якорь «Шаг 4: Вид справа» — необязательный шаг: «Пропустить шаг»', K => K.demoAnchor('step:p-auto:s-right'),
+      { 'demo.screen': 'step:p-auto:s-right', 'demo.counter': 'Экран 8 из 14',
+        'demo.phone': ['progress', 'title · Шаг 4: Вид справа', 'description · Боковая съёмка правой стороны автомобиля', 'shot · Нажмите для съёмки от 2 до 7 фото',
+          'skip · Пропустить шаг', 'next · Продолжить'] }],
+    ['«Пропустить шаг» — первый шаг следующего процесса', K => K.demoPart('skip'),
+      { 'demo.screen': 'step:p-docs:s-pts', 'demo.stage': 'process:p-docs', 'demo.counter': 'Экран 9 из 14' }],
+    ['Esc — оверлей закрыт, фокус на «Предпросмотр», записи нет', K => K.key('Escape'), { surface: '', demo: null, focusAct: 'preview', writes: 0 }],
+  ]],
+  'СС-94': ['демо-осмотр «Карта»: ряды миниатюр по этапам, пробелы, текущий экран; миниатюра открывает экран «По шагам» (ревью 4.1; выборка B2; решение 5)', [
+    ['«Карта» — этапы рядами, миниатюры экранов, «!» — экран с пробелом', async (K) => { await K.preview(); await K.demoMode('map') },
+      { 'demo.mode': 'map', 'demo.counter': null, 'demo.map': ['start: start *', 'form: form:g-lead, form:g-car, form:g-body',
+        'process:p-auto: step:p-auto:s-vin-glass, step:p-auto:s-vin-metal !, step:p-auto:s-front, step:p-auto:s-right !', 'process:p-docs: step:p-docs:s-pts !',
+        'process:p-damage: repeat-list:p-damage !, repeat-item:p-damage !, repeat-more:p-damage !', 'confirm: confirm !', 'done: done'] }],
+    ['миниатюра «Подтверждение» — экран «По шагам»', K => K.demoThumb('confirm'),
+      { 'demo.mode': 'steps', 'demo.screen': 'confirm', 'demo.counter': 'Экран 13 из 14',
+        'demo.phone': ['confirm · Проверьте и отправьте', 'files · Дополнительные файлы Приложить сверх шагов', 'check · Подтверждаю, что данные верны', 'send · Отправить'] }],
+    ['снова «Карта» — текущий экран отмечен', K => K.demoMode('map'), { 'demo.map.5': 'confirm: confirm * !', 'demo.map.0': 'start: start' }],
+  ]],
+  'СС-95': ['«Изменить» строки «Из чего собран экран»: оверлей закрывается; сущность — свой сайд, настройка — переход поиска с подсветкой (ревью 4.1, выборка B5; решение 5)', [
+    ['демо-осмотр, экран «Передняя часть» — источники экрана', async (K) => { await K.preview(); await K.demoStage('process:p-auto'); await K.demoAnchor('step:p-auto:s-front') },
+      { 'demo.screen': 'step:p-auto:s-front', 'demo.sources': ['setting:mobile.mode · Режим выполнения | Обычный — экраны шагов по очереди',
+        'step:s-front · Шаг «Передняя часть» | Основной · обязательный', 'step-desc:s-front · Описание шага | Снимите переднюю часть автомобиля с расстояния 3–5 метров',
+        'step-hints:s-front · Фото-подсказки и способ съёмки | 8 · Передняя часть · анфас · 2–7 фото', 'setting:general.behavior.refuse · Отказ от осмотра | разрешён — кнопка «Осмотр невозможен»'] }],
+    ['«Изменить» у фото-подсказок — оверлей закрыт, таб «Процессы и шаги», сайд шага', K => K.demoEdit('step-hints:s-front'),
+      { demo: null, surface: 'step', tab: 'processes', 'stepSide.title': 'Редактирование шага — Передняя часть', 'stepSide.hints.length': 8, writes: 0 }],
+    ['Esc — сайд закрыт; «Предпросмотр» — тот же экран', async (K) => { await K.key('Escape'); await K.preview() }, { surface: 'demo', 'demo.screen': 'step:p-auto:s-front' }],
+    ['«Изменить» у «Отказа от осмотра» — «Настройки → Общие → Поведение процесса», строка вспыхивает', K => K.demoEdit('setting:general.behavior.refuse'),
+      { demo: null, surface: '', tab: 'settings', section: 'general', anchor: 'behavior', flash: ['refuse'], writes: 0 }],
+  ], { query: 'app=full' }],
+  'СС-95/просмотр': ['демо-осмотр по снимку версии: «?» — «Открыть в демо-осмотре», подзаголовок «По версии от …»; «Показать» — только переход, сайдов правки в просмотре нет (ревью 4.1; СС-53/просмотр)', [
+    ['«?» у отказа — превью по снимку версии', K => K.helpOpen('refuse'), { 'help.title': 'Отказ от осмотра', 'help.fragment': true, viewing: 'v1' }],
+    ['«Открыть в демо-осмотре» — оверлей по снимку, у строк «Показать»', K => K.helpAction(),
+      { surface: 'demo', 'demo.sub': 'По версии от 14.08.2026, 10:20 · логика не выполняется', 'demo.edit': 'Показать' }],
+    ['этап «Анкета» — экран группы «Заявка»', K => K.demoStage('form'), { 'demo.screen': 'form:g-lead', 'demo.sources.1': 'field:f-number · Поле «Номер полиса» | Текст · обязательное' }],
+    ['«Показать» у поля — оверлей закрыт, «Форма», фокус на строке поля; сайда нет, записи нет', K => K.demoEdit('field:f-number'),
+      { demo: null, surface: '', tab: 'form', 'form.group': 'Заявка', focusRow: 'f-number', viewing: 'v1', writes: 0 }],
+  ], { query: 'view=v1' }],
+  'СС-96': ['правка настройки видна в демо-осмотре: выключили отказ — кнопки «Осмотр невозможен» и ветки нет (ревью 4.1: «правка видна сразу после возврата»)', [
+    ['экран шага: «Осмотр невозможен» и ветка в оглавлении', async (K) => { await K.preview(); await K.demoStage('process:p-auto'); await K.demoAnchor('step:p-auto:s-front') },
+      { 'demo.phone': ['progress', 'title · Шаг 3: Передняя часть', 'description · Снимите переднюю часть автомобиля с расстояния 3–5 метров', 'shot · Нажмите для съёмки от 2 до 7 фото',
+        'refuse · Осмотр невозможен', 'next · Продолжить'], 'demo.stages.7': 'refuse', 'demo.counter': 'Экран 8 из 17' }],
+    ['«Осмотр невозможен» — ветка; «Вернуться к осмотру» — экран, с которого пришли', async (K) => { await K.demoPart('refuse'); await K.demoPart('back') },
+      { 'demo.screen': 'step:p-auto:s-front' }],
+    ['«Изменить» у отказа и выключить отказ — запись', async (K) => { await K.demoEdit('setting:general.behavior.refuse'); await K.toggle('refuse'); await K.settled() },
+      { 'g.behavior.refuse': false, saveLog: ['saving', 'saved'], writes: 1 }],
+    ['«Предпросмотр» — тот же экран без кнопки, ветки нет, источник — «выключен»', K => K.preview(),
+      { 'demo.screen': 'step:p-auto:s-front', 'demo.counter': 'Экран 8 из 16', 'demo.stages.7': undefined,
+        'demo.phone': ['progress', 'title · Шаг 3: Передняя часть', 'description · Снимите переднюю часть автомобиля с расстояния 3–5 метров', 'shot · Нажмите для съёмки от 2 до 7 фото', 'next · Продолжить'],
+        'demo.sources.4': 'setting:general.behavior.refuse · Отказ от осмотра | выключен — кнопки нет' }],
+  ], { query: 'app=full' }],
+  'СС-97': ['«?» с превью у настройки: фрагмент экрана с обведённым элементом, название, пояснение, значение; «Открыть в демо-осмотре» — этот экран с подсветкой (ревью 4.2; решение 7)', [
+    ['«?» у отказа — поповер: фрагмент экрана шага, «Осмотр невозможен» обведён', K => K.helpOpen('refuse'),
+      { help: { title: 'Отказ от осмотра', description: 'Исполнитель сможет завершить осмотр с отметкой «Осмотр невозможен», если выполнение осмотра в данный момент недоступно (например, объект повреждён или заблокирован).',
+        value: 'Сейчас: разрешён — кнопка на экранах съёмки', fragment: true, marked: ['refuse'],
+        parts: ['progress', 'title · Шаг 1: VIN под стеклом', 'description · Сфотографируйте VIN-номер через лобовое стекло, номер должен быть чётко виден', 'shot · Нажмите для съёмки 1 фото',
+          'refuse · Осмотр невозможен ◉', 'next · Продолжить'] }, surface: '' }],
+    ['«Открыть в демо-осмотре» — экран шага, кнопка обведена, строка источника подсвечена', K => K.helpAction(),
+      { help: null, surface: 'demo', 'demo.screen': 'step:p-auto:s-vin-glass', 'demo.phone.4': 'refuse · Осмотр невозможен ◉',
+        'demo.sources.5': 'setting:general.behavior.refuse · Отказ от осмотра | разрешён — кнопка «Осмотр невозможен» *' }],
+    ['«Мобильное приложение»: «?» у «Запустить осмотр сразу после создания» — промежуточный экран', async (K) => { await K.key('Escape'); await K.section('mobile'); await K.helpOpen('startAfterCreate') },
+      { 'help.title': 'Промежуточный экран', 'help.value': 'Сейчас: выключено — после «Начать» экран «Осмотр создан»', 'help.marked': ['intro', 'go'] }],
+    ['«Открыть в демо-осмотре» — экран «Осмотр создан»', K => K.helpAction(), { 'demo.screen': 'intro', 'demo.counter': 'Экран 2 из 17', 'demo.phone.0': 'intro · Осмотр создан ◉' }],
+    ['«?» у телефона — экран «Осмотр отправлен», кнопка звонка обведена', async (K) => { await K.key('Escape'); await K.helpOpen('phone') },
+      { 'help.value': 'Сейчас: Служба поддержки · +7 800 000-00-00', 'help.marked': ['call'] }],
+  ], { query: 'app=full' }],
+  'СС-98': ['демо-осмотр новой схемы: экраны с пробелами и подсказкой, чего не хватает; «Изменить» у пустого таба — причина двухфазности (ревью 4.1, С-1; решение 6)', [
+    ['«Предпросмотр» — пять экранов, этапы с пробелами', K => K.preview(),
+      { 'demo.title': 'Демо-осмотр — Новая схема осмотра', 'demo.counter': 'Экран 1 из 5', 'demo.phoneTitle': 'Новая схема осмотра',
+        'demo.stages': ['start', 'form !', 'shooting !', 'confirm !', 'done'] }],
+    ['«Начать» — «Анкета»: полей нет — подсказка, где их добавить', K => K.demoPart('start'),
+      { 'demo.screen': 'form:none', 'demo.anchors': ['Анкета | нет полей анкеты *'],
+        'demo.phone': ['form · Анкета', 'form-empty · Полей пока нет Добавьте группы и поля на табе «Форма» — с показом в мобильном', 'next · Продолжить'],
+        'demo.sources': ['tab:form · Форма | групп и полей нет'] }],
+    ['«Продолжить» — «Съёмка»: процессов нет', K => K.demoPart('next'),
+      { 'demo.screen': 'shooting:none', 'demo.phone.1': 'shooting-empty · Снимать пока нечего Добавьте процесс и шаги на табе «Процессы и шаги»',
+        'demo.sources': ['tab:processes · Процессы и шаги | процессов нет'] }],
+    ['«Изменить» — оверлей закрыт; таб недоступен до первого сохранения — причина', K => K.demoEdit('tab:processes'),
+      { demo: null, surface: '', tab: 'settings', notices: ['Станет доступно после первого сохранения схемы: полям и шагам нужен её идентификатор'] }],
+  ], { query: 'data=new' }],
+  'СС-99': ['наведение: элемент телефона подсвечивает строку «Из чего собран экран», строка — обводит элемент (ревью 4.1)', [
+    ['экран «Передняя часть»; курсор на слот съёмки — строка фото-подсказок подсвечена, слот обведён', async (K) => {
+      await K.preview(); await K.demoStage('process:p-auto'); await K.demoAnchor('step:p-auto:s-front'); await K.demoHoverPart('shot') },
+      { 'demo.phone.3': 'shot · Нажмите для съёмки от 2 до 7 фото ◉', 'demo.sources.3': 'step-hints:s-front · Фото-подсказки и способ съёмки | 8 · Передняя часть · анфас · 2–7 фото *' }],
+    ['курсор на строку «Отказ от осмотра» — кнопка обведена', K => K.demoHoverSource('setting:general.behavior.refuse'),
+      { 'demo.phone.4': 'refuse · Осмотр невозможен ◉', 'demo.phone.3': 'shot · Нажмите для съёмки от 2 до 7 фото',
+        'demo.sources.4': 'setting:general.behavior.refuse · Отказ от осмотра | разрешён — кнопка «Осмотр невозможен» *' }],
+  ], { query: 'app=full' }],
+  'СС-100': ['«Где увидит исполнитель» у поля «Формы» — тот же поповер: экран анкеты с обведённым полем; поле только web — места в приложении нет (решение 7)', [
+    ['«?» у «VIN» — экран группы «Автомобиль», поле обведено', K => K.helpOpen('field:f-vin'),
+      { 'help.title': 'VIN', 'help.value': 'Анкета, экран 2 — «Автомобиль» · обязательное', 'help.fragment': true, 'help.marked': ['field-f-vin'] }],
+    ['«Открыть в демо-осмотре» — экран «Автомобиль», поле обведено', K => K.helpAction(),
+      { surface: 'demo', 'demo.screen': 'form:g-car', 'demo.phone.2': 'field-f-vin · VIN * VIN ◉' }],
+    ['группа «Заявка»: «?» у «Дата начала полиса» — только web, фрагмента нет', async (K) => { await K.key('Escape'); await K.group('g-lead'); await K.helpOpen('field:f-start') },
+      { 'help.title': 'Дата начала полиса', 'help.value': 'Только web — в приложении поля нет', 'help.fragment': false, 'help.parts': [] }],
+    ['«Открыть в демо-осмотре» — первый экран анкеты', K => K.helpAction(), { 'demo.screen': 'form:g-lead' }],
+  ], { query: 'tab=form&group=g-car' }],
+  'СС-101': ['действие поиска «Предпросмотр» открывает демо-осмотр (решение 8 оркестратора)', [
+    ['«предпросмотр», Enter — демо-осмотр, запрос очищен', async (K) => { await K.searchClick(); await K.type('предпросмотр'); await K.key('Enter') },
+      { surface: 'demo', 'demo.screen': 'start', query: '', notices: [] }],
+  ]],
+  'СС-102': ['фрагмент экрана приложения у раздела «Тексты в приложении»: экран списка повторов; поле в фокусе — его экран и обведённый текст (решение 7)', [
+    ['оверлей повторяемого процесса — фрагмент списка повторов на текстах по умолчанию', K => K.processAct('p-damage', 'process-open'),
+      { 'textsPreview.parts': ['process · Осмотр повреждений', 'empty · Пока ничего не добавлено', 'add · Добавить'], 'textsPreview.marked': [] }],
+    ['чип «Повреждение» у названия повтора — экран повтора, название обведено', K => K.textChip('item', 'Повреждение'),
+      { 'textsPreview.parts.0': 'item · Повреждение 1 ◉', 'textsPreview.marked': ['item'] }],
+    ['свой текст кнопки добавления — экран списка, кнопка обведена', K => K.fill('[data-overlay-texts] [data-text=add]', 'Добавить деталь'),
+      { 'textsPreview.parts': ['process · Осмотр повреждений', 'empty · Пока ничего не добавлено', 'add · Добавить деталь ◉'], writes: 0 }],
   ], { query: 'tab=processes' }],
 }
 

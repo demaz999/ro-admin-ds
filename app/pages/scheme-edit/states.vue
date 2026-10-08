@@ -3,6 +3,8 @@ import { onBeforeUnmount, ref } from 'vue'
 import { formulaPreview } from '~/components/ui/formula-input'
 import { clearMatches, highlightMatches, queryWords } from '~/components/ui/highlight-text'
 import { variantChips, variantGroups } from '~/stands/scheme-edit/repeat-texts'
+import { createModel, type Dataset } from '~/stands/scheme-edit/model'
+import demoData from '~/stands/scheme-edit/demo-data.json'
 
 /**
  * Матрицы компонентов страницы «Редактирование схемы осмотра» — стенд, такты 61–62. Примеры вызова для фронтов.
@@ -20,6 +22,9 @@ import { variantChips, variantGroups } from '~/stands/scheme-edit/repeat-texts'
  * Такт 87: оси `MediaGalleryItem` — выбор, «уже у шага», «открыть крупно», подпись; `ThumbStrip` (карточка 10).
  * Такт 88: ось `Chip pressable` — чип-вариант; композиции страницы — строки вставки из другой схемы (поле с конфликтом
  * алиаса, шаг с подсказками) и поле текста повторяемого процесса с вариантами.
+ * Такт 89: семейство «Превью приложения» (`AppPreview`, части, `AppPreviewScreen`, `AppPreviewThumb` — карточка 11) и «?» с
+ * превью `HelpPreview` (карточка 12); слот `help` у `SettingRow` и `Field`, вторая строка якоря `SectionNavAnchor`. Экраны — из
+ * демо-данных страницы схемы той же сборкой, что демо-осмотр (`buildDemo`).
  */
 definePageMeta({ layout: false })
 useHead({ title: 'Редактирование схемы осмотра — матрицы' })
@@ -294,6 +299,54 @@ const REPEAT_TEXT_EXAMPLE = `<Field label="Название повтора" hint
     </div>
   </div>
 </Field>`
+
+/* ------------------------------ такт 89: превью приложения и «?» с превью ------------------------------ */
+/** Экраны матрицы — демо-данные страницы схемы с разрешённым отказом, промежуточным экраном и телефоном (оснастка `?app=full`). */
+const appModel = createModel((demoData as unknown as Record<'main', Dataset>).main)
+{
+  const s = appModel.draft.config.settings
+  s.general.behavior.refuse = true
+  s.general.behavior.refuseRepeatable = true
+  s.mobile.startAfterCreate = false
+  s.mobile.phone = '+7 800 000-00-00'
+  s.mobile.phoneName = 'Служба поддержки'
+}
+const appScreens = appModel.demo.value.byId
+const REFUSE = ['setting:general.behavior.refuse']
+const pressLog = ref('—')
+const previewOpen = ref(true)
+const anchorAt = ref('step-2')
+const APP_PREVIEW_EXAMPLE = `<!-- экран из данных: части в рамке телефона; marked — источники обведённых частей; interactive — кнопки с переходом нажимаются -->
+<AppPreviewScreen :screen="{ title: 'Осмотр КАСКО', parts }" size="lg" :scale="1.4" :marked="['setting:refuse']" interactive
+  @go="openScreen" @enter="hover = $event" @leave="hover = ''" />
+<!-- фрагмент для поповера «?»: тело экрана без строки состояния и шапки, окно во всю ширину и 288 в высоту -->
+<AppPreviewScreen :screen="screen" size="md" fragment :marked="['setting:refuse']" />
+<!-- части отдельно -->
+<AppPreview title="Осмотр КАСКО" size="md">
+  <AppPreviewProgress :total="4" :done="2" />
+  <AppPreviewText variant="heading">Шаг 3: Фото переднего бампера</AppPreviewText>
+  <AppPreviewText variant="secondary" class="-mt-2">Сфотографируйте повреждения крупным планом</AppPreviewText>
+  <AppPreviewShot caption="1 фото" />
+  <template #footer>
+    <AppPreviewButton variant="refuse" highlighted>Осмотр невозможен</AppPreviewButton>
+    <AppPreviewButton>Продолжить</AppPreviewButton>
+  </template>
+</AppPreview>
+<!-- миниатюра карты экранов: подпись, пробелы, текущий -->
+<AppPreviewThumb :screen="screen" label="Шаг 2: VIN на металле" :gaps="['нет фото-подсказки']" current @click="open" />`
+const HELP_PREVIEW_EXAMPLE = `<!-- «?» с превью: поповер по нажатию справа от кнопки; фрагмент — слотом; «Открыть в демо-осмотре» — событие action -->
+<SettingRow>
+  <Checkbox v-model="refuse">Разрешить отказываться с отметкой «Осмотр невозможен»</Checkbox>
+  <template #help>
+    <HelpPreview title="Отказ от осмотра" description="…" value="Сейчас: разрешён" @action="openDemo">
+      <AppPreviewScreen :screen="screen" size="md" fragment :marked="['setting:refuse']" />
+    </HelpPreview>
+  </template>
+</SettingRow>
+<!-- у подписи поля — слот help у Field -->
+<Field label="Телефон для звонка"><Input v-model="phone" /><template #help><HelpPreview … /></template></Field>`
+const ANCHOR_DESCRIPTION_EXAMPLE = `<!-- вторая строка якоря: пробелы экрана тоном предупреждения -->
+<SectionNavAnchor label="Шаг 2: VIN на металле" description="нет фото-подсказки" tone="warning" :active="current" @select="open" />`
 
 /** Подсветка на странице — пример `highlightMatches` на узлах матрицы: все совпадения и текущее. */
 const pagePainted = ref('—')
@@ -1176,6 +1229,177 @@ onBeforeUnmount(() => clearMatches())
         </div>
       </div>
       <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ REPEAT_TEXT_EXAMPLE }}</pre>
+    </section>
+
+    <!-- ============================ Такт 89: превью приложения, «?» с превью ============================ -->
+    <section class="flex flex-col gap-4" data-matrix="app-preview">
+      <Heading>AppPreview — рамка телефона и экран приложения (карточка 11; макет 33694:3879)</Heading>
+      <div class="flex flex-wrap items-start gap-10">
+        <div class="flex flex-col gap-2" data-case="mockup">
+          <ToolbarText>md 220 × 360 — как в макете: «Осмотр невозможен» обведён</ToolbarText>
+          <AppPreviewScreen :screen="appScreens['step:p-auto:s-front']!" size="md" :marked="REFUSE" />
+        </div>
+        <div class="flex w-70 flex-col gap-2" data-case="fragment">
+          <ToolbarText>фрагмент для поповера «?»: окно 288 во всю ширину</ToolbarText>
+          <AppPreviewScreen :screen="appScreens['step:p-auto:s-vin-glass']!" size="md" fragment :marked="REFUSE" />
+        </div>
+        <div class="flex flex-col gap-2" data-case="lg">
+          <ToolbarText>lg 220 × 476 (пропорция 375 × 812), масштаб 1 — экран анкеты</ToolbarText>
+          <AppPreviewScreen :screen="appScreens['form:g-car']!" size="lg" />
+        </div>
+        <div class="flex flex-col gap-2" data-case="interactive">
+          <ToolbarText>нажимается — кнопки с переходом; масштаб 0.75</ToolbarText>
+          <AppPreviewScreen :screen="appScreens.start!" size="lg" :scale="0.75" interactive @go="pressLog = `go: ${$event}`" />
+          <ToolbarText>Событие: {{ pressLog }}</ToolbarText>
+        </div>
+      </div>
+    </section>
+
+    <section class="flex flex-col gap-4" data-matrix="app-preview-parts">
+      <Heading>Части экрана приложения — AppPreviewProgress, AppPreviewText, AppPreviewShot, AppPreviewField, AppPreviewButton, AppPreviewRow</Heading>
+      <div class="flex flex-wrap items-start gap-10">
+        <div class="flex flex-col gap-2" data-case="texts">
+          <ToolbarText>полоски, тексты, подсказка, пустой экран</ToolbarText>
+          <AppPreview title="Осмотр КАСКО" size="lg">
+            <AppPreviewProgress :total="4" :done="2" />
+            <AppPreviewText variant="heading">
+              Шаг 3: Фото переднего бампера
+            </AppPreviewText>
+            <AppPreviewText variant="secondary" class="-mt-2">
+              Сфотографируйте повреждения крупным планом
+            </AppPreviewText>
+            <AppPreviewText variant="note">
+              Снимайте при дневном свете
+            </AppPreviewText>
+            <AppPreviewText variant="title">
+              Осмотр отправлен
+            </AppPreviewText>
+            <AppPreviewText variant="body">
+              Основной текст экрана 12/16
+            </AppPreviewText>
+            <AppPreviewText variant="empty" title="Полей пока нет">
+              Добавьте группы и поля на табе «Форма»
+            </AppPreviewText>
+          </AppPreview>
+        </div>
+        <div class="flex flex-col gap-2" data-case="shot-field">
+          <ToolbarText>слот съёмки — без подсказки и с ней; поля анкеты и галочка</ToolbarText>
+          <AppPreview title="Осмотр КАСКО" size="lg">
+            <AppPreviewShot caption="1 фото" />
+            <AppPreviewShot caption="от 2 до 7 фото" src="/scheme-edit/hints/car-front.svg" />
+            <AppPreviewField label="VIN" required placeholder="VIN" hint="standard" />
+            <AppPreviewField label="Дата начала" type="date" placeholder="ДД.ММ.ГГГГ" />
+            <AppPreviewField label="Тип кузова" type="choice" required placeholder="Тип кузова" hint="photo" />
+            <AppPreviewField label="Подтверждаю, что данные верны" type="checkbox" />
+          </AppPreview>
+        </div>
+        <div class="flex flex-col gap-2" data-case="buttons">
+          <ToolbarText>кнопки и строки; обведённые — справа</ToolbarText>
+          <div class="flex gap-6">
+            <AppPreview title="Осмотр КАСКО" size="lg">
+              <AppPreviewRow title="1. VIN под стеклом" meta="1 фото · обязательный" src="/scheme-edit/hints/car-vin-glass.svg" pressable @press="pressLog = 'row'" />
+              <AppPreviewRow title="Повреждение 1" meta="снято" done />
+              <AppPreviewRow title="Дополнительные файлы" meta="Приложить сверх шагов" icon="add" />
+              <template #footer>
+                <AppPreviewButton variant="link" pressable @press="pressLog = 'link'">
+                  Пропустить шаг
+                </AppPreviewButton>
+                <AppPreviewButton variant="outline">
+                  Выполнить позже
+                </AppPreviewButton>
+                <AppPreviewButton variant="refuse">
+                  Осмотр невозможен
+                </AppPreviewButton>
+                <AppPreviewButton pressable @press="pressLog = 'primary'">
+                  Продолжить
+                </AppPreviewButton>
+              </template>
+            </AppPreview>
+            <AppPreview title="Осмотр КАСКО" size="lg">
+              <AppPreviewProgress :total="4" :done="1" highlighted />
+              <AppPreviewText variant="heading" highlighted>
+                Шаг 2: VIN на металле
+              </AppPreviewText>
+              <AppPreviewField label="VIN" required placeholder="VIN" highlighted />
+              <AppPreviewRow title="Дополнительные файлы" icon="add" highlighted />
+              <template #footer>
+                <AppPreviewButton variant="refuse" highlighted>
+                  Осмотр невозможен
+                </AppPreviewButton>
+                <AppPreviewButton highlighted>
+                  Продолжить
+                </AppPreviewButton>
+              </template>
+            </AppPreview>
+          </div>
+        </div>
+      </div>
+      <ToolbarText>
+        Событие: {{ pressLog }}
+      </ToolbarText>
+    </section>
+
+    <section class="flex flex-col gap-4" data-matrix="app-preview-thumb">
+      <Heading>AppPreviewThumb — миниатюра карты экранов: подпись, пробелы, текущий</Heading>
+      <div class="flex flex-wrap items-start gap-6">
+        <AppPreviewThumb :screen="appScreens['step:p-auto:s-vin-glass']!" label="Шаг 1: VIN под стеклом" data-case="rest" @click="pressLog = 'thumb: rest'" />
+        <AppPreviewThumb :screen="appScreens['step:p-auto:s-vin-metal']!" label="Шаг 2: VIN на металле" :gaps="['нет фото-подсказки']" current data-case="current" @click="pressLog = 'thumb: current'" />
+        <AppPreviewThumb :screen="appScreens['repeat-item:p-damage']!" label="Повтор 1" :gaps="['нет названия повтора', 'нет шагов повтора']" data-case="gaps" @click="pressLog = 'thumb: gaps'" />
+      </div>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ APP_PREVIEW_EXAMPLE }}</pre>
+    </section>
+
+    <section class="flex flex-col gap-4" data-matrix="section-nav-anchor-description">
+      <Heading>SectionNavAnchor · description — вторая строка якоря: пробелы экрана в оглавлении демо-осмотра</Heading>
+      <SectionNav model-value="process" title="Экраны">
+        <SectionNavItem value="process" label="Осмотр автомобиля" status="attention">
+          <SectionNavAnchor label="Шаг 1: VIN под стеклом" :active="anchorAt === 'step-1'" @select="anchorAt = 'step-1'" />
+          <SectionNavAnchor label="Шаг 2: VIN на металле" description="нет фото-подсказки" tone="warning" :active="anchorAt === 'step-2'" @select="anchorAt = 'step-2'" />
+          <SectionNavAnchor label="Шаг 4: Вид справа" description="нет описания · нет фото-подсказки" tone="warning" :active="anchorAt === 'step-4'" @select="anchorAt = 'step-4'" />
+        </SectionNavItem>
+        <SectionNavItem value="confirm" label="Подтверждение" />
+      </SectionNav>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ ANCHOR_DESCRIPTION_EXAMPLE }}</pre>
+    </section>
+
+    <section class="flex flex-col gap-4" data-matrix="help-preview">
+      <Heading>HelpPreview — «?» с превью в приложении (карточка 12): слот help у SettingRow и Field; поповер справа от «?»</Heading>
+      <div class="flex flex-col gap-6">
+        <div class="flex max-w-settings flex-col" data-case="setting-row">
+          <SettingRow>
+            <Checkbox :model-value="true">
+              Разрешить отказываться с отметкой «Осмотр невозможен»
+            </Checkbox>
+            <template #help>
+              <HelpPreview
+                v-model:open="previewOpen"
+                title="Отказ от осмотра"
+                description="Исполнитель сможет завершить осмотр с отметкой «Осмотр невозможен», если выполнение осмотра в данный момент недоступно (например, объект повреждён или заблокирован)."
+                value="Сейчас: разрешён — кнопка на экранах съёмки"
+                @action="pressLog = 'help: action'"
+              >
+                <AppPreviewScreen :screen="appScreens['step:p-auto:s-vin-glass']!" size="md" fragment :marked="REFUSE" />
+              </HelpPreview>
+            </template>
+          </SettingRow>
+          <SettingRow help="Текстовая подсказка по наведению — у настроек без проявления в приложении">
+            <Checkbox :model-value="false">
+              Отправлять поля на согласование согласующему лицу
+            </Checkbox>
+          </SettingRow>
+        </div>
+        <div class="flex w-110 flex-col" data-case="field">
+          <Field label="Телефон для звонка" hint="Номер, на который будет совершён звонок из мобильного приложения">
+            <Input model-value="+7 800 000-00-00" placeholder="+7 900 000 00 00" :show-icon="false" />
+            <template #help>
+              <HelpPreview title="Телефон для звонка" value="Сейчас: Служба поддержки · +7 800 000-00-00" @action="pressLog = 'help: phone'">
+                <AppPreviewScreen :screen="appScreens.done!" size="md" fragment :marked="['setting:mobile.phone']" />
+              </HelpPreview>
+            </template>
+          </Field>
+        </div>
+      </div>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ HELP_PREVIEW_EXAMPLE }}</pre>
     </section>
   </main>
 </template>

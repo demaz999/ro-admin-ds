@@ -52,6 +52,11 @@ const props = withDefaults(defineProps<{
    * `#popList`, решение чата 2026-09-30, такт 41.
    */
   muted?: boolean
+  /**
+   * Подпись и вторая строка переносятся целиком — такт 89: строки «Из чего собран экран» демо-осмотра страницы схемы
+   * (название настройки и её значение в колонке 320). Без пропа — в одну строку с многоточием, как у мастера.
+   */
+  multiline?: boolean
 }>(), {
   subtitle: '',
   selected: false,
@@ -60,6 +65,7 @@ const props = withDefaults(defineProps<{
   checkbox: false,
   disabled: false,
   muted: false,
+  multiline: false,
 })
 </script>
 
@@ -68,7 +74,9 @@ const props = withDefaults(defineProps<{
     data-slot="list-item"
     :data-selected="selected || undefined"
     :class="[
-      'group/item flex min-h-11 w-full items-center gap-3 rounded-md px-4 py-2 text-left',
+      'group/item flex min-h-11 w-full gap-3 rounded-md px-4 py-2 text-left',
+      /* С переносом — иконка и хвостовой слот у первой строки (такт 89). */
+      props.multiline ? 'items-start' : 'items-center',
       selected
         ? (props.tone === 'success' ? 'bg-success-surface ring-1 ring-success ring-inset' : 'bg-list-selected')
         : props.muted ? '' : 'hover:bg-list-hover',
@@ -93,21 +101,25 @@ const props = withDefaults(defineProps<{
       </slot>
     </span>
 
+    <!-- Такт 89 — `multiline`: подпись и вторая строка переносятся целиком, без многоточия. -->
     <span class="flex min-w-0 flex-1 flex-col">
       <span
         data-slot="list-item-title"
-        class="truncate text-sm font-medium"
-        :class="selected
-          ? (props.tone === 'success' ? 'text-success-strong' : 'text-field-foreground-hover')
-          : props.muted ? 'text-field-foreground' : 'text-field-foreground group-hover/item:text-field-foreground-hover'"
+        class="text-sm font-medium"
+        :class="[
+          props.multiline ? 'break-words' : 'truncate',
+          selected
+            ? (props.tone === 'success' ? 'text-success-strong' : 'text-field-foreground-hover')
+            : props.muted ? 'text-field-foreground' : 'text-field-foreground group-hover/item:text-field-foreground-hover',
+        ]"
       >
         <slot />
       </span>
       <span
         v-if="props.subtitle"
         data-slot="list-item-subtitle"
-        class="truncate text-xs font-medium"
-        :class="selected && props.tone === 'success' ? 'text-success-strong' : 'text-field-placeholder'"
+        class="text-xs font-medium"
+        :class="[props.multiline ? 'break-words' : 'truncate', selected && props.tone === 'success' ? 'text-success-strong' : 'text-field-placeholder']"
       >
         {{ props.subtitle }}
       </span>
@@ -119,7 +131,7 @@ const props = withDefaults(defineProps<{
       Понадобился строке снятого значения в чипе применённого фильтра: у неё
       справа крестик. Строка в `docs/page-my-inspections.md`.
     -->
-    <span v-if="$slots.trailing" data-slot="list-item-trailing" class="flex shrink-0 items-center">
+    <span v-if="$slots.trailing" data-slot="list-item-trailing" class="flex shrink-0 items-center" :class="props.multiline ? 'h-5' : ''">
       <slot name="trailing" />
     </span>
   </div>

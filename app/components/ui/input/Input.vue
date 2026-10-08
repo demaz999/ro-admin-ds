@@ -224,10 +224,16 @@ function onBoxDown(event: MouseEvent) {
         <slot name="end" />
       </span>
 
+      <!--
+        Такт 89, решение 1 оркестратора 2026-10-08 (прецедент `Autocomplete`, такт 88): крестик — не остановка Tab. У пустого
+        поля он есть, пока поле в фокусе (`isActive`): Tab переводил фокус на крестик, поле теряло фокус, крестик пропадал вместе
+        с фокусом — фокус уходил на `body`. Очистка — нажатием, с клавиатуры — стиранием текста; вид прежний.
+      -->
       <button
         v-else-if="showClear"
         data-slot="field-clear"
         type="button"
+        tabindex="-1"
         :disabled="props.disabled"
         class="flex size-5 shrink-0 items-center justify-center rounded-full p-1.5 text-field-clear-foreground"
         :class="variant === 'elevated' ? 'bg-field-clear-elevated' : 'bg-field-clear'"
