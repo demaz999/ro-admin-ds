@@ -5,6 +5,7 @@ import { clearMatches, highlightMatches, queryWords } from '~/components/ui/high
 import { variantChips, variantGroups } from '~/stands/scheme-edit/repeat-texts'
 import { createModel, PRICE_SOURCES, SHOWCASE_IMAGE_SRC, type Dataset } from '~/stands/scheme-edit/model'
 import type { ScenarioPage } from '~/components/ui/scenario-preview'
+import type { ReadinessGroupItem, ReadinessStageItem } from '~/components/ui/readiness'
 import demoData from '~/stands/scheme-edit/demo-data.json'
 
 /**
@@ -29,6 +30,8 @@ import demoData from '~/stands/scheme-edit/demo-data.json'
  * Такт 90: рамка браузера `AppPreviewBrowser` (карточка 13) и семейство «Превью страницы сценария» (`ScenarioPreview` и части —
  * карточка 14); композиция страницы — «Цена «от»» с источником. Страницы — из демо-данных страницы схемы той же сборкой, что
  * превью на табе «Витрина» (`buildSitePreview`).
+ * Такт 91: семейство «Модель готовности» — `ReadinessMark`, `ReadinessStage`, `ReadinessBar` (карточка 15) и `ReadinessChip`,
+ * `ReadinessList`, `ReadinessCheck` (карточка 16); тон `destructive` у `SelectItem` (ревью К-4) и значок `badge` у `SectionNavItem`.
  */
 definePageMeta({ layout: false })
 useHead({ title: 'Редактирование схемы осмотра — матрицы' })
@@ -411,6 +414,60 @@ const PRICE_EXAMPLE = `<!-- композиция страницы: источн�
   <!-- вручную: ниже тарифа — подсказка тоном предупреждения -->
   <Field hint="Ниже тарифа: для не клиента — от 700 ₽" hint-tone="warning"><Input v-model="price" unit="₽" numeric /></Field>
 </Field>`
+
+/* ------------------------------ Такт 91: модель готовности ------------------------------ */
+/** Полоса подготовки: все состояния этапа — готово, «! N» предупреждает и блокирует, не готово, замок; текущий — «Съёмка». */
+const BAR_STAGES: ReadinessStageItem[] = [
+  { id: 'base', label: 'Основа', state: 'done' },
+  { id: 'form', label: 'Анкета', state: 'done' },
+  { id: 'shooting', label: 'Съёмка', state: 'warning', count: 2 },
+  { id: 'rules', label: 'Правила', state: 'todo' },
+  { id: 'publish', label: 'Проверка и публикация', state: 'blocked', count: 1 },
+]
+const BAR_LOCKED: ReadinessStageItem[] = [
+  { id: 'base', label: 'Основа', state: 'done' },
+  { id: 'form', label: 'Анкета', state: 'locked', reason: 'Станет доступно после первого сохранения схемы: полям и шагам нужен её идентификатор' },
+  { id: 'shooting', label: 'Съёмка', state: 'locked', reason: 'Станет доступно после первого сохранения схемы: полям и шагам нужен её идентификатор' },
+  { id: 'rules', label: 'Правила', state: 'todo' },
+  { id: 'publish', label: 'Проверка и публикация', state: 'blocked', count: 1 },
+]
+const barLog = ref('—')
+/** Группы списка: этап готов, этап с предупреждением и блокирующей, ручная отметка, после публикации — замок. */
+const READY_GROUPS = ref<ReadinessGroupItem[]>([
+  { id: 'base', title: 'Основа', state: 'done', meta: 'Осмотр транспорта · Демо Страхование', action: 'Перейти', checks: [] },
+  { id: 'form', title: 'Анкета', state: 'blocked', count: 2, meta: '8 полей в 2 группах', action: 'Перейти', checks: [
+    { key: 'alias-empty:f-mileage', level: 'block', text: 'У поля «Пробег» пустой алиас', area: 'Форма → Автомобиль', action: 'Исправить' },
+    { key: 'field-hint:f-year', level: 'warn', text: 'У поля «Год выпуска» нет подсказки', area: 'Форма → Кузов и комплектация', action: 'Исправить' },
+  ] },
+  { id: 'rules', title: 'Правила', state: 'todo', meta: 'Проверьте права доступа и шаблоны PDF', action: 'Перейти', checks: [], manual: { label: 'Проверил унаследованное: права доступа, шаблоны PDF', checked: false } },
+  { id: 'publish', title: 'Проверка и публикация', state: 'blocked', count: 1, meta: 'Блокирует публикацию: 1', action: 'Проверить и опубликовать', checks: [] },
+  { id: 'showcase', title: 'Витрина — после публикации', state: 'locked', meta: 'Доступно после публикации схемы', checks: [] },
+])
+const readyLog = ref('—')
+function readyManual(_id: string, on: boolean) {
+  const g = READY_GROUPS.value.find(x => x.id === 'rules')!
+  g.manual = { ...g.manual!, checked: on }
+  g.state = on ? 'done' : 'todo'
+  g.meta = on ? 'Унаследованное проверено' : 'Проверьте права доступа и шаблоны PDF'
+  readyLog.value = `manual: ${on}`
+}
+const chipReadyOpen = ref(false)
+const CHECK_GROUPS: ReadinessGroupItem[] = [
+  { id: 'processes', title: 'Процессы и шаги', state: 'warning', count: 2, checks: [
+    { key: 'step-hint:s-vin-metal', level: 'warn', text: 'У шага «VIN на металле» нет фото-подсказки', area: 'Процессы → Осмотр автомобиля', action: 'Исправить' },
+    { key: 'repeat-empty:p-damage', level: 'warn', text: 'В повторяемом процессе «Осмотр повреждений» нет шагов повтора', area: 'Процессы → Осмотр повреждений', action: 'Исправить' },
+  ] },
+]
+const READINESS_EXAMPLE = `<!-- полоса подготовки: этапы со статусом, «Далее», «Свернуть» -->
+<ReadinessBar title="Подготовка схемы: 2 из 5" :stages="stages" current="shooting" next-label="Далее: Съёмка →"
+  @select="goStage" @next="goStage(next)" @collapse="collapsed = true" />
+<!-- чип у главного действия: поповер со списком готовности -->
+<ReadinessChip v-model:open="open" label="Готовность 2 из 5" state="blocked" :count="1" title="Готовность к публикации" summary="2 из 5 этапов · блокирует публикацию: 1">
+  <ReadinessList :groups="groups" @go="goStage" @fix="fixCheck" @manual="(id, on) => setRulesChecked(on)" />
+</ReadinessChip>
+<!-- маркер этапа у вкладки — слот counter -->
+<TabsTrigger value="form">Форма<template #counter><ReadinessMark state="warning" :count="2" /></template></TabsTrigger>`
+const sourceDemo = ref('other')
 </script>
 
 <template>
@@ -1570,6 +1627,137 @@ const PRICE_EXAMPLE = `<!-- композиция страницы: источн�
         </Field>
       </div>
       <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ PRICE_EXAMPLE }}</pre>
+    </section>
+
+    <!-- ============================ Такт 91: модель готовности — карточки 15 и 16; тон удаления у SelectItem, значок у SectionNavItem ============================ -->
+    <section class="flex flex-col gap-4" data-matrix="readiness-mark">
+      <Heading>ReadinessMark — маркер этапа: готово, не готово, «! N» предупреждает, «! N» блокирует, замок (карточка 15)</Heading>
+      <div class="flex flex-wrap items-center gap-8">
+        <div class="flex items-center gap-2" data-case="done">
+          <ReadinessMark state="done" />
+          <ToolbarText>готово</ToolbarText>
+        </div>
+        <div class="flex items-center gap-2" data-case="todo">
+          <ReadinessMark state="todo" />
+          <ToolbarText>не готово</ToolbarText>
+        </div>
+        <div class="flex items-center gap-2" data-case="warning">
+          <ReadinessMark state="warning" :count="2" />
+          <ToolbarText>предупреждает</ToolbarText>
+        </div>
+        <div class="flex items-center gap-2" data-case="blocked">
+          <ReadinessMark state="blocked" :count="12" />
+          <ToolbarText>блокирует</ToolbarText>
+        </div>
+        <div class="flex items-center gap-2" data-case="locked">
+          <ReadinessMark state="locked" />
+          <ToolbarText>замок до идентификатора</ToolbarText>
+        </div>
+      </div>
+      <Tabs model-value="settings">
+        <TabsList>
+          <TabsTrigger value="settings">
+            Настройки
+          </TabsTrigger>
+          <TabsTrigger value="form">
+            Форма
+            <template #counter>
+              <ReadinessMark state="done" />
+            </template>
+          </TabsTrigger>
+          <TabsTrigger value="processes">
+            Процессы и шаги
+            <template #counter>
+              <ReadinessMark state="warning" :count="2" />
+            </template>
+          </TabsTrigger>
+          <TabsTrigger value="locked" disabled reason="Станет доступно после первого сохранения схемы: полям и шагам нужен её идентификатор">
+            Форма
+            <template #counter>
+              <ReadinessMark state="locked" label="" />
+            </template>
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+    </section>
+
+    <section class="flex flex-col gap-4" data-matrix="readiness-bar">
+      <Heading>ReadinessBar и ReadinessStage — полоса подготовки: этапы со статусом, текущий, «Далее», «Свернуть» (карточка 15)</Heading>
+      <ReadinessBar title="Подготовка схемы: 2 из 5" :stages="BAR_STAGES" current="shooting" next-label="Далее: Съёмка →" data-case="bar"
+        @select="barLog = `select: ${$event}`" @next="barLog = 'next'" @collapse="barLog = 'collapse'" />
+      <ReadinessBar title="Подготовка схемы: 1 из 5" :stages="BAR_LOCKED" current="base" next-label="Далее: Анкета →" data-case="bar-locked"
+        @select="barLog = `select: ${$event}`" @next="barLog = 'next'" @collapse="barLog = 'collapse'" />
+      <ReadinessBar title="Подготовка схемы: 5 из 5" :stages="BAR_STAGES.map(s => ({ ...s, state: 'done', count: 0 }))" current="rules" next-label="Проверить и опубликовать" data-case="bar-ready"
+        @select="barLog = `select: ${$event}`" @next="barLog = 'next'" @collapse="barLog = 'collapse'" />
+      <div class="flex flex-wrap items-center gap-2" data-case="stages">
+        <ReadinessStage label="Основа" state="done" />
+        <ReadinessStage label="Анкета" state="warning" :count="3" current />
+        <ReadinessStage label="Съёмка" state="blocked" :count="1" />
+        <ReadinessStage label="Правила" state="todo" />
+        <ReadinessStage label="Съёмка" state="locked" reason="Станет доступно после первого сохранения схемы" />
+      </div>
+      <ToolbarText>Событие: {{ barLog }}</ToolbarText>
+    </section>
+
+    <section class="flex flex-col gap-4" data-matrix="readiness-chip">
+      <Heading>ReadinessChip, ReadinessList, ReadinessCheck — чип у главного действия с поповером проверок; список в окне публикации (карточка 16)</Heading>
+      <div class="flex flex-wrap items-center gap-4" data-case="chips">
+        <ReadinessChip v-model:open="chipReadyOpen" label="Готовность 2 из 5" state="blocked" :count="1" title="Готовность к публикации" summary="2 из 5 этапов · блокирует публикацию: 1 · предупреждений: 1">
+          <ReadinessList :groups="READY_GROUPS" @go="readyLog = `go: ${$event}`" @fix="readyLog = `fix: ${$event}`" @manual="readyManual" />
+          <template #footer>
+            <ButtonAction size="sm" :show-icon="false">
+              Показать полосу подготовки
+            </ButtonAction>
+          </template>
+        </ReadinessChip>
+        <ReadinessChip label="Готовность 4 из 5" title="Готовность к публикации" summary="4 из 5 этапов · блокирующих нет">
+          <ReadinessList :groups="READY_GROUPS.slice(0, 1)" />
+        </ReadinessChip>
+        <ReadinessChip label="Проверка: 2" state="warning" :count="2" title="Проверка перед публикацией" summary="Блокирующих нет · предупреждений: 2">
+          <ReadinessList :groups="CHECK_GROUPS" />
+        </ReadinessChip>
+      </div>
+      <div class="flex flex-wrap items-start gap-10">
+        <div class="flex w-100 flex-col gap-2" data-case="list">
+          <ToolbarText>этапы — поповер чипа и окно первой публикации</ToolbarText>
+          <ReadinessList :groups="READY_GROUPS" @go="readyLog = `go: ${$event}`" @fix="readyLog = `fix: ${$event}`" @manual="readyManual" />
+        </div>
+        <div class="flex w-140 flex-col gap-2" data-case="checks">
+          <ToolbarText>области — проверки над диффом публикации и чип «Проверка: N»</ToolbarText>
+          <ReadinessList :groups="CHECK_GROUPS" @fix="readyLog = `fix: ${$event}`" />
+          <ul class="flex flex-col">
+            <ReadinessCheck level="block" text="В процессе «Документы» нет шагов" area="Процессы → Документы" action="Исправить" @fix="readyLog = 'fix: block'" />
+            <ReadinessCheck level="warn" text="У шага «Салон» нет фото-подсказки" area="Процессы → Осмотр автомобиля" action="Исправить" @fix="readyLog = 'fix: warn'" />
+            <ReadinessCheck level="todo" text="Компания-владелец не выбрана" area="Настройки → Основное" action="Перейти" @fix="readyLog = 'fix: todo'" />
+          </ul>
+        </div>
+      </div>
+      <ToolbarText>Событие: {{ readyLog }}</ToolbarText>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ READINESS_EXAMPLE }}</pre>
+    </section>
+
+    <section class="flex flex-col gap-4" data-matrix="select-item-destructive">
+      <Heading>SelectItem tone="destructive" — опасное действие в списке действий (ревью К-4)</Heading>
+      <div class="flex w-80 flex-col rounded-lg p-1 shadow-dropdown" data-case="menu">
+        <SelectGroup>
+          <SelectItem>Сделать копию</SelectItem>
+          <SelectItem>Сбросить черновик к текущей версии</SelectItem>
+        </SelectGroup>
+        <SelectGroup>
+          <SelectItem tone="destructive">
+            Удалить схему
+          </SelectItem>
+        </SelectGroup>
+      </div>
+    </section>
+
+    <section class="flex flex-col gap-4" data-matrix="section-nav-badge">
+      <Heading>SectionNavItem badge — значок после подписи: доступ по роли (окно «Новая схема осмотра»)</Heading>
+      <SectionNav v-model="sourceDemo" title="Источник" data-case="sources">
+        <SectionNavItem value="templates" label="Отобранные шаблоны" :count="5" />
+        <SectionNavItem value="other" label="Другие схемы" :count="2" badge="admin" badge-label="Схемы вашей компании — доступ по роли «Администратор»" />
+        <SectionNavItem value="recent" label="Недавние" :count="2" />
+      </SectionNav>
     </section>
   </main>
 </template>

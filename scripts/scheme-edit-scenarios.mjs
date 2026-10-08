@@ -22,7 +22,9 @@
  * `NOTICES=1` печатает тексты уведомлений, `DEBUG_CLICK=1` — координаты и цель каждого клика.
  *
  * Chrome ищется на CDP-порту `CDP_PORT` (по умолчанию 9335); если его нет — запускается headless.
- * Адрес стенда — `KIT_URL` (по умолчанию http://localhost:3000/scheme-edit/).
+ * Адрес стенда — `KIT_URL` (по умолчанию http://localhost:3000/scheme-edit/). Такт 91: опция сценария `path` — страница стенда от
+ * адреса: `new` — окно «Новая схема осмотра» на фоне списка схем (`/scheme-edit/new`); «Создать схему» уводит на страницу схемы в
+ * том же документе — адаптер `created` ждёт модель и снова вешает наблюдатель статуса сохранения.
  */
 import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
@@ -227,7 +229,12 @@ const WATCH = `(() => {
   const take = el => setTimeout(() => { const c = el.cloneNode(true); c.querySelectorAll('button').forEach(b => b.remove()); const x = t(c.textContent); if (x) window.__notices.push(x) }, 0)
   new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach((n) => { if (n.nodeType !== 1) return
     if (n.matches?.('[data-slot=toast]')) take(n); else n.querySelectorAll?.('[data-slot=toast]').forEach(take) }))).observe(document.body, { childList: true, subtree: true })
+  return 1 })()`
+/** Наблюдатель статуса сохранения на корне страницы схемы — такт 91: после перехода из окна создания вешается заново. */
+const WATCH_ROOT = `(() => {
   const root = document.querySelector('[data-scheme-edit]')
+  if (!root || root.__watched) return 0
+  root.__watched = 1
   new MutationObserver(() => { const s = root.dataset.save; if (window.__saveLog[window.__saveLog.length - 1] !== s) window.__saveLog.push(s) }).observe(root, { attributes: true, attributeFilter: ['data-save'] })
   return 1 })()`
 
@@ -253,11 +260,12 @@ const Q = {
 function kit(page) {
   return {
     page,
-    async start(query = '') {
-      await page.goto(`${KIT_URL}${query ? `?${query}` : ''}`, 1500)
-      await until(page, `!!${Q.root} && !!window.__scheme`, 20000)
+    async start(query = '', path = '') {
+      await page.goto(`${KIT_URL}${path}${query ? `?${query}` : ''}`, 1500)
+      await until(page, path ? `!!document.querySelector('[data-scheme-list]')` : `!!${Q.root} && !!window.__scheme`, 20000)
       await page.evaluate(`(async () => { await document.fonts.ready; return 1 })()`)
       await page.evaluate(WATCH)
+      await page.evaluate(WATCH_ROOT)
       await sleep(300)
     },
     back: () => page.click(Q.back),
@@ -542,6 +550,51 @@ function kit(page) {
         ${Q.editor(key)}.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); return 1 })()`)
       await sleep(200)
     },
+    /* ---------- такт 91: окно «Новая схема осмотра», модель готовности ---------- */
+    /** Источник окна — строка колонки; карточка — радио-карточка по `data-card`; кнопка окна — по `data-act`. */
+    createSource: id => page.click(`document.querySelector('[data-modal=create] [data-create-sources] [data-slot=section-nav-item][data-value=${id}]')`),
+    createCard: id => page.click(`document.querySelector('[data-modal=create] [data-card="${id}"] [data-slot=choice-control]')`),
+    createAct: id => page.click(`document.querySelector('[data-modal=create] [data-act=${id}]')`),
+    /** Наименование шага «Основа»: выделить всё и набрать; пустой текст — стереть. */
+    async createName(text) {
+      const sel = `document.querySelector('[data-modal=create] [data-field=create-name] input')`
+      await page.click(sel)
+      await page.evaluate(`(${sel}.select(), 1)`)
+      if (text) await page.type(text)
+      else await page.key('Delete')
+    },
+    /** «Создать схему» уводит на страницу схемы в том же документе: дождаться модели и снова повесить наблюдатель статуса. */
+    async created() {
+      await until(page, `!!${Q.root} && !!window.__scheme`, 20000)
+      await page.evaluate(`(async () => { await document.fonts.ready; return 1 })()`)
+      await page.evaluate(WATCH_ROOT)
+      await sleep(300)
+    },
+    /** Этап полосы, «Далее» полосы, «Свернуть». */
+    stage: id => page.click(`document.querySelector('[data-slot=readiness-stage][data-stage=${id}]')`),
+    stripNext: () => page.click(`document.querySelector('[data-readiness-next]')`),
+    stripCollapse: () => page.click(`document.querySelector('[data-readiness-collapse]')`),
+    /** Чип у «Опубликовать схему» — поповер. */
+    chipOpen: () => page.click(Q.act('readiness')),
+    /** «Исправить» у проверки — поповер либо окно публикации: последняя на странице. */
+    fix: key => page.click(`[...document.querySelectorAll('[data-check="${key}"] [data-readiness-fix]')].pop()`),
+    /** «Перейти» у группы списка. */
+    groupGo: id => page.click(`[...document.querySelectorAll('[data-readiness-group=${id}] [data-readiness-go]')].pop()`),
+    /** Ручная отметка «Правил» — флажок группы списка либо низ «Настроек». */
+    manual: () => page.click(`(m => m.querySelector('[data-slot=choice-control]') ?? m)([...document.querySelectorAll('[data-readiness-manual]')].pop())`),
+    rulesCheck: () => page.click(`(b => b.querySelector('[data-slot=choice-control]') ?? b)(document.querySelector('[data-field=rules-check]'))`),
+    /** Новая группа «Формы» с одним полем и алиасом — из пустых состояний. */
+    async groupWithField(group, field, alias) {
+      await this.act('group-add-empty')
+      await this.typeInto('gdTitle', group)
+      await this.act('group-save')
+      await this.settled()
+      await this.act('field-add-empty')
+      await this.typeInto('fdTitle', field)
+      await this.typeInto('fdAlias', alias)
+      await this.act('field-save')
+      await this.settled()
+    },
     dump: () => page.evaluate(`window.__scheme.dump()`),
     async snapshot() {
       const s = await page.evaluate(`(() => {
@@ -553,11 +606,47 @@ function kit(page) {
         const M = window.__scheme
         const notices = window.__notices.splice(0)
         const saveLog = window.__saveLog.splice(0)
+        /* ---------- такт 91: модель готовности и окно «Новая схема осмотра» ---------- */
+        /* Текст без строк для чтения с экрана: маркер и важность проверки несут их для вспомогательных технологий. */
+        const txt = x => { if (!x) return ''; const c = x.cloneNode(true); c.querySelectorAll('.sr-only').forEach(n => n.remove()); return t(c.textContent) }
+        /* Маркер: состояние и «! N» пилюли (у глифов готово и замок числа нет). */
+        const markOf = mk => mk ? mk.dataset.state + ((p => p ? ' ' + t(p.textContent) : '')(mk.querySelector('span[aria-hidden=true]'))) : null
+        const checked = x => x ? (x.querySelector('[data-slot=choice-control]') ?? x).getAttribute('aria-checked') : null
+        /* Список готовности: группа — «id состояние ! N · название · пояснение», проверки — «ключ · важность · текст · место», флажок отметки. */
+        const listOf = el => el ? [...el.querySelectorAll('[data-slot=readiness-group]')].map(g => ({
+          head: [g.dataset.readinessGroup + ' ' + markOf(g.querySelector('[data-slot=readiness-mark]')), t(g.querySelector('[data-slot=readiness-group-title]')?.textContent),
+            t(g.querySelector('[data-slot=readiness-group-meta]')?.textContent)].filter(Boolean).join(' · '),
+          checks: [...g.querySelectorAll('[data-slot=readiness-check]')].map(c => [c.dataset.check, c.dataset.level, txt(c.querySelector('[data-slot=readiness-check-text]')),
+            t(c.querySelector('[data-slot=readiness-check-area]')?.textContent)].filter(Boolean).join(' · ')),
+          manual: checked(g.querySelector('[data-readiness-manual]')),
+        })) : null
+        const createWin = (el => { if (!el) return null
+          const val = k => el.querySelector('[data-field=' + k + '] input')?.value ?? null
+          return {
+            step: el.dataset.step, mode: el.dataset.mode, source: el.dataset.source,
+            title: t(el.querySelector('[data-slot=modal-card-title]')?.textContent), sub: t(el.querySelector('[data-slot=modal-card-subtitle]')?.textContent),
+            sources: [...el.querySelectorAll('[data-create-sources] [data-slot=section-nav-item]')].map(b => b.dataset.value + ' ' + t(b.querySelector('[data-slot=section-nav-count]')?.textContent)
+              + (b.querySelector('[data-slot=section-nav-badge]') ? ' ⚿' : '') + (b.getAttribute('aria-current') === 'true' ? ' *' : '')),
+            access: t(el.querySelector('[data-create-access]')?.textContent) || null,
+            cards: [...el.querySelectorAll('[data-card]')].map(c => c.dataset.card + ' · ' + t(c.querySelector('[data-slot=choice-meta]')?.textContent)
+              + (c.querySelector('[data-slot=choice-control]')?.getAttribute('data-state') === 'checked' ? ' *' : '')),
+            ai: el.querySelector('[data-field=create-ai]') ? { disabled: !!el.querySelector('[data-field=create-ai] input:disabled'), hint: t(el.querySelector('[data-field=create-ai] [data-slot=field-hint]')?.textContent),
+              value: el.querySelector('[data-field=create-ai] input')?.value ?? null } : null,
+            origin: t(el.querySelector('[data-create-origin] [data-slot=callout-title]')?.textContent) || null,
+            name: val('create-name'), nameError: el.querySelector('[data-field=create-name]')?.dataset.state === 'error' ? t(el.querySelector('[data-field=create-name] [data-slot=field-hint]')?.textContent) : null,
+            owner: val('create-owner'), type: t(el.querySelector('[data-field=create-type] [data-slot=field-input]')?.textContent) || null,
+            inspection: el.querySelector('[data-radio=createInspection] [data-slot=choice-control][data-state=checked]')?.closest('[data-slot=choice]')?.querySelector('[data-slot=choice-title]')?.textContent.trim() ?? null,
+            acts: [...el.querySelectorAll('[data-act]')].map(b => b.dataset.act + (b.disabled ? ' выкл' : '')),
+          } })(document.querySelector('[data-modal=create]'))
+        const url = location.pathname + location.search
+        /* Фон окна создания — список схем вне стенда: модели страницы схемы на нём нет. */
+        if (!root || !M) return JSON.stringify({ page: 'list', url, notices, createWin, rows: document.querySelectorAll('[data-scheme-row]').length })
         return JSON.stringify({
           title: t(document.querySelector('[data-scheme-title]')?.textContent),
           tab: root.dataset.tab,
           tabActive: [...document.querySelectorAll('[data-tab-trigger]')].filter(b => b.dataset.state === 'active' || b.getAttribute('aria-selected') === 'true').map(b => b.dataset.tabTrigger),
-          tabs: [...document.querySelectorAll('[data-tab-trigger]')].map(b => t(b.textContent)),
+          /* Такт 91: маркер этапа у вкладки — поле tabMarks; подпись вкладки — без него. */
+          tabs: [...document.querySelectorAll('[data-tab-trigger]')].map(b => { const c = b.cloneNode(true); c.querySelectorAll('[data-slot=readiness-mark]').forEach(x => x.remove()); return t(c.textContent) }),
           section: root.dataset.section,
           save: root.dataset.save,
           saveText: t(status?.childNodes ? [...status.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join(' ') : ''),
@@ -1097,6 +1186,29 @@ function kit(page) {
                 tags: tags(card), image: pic(one(card, 'img')), width: Math.round(card.getBoundingClientRect().width),
               } : null,
             } })(),
+          /*
+           * ---------- такт 91: модель готовности ----------
+           * Полоса — заголовок, «Далее», этапы «id состояние ! N *» («*» — текущий); чип — подпись и маркер; поповер — заголовок,
+           * сводка, группы списка; маркеры вкладок; «Далее» внизу этапа; флажок «Правил»; список первой публикации и проверки над
+           * диффом; подвал окна; тон пунктов меню «⋯». rd — модель: готово из пяти, блокирующие, предупреждения, следующий и
+           * текущий этап.
+           */
+          page: 'scheme', url, createWin,
+          rd: (r => ({ done: r.done, total: r.total, blocks: r.blocks, warns: r.warns, next: r.next.id, current: M.currentStage.value }))(M.readiness.value),
+          rulesChecked: M.draft.rulesChecked,
+          strip: (b => b ? { title: t(b.querySelector('[data-slot=readiness-bar-title]')?.textContent), next: t(b.querySelector('[data-readiness-next]')?.textContent) || null,
+            stages: [...b.querySelectorAll('[data-slot=readiness-stage]')].map(s => s.dataset.stage + ' ' + s.dataset.state
+              + ((p => p ? ' ' + t(p.textContent) : '')(s.querySelector('span[aria-hidden=true]'))) + (s.dataset.current ? ' *' : '')) } : null)(document.querySelector('[data-slot=readiness-bar]')),
+          chip: (c => c ? { label: t(c.querySelector('[data-slot=readiness-chip-label]')?.textContent), mark: markOf(c.querySelector('[data-slot=readiness-mark]')), open: c.dataset.state === 'open' } : null)(document.querySelector('[data-slot=readiness-chip]')),
+          ready: (p => p ? { title: t(p.querySelector('[data-slot=readiness-popover-title]')?.textContent), summary: t(p.querySelector('[data-slot=readiness-popover-summary]')?.textContent),
+            groups: listOf(p), footer: [...p.querySelectorAll('[data-slot=readiness-popover-footer] [data-act]')].map(b => b.dataset.act) } : null)(document.querySelector('[data-readiness-popover]')),
+          tabMarks: Object.fromEntries([...document.querySelectorAll('[data-tab-trigger]')].map(b => [b.dataset.tabTrigger, markOf(b.querySelector('[data-slot=readiness-mark]'))])),
+          stageNext: [...document.querySelectorAll('[data-stage-next]')].map(x => x.dataset.stageNext + ' · ' + t(x.querySelector('button[data-act]')?.textContent)),
+          rulesBox: checked(document.querySelector('[data-field=rules-check]')),
+          firstList: listOf(document.querySelector('[data-first-readiness]')),
+          gate: listOf(document.querySelector('[data-publish-checks]')),
+          note: t([...document.querySelectorAll('[data-slot=modal-card-note]')].pop()?.textContent) || null,
+          menuTone: [...document.querySelectorAll('[data-menu=scheme] [data-slot=list-item]')].map(x => t(x.textContent) + (x.dataset.tone ? ' · ' + x.dataset.tone : '')),
         })
       })()`)
       return JSON.parse(s)
@@ -1322,7 +1434,8 @@ const SCENARIOS = {
   ]],
   /* ============================ П4, такт 64 ============================ */
   'СС-02': ['новая схема: индикатор «Ни разу не опубликовано», главная кнопка ведёт в первую публикацию (r2 §2, состояние 1)', [
-    ['старт', null, { publish: 'never', status: { state: 'never', text: 'Ни разу не опубликовано', clickable: false, editing: '' }, versions: 0, current: null, headerActs: ['history', 'preview', 'publish', 'menu'] }],
+    /* Такт 91: «История версий» — после первой публикации (ревью С-1); чип «Готовность N из 5» — у «Опубликовать схему». */
+    ['старт', null, { publish: 'never', status: { state: 'never', text: 'Ни разу не опубликовано', clickable: false, editing: '' }, versions: 0, current: null, headerActs: ['preview', 'readiness', 'publish', 'menu'] }],
     ['«Опубликовать схему» — первая публикация', K => K.publish(), { surface: 'first-publish', modalTitle: 'Первая публикация схемы', diff: null, versions: 0 }],
   ], { query: 'data=new&now=2026-10-03T09:00:00' }],
   'СС-03': ['правка делает черновик грязным: индикатор «Черновик: правки {автор} от {дата}»; клик по индикатору открывает дифф (r2 §2, состояние 2; аудит, «Индикатор состояния схемы»)', [
@@ -1351,20 +1464,29 @@ const SCENARIOS = {
       status: { state: 'published', text: 'Всё опубликовано', clickable: false, editing: '' }, notices: ['Схема опубликована: версия от 03.10.2026, 09:00'] }],
     ['история: новая версия сверху', K => K.act('history'), { surface: 'history', 'historyRows.0': { id: 'v3', text: 'Версия от 03.10.2026, 09:00 Опубликовал(а) Анна Смирнова · 0 осмотров Текущая', current: true }, 'historyRows.1.current': false }],
   ], { query: 'now=2026-10-03T09:00:00' }],
-  'СС-06': ['первая публикация: подтверждение без диффа со сводкой настроенного (r2 §2; аудит, «Первая публикация ≠ дифф»)', [
-    ['«Опубликовать схему»', K => K.publish(), { surface: 'first-publish', modalTitle: 'Первая публикация схемы', diff: null, confirmOff: false,
-      firstSummary: ['Настройки — настроены', 'Форма — 0 полей в 0 группах', 'Процессы — 0 шагов в 0 процессах', 'Витрина — требует оформления'] }],
+  'СС-06': ['первая публикация: модель готовности вместо сводки — этапы с проверками; подтверждение рождает первую версию (r2 §2; аудит, «Первая публикация ≠ дифф»; ревью 5.5, такт 91)', [
+    ['«Опубликовать схему» — первая публикация: этапы и проверки, «Опубликовать» доступна', K => K.publish(), { surface: 'first-publish', modalTitle: 'Первая публикация схемы', diff: null, confirmOff: false,
+      note: 'После публикации создаётся неизменяемый снимок версии', firstSummary: [], firstList: [
+        { head: 'base done · Основа · Осмотр транспорта · Демо Страхование', checks: [], manual: null },
+        { head: 'form done · Анкета · 8 полей в 2 группах', checks: [], manual: null },
+        { head: 'shooting warning ! 1 · Съёмка · 9 шагов в 2 процессах', checks: ['step-hint:ts-car-interior · warn · У шага «Салон» нет фото-подсказки · Процессы → Осмотр автомобиля'], manual: null },
+        { head: 'rules todo · Правила · Проверьте права доступа и шаблоны PDF', checks: [], manual: 'false' },
+        { head: 'publish done · Проверка и публикация · Блокирующих проверок нет — можно публиковать', checks: [], manual: null },
+        { head: 'showcase locked · Витрина — после публикации · Доступно после публикации схемы', checks: [], manual: null }] }],
     ['«Отмена»', K => K.act('first-cancel'), { surface: '', versions: 0, publish: 'never' }],
-    ['«Опубликовать» — первая версия', async (K) => { await K.publish(); await K.act('first-confirm') },
-      { surface: '', versions: 1, current: 'v1', publish: 'published', 'status.text': 'Всё опубликовано', notices: ['Схема опубликована: версия от 03.10.2026, 09:00'] }],
+    ['«Опубликовать» — первая версия; полоса подготовки ушла, «История версий» в шапке, чип «Проверка: 1»', async (K) => { await K.publish(); await K.act('first-confirm') },
+      { surface: '', versions: 1, current: 'v1', publish: 'published', 'status.text': 'Всё опубликовано', notices: ['Схема опубликована: версия от 03.10.2026, 09:00'], strip: null,
+        headerActs: ['history', 'preview', 'readiness', 'publish', 'menu'], 'chip.label': 'Проверка: 1', stageNext: [] }],
     ['повторное нажатие — публиковать нечего', K => K.publish(), { surface: '', versions: 1, notices: ['Публиковать нечего: изменений нет'] }],
-  ], { query: 'data=new&now=2026-10-03T09:00:00' }],
+  ], { query: 'data=created&from=t-car&now=2026-10-03T09:00:00' }],
   'СС-07': ['меню «⋯»: экспорт, дамп, копия, удаление — пункты с уведомлением-заглушкой, удаление с подтверждением (r2 §3)', [
-    ['открыть меню', K => K.menu(), { menuItems: ['Экспортировать схему', 'Скачать дамп', 'Сделать копию', 'Сбросить черновик к текущей версии', 'Удалить схему'] }],
+    ['открыть меню', K => K.menu(), { menuItems: ['Экспортировать схему', 'Скачать дамп', 'Сделать копию', 'Сбросить черновик к текущей версии', 'Удалить схему'],
+      menuTone: ['Экспортировать схему', 'Скачать дамп', 'Сделать копию', 'Сбросить черновик к текущей версии', 'Удалить схему · destructive'] }],
     ['«Экспортировать схему»', K => K.act('menu').then(() => K.menu('export')), { notices: ['Экспорт схемы — вне стенда'], menuItems: [] }],
     ['«Скачать дамп»', K => K.menu('dump'), { notices: ['Дамп схемы — вне стенда'] }],
-    ['«Сделать копию»', K => K.menu('copy'), { notices: ['Копия схемы — вне стенда'] }],
-    ['«Удалить схему» — подтверждение', K => K.menu('delete'), { surface: 'delete', modalTitle: 'Удалить схему?', notices: [] }],
+    /* Такт 91: копия — окно «Новая схема осмотра» на шаге «Основа»; до такта 91 — уведомление «вне стенда». */
+    ['«Сделать копию» — окно «Новая схема осмотра» на шаге «Основа»', K => K.menu('copy'), { surface: 'copy', 'createWin.mode': 'copy', 'createWin.step': 'base', notices: [] }],
+    ['Esc; «Удалить схему» — подтверждение', async (K) => { await K.key('Escape'); await K.menu('delete') }, { surface: 'delete', modalTitle: 'Удалить схему?', notices: [] }],
     ['«Отмена»', K => K.act('delete-cancel'), { surface: '', notices: [], versions: 2 }],
     ['«Удалить»', async (K) => { await K.menu('delete'); await K.act('delete-confirm') }, { surface: '', notices: ['Удаление схемы — вне стенда'], versions: 2, writes: 0 }],
   ]],
@@ -1380,8 +1502,11 @@ const SCENARIOS = {
       { id: 'v1', text: 'Версия от 14.08.2026, 10:20 Опубликовал(а) Анна Смирнова · 128 осмотров', current: false }] }],
     ['Esc закрывает, фокус на «Истории версий»', K => K.key('Escape'), { surface: '', focusAct: 'history', writes: 0 }],
   ]],
-  'СС-45/новая': ['история версий у новой схемы — «Публикаций ещё не было» (r2 §2, §8; аудит, «Пустые состояния»)', [
-    ['«История версий»', K => K.act('history'), { surface: 'history', historyRows: [], historyEmpty: 'Публикаций ещё не было' }],
+  'СС-45/новая': ['история версий у новой схемы — входа нет до первой публикации (ревью С-1, такт 91; до такта 91 — сайд «Публикаций ещё не было»)', [
+    ['старт: в шапке «Истории версий» нет', null, { headerActs: ['preview', 'readiness', 'publish', 'menu'], versions: 0 }],
+    ['поиск «история» — действие приглушено с причиной', async (K) => { await K.searchClick(); await K.type('история') },
+      { results: [{ path: 'Действия', items: ['История версий | Появится после первой публикации схемы'] }] }],
+    ['Enter — отказ с причиной, сайда нет', K => K.key('Enter'), { surface: '', notices: ['Появится после первой публикации схемы'] }],
   ], { query: 'data=new' }],
   'СС-46': ['история: клик по версии — её дифф с предыдущей вторым слоем сайда, «← назад», «Сделать копию» (r2 §2; аудит, «Два режима одного дифф-компонента»)', [
     ['версия от 22.09 — второй слой с диффом', async (K) => { await K.act('history'); await K.version('v2') }, { surface: 'history', headerType: 'back', modalTitle: 'Версия от 22.09.2026, 16:05', modalSub: 'Опубликовал(а) Игорь Петров · 41 осмотр',
@@ -1390,7 +1515,9 @@ const SCENARIOS = {
     ['раскрыть «Процессы и шаги»', K => K.area('processes'), { 'diff.open.0.groups.0': { kind: 'added', title: 'Добавлено · 4', items: ['Шаг «VIN на металле» | процесс «Осмотр автомобиля»', 'Шаг «Вид справа» | процесс «Осмотр автомобиля»', 'Процесс «Осмотр документов» | 2 шага', 'Процесс «Осмотр повреждений» | 0 шагов'] } }],
     ['«←» — назад к списку', K => K.backLayer(), { headerType: 'close', modalTitle: 'История версий', 'historyRows.length': 2 }],
     ['первая версия — сравнивать не с чем; «Открыть версию» есть', K => K.version('v1'), { headerType: 'back', modalTitle: 'Версия от 14.08.2026, 10:20', versionFirst: true, diff: null, sideActs: ['version-copy', 'version-view'] }],
-    ['«Сделать копию»', K => K.act('version-copy'), { notices: ['Копия схемы — вне стенда'], versions: 2, writes: 0 }],
+    /* Такт 91: копия версии — окно «Новая схема осмотра» поверх истории, имя — из версии. */
+    ['«Сделать копию» — окно на шаге «Основа» с «Копия — …»', K => K.act('version-copy'),
+      { surface: 'copy', surfaces: ['history', 'copy'], 'createWin.name': 'Копия — КАСКО — осмотр легкового автомобиля', notices: [], versions: 2, writes: 0 }],
   ]],
   'СС-47': ['просмотр прошлой версии: плашка с датой и числом осмотров, поля только для чтения, табы и навигатор работают, «Перейти к текущей версии», «Сделать копию»; индикатора черновика и «Опубликовать схему» нет (r2 §2, состояние 7)', [
     ['история → версия от 14.08 → «Открыть версию»', async (K) => { await K.act('history'); await K.version('v1'); await K.act('version-view') },
@@ -1412,8 +1539,9 @@ const SCENARIOS = {
       { tab: 'showcase', viewing: 'v1', 'showcase.title': '', 'showcase.ro': { fields: true, actsInert: true, removable: 0 }, writes: 0 }],
     ['«Витрина»: клик в продающее название и набор — правки нет', K => K.tryType('scTitle'), { 'showcase.title': '', focusRo: true, writes: 0, saveLog: [] }],
     ['табы работают', async (K) => { await K.tab('settings') }, { tab: 'settings', viewing: 'v1' }],
-    ['«Сделать копию»', K => K.act('view-copy'), { notices: ['Копия схемы — вне стенда'], viewing: 'v1' }],
-    ['«Перейти к текущей версии» — снова черновик', K => K.act('view-leave'), { viewing: '', readonly: false, banner7: null, 'status.state': 'draft', headerActs: ['history', 'preview', 'publish', 'menu'] }],
+    ['«Сделать копию» — окно на шаге «Основа» (такт 91)', K => K.act('view-copy'), { surface: 'copy', 'createWin.step': 'base', notices: [], viewing: 'v1' }],
+    ['Esc; «Перейти к текущей версии» — снова черновик, чип «Проверка: 6»', async (K) => { await K.key('Escape'); await K.act('view-leave') },
+      { viewing: '', readonly: false, banner7: null, 'status.state': 'draft', headerActs: ['history', 'preview', 'readiness', 'publish', 'menu'], 'chip.label': 'Проверка: 6' }],
   ]],
   'СС-47/вход': ['просмотр прошлой версии — вход адресом, как из осмотра, прошедшего по старому снимку (r2 §2, состояние 7)', [
     ['старт', null, { viewing: 'v1', readonly: true, status: null, headerActs: ['history', 'view-copy', 'view-leave'], shownDescription: 'Осмотр автомобиля перед оформлением полиса', inertOnFields: false }],
@@ -1436,14 +1564,17 @@ const SCENARIOS = {
   ], { query: 'view=v1' }],
   'СС-48': ['валидация: блок предупреждений в диффе; критичное выключает «Опубликовать» с причиной (r2 §8; аудит, «Валидационный гейт публикации»)', [
     ['формула с переменной, которой нет в форме, — предупреждение, публикация доступна', async (K) => { await K.formulaEnd('zipName'); await K.paste('zipName', '_{Car:colour}'); await K.settled(); await K.publish() },
-      { surface: 'publish', 'diff.warnings': [{ text: 'Формула имени zip-архива ссылается на переменную {Car:colour}, которой нет в форме', critical: false }], confirmOff: false }],
+      { surface: 'publish', 'diff.warnings': [], 'gate.0': { head: 'settings warning ! 1 · Настройки',
+        checks: ['formula:zipName:Car:colour · warn · Формула имени zip-архива ссылается на переменную {Car:colour}, которой нет в форме · Настройки → Формулы и служебное'], manual: null }, confirmOff: false }],
     ['пустое наименование — критичное: «Опубликовать» выключена', async (K) => { await K.act('publish-cancel'); await K.clear('[data-field=name]'); await K.settled(); await K.publish() },
-      { surface: 'publish', name: '', confirmOff: true, 'diff.warnings': [{ text: 'Наименование схемы не заполнено — публикация невозможна', critical: true }, { text: 'Формула имени zip-архива ссылается на переменную {Car:colour}, которой нет в форме', critical: false }] }],
+      { surface: 'publish', name: '', confirmOff: true, note: 'Публикация невозможна: исправьте блокирующие проверки — 1', 'gate.0': { head: 'settings blocked ! 2 · Настройки',
+        checks: ['name-empty · block · Наименование схемы не заполнено · Настройки → Основное', 'formula:zipName:Car:colour · warn · Формула имени zip-архива ссылается на переменную {Car:colour}, которой нет в форме · Настройки → Формулы и служебное'], manual: null } }],
     ['нажатие по выключенной «Опубликовать» — снимка нет', K => K.act('publish-confirm'), { surface: 'publish', versions: 2 }, { blind: true }],
   ], { query: 'now=2026-10-03T09:00:00' }],
-  'СС-48/первая': ['валидация в первой публикации: согласование без полей — предупреждение (аудит, «Валидационный гейт публикации»)', [
+  'СС-48/первая': ['валидация в первой публикации: согласование без полей — предупреждение у «Анкеты»; форма без полей блокирует (аудит, «Валидационный гейт публикации»; такт 91 — модель готовности)', [
     ['включить согласование и открыть первую публикацию', async (K) => { await K.toggle('approval'); await K.settled(); await K.publish() },
-      { surface: 'first-publish', 'diff.warnings': [{ text: 'Согласование включено, поля для согласования не отмечены', critical: false }], confirmOff: false }],
+      { surface: 'first-publish', diff: null, 'firstList.1': { head: 'form blocked ! 2 · Анкета · Полей нет', checks: [
+        'form-empty · block · В форме нет полей · Форма', 'approval-none · warn · Согласование включено, поля для согласования не отмечены · Настройки → Поведение процесса'], manual: null }, confirmOff: true }],
   ], { query: 'data=new&now=2026-10-03T09:00:00' }],
   'СС-50': ['presence: «Сейчас редактирует {кто}» (r2 §2, состояние 6)', [
     ['старт', null, { status: { state: 'draft', text: 'Черновик: правки Игорь Петров от 01.10.2026, 11:40', clickable: true, editing: 'Сейчас редактирует Игорь Петров' }, save: 'saved' }],
@@ -1838,17 +1969,18 @@ const SCENARIOS = {
   'СС-42': ['витрина: «Опубликовать на витрину» выключена с причиной до публикации схемы; жизненный цикл карточки (r2 §7; аудит, «Структура таба», «Две независимые публикации»)', [
     ['таб «Витрина» новой схемы: требует оформления, кнопка выключена с причиной', K => K.tab('showcase'),
       { tab: 'showcase', 'showcase.status': 'Статус витрины: Требует оформления', 'showcase.tone': 'warning', 'showcase.text': 'Схема ещё не опубликована в ядре — витрина станет доступна после', 'showcase.publish': 'off' }],
-    ['нажатие по выключенной кнопке — карточка прежняя', K => K.act('publish-showcase'), { 'showcase.publish': 'off', 'sc.status': 'needs', notices: [], writes: 0 }, { blind: true }],
+    /* Такт 91: созданная схема — первое сохранение было («Создать схему»), записей с начала — одна; нажатие новых не добавляет. */
+    ['нажатие по выключенной кнопке — карточка прежняя', K => K.act('publish-showcase'), { 'showcase.publish': 'off', 'sc.status': 'needs', notices: [], writes: 1 }, { blind: true }],
     ['продающее название — карточка в черновике', async (K) => { await K.fill('[data-field=scTitle]', 'Осмотр автомобиля онлайн'); await K.settled() },
       { 'showcase.title': 'Осмотр автомобиля онлайн', 'showcase.status': 'Статус витрины: Черновик карточки', 'showcase.tone': 'neutral', 'showcase.publish': 'off', saveLog: ['saving', 'saved'] }],
     ['первая публикация схемы — кнопка доступна', async (K) => { await K.publish(); await K.act('first-confirm') },
-      { versions: 1, 'showcase.publish': 'on', 'showcase.text': 'Карточка появится на витрине после публикации', notices: ['Схема опубликована: версия от 03.10.2026, 09:00'] }],
+      { versions: 1, 'showcase.publish': 'on', 'showcase.text': 'Карточка появится на витрине после публикации', notices: ['Схема опубликована: версия от 03.10.2026, 09:00'], strip: null }],
     ['«Опубликовать на витрину» — карточка на витрине', async (K) => { await K.act('publish-showcase'); await K.settled() },
       { 'sc.status': 'published', 'showcase.status': 'Статус витрины: Опубликована на витрине', 'showcase.tone': 'success', 'showcase.publish': null, notices: ['Карточка опубликована на витрине'] }],
     /* Такт 90 (решение 3): у новой схемы цена «от» — из тарифа по умолчанию; ручная цена — после «Указать вручную». */
     ['правка опубликованной карточки — «Указать вручную», 1990: снова черновик, кнопка вернулась', async (K) => { await K.priceSource('manual'); await K.settled(); await K.fill('[data-field=scPriceValue]', '1990'); await K.settled() },
       { 'showcase.price': '1 990', 'sc.priceFrom': 1990, 'sc.priceSource': 'manual', 'sc.status': 'draft', 'showcase.status': 'Статус витрины: Черновик карточки', 'showcase.publish': 'on' }],
-  ], { query: 'data=new&now=2026-10-03T09:00:00' }],
+  ], { query: 'data=created&from=t-car&now=2026-10-03T09:00:00' }],
   'СС-43': ['витрина: карточка и «Зачем нужен осмотр» — ввод, теги каскадом, четыре пары, метрики (r2 §7; аудит, «Структура таба», «Стержневой принцип: три типа данных»)', [
     ['старт: карточка, теги, шаблон по типу объекта; цена «от» — из тарифа (такт 90), ручная 2599 помнится', null, { 'showcase.title': 'Дистанционный осмотр автомобиля перед страхованием', 'showcase.price': null, 'showcase.priceSource': 'tariff', 'sc.priceFrom': 2599, 'showcase.industry': 'Страхование',
       'showcase.spheres': ['ПСО — предстраховой осмотр'], 'showcase.object': 'Транспорт', 'showcase.problems.length': 4, 'showcase.metrics.length': 2,
@@ -2267,7 +2399,9 @@ const SCENARIOS = {
       { surface: 'paste', focusIn: 'paste', paste: { kind: 'fields', level: 'schemes', title: 'Вставить поля из другой схемы', sub: 'В группу «Заявка»', back: false, query: '',
         groups: [{ legend: 'Схемы компании «Демо Страхование»', rows: ['d-osago · ОСАГО — осмотр легкового автомобиля Осмотр транспорта · 2 группы · 9 полей',
           'd-flat · Осмотр квартиры перед страхованием Осмотр недвижимости · 2 группы · 7 полей'] },
-        { legend: 'Отобранные шаблоны', rows: ['d-machine · Осмотр спецтехники в лизинге Осмотр оборудования · 2 группы · 6 полей'] }],
+        { legend: 'Отобранные шаблоны', rows: ['t-car · Осмотр легкового автомобиля Осмотр транспорта · 2 группы · 8 полей', 't-moto · Осмотр мототехники Осмотр транспорта · 2 группы · 6 полей',
+          't-truck · Осмотр грузового транспорта Осмотр транспорта · 2 группы · 7 полей', 't-house · Осмотр загородного дома Осмотр недвижимости · 2 группы · 6 полей',
+          'd-machine · Осмотр спецтехники в лизинге Осмотр оборудования · 2 группы · 6 полей'] }],
         marks: [], empty: null, parts: [], target: null, rows: [], all: null, note: 'Выбрано: 0', confirm: 'Вставить в группу «Заявка» · выкл' }, writes: 0 }],
     ['«ОСАГО…» — второй уровень: группы полей, «←»; фокус на первой группе', K => K.pasteScheme('d-osago'),
       { 'paste.level': 'parts', 'paste.title': 'ОСАГО — осмотр легкового автомобиля', 'paste.sub': 'Группы полей схемы', 'paste.back': true,
@@ -2296,7 +2430,9 @@ const SCENARIOS = {
       { surface: 'paste', paste: { kind: 'steps', level: 'schemes', title: 'Вставить шаги из другой схемы', sub: 'В процесс «Осмотр автомобиля»', back: false, query: '',
         groups: [{ legend: 'Схемы компании «Демо Страхование»', rows: ['d-osago · ОСАГО — осмотр легкового автомобиля Осмотр транспорта · 2 процесса · 7 шагов',
           'd-flat · Осмотр квартиры перед страхованием Осмотр недвижимости · 1 процесс · 5 шагов'] },
-        { legend: 'Отобранные шаблоны', rows: ['d-machine · Осмотр спецтехники в лизинге Осмотр оборудования · 2 процесса · 6 шагов'] }],
+        { legend: 'Отобранные шаблоны', rows: ['t-car · Осмотр легкового автомобиля Осмотр транспорта · 2 процесса · 9 шагов', 't-moto · Осмотр мототехники Осмотр транспорта · 2 процесса · 6 шагов',
+          't-truck · Осмотр грузового транспорта Осмотр транспорта · 2 процесса · 8 шагов', 't-house · Осмотр загородного дома Осмотр недвижимости · 1 процесс · 5 шагов',
+          'd-machine · Осмотр спецтехники в лизинге Осмотр оборудования · 2 процесса · 6 шагов'] }],
         marks: [], empty: null, parts: [], target: null, rows: [], all: null, note: 'Выбрано: 0', confirm: 'Вставить в процесс «Осмотр автомобиля» · выкл' }, writes: 0 }],
     ['«ОСАГО…» — процессы схемы', K => K.pasteScheme('d-osago'),
       { 'paste.sub': 'Процессы схемы', 'paste.parts': ['dp-auto · Осмотр автомобиля auto_inspection · 5 шагов', 'dp-docs · Документы docs · 2 шага'], focusPaste: 'part dp-auto' }],
@@ -2344,7 +2480,9 @@ const SCENARIOS = {
     ['пустой запрос — снова все три', K => K.clear('[data-field=paste-search]'), { 'paste.query': '', 'paste.groups.length': 2, 'paste.empty': null }],
     ['компания-владелец «Пример Лизинг» — схем компании нет, только шаблоны', async (K) => {
       await K.key('Escape'); await K.tab('settings'); await K.fill('[data-field=owner]', 'Пример Лизинг'); await K.blur(); await K.settled(); await K.tab('form'); await K.act('field-paste') },
-      { 'g.owner': 'Пример Лизинг', 'paste.groups': [{ legend: 'Отобранные шаблоны', rows: ['d-machine · Осмотр спецтехники в лизинге Осмотр оборудования · 2 группы · 6 полей'] }] }],
+      { 'g.owner': 'Пример Лизинг', 'paste.groups': [{ legend: 'Отобранные шаблоны', rows: ['t-car · Осмотр легкового автомобиля Осмотр транспорта · 2 группы · 8 полей', 't-moto · Осмотр мототехники Осмотр транспорта · 2 группы · 6 полей',
+          't-truck · Осмотр грузового транспорта Осмотр транспорта · 2 группы · 7 полей', 't-house · Осмотр загородного дома Осмотр недвижимости · 2 группы · 6 полей',
+          'd-machine · Осмотр спецтехники в лизинге Осмотр оборудования · 2 группы · 6 полей'] }] }],
   ], { query: 'tab=form' }],
   'СС-89': ['тексты в приложении: вариант чипом — до трёх вариантов по типу объекта процесса; «Сохранить» оверлея — одна запись; дифф и поиск по текстам (ревью 4.6; решения 4, 5 оркестратора)', [
     ['«Открыть процесс» — раздел «Тексты в приложении»: тип объекта не выбран — варианты разных типов', K => K.processAct('p-damage', 'process-open'),
@@ -2628,6 +2766,156 @@ const SCENARIOS = {
         'site.gaps': ['tags', 'title', 'summary', 'image'], 'site.hero.price': 'от 700 ₽' }],
     ['«Не заполнено · Продающее название» — поле только для чтения в фокусе', K => K.siteGap('title'), { surface: '', site: null, focusField: 'scTitle', focusRo: true, writes: 0 }],
   ], { query: 'view=v1&tab=showcase&now=2026-10-03T09:00:00' }],
+  /* ---------- такт 91: создание схемы с мягкой этапностью — ревью 5, решения 3–7 оркестратора 2026-10-08 ---------- */
+  'СС-110': ['окно «Новая схема осмотра»: шаблон → «Основа» → «Создать схему» — первое сохранение, страница в режиме создания (ревью 5.3; решение 3)', [
+    ['старт: «С чего начать», «Отобранные шаблоны» — пять шаблонов, первый выбран; ИИ-строка выключена с причиной', null,
+      { page: 'list', rows: 4, 'createWin.step': 'start', 'createWin.mode': 'create', 'createWin.source': 'templates', 'createWin.sub': 'С чего начать: шаблон, другая схема или пустая схема',
+        'createWin.sources': ['templates 5 *', 'other 2 ⚿', 'recent 2'], 'createWin.cards': ['t-car · Легковой автомобиль · 8 полей · 9 шагов *', 't-moto · Мототехника · 6 полей · 6 шагов',
+          't-truck · Грузовой транспорт · 7 полей · 8 шагов', 't-house · Загородный дом · 6 полей · 5 шагов', 'd-machine · Спецтехника · 6 полей · 6 шагов'],
+        'createWin.ai': { disabled: true, hint: 'Появится вместе с ИИ-агентом', value: '' }, 'createWin.acts': ['create-empty', 'create-dump', 'create-cancel', 'create-next'] }],
+    ['карточка «Осмотр мототехники»', K => K.createCard('t-moto'), { 'createWin.cards.0': 't-car · Легковой автомобиль · 8 полей · 9 шагов', 'createWin.cards.1': 't-moto · Мототехника · 6 полей · 6 шагов *' }],
+    ['«Далее» — «Основа»: название шаблона, компания пользователя, тип схемы шаблона', K => K.createAct('create-next'),
+      { 'createWin.step': 'base', 'createWin.origin': 'Из шаблона «Осмотр мототехники»', 'createWin.name': 'Осмотр мототехники', 'createWin.owner': 'Демо Страхование',
+        'createWin.type': 'Осмотр транспорта', 'createWin.inspection': 'Обычный', 'createWin.acts': ['create-change', 'create-back', 'create-confirm'] }],
+    ['пустое наименование — «Создать схему» отказывает: ошибка под полем, окно открыто', async (K) => { await K.createName(''); await K.createAct('create-confirm') },
+      { page: 'list', 'createWin.step': 'base', 'createWin.name': '', 'createWin.nameError': 'Заполните наименование схемы' }],
+    ['наименование — «Создать схему»: страница схемы в режиме создания — «Форма» и «Процессы» открыты, полоса подготовки, чип у «Опубликовать схему»',
+      async (K) => { await K.createName('Осмотр скутеров курьерской службы'); await K.createAct('create-confirm'); await K.created() },
+      { page: 'scheme', title: 'Осмотр скутеров курьерской службы', publish: 'never', versions: 0, writes: 1, 'tabLock.off': [],
+        notices: ['Схема «Осмотр скутеров курьерской службы» создана из шаблона «Осмотр мототехники»'], headerActs: ['preview', 'readiness', 'publish', 'menu'],
+        strip: { title: 'Подготовка схемы: 4 из 5', next: 'Далее: Правила →', stages: ['base done *', 'form done', 'shooting done', 'rules todo', 'publish done'] },
+        chip: { label: 'Готовность 4 из 5', mark: null, open: false }, tabMarks: { settings: null, form: 'done', processes: 'done', showcase: null },
+        stageNext: ['base · Далее: Анкета →', 'rules · Проверить и опубликовать'] }],
+    ['таб «Форма» — группы и поля шаблона; текущий этап — «Анкета»', K => K.tab('form'),
+      { tab: 'form', 'form.groups': ['Заявка', 'Мототехника'], 'form.title': 'Заявка · 2 поля', 'strip.stages.1': 'form done *', stageNext: ['form · Далее: Съёмка →'] }],
+  ], { path: 'new', query: 'now=2026-10-03T09:00:00' }],
+  'СС-111': ['окно «Новая схема осмотра»: «Другие схемы» по роли, «Недавние», «Загрузить из дампа», ИИ выключен, «Пустая схема», Esc и «Добавить схему» (ревью 5.3; решение 3)', [
+    ['«Другие схемы» — схемы компании, доступ по роли', K => K.createSource('other'),
+      { 'createWin.source': 'other', 'createWin.sources': ['templates 5', 'other 2 ⚿ *', 'recent 2'], 'createWin.access': 'Схемы вашей компании — доступ по роли «Администратор»',
+        'createWin.cards': ['d-osago · Легковой автомобиль · 9 полей · 7 шагов *', 'd-flat · Квартира · 7 полей · 5 шагов'] }],
+    ['«Далее» — «Основа»: «Копия — …» схемы компании', K => K.createAct('create-next'),
+      { 'createWin.step': 'base', 'createWin.origin': 'Из схемы «ОСАГО — осмотр легкового автомобиля»', 'createWin.name': 'Копия — ОСАГО — осмотр легкового автомобиля' }],
+    ['«Выбрать другой» — снова «С чего начать», источник прежний', K => K.createAct('create-change'), { 'createWin.step': 'start', 'createWin.source': 'other' }],
+    ['«Недавние» — схема компании и шаблон, свежие первыми', K => K.createSource('recent'),
+      { 'createWin.source': 'recent', 'createWin.access': null, 'createWin.cards': ['d-osago · Легковой автомобиль · 9 полей · 7 шагов *', 't-car · Легковой автомобиль · 8 полей · 9 шагов'] }],
+    ['«Загрузить из дампа» — вне стенда: уведомление, окно прежнее', K => K.createAct('create-dump'), { notices: ['Загрузка из дампа — вне стенда'], 'createWin.step': 'start' }],
+    ['ИИ-строка выключена: нажатие не ставит фокус и не вводит текст', async (K) => { await K.clickEl(`document.querySelector('[data-modal=create] [data-field=create-ai] input')`); await K.type('осмотр склада') },
+      { 'createWin.ai': { disabled: true, hint: 'Появится вместе с ИИ-агентом', value: '' } }, { blind: true }],
+    ['«Пустая схема» — «Основа» без источника, наименование пустое', K => K.createAct('create-empty'),
+      { 'createWin.step': 'base', 'createWin.origin': 'Пустая схема', 'createWin.name': '', 'createWin.type': 'Осмотр транспорта' }],
+    ['Esc — окно закрыто, фон — список схем', K => K.key('Escape'), { page: 'list', createWin: null, rows: 4 }],
+    ['«Добавить схему» — окно снова с начала', K => K.act('scheme-add'), { 'createWin.step': 'start', 'createWin.source': 'templates', 'createWin.cards.0': 't-car · Легковой автомобиль · 8 полей · 9 шагов *' }],
+    ['«Пустая схема», «Осмотр склада» — «Создать схему»: 1 из 5, форма без полей блокирует, «Далее: Анкета →»',
+      async (K) => { await K.createAct('create-empty'); await K.createName('Осмотр склада'); await K.createAct('create-confirm'); await K.created() },
+      { page: 'scheme', title: 'Осмотр склада', versions: 0, writes: 1, 'tabLock.off': [], notices: ['Схема «Осмотр склада» создана'],
+        strip: { title: 'Подготовка схемы: 1 из 5', next: 'Далее: Анкета →', stages: ['base done *', 'form blocked ! 1', 'shooting warning ! 1', 'rules todo', 'publish blocked ! 1'] },
+        chip: { label: 'Готовность 1 из 5', mark: 'blocked ! 1', open: false }, tabMarks: { settings: null, form: 'blocked ! 1', processes: 'warning ! 1', showcase: null } }],
+  ], { path: 'new', query: 'now=2026-10-03T09:00:00' }],
+  'СС-112': ['рост готовности: группа, поле, процесс и шаг — этапы готовы, счёт полосы растёт; «Правила» — ручной отметкой (ревью 5.4, 5.5; решения 4, 5)', [
+    ['старт: пустая созданная схема — 1 из 5', null, { 'strip.title': 'Подготовка схемы: 1 из 5', rd: { done: 1, total: 5, blocks: 1, warns: 1, next: 'form', current: 'base' } }],
+    ['«Далее: Анкета →» в полосе — таб «Форма», фокус на «Добавить группу»', K => K.stripNext(),
+      { tab: 'form', 'strip.stages.1': 'form blocked ! 1 *', focusAct: 'group-add-empty' }],
+    ['группа «Объект» — в группе нет полей: предупреждение, «В форме нет полей» блокирует', async (K) => { await K.act('group-add-empty'); await K.typeInto('gdTitle', 'Объект'); await K.act('group-save'); await K.settled() },
+      { 'form.groups': ['Объект'], 'strip.stages.1': 'form blocked ! 2 *', 'tabMarks.form': 'blocked ! 2' }],
+    ['поле «Адрес» с алиасом — «Анкета» готова; блокирующих нет: 3 из 5', async (K) => {
+      await K.act('field-add-empty'); await K.typeInto('fdTitle', 'Адрес'); await K.typeInto('fdAlias', 'address'); await K.act('field-save'); await K.settled() },
+      { 'form.rows': ['1 · Адрес · address · Текст'], strip: { title: 'Подготовка схемы: 3 из 5', next: 'Далее: Съёмка →', stages: ['base done', 'form done *', 'shooting warning ! 1', 'rules todo', 'publish done'] },
+        'tabMarks.form': 'done', stageNext: ['form · Далее: Съёмка →'] }],
+    ['«Далее: Съёмка →» внизу «Анкеты» — «Процессы и шаги»', K => K.act('stage-next-form'), { tab: 'processes', 'strip.stages.2': 'shooting warning ! 1 *', focusAct: 'process-add-empty' }],
+    ['процесс «Осмотр склада» без шагов — блокирует публикацию: 2 из 5', async (K) => { await K.act('process-add-empty'); await K.typeInto('pdTitle', 'Осмотр склада'); await K.act('process-save'); await K.settled() },
+      { 'proc.cards.length': 1, 'strip.title': 'Подготовка схемы: 2 из 5', 'strip.stages.2': 'shooting blocked ! 1 *', 'strip.stages.4': 'publish blocked ! 1', 'tabMarks.processes': 'blocked ! 1' }],
+    ['шаг «Стеллажи» — «Съёмка» готова, без описания и фото-подсказки — два предупреждения: 4 из 5', async (K) => {
+      await K.clickEl(`document.querySelector('[data-process] [data-act=step-add]')`); await K.typeInto('sdTitle', 'Стеллажи'); await K.act('step-save'); await K.settled() },
+      { strip: { title: 'Подготовка схемы: 4 из 5', next: 'Далее: Правила →', stages: ['base done', 'form done', 'shooting warning ! 2 *', 'rules todo', 'publish done'] }, 'tabMarks.processes': 'warning ! 2' }],
+    ['«Далее: Правила →» внизу «Съёмки» — «Настройки», «Поведение процесса»', K => K.act('stage-next-shooting'),
+      { tab: 'settings', section: 'general', anchor: 'behavior', 'strip.stages.3': 'rules todo *', rulesBox: 'false' }],
+    ['отметка «Проверил унаследованное…» внизу «Настроек» — 5 из 5, «Проверить и опубликовать»; запись автосохранением', async (K) => { await K.rulesCheck(); await K.settled() },
+      { rulesChecked: true, rulesBox: 'true', strip: { title: 'Подготовка схемы: 5 из 5', next: 'Проверить и опубликовать', stages: ['base done', 'form done', 'shooting warning ! 2', 'rules done *', 'publish done'] },
+        'chip.label': 'Готовность 5 из 5', 'tabMarks.settings': 'done', saveLog: ['saving', 'saved'] }],
+    ['«Проверить и опубликовать» в полосе — первая публикация', K => K.stripNext(), { surface: 'first-publish', confirmOff: false }],
+  ], { query: 'data=created&from=empty&now=2026-10-03T09:00:00' }],
+  'СС-113': ['чип «Готовность N из 5»: поповер — этапы и проверки; «Исправить» ведёт к месту; ручная отметка «Правил»; «Перейти» (ревью 5.5; решения 4, 5)', [
+    ['чип — поповер: этапы, «! 1» у «Съёмки», флажок «Правил», «Витрина» после публикации', K => K.chipOpen(),
+      { 'chip.open': true, ready: { title: 'Готовность к публикации', summary: '4 из 5 этапов · блокирующих нет · предупреждений: 1', footer: [], groups: [
+        { head: 'base done · Основа · Осмотр транспорта · Демо Страхование', checks: [], manual: null },
+        { head: 'form done · Анкета · 8 полей в 2 группах', checks: [], manual: null },
+        { head: 'shooting warning ! 1 · Съёмка · 9 шагов в 2 процессах', checks: ['step-hint:ts-car-interior · warn · У шага «Салон» нет фото-подсказки · Процессы → Осмотр автомобиля'], manual: null },
+        { head: 'rules todo · Правила · Проверьте права доступа и шаблоны PDF', checks: [], manual: 'false' },
+        { head: 'publish done · Проверка и публикация · Блокирующих проверок нет — можно публиковать', checks: [], manual: null },
+        { head: 'showcase locked · Витрина — после публикации · Доступно после публикации схемы', checks: [], manual: null }] } }],
+    ['«Исправить» у «Салон» — поповер закрыт, «Процессы и шаги», фокус на строке шага', K => K.fix('step-hint:ts-car-interior'),
+      { ready: null, tab: 'processes', focusStep: 'ts-car-interior', 'strip.stages.2': 'shooting warning ! 1 *' }],
+    ['загрузка фото-подсказки у «Салон» — «Съёмка» без замечаний, маркер вкладки — готово', async (K) => { await K.stepAct('ts-car-interior', 'hint-upload'); await K.uploadZone('ts-car-interior'); await K.settled() },
+      { 'strip.stages.2': 'shooting done *', 'tabMarks.processes': 'done', 'chip.mark': null }],
+    ['поповер: флажок «Правил» — 5 из 5; запись автосохранением', async (K) => { await K.chipOpen(); await K.manual(); await K.settled() },
+      { rulesChecked: true, 'chip.label': 'Готовность 5 из 5', 'ready.groups.3': { head: 'rules done · Правила · Унаследованное проверено', checks: [], manual: 'true' }, saveLog: ['saving', 'saved'] }],
+    ['«Перейти» у «Анкеты» — поповер закрыт, таб «Форма»', K => K.groupGo('form'), { ready: null, tab: 'form', 'strip.stages.1': 'form done *' }],
+  ], { query: 'data=created&from=t-car&now=2026-10-03T09:00:00' }],
+  'СС-114': ['маркеры вкладок и полоса: «Свернуть» — чип остаётся, память сессии; «Показать полосу»; этап полосы ведёт к месту; «Далее» внизу «Правил» (ревью 5.5; решение 5)', [
+    ['старт: маркеры — «Форма» готова, «Процессы» «! 1» (у шага нет фото-подсказки)', null,
+      { tabMarks: { settings: null, form: 'done', processes: 'warning ! 1', showcase: null }, 'strip.title': 'Подготовка схемы: 4 из 5' }],
+    ['«Свернуть» — полосы нет, чип у «Опубликовать схему» остаётся', K => K.stripCollapse(), { strip: null, 'chip.label': 'Готовность 4 из 5' }],
+    ['перезагрузка — полоса свёрнута: память сессии вкладки', K => K.start('data=created&from=d-machine&now=2026-10-03T09:00:00'), { strip: null, 'chip.label': 'Готовность 4 из 5' }],
+    ['поповер чипа — «Показать полосу подготовки»', async (K) => { await K.chipOpen() }, { 'ready.footer': ['strip-expand'] }],
+    ['«Показать полосу подготовки» — полоса снова, поповер закрыт', K => K.act('strip-expand'), { ready: null, 'strip.title': 'Подготовка схемы: 4 из 5' }],
+    ['этап «Правила» в полосе — «Настройки», «Поведение процесса»', K => K.stage('rules'),
+      { tab: 'settings', section: 'general', anchor: 'behavior', 'strip.stages.3': 'rules todo *' }],
+    ['«Проверить и опубликовать» внизу «Правил» — первая публикация', K => K.act('stage-publish'), { surface: 'first-publish', modalTitle: 'Первая публикация схемы', 'firstList.length': 6 }],
+  ], { query: 'data=created&from=d-machine&now=2026-10-03T09:00:00' }],
+  'СС-115': ['первая публикация с блокирующей проверкой: «Опубликовать» выключена с причиной; «Исправить» — к месту; блокировка снята — первая версия, чип «Проверка» (ревью 5.5; решения 4, 5)', [
+    ['«Опубликовать схему» — «В форме нет полей» блокирует: «Опубликовать» выключена, причина в подвале', K => K.publish(),
+      { surface: 'first-publish', confirmOff: true, note: 'Публикация невозможна: исправьте блокирующие проверки — 1',
+        'firstList.1': { head: 'form blocked ! 1 · Анкета · Полей нет', checks: ['form-empty · block · В форме нет полей · Форма'], manual: null },
+        'firstList.4.head': 'publish blocked ! 1 · Проверка и публикация · Блокирует публикацию: 1' }],
+    ['нажатие по выключенной «Опубликовать» — снимка нет', K => K.act('first-confirm'), { surface: 'first-publish', versions: 0 }, { blind: true }],
+    ['«Исправить» у «В форме нет полей» — окно закрыто, «Форма», фокус на «Добавить группу»', K => K.fix('form-empty'), { surface: '', tab: 'form', focusAct: 'group-add-empty' }],
+    ['группа и поле с алиасом — блокирующих нет', K => K.groupWithField('Склад', 'Адрес склада', 'address'), { 'rd.blocks': 0, 'strip.title': 'Подготовка схемы: 3 из 5' }],
+    ['снова «Опубликовать схему» — «Опубликовать» доступна', K => K.publish(),
+      { surface: 'first-publish', confirmOff: false, note: 'После публикации создаётся неизменяемый снимок версии', 'firstList.4.head': 'publish done · Проверка и публикация · Блокирующих проверок нет — можно публиковать' }],
+    ['«Опубликовать» — первая версия: полосы и «Далее» нет, «История версий» в шапке, чип «Проверка: 1», «! 1» у «Процессов»', K => K.act('first-confirm'),
+      { surface: '', versions: 1, publish: 'published', strip: null, stageNext: [], headerActs: ['history', 'preview', 'readiness', 'publish', 'menu'],
+        chip: { label: 'Проверка: 1', mark: 'warning ! 1', open: false }, tabMarks: { settings: null, form: null, processes: 'warning ! 1', showcase: null },
+        notices: ['Схема опубликована: версия от 03.10.2026, 09:00'] }],
+  ], { query: 'data=created&from=empty&now=2026-10-03T09:00:00' }],
+  'СС-116': ['после публикации: чип «Проверка: N» при замечаниях, «! N» на вкладках, проверки над диффом, «Исправить» из окна публикации (ревью 5.5; решения 4, 5)', [
+    ['старт: полосы нет, «Проверка: 6», «! 1» у «Формы», «! 5» у «Процессов»', null,
+      { strip: null, stageNext: [], chip: { label: 'Проверка: 6', mark: 'warning ! 6', open: false }, tabMarks: { settings: null, form: 'warning ! 1', processes: 'warning ! 5', showcase: null } }],
+    ['поповер — проверки по областям', K => K.chipOpen(), { ready: { title: 'Проверка перед публикацией', summary: 'Блокирующих нет · предупреждений: 6', footer: [], groups: [
+      { head: 'form warning ! 1 · Форма', checks: ['field-hint:f-year · warn · У поля «Год выпуска» нет подсказки · Форма → Кузов и комплектация'], manual: null },
+      { head: 'processes warning ! 5 · Процессы и шаги', checks: [
+        'step-hint:s-vin-metal · warn · У шага «VIN на металле» нет фото-подсказки · Процессы → Осмотр автомобиля',
+        'step-hint:s-right · warn · У шага «Вид справа» нет фото-подсказки · Процессы → Осмотр автомобиля',
+        'step-hint:s-pts · warn · У шага «Паспорт ТС (ПТС)» нет фото-подсказки · Процессы → Осмотр документов',
+        'repeat-empty:p-damage · warn · В повторяемом процессе «Осмотр повреждений» нет шагов повтора · Процессы → Осмотр повреждений',
+        'repeat-texts:p-damage · warn · У повторяемого процесса «Осмотр повреждений» не заполнены тексты в приложении · Процессы → Осмотр повреждений'], manual: null }] } }],
+    ['Esc; «Опубликовать схему» — проверки над диффом, «Опубликовать» доступна', async (K) => { await K.key('Escape'); await K.publish() },
+      { surface: 'publish', 'gate.length': 2, 'gate.1.head': 'processes warning ! 5 · Процессы и шаги', 'diff.warnings': [], confirmOff: false, note: 'После публикации создаётся неизменяемый снимок версии' }],
+    ['«Исправить» у «VIN на металле» — окно закрыто, «Процессы и шаги», фокус на строке шага', K => K.fix('step-hint:s-vin-metal'), { surface: '', tab: 'processes', focusStep: 's-vin-metal' }],
+    ['«Исправить» из чипа у поля без подсказки — «Форма», группа поля, фокус на строке', async (K) => { await K.chipOpen(); await K.fix('field-hint:f-year') },
+      { ready: null, tab: 'form', 'form.group': 'Кузов и комплектация', focusRow: 'f-year' }],
+  ], { query: 'now=2026-10-03T09:00:00' }],
+  'СС-117': ['«⋯ → Сделать копию»: окно «Новая схема осмотра» на шаге «Основа» с «Копия — …»; «Создать схему» — копия в режиме создания (ревью 5.3; решение 3)', [
+    ['«Сделать копию» — «Основа»: «Копия — КАСКО…», компания, тип', K => K.menu('copy'),
+      { surface: 'copy', 'createWin.mode': 'copy', 'createWin.step': 'base', 'createWin.origin': 'Копия схемы «КАСКО — осмотр легкового автомобиля»',
+        'createWin.name': 'Копия — КАСКО — осмотр легкового автомобиля', 'createWin.owner': 'Демо Страхование', 'createWin.type': 'Осмотр транспорта', 'createWin.acts': ['create-cancel', 'create-confirm'] }],
+    ['Esc — окно закрыто, схема прежняя', K => K.key('Escape'), { surface: '', createWin: null, versions: 2, title: 'КАСКО — осмотр легкового автомобиля' }],
+    ['снова; «Создать схему» — копия: публикаций нет, «Форма» и «Процессы» открыты, полоса подготовки, истории нет', async (K) => { await K.menu('copy'); await K.createAct('create-confirm'); await K.created() },
+      { page: 'scheme', title: 'Копия — КАСКО — осмотр легкового автомобиля', versions: 0, publish: 'never', writes: 1, 'tabLock.off': [],
+        notices: ['Схема «Копия — КАСКО — осмотр легкового автомобиля» создана копией «КАСКО — осмотр легкового автомобиля»'],
+        headerActs: ['preview', 'readiness', 'publish', 'menu'], 'strip.title': 'Подготовка схемы: 3 из 5', 'strip.next': 'Далее: Съёмка →',
+        'g.description': 'Комплексный осмотр автомобиля перед оформлением полиса добровольного страхования' }],
+  ], { query: 'now=2026-10-03T09:00:00' }],
+  'СС-118': ['прямой адрес новой схемы без идентификатора: «Анкета» и «Съёмка» под замком с причиной, замки на вкладках; истории и копии нет (ревью 5, решение 7)', [
+    ['старт: полоса — замки у «Анкеты» и «Съёмки», вкладки с замком, истории нет', null,
+      { strip: { title: 'Подготовка схемы: 1 из 5', next: 'Далее: Анкета →', stages: ['base done *', 'form locked', 'shooting locked', 'rules todo', 'publish blocked ! 1'] },
+        tabMarks: { settings: null, form: 'locked', processes: 'locked', showcase: null }, headerActs: ['preview', 'readiness', 'publish', 'menu'],
+        'tabLock.wrap': ['form | Форма: Станет доступно после первого сохранения схемы: полям и шагам нужен её идентификатор', 'processes | Процессы и шаги: Станет доступно после первого сохранения схемы: полям и шагам нужен её идентификатор'] }],
+    ['«Далее: Анкета →» — отказ с причиной, таб прежний', K => K.stripNext(), { tab: 'settings', notices: ['Станет доступно после первого сохранения схемы: полям и шагам нужен её идентификатор'] }],
+    ['этап «Съёмка» в полосе — тот же отказ', K => K.stage('shooting'), { tab: 'settings', notices: ['Станет доступно после первого сохранения схемы: полям и шагам нужен её идентификатор'] }],
+    ['«⋯ → Сделать копию» — отказ с причиной, окна нет', K => K.menu('copy'), { surface: '', createWin: null, notices: ['Станет доступно после первого сохранения схемы: полям и шагам нужен её идентификатор'] }],
+    ['первая правка — идентификатор есть: замки сняты, «Анкета» блокирует — форма без полей', async (K) => { await K.rename('Осмотр склада'); await K.settled() },
+      { 'tabLock.off': [], writes: 1, 'strip.stages': ['base done *', 'form blocked ! 1', 'shooting warning ! 1', 'rules todo', 'publish blocked ! 1'], tabMarks: { settings: null, form: 'blocked ! 1', processes: 'warning ! 1', showcase: null } }],
+  ], { query: 'data=new' }],
 }
 
 /* ------------------------------ прогон ------------------------------ */
@@ -2654,7 +2942,7 @@ async function run(id) {
   const fails = []
   const snaps = []
   try {
-    await K.start(opts.query)
+    await K.start(opts.query, opts.path)
     for (const [name, act, expect, o = {}] of steps) {
       if (act) { await act(K); await sleep(150) }
       const blind = kp.blind.splice(0)

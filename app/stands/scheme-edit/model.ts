@@ -5,10 +5,11 @@ import {
   type PriceSource, type ShowcaseMetric, type ShowcaseProblem, type StepFlag,
 } from './catalogs'
 import { buildDemo, fieldPreview, helpPreview, type DemoEdit, type DemoSource, type HelpKey } from './demo'
-import { diffConfigs, formatDate, plural, summarize, validateConfig } from './diff'
+import { diffConfigs, formatDate, plural } from './diff'
 import { DONOR_SCHEMES, type DonorSchemeRaw } from './donors'
 import { catalogHint, categoryAtOpen, proposeHint, stepCategory, type HintProposal, type StepHint } from './hints'
 import { EMPTY_REPEAT_TEXTS, fillRepeatTexts, type RepeatTexts } from './repeat-texts'
+import { readinessOf, stageAfter, TAB_STAGES, tabIssues, type Check, type Place, type Stage, type StageId } from './readiness'
 import { buildSitePreview, priceSearchValue, showcasePrice } from './site'
 import { tariffPrice, type TariffLink } from './tariff'
 import {
@@ -19,6 +20,7 @@ import {
 export * from './catalogs'
 export * from './demo'
 export * from './hints'
+export * from './readiness'
 export * from './repeat-texts'
 export * from './site'
 export * from './tariff'
@@ -85,7 +87,13 @@ export * from './tariff'
  * вручную, не показывать; цена схемы в тарификации (`tariff` — `tariff.ts`, соответствие схемы — поле `tariff` набора данных) и
  * цена на витрине с предупреждением ручной цены ниже тарифа (`price` — `site.ts`); превью публичной страницы сценария —
  * данные из полей витрины и незаполненное (`site`), оверлей (`openSite`, `setSiteDevice`, `setSiteView`), переход от метки
- * «Не заполнено» к полю таба (`siteGo`). Дифф и поиск — по источнику цены.
+ * «Не заполнено» к полю таба (`siteGo`). Дифф и поиск — по источнику цены. **Такт 91 — создание схемы с мягкой этапностью**
+ * (`scheme-edit-review.md`, раздел 5): модель готовности — этапы и проверки черновика (`readiness` — `readiness.ts`), одна правда
+ * для полосы, чипа, вкладок и гейта публикации: `warnings` и `blocked` идут из неё (до такта 91 — `validateConfig`); режим создания
+ * — ни одной публикации (`creating`); текущий этап по месту на странице (`currentStage`), переходы к этапу и к месту проверки тем же
+ * переходом, что поиск (`goStage`, `fixCheck`), ручная отметка этапа «Правила» (`setRulesChecked`), полоса свёрнута (`setStrip`);
+ * «Сделать копию» открывает окно «Новая схема осмотра» на шаге «Основа» (`copy`, `copySource`). Конфигурация новой схемы —
+ * `create.ts`.
  */
 
 export type TabId = 'settings' | 'form' | 'processes' | 'showcase'
@@ -436,7 +444,11 @@ export interface SchemeConfig {
 
 /** Неизменяемый снимок версии — r2 §2. */
 export interface Snapshot { id: string, publishedAt: string, author: string, inspections: number, config: SchemeConfig }
-export interface Draft { config: SchemeConfig, author: string, editedAt: string }
+/**
+ * Черновик: конфигурация, автор и время правок. `rulesChecked` — ручная отметка этапа «Правила» (такт 91): признак подготовки
+ * черновика, в конфигурацию и в снимок версии не входит.
+ */
+export interface Draft { config: SchemeConfig, author: string, editedAt: string, rulesChecked: boolean }
 
 export type SaveState = 'saving' | 'saved' | 'error'
 /** Состояние публикации для индикатора шапки — r2 §2, состояния 1–3. */
@@ -473,7 +485,7 @@ export interface FillRow {
 /** Набор демо-данных: у набора с версиями черновик задан правками поверх current, у новой схемы — конфигурацией. */
 export interface Dataset {
   snapshots: Snapshot[]
-  draft: { author: string, editedAt: string, config?: SchemeConfig, patch?: [string, unknown][] }
+  draft: { author: string, editedAt: string, config?: SchemeConfig, patch?: [string, unknown][], rulesChecked?: boolean }
   /**
    * Соответствие схеме страницы «Тарификация» — такт 90 (решение 3 оркестратора 2026-10-08): компания, группа и схема тарификации.
    * Нет — схемы в тарификации нет (новая схема): цены из тарифа нет.
@@ -502,6 +514,8 @@ export interface ModelOptions {
   selectedSteps?: string[]
   /** Новая схема уже сохранялась: «Форма» и «Процессы» доступны — оснастка `?saved=1` (такт 72). */
   saved?: boolean
+  /** Полоса подготовки свёрнута — память сессии и оснастка `?strip=collapsed` (такт 91). */
+  stripCollapsed?: boolean
 }
 
 /** Сколько длится запись черновика на стенде. */
@@ -600,7 +614,7 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   const startConfig = data.draft.config ? withDefaults(clone(data.draft.config)) : clone(snapshots[snapshots.length - 1]!.config)
   for (const [path, value] of data.draft.patch ?? []) setPath(startConfig, path, value)
   withFormDefaults(startConfig)
-  const draft = reactive<Draft>({ config: startConfig, author: data.draft.author, editedAt: data.draft.editedAt })
+  const draft = reactive<Draft>({ config: startConfig, author: data.draft.author, editedAt: data.draft.editedAt, rulesChecked: !!data.draft.rulesChecked })
 
   /** Черновик отличается от current: есть неопубликованные изменения. */
   const dirty = computed(() => !!current.value && JSON.stringify(draft.config) !== JSON.stringify(current.value.config))
@@ -679,6 +693,10 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     demo: { screen: '', mode: 'steps' as 'steps' | 'map', mark: [] as string[], back: [] as string[] },
     /** Превью публичной страницы — такт 90: устройство рамки и вид — страница сценария либо карточка в каталоге. */
     site: { device: 'desktop' as 'desktop' | 'phone', view: 'page' as 'page' | 'card' },
+    /** Полоса подготовки свёрнута в чип — такт 91; страница помнит это в сессии вкладки. */
+    stripCollapsed: !!opts.stripCollapsed,
+    /** Источник копии — такт 91: пусто — конфигурация на экране, иначе снимок версии (из истории). */
+    copyFrom: '',
   })
 
   /** Конфигурация на экране: открытый снимок либо черновик. */
@@ -1718,11 +1736,12 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   /* ------------------------------ публикация и версии — П4 ------------------------------ */
   /** Дифф черновика с текущей версией — модалка-гейт публикации и «Сбросить черновик». */
   const draftDiff = computed(() => (current.value ? diffConfigs(current.value.config, draft.config) : null))
-  /** Предупреждения валидации черновика; критичное блокирует публикацию. */
-  const warnings = computed(() => validateConfig(draft.config))
-  const blocked = computed(() => warnings.value.some(w => w.critical))
-  /** Сводка настроенного — первая публикация. */
-  const summary = computed(() => summarize(draft.config))
+  /**
+   * Предупреждения валидации черновика — с такта 91 из модели готовности (`readiness`): блокирующие проверки — критичные,
+   * предупреждения — некритичные; задачи этапов в гейт не идут.
+   */
+  const warnings = computed(() => readiness.value.checks.filter(c => c.level !== 'todo').map(c => ({ text: c.text, critical: c.level === 'block' })))
+  const blocked = computed(() => readiness.value.blocks > 0)
   const draftDate = computed(() => formatDate(draft.editedAt))
 
   function openModal(id: string) { ui.surfaces.push({ kind: 'modal', id }) }
@@ -1759,8 +1778,21 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     write()
     notify('Черновик сброшен к текущей версии')
   }
-  /** «Сделать копию» — штатный механизм платформы; на стенде списка схем нет. */
-  function copy() { notify('Копия схемы — вне стенда') }
+  /**
+   * «Сделать копию» — такт 91 (решение 3 оркестратора 2026-10-08): окно «Новая схема осмотра» сразу на шаге «Основа» с «Копия —
+   * <имя>». Источник — конфигурация на экране (черновик либо открытый снимок) или версия из истории (`from`). У новой схемы без
+   * идентификатора копировать нечего — отказ с причиной двухфазности. До такта 91 — уведомление «вне стенда».
+   */
+  function copy(from = '') {
+    if (phaseLocked.value) { notify(PHASE_REASON, 'err'); return }
+    ui.copyFrom = snapshots.some(v => v.id === from) ? from : ''
+    openModal('copy')
+  }
+  /** Источник копии: конфигурация и имя схемы в ней. */
+  const copySource = computed(() => {
+    const config = snapshots.find(v => v.id === ui.copyFrom)?.config ?? shown.value
+    return { config, title: config.settings.general.name }
+  })
   /**
    * «Предпросмотр» — вход в демо-осмотр (r2 §3; ревью 4.1, такт 89). До такта 89 — уведомление-заглушка: демо-осмотр был
    * вне VA-16377 (r2 §9).
@@ -1848,6 +1880,8 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     meta: `Опубликовал(а) ${v.author} · ${v.inspections} ${plural(v.inspections, 'осмотр', 'осмотра', 'осмотров')}`,
   })))
   function openHistory() {
+    /* Такт 91 (ревью С-1): история — после первой публикации; действие поиска у схемы без публикаций — отказ с причиной. */
+    if (!current.value) { notify('Появится после первой публикации схемы', 'err'); return }
     ui.historyVersion = ''
     openSide('history')
   }
@@ -1875,12 +1909,83 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     return `Вы смотрите версию от ${formatDate(v.publishedAt)}, по ней ${plural(v.inspections, 'проведён', 'проведено', 'проведено')} ${v.inspections} ${plural(v.inspections, 'осмотр', 'осмотра', 'осмотров')}. Текущая — от ${formatDate(current.value.publishedAt)}`
   })
 
+  /* ------------------------------ модель готовности — такт 91 ------------------------------ */
+  /**
+   * Режим создания — схема ни разу не опубликована (`scheme-edit-review.md`, 5.2): модель развёрнута — полоса подготовки, чип
+   * «Готовность N из 5», маркеры этапов на вкладках, «Далее» внизу этапа, первая публикация с моделью. После первой публикации —
+   * чип «Проверка: N» при замечаниях и «! N» на вкладках.
+   */
+  const creating = computed(() => !current.value)
+  /** Незаполненное витрины по черновику — этап «Витрина» после публикации. */
+  const draftShowcaseGaps = computed(() => {
+    const p = showcasePrice(draft.config.showcase, tariff.value)
+    const mods = schemeModules(draft.config)
+    const visible = mods.filter(x => !draft.config.showcase.hiddenModules.includes(x.key))
+    return buildSitePreview(draft.config, { price: p, modules: visible.map(x => x.label), hiddenModules: mods.length - visible.length, flow: schemeFlow(draft.config) })
+      .gapList.map(g => ({ field: g.field, label: g.label }))
+  })
+  /** Этапы и проверки черновика — `readiness.ts`. */
+  const readiness = computed(() => readinessOf(draft.config, {
+    published: !!current.value, phaseLocked: phaseLocked.value, phaseReason: PHASE_REASON, rulesChecked: draft.rulesChecked, showcaseGaps: draftShowcaseGaps.value,
+  }))
+  /** Текущий этап — место на странице: «Основное» — «Основа», прочие «Настройки» — «Правила», вкладки — свои этапы. */
+  const currentStage = computed<StageId>(() => {
+    if (ui.tab === 'form') return 'form'
+    if (ui.tab === 'processes') return 'shooting'
+    if (ui.tab === 'showcase') return 'showcase'
+    return ui.section === 'general' && (!ui.anchor || ui.anchor === 'main') ? 'base' : 'rules'
+  })
+  /** Маркер вкладки: замок до идентификатора; «! N» — замечания с местом исправления на вкладке; в режиме создания — готово. */
+  function tabMark(tab: TabId): { state: 'locked' | 'blocked' | 'warning' | 'done' | '', count: number } {
+    if (tabLocked(tab)) return { state: 'locked', count: 0 }
+    const r = readiness.value
+    const issues = tabIssues(r, tab)
+    if (issues.count) return { state: issues.blocked ? 'blocked' : 'warning', count: issues.count }
+    if (!creating.value) return { state: '', count: 0 }
+    const stages = r.stages.filter(st => TAB_STAGES[tab].includes(st.id) && !st.after)
+    return stages.length && stages.every(st => st.done) ? { state: 'done', count: 0 } : { state: '', count: 0 }
+  }
+  /** Переход к месту: закрыт до идентификатора — отказ с причиной; окно публикации закрывается, остальное — переход поиска. */
+  function goPlace(p: Place): boolean {
+    if (tabLocked(p.tab)) { notify(PHASE_REASON, 'err'); return false }
+    const top = topSurface.value?.id
+    if (top === 'publish' || top === 'first-publish') closeSurface()
+    goTo(p, true)
+    return true
+  }
+  /** Этап полосы, «Далее» и строка поповера: место этапа; «Проверка и публикация» — окно публикации. */
+  function goStage(id: StageId): boolean {
+    const st = readiness.value.stages.find(x => x.id === id)
+    if (!st) return false
+    if (st.locked) { notify(st.locked, 'err'); return false }
+    if (!st.place) { openPublish(); return true }
+    return goPlace(st.place)
+  }
+  /** «Исправить» у проверки — место исправления тем же переходом, что поиск (решение 4 оркестратора 2026-10-08). */
+  function fixCheck(key: string): boolean {
+    const c: Check | undefined = readiness.value.checks.find(x => x.key === key)
+    return c ? goPlace(c.place) : false
+  }
+  /** Ручная отметка этапа «Правила» — признак черновика, запись — автосохранением (в конфигурацию не входит). */
+  function setRulesChecked(on: boolean) {
+    if (ui.viewing) { notify('Прошлая версия открыта только для чтения', 'err'); return }
+    if (draft.rulesChecked === on) return
+    draft.rulesChecked = on
+    write()
+  }
+  function setStrip(collapsed: boolean) { ui.stripCollapsed = collapsed }
+  /** Следующий этап после этапа — «Далее» внизу этапа. */
+  const nextStage = (id: StageId): Stage | null => {
+    const n = stageAfter(id)
+    return n ? readiness.value.stages.find(x => x.id === n) ?? null : null
+  }
+
   /** Состояние модели одной строкой — прогону, для сравнения «до / после». */
   function dump() {
     return JSON.stringify({
-      draft: draft.config, author: draft.author, versions: snapshots.map(s => s.id), current: current.value?.id ?? null,
+      draft: draft.config, author: draft.author, rulesChecked: draft.rulesChecked, versions: snapshots.map(s => s.id), current: current.value?.id ?? null,
       publish: publishState.value, save: save.state, writes: save.writes,
-      ui: { tab: ui.tab, hintClosed: ui.hintClosed, section: ui.section, anchor: ui.anchor, scroll: ui.scroll, viewing: ui.viewing, surfaces: ui.surfaces.map(x => x.id), historyVersion: ui.historyVersion, group: ui.group, selectedFields: ui.selectedFields, selectedSteps: ui.selectedSteps, demo: ui.demo, site: ui.site },
+      ui: { tab: ui.tab, hintClosed: ui.hintClosed, section: ui.section, anchor: ui.anchor, scroll: ui.scroll, viewing: ui.viewing, surfaces: ui.surfaces.map(x => x.id), historyVersion: ui.historyVersion, group: ui.group, selectedFields: ui.selectedFields, selectedSteps: ui.selectedSteps, demo: ui.demo, site: ui.site, stripCollapsed: ui.stripCollapsed },
       search: { query: ui.query, scope: ui.scope, modified: ui.modified, find: ui.find, recent: ui.recent },
     })
   }
@@ -1891,8 +1996,9 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     searchIndex, search, searchGroups, setQuery, setScope, cycleScope, expand, setModified, modifiedAvailable, changedKeys, goTo, quick,
     openResult, findHits, findPos, findStep, findCounts, findSummary, leaveFind, exitFind, startFind, toggleFromSearch, runAction,
     recentPlaces, setRecent, remember,
-    shown, draftDiff, warnings, blocked, summary, draftDate, history, versionDiff, versionShown, viewingText,
-    openPublish, confirmPublish, openReset, confirmReset, copy, preview, menu, confirmDelete, openHistory, openVersion, closeVersion, view, leaveView,
+    shown, draftDiff, warnings, blocked, draftDate, history, versionDiff, versionShown, viewingText,
+    openPublish, confirmPublish, openReset, confirmReset, copy, copySource, preview, menu, confirmDelete, openHistory, openVersion, closeVersion, view, leaveView,
+    creating, readiness, currentStage, tabMark, goStage, fixCheck, setRulesChecked, setStrip, nextStage,
     demo, demoScreen, demoPos, openDemo, demoGo, demoStep, setDemoMode, demoEdit, helpView, fieldView,
     set, setTab, setSection, rememberScroll, back, retry, notify, dismissNotice, dump,
     neighbourSection, stepSection, goToFields, openSide, closeSurface,

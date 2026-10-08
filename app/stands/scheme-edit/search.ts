@@ -257,6 +257,9 @@ function actionReason(key: ActionKey, ctx: IndexContext): string {
   switch (key) {
     case 'publish': return edit || (ctx.hasCurrent && !ctx.dirty ? 'Изменений нет — публиковать нечего' : '')
     case 'reset': return !ctx.hasCurrent || !ctx.dirty ? 'Черновик совпадает с текущей версией' : ''
+    /* Такт 91 (ревью С-1): история — после первой публикации; копия — у схемы с идентификатором. */
+    case 'history': return ctx.hasCurrent ? '' : 'Появится после первой публикации схемы'
+    case 'copy': return ctx.phaseLocked ? ctx.phaseReason : ''
     case 'add-field': return edit || (ctx.phaseLocked ? ctx.phaseReason : ctx.config.form.groups.length ? '' : 'В форме нет групп — сначала добавьте группу')
     case 'add-group': case 'add-process': case 'fill-images': return edit || (ctx.phaseLocked ? ctx.phaseReason : '')
     default: return ''

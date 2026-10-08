@@ -64,4 +64,15 @@ export const SCHEME_COVERAGE_STATES = [
   'tab=showcase&price=manual', 'tab=showcase&price=low', 'tab=showcase&price=hidden',
   'open=site', 'open=site&device=phone', 'open=site&site=card', 'open=site&device=phone&site=card', 'data=new&open=site', 'view=v1&open=site',
   'open=site&price=hidden',
+  /*
+   * Такт 91, создание схемы: окно «Новая схема осмотра» на фоне списка — «С чего начать» по трём источникам, «Основа» шаблона и
+   * пустой схемы, окно закрыто; режим создания — схема из шаблона (полоса, чип, маркеры, «Далее» внизу этапов на трёх вкладках),
+   * поповер готовности, полоса свёрнута, пустая схема и первая публикация с блокирующей проверкой и без, копия, «Проверка: N» после
+   * публикации, новая схема без идентификатора с поповером.
+   */
+  '/scheme-edit/new', '/scheme-edit/new?source=other', '/scheme-edit/new?source=recent', '/scheme-edit/new?step=base', '/scheme-edit/new?step=empty',
+  '/scheme-edit/new?open=closed',
+  'data=created&from=t-car', 'data=created&from=t-car&tab=form', 'data=created&from=t-car&tab=processes', 'data=created&from=t-car&open=readiness',
+  'data=created&from=t-car&strip=collapsed', 'data=created&from=empty', 'data=created&from=empty&open=first-publish', 'data=created&from=t-car&open=first-publish',
+  'open=copy', 'open=readiness', 'data=new&open=readiness',
 ] as const

@@ -21,6 +21,10 @@ import {
 } from '~/stands/scheme-edit/model'
 import demo from '~/stands/scheme-edit/demo-data.json'
 import { useReorder } from '~/stands/scheme-edit/reorder'
+import SchemeCreate from '~/stands/scheme-edit/SchemeCreate.vue'
+import { createCard, createdDataset, createdNotice, defaultBasics, setHandoff, takeHandoff, type CreateBasics, type CreateFrom } from '~/stands/scheme-edit/create'
+import { RULES_LABEL, type Stage, type StageId } from '~/stands/scheme-edit/readiness'
+import type { ReadinessGroupItem, ReadinessMarkState, ReadinessStageItem } from '~/components/ui/readiness'
 
 /**
  * Страница «Редактирование схемы осмотра» (VA-16377) — стенд, такты 61–65, порции П1–П5 (`docs/scheme-edit.md`,
@@ -102,6 +106,14 @@ import { useReorder } from '~/stands/scheme-edit/reorder'
  * для не клиента и «Открыть тарификацию», вручную — поле с предупреждением ниже тарифа. «Предпросмотр страницы» у статуса
  * витрины — `ModalCard placement="full"`: «Компьютер / Телефон», «Страница сценария / Карточка в каталоге», статус карточки и
  * будущий адрес над рамкой `AppPreviewBrowser`, страница — `ScenarioPreview`; метка «Не заполнено» ведёт к полю таба.
+ * **Такт 91 — создание схемы с мягкой этапностью** (`docs/scheme-edit-review.md`, раздел 5): модель готовности в режиме создания
+ * (ни одной публикации) — полоса подготовки под шапкой (`ReadinessBar`: «Подготовка схемы: N из 5 · Далее: … →», этапы кнопками,
+ * «Свернуть» — память сессии), чип «Готовность N из 5» у «Опубликовать схему» (`ReadinessChip` с `ReadinessList`: этапы, проверки,
+ * «Исправить», ручная отметка «Правил»), маркеры этапов на вкладках (`ReadinessMark`: готово, «! N», замок), «Далее» внизу этапа,
+ * первая публикация — та же модель вместо сводки, блокирующее выключает «Опубликовать» с причиной в подвале. После первой
+ * публикации — чип «Проверка: N» при замечаниях, «! N» на вкладках, проверки над диффом. «История версий» — после первой публикации
+ * (С-1); «Удалить схему» в меню «⋯» — тоном опасного действия (К-4); «Сделать копию» — окно «Новая схема осмотра» на шаге «Основа»
+ * (`SchemeCreate`, вход — `/scheme-edit/new`).
  *
  * ## Поведение — модель `~/stands/scheme-edit/model.ts`
  *
@@ -165,8 +177,14 @@ import { useReorder } from '~/stands/scheme-edit/reorder'
  * | `?help=refuse` · `confirmHint` · `confirmCheckbox` · `mobileMode` · `phone` · `startAfterCreate` · `forbidExtraFiles` · `field:f-vin` | открытый поповер «?» с превью (такт 89) |
  * | `?price=tariff` · `manual` · `low` · `hidden` | источник цены «от» в черновике; `low` — вручную 500 ₽, ниже тарифа: предупреждение (такт 90) |
  * | `?open=site` · `?device=phone` · `?site=card` | превью публичной страницы: оверлей на табе «Витрина», телефон, карточка в каталоге (такт 90) |
+ * | `?data=created&from=t-car` | схема, созданная из шаблона (`t-car`, `t-moto`, `t-truck`, `t-house`, `d-machine`) либо из схемы компании (`d-osago`, `d-flat`); `from=empty` — пустая; `from=copy` — копия «КАСКО…»: первое сохранение было, публикаций нет — режим создания (такт 91) |
+ * | `?strip=collapsed` | полоса подготовки свёрнута в чип (такт 91) |
+ * | `?open=readiness` | поповер чипа «Готовность N из 5» либо «Проверка: N» открыт (такт 91) |
+ * | `?open=copy` | окно «Новая схема осмотра» копии на шаге «Основа» (такт 91) |
+ * | `?rules=1` | этап «Правила» отмечен: «Проверил унаследованное…» (такт 91) |
  */
-definePageMeta({ layout: 'admin' })
+/* Такт 91: копия переходит на тот же адрес с другим набором — страница пересобирается по полному адресу. */
+definePageMeta({ layout: 'admin', key: route => route.fullPath })
 useHead({ title: 'Редактирование схемы осмотра — стенд' })
 
 const route = useRoute()
@@ -186,7 +204,25 @@ const SHOWCASE_OPEN = ['site']
 const tabAtLoad = FORM_OPEN.includes(q('open')) || q('selected') ? 'form' : q('steps') || q('upload') || PROCESS_OPEN.includes(q('open')) ? 'processes'
   : SHOWCASE_OPEN.includes(q('open')) ? 'showcase' : TABS.find(t => t.id === q('tab'))?.id
 const saveAtLoad = (['saving', 'error'] as SaveState[]).find(s => s === q('save'))
-const m = createModel(q('data') === 'new' ? D.fresh : D.main, {
+/**
+ * Созданная схема — такт 91: набор данных передаёт окно «Новая схема осмотра» (`create.ts`, `takeHandoff`); прямой адрес
+ * `?data=created&from=…` (оснастка) — набор по источнику с основой по умолчанию: шаблон или схема компании, пустая, копия «КАСКО…».
+ */
+const handoff = q('data') === 'created' ? takeHandoff() : null
+function createdAtLoad(): Dataset {
+  const at = { author: 'Анна Смирнова', editedAt: q('now') || '2026-10-03T09:00:00' }
+  const id = q('from')
+  if (id === 'copy') {
+    const config = D.main.snapshots[D.main.snapshots.length - 1]!.config
+    const from: CreateFrom = { kind: 'copy', config, title: config.settings.general.name }
+    return createdDataset(from, defaultBasics(from), at)
+  }
+  const from: CreateFrom = createCard(id) ? { kind: 'card', id } : { kind: 'empty' }
+  const basics = defaultBasics(from)
+  return createdDataset(from, { ...basics, name: basics.name || 'Новая схема осмотра' }, at)
+}
+const created = q('data') === 'created'
+const m = createModel(q('data') === 'new' ? D.fresh : created ? (handoff?.dataset ?? createdAtLoad()) : D.main, {
   tab: tabAtLoad,
   save: saveAtLoad,
   failNext: q('save') === 'fail',
@@ -196,8 +232,12 @@ const m = createModel(q('data') === 'new' ? D.fresh : D.main, {
   group: q('group'),
   selectedFields: q('selected') ? q('selected').split(',') : [],
   selectedSteps: q('steps') ? q('steps').split(',') : [],
-  saved: q('saved') === '1',
+  saved: q('saved') === '1' || created,
+  stripCollapsed: q('strip') === 'collapsed',
 })
+/* Уведомление о создании — после монтирования: тост, пришедший до области уведомлений, переносится в неё вторым узлом. */
+if (handoff?.notice) onMounted(() => { setTimeout(() => m.notify(handoff.notice), 120) })
+if (q('rules') === '1') m.draft.rulesChecked = true
 const sectionAtLoad = SECTIONS.find(s => s.id === q('section'))?.id
 if (sectionAtLoad) m.setSection(sectionAtLoad)
 if (q('open') === 'comments') m.openSide('comments')
@@ -661,6 +701,10 @@ function findTarget(target: string): HTMLElement | null {
   if (group) return document.querySelector(`[data-form-group="${group[1]}"]`)
   const process = target.match(/^process-(.+)$/)
   if (process) return document.querySelector(`[data-process="${process[1]}"]`)
+  /* Кнопка по `data-act` (такт 91): «Добавить группу» и «Добавить процесс» пустых состояний — место проверок модели готовности. */
+  if (target.startsWith('act:')) return document.querySelector(`[data-act="${target.slice(4)}"]`)
+  /* Подраздел «Настроек» (такт 91): начало этапа «Правила» — его подраздел встаёт к верху окна, как по якорю навигатора. */
+  if (/^anchor-/.test(target)) return document.getElementById(target)
   return document.querySelector(`[data-setting="${target}"], [data-field="${target}"], [data-radio="${target}"], [data-formula="${target}"], [data-act="${target}"]`)
 }
 /**
@@ -677,6 +721,11 @@ watch(() => m.ui.found.n, async (n) => {
     el = findTarget(target)
   }
   if (!el || m.ui.found.n !== n) return
+  /* Такт 91: подраздел — к верху окна, как якорь навигатора (`goAnchor`): активный якорь следит за прокруткой и встаёт на него. */
+  if (/^anchor-/.test(target)) {
+    window.scrollTo({ top: anchorTop(target.slice(7)), behavior: 'instant' })
+    return
+  }
   const top = el.getBoundingClientRect().top + window.scrollY - Math.round(window.innerHeight / 3)
   window.scrollTo({ top: Math.max(0, top), behavior: 'instant' })
   flashed.value = { target, n }
@@ -685,7 +734,9 @@ watch(() => m.ui.found.n, async (n) => {
   /* У строки таблицы (поле, шаг) первая кнопка — ручка перестановки (такт 70): фокус встаёт на флажок выбора строки. */
   const row = el.matches('[data-form-row], [data-step-row]') ? el.querySelector<HTMLElement>('[data-slot=choice-control]') : null
   if (el.matches('[data-setting], [data-process]')) return
-  ;(row ?? el.querySelector<HTMLElement>('input, textarea, button, [contenteditable=true], [tabindex="0"]'))?.focus({ preventScroll: true })
+  /* Такт 91: цель-кнопка («Добавить группу» пустой формы — место проверки «В форме нет полей») — фокус на ней самой. */
+  const self = el.matches('button, input, textarea') ? el : null
+  ;(row ?? self ?? el.querySelector<HTMLElement>('input, textarea, button, [contenteditable=true], [tabindex="0"]'))?.focus({ preventScroll: true })
 })
 
 /* ---------- подсветка совпадений на табе — 3.2, п. 15 ---------- */
@@ -795,6 +846,7 @@ if (q('open') === 'publish' || q('open') === 'first-publish') m.openPublish()
 if (q('open') === 'reset') m.openReset()
 if (q('open') === 'delete') m.menu('delete')
 if (q('open') === 'history') { m.openHistory(); if (q('version')) m.openVersion(q('version')) }
+if (q('open') === 'copy') m.copy()
 
 /* ------------------------------ «Форма» — П6, такт 69 ------------------------------ */
 const fg = computed(() => m.formGroup.value)
@@ -1320,6 +1372,11 @@ const demoStage = computed<string>({
 const demoHover = ref('')
 const demoMarked = computed(() => (demoHover.value ? [...m.ui.demo.mark, demoHover.value] : m.ui.demo.mark))
 watch(() => m.ui.demo.screen, () => { demoHover.value = '' })
+/*
+ * Такт 91: «Изменить» закрывает оверлей под курсором — строка уходит из DOM без `mouseleave`, и наведение пережило бы закрытие:
+ * снова открытый демо-осмотр подсвечивал строку без курсора над ней (вскрыл прогон, СС-96). Закрытие оверлея наведение сбрасывает.
+ */
+watch(() => demoOpen.value, (v) => { if (!v) demoHover.value = '' })
 const demoTitle = computed(() => `Демо-осмотр — ${general.value.name || 'Новая схема осмотра'}`)
 const demoSubtitle = computed(() => (ro.value ? `По версии от ${m.history.value.find(v => v.id === m.ui.viewing)?.date ?? ''} · логика не выполняется` : 'По черновику · логика не выполняется'))
 /** Якоря этапа в оглавлении: у этапа из нескольких экранов и у экрана с пробелом. */
@@ -1564,6 +1621,97 @@ const afterMount = (fn: () => void) => onMounted(() => { setTimeout(fn, 120) })
   }
 }
 
+/* ------------------------------ модель готовности — такт 91 ------------------------------ */
+/**
+ * Мягкая этапность (`docs/scheme-edit-review.md`, 5.4–5.5; решения 4–5 оркестратора 2026-10-08): модель считает этапы и проверки
+ * (`readiness.ts`), страница переводит их в пропы семейства `Readiness`. Режим создания — ни одной публикации; в просмотре
+ * версии модели нет.
+ */
+const R = computed(() => m.readiness.value)
+const creatingNow = computed(() => m.creating.value && !ro.value)
+/** Маркер этапа: замок; блокирующие — «! N» по всем замечаниям этапа; предупреждения — «! N»; иначе готово либо не готово. */
+function stageMark(st: Stage): { state: ReadinessMarkState, count: number } {
+  if (st.locked) return { state: 'locked', count: 0 }
+  /* «Проверка и публикация» своих проверок не несёт: её маркер — блокирующие всей схемы. */
+  if (st.id === 'publish') return R.value.blocks ? { state: 'blocked', count: R.value.blocks } : { state: 'done', count: 0 }
+  const blocks = st.checks.filter(c => c.level === 'block').length
+  const warns = st.checks.filter(c => c.level === 'warn').length
+  if (blocks) return { state: 'blocked', count: blocks + warns }
+  if (warns) return { state: 'warning', count: warns }
+  return { state: st.done ? 'done' : 'todo', count: 0 }
+}
+const mainStages = computed(() => R.value.stages.filter(st => !st.after))
+const stripStages = computed<ReadinessStageItem[]>(() => mainStages.value.map(st => ({ id: st.id, label: st.label, ...stageMark(st), reason: st.locked })))
+const stripTitle = computed(() => `Подготовка схемы: ${R.value.done} из ${R.value.total}`)
+const nextLabel = (st: Stage | null) => (!st ? '' : st.id === 'publish' ? 'Проверить и опубликовать' : `Далее: ${st.label} →`)
+/** Строки поповера и окна первой публикации: этапы с проверками; «Правила» — с ручной отметкой. */
+function stageGroups(inPublish = false): ReadinessGroupItem[] {
+  return R.value.stages.map(st => ({
+    id: st.id, title: st.after ? `${st.label} — после публикации` : st.label, ...stageMark(st),
+    meta: st.locked || st.meta,
+    action: st.locked ? '' : st.id === 'publish' ? (inPublish ? '' : 'Проверить и опубликовать') : 'Перейти',
+    /* Ручная отметка «Правил» — флажок группы: задача «Проверьте унаследованное» в строках не повторяется. */
+    checks: st.checks.filter(c => c.key !== 'rules-check').map(c => ({ key: c.key, level: c.level, text: c.text, area: c.area, action: c.level === 'todo' ? 'Перейти' : 'Исправить' })),
+    manual: st.id === 'rules' ? { label: RULES_LABEL, checked: m.draft.rulesChecked } : undefined,
+  }))
+}
+/** Проверки по областям — чип «Проверка: N» и проверки над диффом после публикации; задачи этапов сюда не идут. */
+const AREAS: { tab: TabId, title: string }[] = [{ tab: 'settings', title: 'Настройки' }, { tab: 'form', title: 'Форма' }, { tab: 'processes', title: 'Процессы и шаги' }, { tab: 'showcase', title: 'Витрина' }]
+const checkGroups = computed<ReadinessGroupItem[]>(() => AREAS.map((a) => {
+  const list = R.value.checks.filter(c => c.level !== 'todo' && c.place.tab === a.tab)
+  const blocks = list.filter(c => c.level === 'block').length
+  return { id: a.tab, title: a.title, state: (blocks ? 'blocked' : 'warning') as ReadinessMarkState, count: list.length,
+    checks: list.map(c => ({ key: c.key, level: c.level, text: c.text, area: c.area, action: 'Исправить' })) }
+}).filter(g => g.checks.length))
+const issues = computed(() => R.value.blocks + R.value.warns)
+/** Чип у «Опубликовать схему»: в режиме создания — всегда; после публикации — при замечаниях. */
+const chip = computed(() => {
+  const r = R.value
+  if (m.creating.value) {
+    const state: ReadinessMarkState | '' = r.blocks ? 'blocked' : r.warns ? 'warning' : r.done === r.total ? 'done' : ''
+    const tail = [r.blocks ? `блокирует публикацию: ${r.blocks}` : 'блокирующих нет', r.warns ? `предупреждений: ${r.warns}` : ''].filter(Boolean).join(' · ')
+    return { label: `Готовность ${r.done} из ${r.total}`, state, count: r.blocks || r.warns, title: 'Готовность к публикации', summary: `${r.done} из ${r.total} этапов · ${tail}` }
+  }
+  if (!issues.value) return null
+  return { label: `Проверка: ${issues.value}`, state: (r.blocks ? 'blocked' : 'warning') as ReadinessMarkState, count: issues.value, title: 'Проверка перед публикацией',
+    summary: [r.blocks ? `Блокирует публикацию: ${r.blocks}` : 'Блокирующих нет', r.warns ? `предупреждений: ${r.warns}` : ''].filter(Boolean).join(' · ') }
+})
+const readinessOpen = ref(false)
+if (q('open') === 'readiness') onMounted(() => { setTimeout(() => { readinessOpen.value = true }, 120) })
+/** «Исправить» и «Перейти»: поповер закрывается, модель ведёт к месту (окно публикации закрывает сама). */
+function fixFrom(key: string) {
+  readinessOpen.value = false
+  m.fixCheck(key)
+}
+function goStageFrom(id: string) {
+  readinessOpen.value = false
+  m.goStage(id as StageId)
+}
+function manualFrom(_id: string, on: boolean) { m.setRulesChecked(on) }
+/** Причина выключенной «Опубликовать» — в подвале окна полным контрастом. */
+const publishNote = computed(() => (m.blocked.value
+  ? `Публикация невозможна: исправьте блокирующие проверки — ${R.value.blocks}`
+  : 'После публикации создаётся неизменяемый снимок версии'))
+
+/* Полоса подготовки свёрнута — память сессии вкладки (решение 5); хранилище бывает закрыто — чтение и запись в `try`. */
+const STRIP_KEY = 'scheme-edit:readiness-strip'
+function setStrip(collapsed: boolean) {
+  m.setStrip(collapsed)
+  try { sessionStorage.setItem(STRIP_KEY, collapsed ? 'collapsed' : 'open') } catch {}
+}
+onMounted(() => {
+  if (q('strip')) return
+  try { if (sessionStorage.getItem(STRIP_KEY) === 'collapsed') m.setStrip(true) } catch {}
+})
+
+/* «Сделать копию» — окно «Новая схема осмотра» на шаге «Основа»; «Создать схему» — набор копии и переход в режим создания. */
+const copyOpen = surface('copy')
+function createCopy(e: { from: CreateFrom, basics: CreateBasics }) {
+  setHandoff({ dataset: createdDataset(e.from, e.basics, { author: 'Анна Смирнова', editedAt: q('now') || new Date().toISOString() }), notice: createdNotice(e.from, e.basics.name.trim()) })
+  m.closeSurface()
+  navigateTo({ path: '/scheme-edit', query: { data: 'created', from: 'copy', ...(q('now') ? { now: q('now') } : {}) } })
+}
+
 /*
  * Оснастка приёмки (такт 89): настройки приложения в черновике, демо-осмотр — экран, режим, обведённый элемент; открытый «?».
  * `?app=full` — отказ разрешён (и от повторяемых), промежуточный экран, телефон поддержки; `?app=checklist` — то же и режим
@@ -1754,7 +1902,8 @@ if (import.meta.client) {
             @open="m.openPublish()"
           />
           <div class="flex shrink-0 items-center gap-4">
-            <ButtonAction size="sm" :show-icon="false" data-act="history" @click="m.openHistory()">
+            <!-- С-1 (такт 91): история — после первой публикации; у схемы без публикаций входа в пустоту нет. -->
+            <ButtonAction v-if="m.current.value" size="sm" :show-icon="false" data-act="history" @click="m.openHistory()">
               История версий
             </ButtonAction>
             <AppBarStatus v-if="!ro" surface="light" retryable :state="m.save.state" @retry="m.retry()" />
@@ -1777,6 +1926,27 @@ if (import.meta.client) {
             </template>
             Предпросмотр
           </Button>
+          <!--
+            Чип модели готовности — такт 91 (5.5): в режиме создания «Готовность N из 5» с этапами и проверками; после публикации —
+            «Проверка: N» только при замечаниях. «Исправить» ведёт к месту тем же переходом, что поиск.
+          -->
+          <ReadinessChip
+            v-if="chip"
+            v-model:open="readinessOpen"
+            :label="chip.label"
+            :state="chip.state"
+            :count="chip.count"
+            :title="chip.title"
+            :summary="chip.summary"
+            data-act="readiness"
+          >
+            <ReadinessList :groups="m.creating.value ? stageGroups() : checkGroups" data-readiness-list @go="goStageFrom" @fix="fixFrom" @manual="manualFrom" />
+            <template v-if="m.creating.value && m.ui.stripCollapsed" #footer>
+              <ButtonAction size="sm" :show-icon="false" data-act="strip-expand" @click="setStrip(false); readinessOpen = false">
+                Показать полосу подготовки
+              </ButtonAction>
+            </template>
+          </ReadinessChip>
           <Button data-act="publish" @click="m.openPublish()">
             Опубликовать схему
           </Button>
@@ -1794,7 +1964,8 @@ if (import.meta.client) {
                 </SelectItem>
               </SelectGroup>
               <SelectGroup data-section="danger">
-                <SelectItem data-action="delete" @click="pickMenu('delete')">
+                <!-- К-4 (такт 91): удаление — тоном опасного действия. -->
+                <SelectItem tone="destructive" data-action="delete" @click="pickMenu('delete')">
                   Удалить схему
                 </SelectItem>
               </SelectGroup>
@@ -1807,6 +1978,19 @@ if (import.meta.client) {
         {{ m.viewingText.value }}. Настройки открыты только для чтения
       </Callout>
     </div>
+
+    <!-- Полоса подготовки — такт 91 (5.5): до первой публикации; сворачивается в чип у «Опубликовать схему». -->
+    <ReadinessBar
+      v-if="creatingNow && !m.ui.stripCollapsed"
+      :title="stripTitle"
+      :stages="stripStages"
+      :current="m.currentStage.value"
+      :next-label="nextLabel(R.next)"
+      data-readiness-bar
+      @select="m.goStage($event as StageId)"
+      @next="m.goStage(R.next.id)"
+      @collapse="setStrip(true)"
+    />
 
     <!-- Плашка «Сохранение теперь автоматическое» — № 67: одноразовая ориентация, закрытая не возвращается (аудит, «Смена парадигмы»). -->
     <Callout v-if="!ro && !m.ui.hintClosed" closable data-autosave-hint @close="closeHint()">
@@ -1950,12 +2134,20 @@ if (import.meta.client) {
           -->
           <TabsTrigger v-if="m.tabLocked(t.id)" :value="t.id" disabled :reason="m.PHASE_REASON" :data-tab-trigger="t.id">
             {{ t.label }}
+            <!-- Такт 91: замок до идентификатора — маркер для глаза; причину читает сама вкладка. -->
+            <template #counter>
+              <ReadinessMark state="locked" label="" />
+            </template>
           </TabsTrigger>
           <!-- Режим «найдено» (такт 86; 3.2, п. 16): число совпадений таба — счётчик вкладки. -->
           <TabsTrigger v-else :value="t.id" :count="finding ? m.findCounts.value.tabs[t.id] : undefined" :data-tab-trigger="t.id">
             <!-- Звезда «Витрины» — макет `33347:6751`: глиф 12, зазор вкладки 8 (строка 13 реестра покрытия). -->
             <Icon v-if="t.id === 'showcase'" name="star" :size="12" />
             {{ t.label }}
+            <!-- Такт 91 (5.5): маркер этапа — готово (в режиме создания), «! N» — замечания с местом исправления на вкладке. -->
+            <template v-if="!ro && m.tabMark(t.id).state" #counter>
+              <ReadinessMark :state="m.tabMark(t.id).state || 'todo'" :count="m.tabMark(t.id).count" />
+            </template>
           </TabsTrigger>
         </template>
       </TabsList>
@@ -2026,6 +2218,12 @@ if (import.meta.client) {
                     </RadioGroup>
                   </Field>
                 </Card>
+                <!-- Такт 91 (5.5): «Далее» внизу этапа «Основа» — к анкете. -->
+                <div v-if="creatingNow" class="flex" data-stage-next="base">
+                  <Button variant="outline" data-act="stage-next-base" @click="m.goStage('form')">
+                    {{ nextLabel(m.nextStage('base')) }}
+                  </Button>
+                </div>
               </section>
 
               <!-- ============================ Поведение процесса — № 18, 20 ============================ -->
@@ -2911,6 +3109,18 @@ if (import.meta.client) {
                 Далее
               </Button>
             </div>
+            <!--
+              Такт 91 (5.4–5.5): низ этапа «Правила» — ручная отметка унаследованного и «Проверить и опубликовать» (последний этап
+              с местом на странице).
+            -->
+            <div v-if="creatingNow" class="flex flex-wrap items-center justify-between gap-4" data-stage-next="rules">
+              <Checkbox :model-value="m.draft.rulesChecked" data-field="rules-check" @update:model-value="m.setRulesChecked(!!$event)">
+                {{ RULES_LABEL }}
+              </Checkbox>
+              <Button variant="outline" data-act="stage-publish" @click="m.goStage('publish')">
+                {{ nextLabel(m.nextStage('rules')) }}
+              </Button>
+            </div>
           </div>
 
           <!-- Правый навигатор — № 14: липкий в колонке (r2 §3). -->
@@ -3150,6 +3360,12 @@ if (import.meta.client) {
               </template>
             </Empty>
           </Card>
+        </div>
+        <!-- Такт 91 (5.5): «Далее» внизу этапа «Анкета». -->
+        <div v-if="creatingNow" class="flex pt-6" data-stage-next="form">
+          <Button variant="outline" data-act="stage-next-form" @click="m.goStage('shooting')">
+            {{ nextLabel(m.nextStage('form')) }}
+          </Button>
         </div>
       </TabsContent>
 
@@ -3440,6 +3656,12 @@ if (import.meta.client) {
               </TableRow>
             </Table>
           </Card>
+        </div>
+        <!-- Такт 91 (5.5): «Далее» внизу этапа «Съёмка». -->
+        <div v-if="creatingNow" class="flex pt-6" data-stage-next="shooting">
+          <Button variant="outline" data-act="stage-next-shooting" @click="m.goStage('rules')">
+            {{ nextLabel(m.nextStage('shooting')) }}
+          </Button>
         </div>
       </TabsContent>
 
@@ -4844,18 +5066,19 @@ if (import.meta.client) {
     <ModalCard v-model:open="publishOpen">
       <ModalCardContent data-modal="publish">
         <ModalCardHeader title="Публикация схемы" subtitle="Эти изменения войдут в новую версию и будут применяться к новым осмотрам" />
-        <ModalCardBody>
+        <ModalCardBody class="flex flex-col gap-4">
+          <!-- Такт 91 (5.5): проверки модели готовности над диффом — та же правда, что у чипа; «Исправить» ведёт к месту. -->
+          <ReadinessList v-if="checkGroups.length" :groups="checkGroups" data-publish-checks @fix="fixFrom" />
           <Diff
             v-if="m.draftDiff.value"
             :areas="m.draftDiff.value.areas"
             :attention="m.draftDiff.value.attention"
-            :warnings="m.warnings.value"
             :total="m.draftDiff.value.total"
           />
         </ModalCardBody>
         <ModalCardFooter>
           <template #note>
-            После публикации создаётся неизменяемый снимок версии
+            {{ publishNote }}
           </template>
           <!-- Сверка дублей, такт 73: отказ от окна — «Отмена» `secondary`, как в сайдах и окнах подтверждения (строки 33, 89). -->
           <Button variant="secondary" data-act="publish-cancel" @click="m.closeSurface()">
@@ -4876,18 +5099,12 @@ if (import.meta.client) {
           <ModalCardText>
             Схема публикуется впервые. После публикации она станет доступна для создания осмотров.
           </ModalCardText>
-          <Callout data-first-summary>
-            <ul>
-              <li v-for="line in m.summary.value" :key="line">
-                {{ line }}
-              </li>
-            </ul>
-          </Callout>
-          <Diff v-if="m.warnings.value.length" :warnings="m.warnings.value" />
+          <!-- Такт 91 (5.5): та же модель готовности вместо сводки — этапы с проверками и «Исправить». -->
+          <ReadinessList :groups="stageGroups(true)" data-first-readiness @go="goStageFrom" @fix="fixFrom" @manual="manualFrom" />
         </ModalCardBody>
         <ModalCardFooter>
           <template #note>
-            После публикации создаётся неизменяемый снимок версии
+            {{ publishNote }}
           </template>
           <Button variant="secondary" data-act="first-cancel" @click="m.closeSurface()">
             Отмена
@@ -4980,6 +5197,9 @@ if (import.meta.client) {
         </template>
       </ModalCardContent>
     </ModalCard>
+
+    <!-- ============================ «Сделать копию» — окно «Новая схема осмотра» на шаге «Основа» (такт 91) ============================ -->
+    <SchemeCreate v-model:open="copyOpen" mode="copy" :copy="m.copySource.value" @create="createCopy" @notify="m.notify($event)" />
 
     <Toaster :bottom="toastBottom">
       <Toast

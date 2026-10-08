@@ -1,4 +1,4 @@
-import type { DiffAreaItem, DiffChangeItem, DiffGroupItem, DiffKind, DiffTone, DiffWarning } from '~/components/ui/diff'
+import type { DiffAreaItem, DiffChangeItem, DiffGroupItem, DiffKind, DiffTone } from '~/components/ui/diff'
 import type { SchemeConfig } from './model'
 import {
   ACCESS_GROUPS, ACCESS_ROLES, COMMENT_DICTIONARIES, DEADLINE_EVENTS, DETECTOR_GROUPS, FINISH_CLASSES, PDF_SIGNERS, PHOTO_RESOLUTIONS,
@@ -9,8 +9,9 @@ import { hintLabel } from './hints'
 import { REPEAT_TEXT_FIELDS } from './repeat-texts'
 
 /**
- * Дифф конфигураций схемы, валидация и каталог настроек — такт 64, порция П4 (`docs/scheme-edit.md`, 6.2).
- * Источник — `spec-audit.md`: «Как устроен дифф», «Масштабируемость диффа», «Валидационный гейт публикации».
+ * Дифф конфигураций схемы и каталог настроек — такт 64, порция П4 (`docs/scheme-edit.md`, 6.2).
+ * Источник — `spec-audit.md`: «Как устроен дифф», «Масштабируемость диффа». Валидация перед публикацией (`validateConfig`) и сводка
+ * первой публикации (`summarize`) с такта 91 — часть модели готовности (`readiness.ts`): проверки и этапы с прежними текстами.
  *
  * Чистые функции: DOM и реактивности модуль не знает. Один расчёт на оба режима — черновик против текущей версии
  * и версия N против N−1.
@@ -329,43 +330,6 @@ function fieldValue(v: unknown): string {
   if (v == null || v === '') return 'пусто'
   if (Array.isArray(v)) return v.length ? `${v.length}` : 'пусто'
   return String(v)
-}
-
-/**
- * Валидация перед публикацией — `spec-audit.md`, «Валидационный гейт публикации»: черновик может быть сломан,
- * опубликованный снимок — нет. Критичное блокирует публикацию, остальное предупреждает.
- */
-export function validateConfig(config: SchemeConfig): DiffWarning[] {
-  const out: DiffWarning[] = []
-  const general = config.settings.general
-  if (!general.name.trim()) out.push({ text: 'Наименование схемы не заполнено', critical: true })
-  const fields = config.form.groups.flatMap(grp => grp.fields.map(f => ({ ...f, group: grp })))
-  for (const f of fields) if (!f.alias.trim()) out.push({ text: `У поля «${f.title}» пустой алиас`, critical: true })
-  if (general.behavior.approval && !fields.some(f => f.approval)) out.push({ text: 'Согласование включено, поля для согласования не отмечены', critical: false })
-  /* Формулы: переменная `{Группа:алиас}`, которой нет в форме и среди служебных. */
-  const known = new Set([...fields.map(f => `${f.group.alias}:${f.alias}`), 'Inspection:number', 'Inspection:date', 'Scheme:type'])
-  const formulas: [string, string][] = [
-    ['наименования объекта', general.formulas.objectName], ['наименования схемы', general.formulas.schemeName], ['имени zip-архива', general.formulas.zipName],
-    ['темы письма', general.formulas.mailSubject], ['имени PDF-документа', config.settings.pdf.fileName],
-  ]
-  for (const [name, formula] of formulas) {
-    for (const m of formula.matchAll(/\{([^{}\s:]+:[^{}\s]+)\}/g)) if (!known.has(m[1]!)) out.push({ text: `Формула ${name} ссылается на переменную {${m[1]}}, которой нет в форме`, critical: false })
-  }
-  return out
-}
-
-/** Сводка настроенного — первая публикация (`spec-audit.md`, «Первая публикация ≠ дифф»; макет `32765:13817`). */
-export function summarize(config: SchemeConfig): string[] {
-  const fields = config.form.groups.reduce((n, grp) => n + grp.fields.length, 0)
-  const groups = config.form.groups.length
-  const steps = config.processes.reduce((n, p) => n + p.steps.length, 0)
-  const showcase = { needs: 'требует оформления', draft: 'черновик карточки', published: 'карточка опубликована' }[config.showcase.status]
-  return [
-    'Настройки — настроены',
-    `Форма — ${fields} ${plural(fields, 'поле', 'поля', 'полей')} в ${groups} ${plural(groups, 'группе', 'группах', 'группах')}`,
-    `Процессы — ${steps} ${plural(steps, 'шаг', 'шага', 'шагов')} в ${config.processes.length} ${plural(config.processes.length, 'процессе', 'процессах', 'процессах')}`,
-    `Витрина — ${showcase}`,
-  ]
 }
 
 /** Дата для индикатора, плашки и истории: «22.09.2026, 16:05». */

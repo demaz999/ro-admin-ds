@@ -3,6 +3,7 @@ import { SCHEME_COVERAGE_STATES } from '~/stands/scheme-edit/coverage'
 import { createModel, type Dataset } from '~/stands/scheme-edit/model'
 import schemeDemo from '~/stands/scheme-edit/demo-data.json'
 import { TARIFFS_COVERAGE_STATES } from '~/stands/tariffs/coverage'
+import type { ReadinessGroupItem, ReadinessStageItem } from '~/components/ui/readiness'
 useHead({ title: 'Наложение — сверка с Атомом' })
 
 /**
@@ -293,6 +294,25 @@ const textareaVariants = [
   { t: 'Textarea · пусто · disabled', x: 16, y: 328, disabled: true },
   { t: 'Textarea · заполнено · disabled', x: 16, y: 484, value: VALUE, disabled: true },
 ] as const
+
+/* Такт 91: модель готовности — все состояния этапа и важности проверки. */
+const READY_STAGES: ReadinessStageItem[] = [
+  { id: 'base', label: 'Основа', state: 'done' },
+  { id: 'form', label: 'Анкета', state: 'locked', reason: 'Станет доступно после первого сохранения схемы' },
+  { id: 'shooting', label: 'Съёмка', state: 'warning', count: 2 },
+  { id: 'rules', label: 'Правила', state: 'todo' },
+  { id: 'publish', label: 'Проверка и публикация', state: 'blocked', count: 1 },
+]
+const READY_GROUPS: ReadinessGroupItem[] = [
+  { id: 'base', title: 'Основа', state: 'done', meta: 'Осмотр транспорта · Демо Страхование', action: 'Перейти', checks: [] },
+  { id: 'form', title: 'Анкета', state: 'blocked', count: 2, meta: '8 полей в 2 группах', action: 'Перейти', checks: [
+    { key: 'alias', level: 'block', text: 'У поля «Пробег» пустой алиас', area: 'Форма → Автомобиль', action: 'Исправить' },
+    { key: 'hint', level: 'warn', text: 'У поля «Год выпуска» нет подсказки', area: 'Форма → Кузов и комплектация', action: 'Исправить' },
+    { key: 'owner', level: 'todo', text: 'Компания-владелец не выбрана', area: 'Настройки → Основное', action: 'Перейти' },
+  ] },
+  { id: 'rules', title: 'Правила', state: 'todo', meta: 'Проверьте права доступа и шаблоны PDF', checks: [], manual: { label: 'Проверил унаследованное: права доступа, шаблоны PDF', checked: false } },
+  { id: 'showcase', title: 'Витрина — после публикации', state: 'locked', meta: 'Доступно после публикации схемы', checks: [] },
+]
 </script>
 
 <template>
@@ -2032,6 +2052,39 @@ const textareaVariants = [
         <AppPreviewBrowser device="phone" url="example.com/scenarios" class="h-160">
           <ScenarioPreview :page="sitePage" view="card" />
         </AppPreviewBrowser>
+      </div>
+    </section>
+
+    <!--
+      Такт 91: модель готовности — `ReadinessBar`, `ReadinessStage`, `ReadinessMark` (карточка 15), `ReadinessList`, `ReadinessCheck`
+      (карточка 16); чип — у матриц `/scheme-edit/states` (поповер открывается нажатием). Тон `destructive` у `SelectItem`, значок у
+      `SectionNavItem`. Мастера в ките нет — раздел ради автопроверок шрифтов и оптики иконок.
+    -->
+    <section data-theme="rososmotr" class="space-y-3 bg-background font-sans text-foreground" data-compare="readiness">
+      <h2 class="text-lg font-bold">
+        Readiness — модель готовности, без эталона кита, такт 91
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Полоса подготовки со всеми состояниями этапа, список готовности с проверками трёх важностей и ручной отметкой; ниже — пункт
+        опасного действия и значок доступа у источника.
+      </p>
+      <ReadinessBar title="Подготовка схемы: 2 из 5" :stages="READY_STAGES" current="shooting" next-label="Далее: Съёмка →" />
+      <div class="flex flex-wrap items-start gap-10">
+        <div class="w-100">
+          <ReadinessList :groups="READY_GROUPS" />
+        </div>
+        <div class="flex w-80 flex-col gap-6">
+          <div class="flex flex-col rounded-lg p-1 shadow-dropdown">
+            <SelectItem>Сделать копию</SelectItem>
+            <SelectItem tone="destructive">
+              Удалить схему
+            </SelectItem>
+          </div>
+          <SectionNav model-value="other" title="Источник">
+            <SectionNavItem value="templates" label="Отобранные шаблоны" :count="5" />
+            <SectionNavItem value="other" label="Другие схемы" :count="2" badge="admin" badge-label="Доступ по роли" />
+          </SectionNav>
+        </div>
       </div>
     </section>
 

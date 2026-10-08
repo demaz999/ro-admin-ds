@@ -451,7 +451,8 @@ node scripts/free-shoot-scenarios.mjs
 `fill-catalog` · `hint-view`, `?catq=`, `?category=`, `?picked=`, `?fill=all`, `?row=`, с такта 88 — `?open=paste-fields` · `paste-steps` ·
 `overlay-texts` · `overlay-variants`, `?pasteq=`, `?donor=`, `?part=`, `?pick=`, `?target=`, `?otype=`, `?texts=filled`, с такта 89 —
 `?open=demo`, `?screen=`, `?demo=map`, `?mark=`, `?app=full` · `checklist`, `?help=`, с такта 90 — `?price=`, `?open=site`, `?device=phone`,
-`?site=card` — список в `docs/naming.md`, «Такт 61»–«Такт 72», «Такт 86»–«Такт 90».
+`?site=card`, с такта 91 — `?data=created&from=`, `?strip=collapsed`, `?open=readiness` · `copy`, `?rules=1` и страница `/scheme-edit/new`
+(`?source=`, `?card=`, `?step=base` · `empty`, `?open=closed`) — список в `docs/naming.md`, «Такт 61»–«Такт 72», «Такт 86»–«Такт 91».
 
 **Страница тарификации — свой прогон** (такт 77): сценарии `/tariffs` идут отдельным скриптом, около 30 с на сценарии П1,
 1 мин 20 с с П2 (растёт с порциями). До приёмки экрана ожидания из сводки стоят в самих сценариях; в приёмку каждого такта страницы — он,

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { SectionNavStatus } from '.'
+import type { IconName } from '../icon/icons'
 import { computed, inject, ref } from 'vue'
+import { Icon } from '../icon'
 import { SECTION_NAV_KEY } from '.'
 
 /**
@@ -14,7 +16,13 @@ const props = withDefaults(defineProps<{
   status?: SectionNavStatus
   /** Счётчик раздела — такт 86: число совпадений поиска в режиме «найдено»; 0 показывается. Не задан — счётчика нет. */
   count?: number
-}>(), { status: 'none', count: undefined })
+  /**
+   * Значок после подписи — такт 91: признак раздела глифом 14 `--foreground-secondary` (источник «Другие схемы» окна «Новая
+   * схема осмотра» — доступ по роли). Смысл — `badgeLabel` для чтения с экрана. Не задан — значка нет.
+   */
+  badge?: IconName
+  badgeLabel?: string
+}>(), { status: 'none', count: undefined, badge: undefined, badgeLabel: '' })
 
 const ctx = inject(SECTION_NAV_KEY, { model: ref(''), select: () => {} })
 const active = computed(() => ctx.model.value === props.value)
@@ -38,6 +46,10 @@ const STATUS_CLASS: Record<SectionNavStatus, string> = { none: '', on: 'bg-succe
       @click="ctx.select(props.value)"
     >
       <span class="min-w-0 truncate">{{ props.label }}</span>
+      <span v-if="props.badge" data-slot="section-nav-badge" class="inline-flex shrink-0 items-center text-foreground-secondary">
+        <Icon :name="props.badge" :size="14" />
+        <span v-if="props.badgeLabel" class="sr-only">{{ props.badgeLabel }}</span>
+      </span>
       <span v-if="props.status !== 'none'" data-slot="section-nav-status" class="size-1.5 shrink-0 rounded-full" :class="STATUS_CLASS[props.status]">
         <span class="sr-only">{{ STATUS_TEXT[props.status] }}</span>
       </span>

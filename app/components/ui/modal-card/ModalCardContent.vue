@@ -16,8 +16,11 @@ defineOptions({ inheritAttrs: false })
 
 const props = withDefaults(defineProps<DialogContentProps & {
   placement?: ModalCardPlacement
-  /** Ширина центрального окна: `md` 600, `sm` 440. У `edge` ширина одна — 642; `full` — во всё окно. */
-  size?: 'md' | 'sm'
+  /**
+   * Ширина центрального окна: `md` 600, `sm` 440, `lg` 960 — такт 91: окно выбора с колонкой источников и сеткой карточек
+   * («Новая схема осмотра» страницы схемы). У `edge` ширина одна — 642; `full` — во всё окно.
+   */
+  size?: 'md' | 'sm' | 'lg'
   /** `false` — закрыть можно только кнопками окна: без крестика, Esc и клика мимо (§12.5). */
   closable?: boolean
   /**
@@ -81,7 +84,7 @@ const position = computed(() => (props.inline ? 'absolute' : 'fixed'))
           : props.placement === 'full'
             /* Полноэкранный слой (такт 71): во всё окно, без скругления; паддинги и зазоры — прежние. */
             ? 'inset-0'
-            : cn('top-1/2 left-1/2 max-h-[88vh] rounded-md -translate-x-1/2 -translate-y-1/2', props.size === 'sm' ? 'w-modal-narrow' : 'w-modal'),
+            : cn('top-1/2 left-1/2 max-h-[88vh] rounded-md -translate-x-1/2 -translate-y-1/2', props.size === 'sm' ? 'w-modal-narrow' : props.size === 'lg' ? 'w-modal-wide' : 'w-modal'),
         props.class,
       )"
       tabindex="-1"

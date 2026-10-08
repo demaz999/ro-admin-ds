@@ -40,11 +40,16 @@ export interface MarkupResult {
 /**
  * Исходники экрана — все `.vue` в папке страницы, кроме стенда матриц. Экранов три: `/free-shoot`, с такта 61
  * `/scheme-edit` (`docs/scheme-edit.md`), с такта 77 `/tariffs` (`docs/tariffs.md`): правило стендов экрана у них одно.
+ * С такта 91 у страницы схемы — ещё композиции стенда `app/stands/scheme-edit/*.vue` (окно «Новая схема осмотра» `SchemeCreate` —
+ * одна разметка на `/scheme-edit/new` и копию на `/scheme-edit`): правило то же.
  */
 export type MarkupScreen = 'free-shoot' | 'scheme-edit' | 'tariffs'
 const SCREENS: Record<MarkupScreen, Record<string, string>> = {
   'free-shoot': import.meta.glob('../../pages/free-shoot/*.vue', { query: '?raw', import: 'default', eager: true }) as Record<string, string>,
-  'scheme-edit': import.meta.glob('../../pages/scheme-edit/*.vue', { query: '?raw', import: 'default', eager: true }) as Record<string, string>,
+  'scheme-edit': {
+    ...import.meta.glob('../../pages/scheme-edit/*.vue', { query: '?raw', import: 'default', eager: true }) as Record<string, string>,
+    ...import.meta.glob('../../stands/scheme-edit/*.vue', { query: '?raw', import: 'default', eager: true }) as Record<string, string>,
+  },
   /* Такт 77: страница «Тарификация» (`docs/tariffs.md`). */
   'tariffs': import.meta.glob('../../pages/tariffs/*.vue', { query: '?raw', import: 'default', eager: true }) as Record<string, string>,
 }
@@ -142,7 +147,8 @@ export function auditMarkup(screen: MarkupScreen = 'free-shoot'): MarkupResult {
   for (const [path, source] of Object.entries(SCREENS[screen]).sort()) {
     const file = path.split('/').pop()!
     if (EXCLUDED.has(file)) continue
-    files.push(`app/pages/${screen}/${file}`)
+    /* Ключ glob — путь от этого модуля: страницы — «../../pages/…», композиции стенда — «../<экран>/…». */
+    files.push(path.includes('/pages/') ? `app/pages/${screen}/${file}` : `app/stands/${screen}/${file}`)
     const r = auditMarkupSource(file, source)
     checked += r.checked
     findings.push(...r.findings)

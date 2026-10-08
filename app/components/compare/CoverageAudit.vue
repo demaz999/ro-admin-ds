@@ -14,7 +14,10 @@ import { settle } from '~/stands/audit/settle'
  */
 interface Row { state: string, checked: number, findings: CoverageFinding[] }
 
-/** Экран и его состояния оснастки: по умолчанию `/free-shoot`; `/scheme-edit` — такт 61, `/tariffs` — такт 77. */
+/**
+ * Экран и его состояния оснастки: по умолчанию `/free-shoot`; `/scheme-edit` — такт 61, `/tariffs` — такт 77. Состояние, которое
+ * начинается с «/», — свой адрес той же страницы (такт 91: `/scheme-edit/new` — окно «Новая схема осмотра»).
+ */
 const props = withDefaults(defineProps<{ path?: string, states?: readonly string[] }>(), { path: '/free-shoot', states: () => COVERAGE_STATES })
 
 const rows = ref<Row[]>([])
@@ -38,7 +41,7 @@ async function run() {
   done.value = false
   rows.value = []
   for (const state of props.states) {
-    const doc = await load(`${props.path}${state ? `?${state}` : ''}`)
+    const doc = await load(state.startsWith('/') ? state : `${props.path}${state ? `?${state}` : ''}`)
     const r = auditCoverage(doc)
     rows.value.push({ state: state || 'по умолчанию', checked: r.checked, findings: r.findings })
   }

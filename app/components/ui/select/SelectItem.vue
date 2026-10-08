@@ -39,8 +39,15 @@ const props = withDefaults(defineProps<{
    * просмотра. Роли такта 30: заливка `--success-surface`, текст `--success-strong`, рамка
    * 1px `--success` (прототип `.it.bound`: `#E9F6EE`, `#1D7444`, рамка `#BFE3CD`). Запрос
    * дизайнерам — `figma-fixes.md`. Действует только на выбранную строку.
+   *
+   * `destructive` — такт 91 (ревью `docs/scheme-edit-review.md`, К-4; решение 6 оркестратора 2026-10-08): опасное действие
+   * в списке действий — «Удалить схему» меню «⋯». Подпись и иконка `--destructive-strong`, наведение — `--destructive-surface`
+   * вместо `--list-hover`. Тёмная ступень тона — как у `success` этой же строки и у `Badge appearance="outline"` (такт 80):
+   * `--destructive` у текста 15/20 даёт 3.66:1 к белому и 3.31:1 к подложке наведения, ступень `-strong` — 7.52:1 и 6.8:1.
+   * Подложка наведения — прецедент `IconButton variant="destructive"` (такт 78). Действует на невыбранную строку: выбранного у
+   * пункта действия нет.
    */
-  tone?: 'default' | 'success'
+  tone?: 'default' | 'success' | 'destructive'
   /** Булев проп мастера `Show Icon`. */
   showIcon?: boolean
   /** Булев проп мастера `Checkbox` — режим множественного выбора. */
@@ -73,13 +80,14 @@ const props = withDefaults(defineProps<{
   <div
     data-slot="list-item"
     :data-selected="selected || undefined"
+    :data-tone="props.tone === 'default' ? undefined : props.tone"
     :class="[
       'group/item flex min-h-11 w-full gap-3 rounded-md px-4 py-2 text-left',
       /* С переносом — иконка и хвостовой слот у первой строки (такт 89). */
       props.multiline ? 'items-start' : 'items-center',
       selected
         ? (props.tone === 'success' ? 'bg-success-surface ring-1 ring-success ring-inset' : 'bg-list-selected')
-        : props.muted ? '' : 'hover:bg-list-hover',
+        : props.muted ? '' : props.tone === 'destructive' ? 'hover:bg-destructive-surface' : 'hover:bg-list-hover',
       disabled ? 'pointer-events-none opacity-[var(--opacity-disabled)]' : '',
       props.muted && !disabled ? 'cursor-default opacity-[var(--opacity-disabled)]' : '',
     ]"
@@ -94,7 +102,7 @@ const props = withDefaults(defineProps<{
       v-if="props.showIcon"
       data-slot="list-item-icon"
       class="flex h-5 w-4 shrink-0 items-center justify-center opacity-[var(--opacity-icon-muted)]"
-      :class="props.muted ? '' : 'group-hover/item:opacity-100'"
+      :class="[props.muted ? '' : 'group-hover/item:opacity-100', props.tone === 'destructive' && !selected ? 'text-destructive-strong' : '']"
     >
       <slot name="icon">
         <Icon name="link" :size="16" />
@@ -110,7 +118,8 @@ const props = withDefaults(defineProps<{
           props.multiline ? 'break-words' : 'truncate',
           selected
             ? (props.tone === 'success' ? 'text-success-strong' : 'text-field-foreground-hover')
-            : props.muted ? 'text-field-foreground' : 'text-field-foreground group-hover/item:text-field-foreground-hover',
+            : props.tone === 'destructive' ? 'text-destructive-strong'
+              : props.muted ? 'text-field-foreground' : 'text-field-foreground group-hover/item:text-field-foreground-hover',
         ]"
       >
         <slot />

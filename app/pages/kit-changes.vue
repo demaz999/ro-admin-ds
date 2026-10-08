@@ -163,6 +163,35 @@ const ro = ref({ name: 'КАСКО — осмотр', text: 'Осмотр авт
             </div>
             <span class="text-xs text-muted-foreground">слот actions у ModalCardHeader; без слота шапка прежняя</span>
           </template>
+          <template v-else-if="c.id === 'select-item-destructive'">
+            <div class="flex w-80 flex-col rounded-lg p-1 shadow-dropdown">
+              <SelectGroup>
+                <SelectItem>Сделать копию</SelectItem>
+                <SelectItem>Сбросить черновик к текущей версии</SelectItem>
+              </SelectGroup>
+              <SelectGroup>
+                <SelectItem tone="destructive">
+                  Удалить схему
+                </SelectItem>
+              </SelectGroup>
+            </div>
+            <span class="text-xs text-muted-foreground">наведение на «Удалить схему» — подложка --destructive-surface; прочие пункты прежние</span>
+          </template>
+          <template v-else-if="c.id === 'modal-card-lg'">
+            <div class="relative h-72 overflow-auto rounded-md border border-border-soft bg-background">
+              <div class="relative h-full w-250">
+                <ModalCard :open="true" :modal="false">
+                  <ModalCardContent inline size="lg">
+                    <ModalCardHeader title="Новая схема осмотра" subtitle="С чего начать: шаблон, другая схема или пустая схема" />
+                    <ModalCardBody>
+                      <ModalCardText>Окно 960 — колонка источников и сетка карточек в две колонки</ModalCardText>
+                    </ModalCardBody>
+                  </ModalCardContent>
+                </ModalCard>
+              </div>
+            </div>
+            <span class="text-xs text-muted-foreground">size="lg" у ModalCardContent; рамка примера прокручивается по горизонтали</span>
+          </template>
           <template v-else-if="c.id === 'badge-outline'">
             <div class="flex flex-wrap items-center gap-2">
               <Badge appearance="outline" variant="neutral">2 схемы</Badge>
