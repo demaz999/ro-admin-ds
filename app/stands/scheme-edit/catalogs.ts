@@ -174,13 +174,16 @@ export const STEP_METHODS = [
   { value: '2–7 фото', label: '2–7 фото' },
   { value: '1 видео', label: '1 видео' },
 ]
-/** Флаги шага — строка «Флаги» панели массовых действий `32765:6585`, порядок макета. */
+/**
+ * Флаги шага — строка «Флаги» панели массовых действий `32765:6585`, порядок макета. Такт 87 (ревью Т-2, решение 6
+ * оркестратора 2026-10-08): подписи признаков — полностью, как в сайде поля; до такта 87 — «Можно в web», «Нет конф. данных».
+ */
 export const STEP_FLAGS = [
   { key: 'required', label: 'Обязательный' },
   { key: 'hidden', label: 'Скрытый' },
   { key: 'gallery', label: 'Из галереи' },
-  { key: 'web', label: 'Можно в web' },
-  { key: 'noConfidential', label: 'Нет конф. данных' },
+  { key: 'web', label: 'Доступен в web' },
+  { key: 'noConfidential', label: 'Не содержит конфиденциальных данных' },
   { key: 'docScan', label: 'Скан документов' },
 ] as const
 export type StepFlag = typeof STEP_FLAGS[number]['key']

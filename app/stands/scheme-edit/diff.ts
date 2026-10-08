@@ -5,6 +5,7 @@ import {
   REGION_MATRICES, ROLE_LADDER, ROLES, SCHEME_TYPES, STATUS_DICTIONARIES, STEP_FLAGS, STEP_KINDS, VIDEO_RESOLUTIONS,
   COORDS_MODES, DURATION_MODES, OBJECT_TYPES, SHOWCASE_STATUS,
 } from './catalogs'
+import { hintLabel } from './hints'
 
 /**
  * Дифф конфигураций схемы, валидация и каталог настроек — такт 64, порция П4 (`docs/scheme-edit.md`, 6.2).
@@ -191,15 +192,25 @@ const PROCESS_ATTRS: [keyof ProcessLike, string, ChoiceItems?][] = [
 /**
  * «Было → стало» у шага: способ и подсказки — всегда (как до такта 70); тип шага и флаги — когда они сменились (такт 70:
  * тип меняется в строке, флаги — панелью массовых действий).
+ *
+ * Такт 87: подсказки — список (каталог и свои загрузки); «подсказок: N» — его длина, а сменившиеся подсказки идут в «стало»
+ * скобкой: «+ «Правая сторона · профиль»; − «Своя загрузка · front-2.jpg»», не больше двух имён на знак — дальше «и ещё N».
  */
 function stepChange(was: StepLike, st: StepLike): { before: string, after: string } {
   const kind = (x: StepLike) => STEP_KINDS.find(k => k.value === x.kind)?.label ?? x.kind
   const flags = (x: StepLike) => STEP_FLAGS.filter(f => x[f.key]).map(f => f.label.toLowerCase()).join(', ') || 'без флагов'
   const nets = (x: StepLike) => x.networks.join(', ') || 'без нейросетей'
   /* Такт 71: сайд шага меняет и нейросети — они в «было → стало», когда сменились. */
-  const text = (x: StepLike) => [x.method, `подсказок: ${x.hints}`, ...(was.kind !== st.kind ? [kind(x)] : []), ...(flags(was) !== flags(st) ? [`флаги: ${flags(x)}`] : []),
+  const text = (x: StepLike) => [x.method, `подсказок: ${x.hints.length}`, ...(was.kind !== st.kind ? [kind(x)] : []), ...(flags(was) !== flags(st) ? [`флаги: ${flags(x)}`] : []),
     ...(nets(was) !== nets(st) ? [`нейросети: ${nets(x)}`] : [])].join(', ')
-  return { before: text(was), after: text(st) }
+  const ids = (x: StepLike) => new Set(x.hints.map(h => `${h.kind}:${h.id}`))
+  const a = ids(was)
+  const b = ids(st)
+  const names = (list: StepLike['hints']) => (list.length > 2 ? [...list.slice(0, 2).map(h => `«${hintLabel(h)}»`), `и ещё ${list.length - 2}`] : list.map(h => `«${hintLabel(h)}»`)).join(', ')
+  const added = st.hints.filter(h => !a.has(`${h.kind}:${h.id}`))
+  const removed = was.hints.filter(h => !b.has(`${h.kind}:${h.id}`))
+  const delta = [added.length ? `+ ${names(added)}` : '', removed.length ? `− ${names(removed)}` : ''].filter(Boolean).join('; ')
+  return { before: text(was), after: delta ? `${text(st)} (${delta})` : text(st) }
 }
 
 /** Дифф `from → to`: сводка по четырём областям, группы «Добавлено · Изменено · Удалено», «Требует внимания». */

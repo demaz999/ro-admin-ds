@@ -4,6 +4,7 @@ import {
   DETECTOR_GROUPS, FIELD_TYPES, INDUSTRIES, SHOWCASE_OBJECTS, SHOWCASE_STATUS, SPHERES, STEP_KINDS,
 } from './catalogs'
 import { plural, SETTINGS, type SettingMeta } from './diff'
+import { catalogHint, catalogLabel } from './hints'
 import type { Rule, SchemeConfig, TabId } from './model'
 
 /**
@@ -22,6 +23,9 @@ import type { Rule, SchemeConfig, TabId } from './model'
  * важны (`normalizeText`, `queryWords` — `ui/highlight-text`: та же нормализация подсвечивает совпадение). Пустая выдача
  * повторяется в другой раскладке. Порядок: точная подпись → подпись с начала → все слова в подписи → синоним → описание →
  * алиас и ключ → середина слова; при равенстве недавнее выше, затем порядок страницы.
+ *
+ * **Такт 87:** шаг находится и по части и ракурсу своих фото-подсказок каталога (`tags`) — уровень описания, пояснение
+ * строки — «фото-подсказка «…»».
  */
 
 export type SearchType = 'setting' | 'field' | 'group' | 'step' | 'process' | 'showcase' | 'action'
@@ -175,6 +179,11 @@ export interface SearchEntry {
   reason: string
   /** Своя иконка действия. */
   icon?: IconName
+  /**
+   * Подписи фото-подсказок каталога у шага — такт 87: шаг находится по части и ракурсу своей подсказки, пояснение строки —
+   * «фото-подсказка «…»». Свои загрузки подписи части и ракурса не несут.
+   */
+  tags: string[]
 }
 
 export interface IndexContext {
@@ -267,7 +276,7 @@ function showcaseValue(key: string, config: SchemeConfig): string {
 
 const base = (e: Partial<SearchEntry> & Pick<SearchEntry, 'key' | 'type' | 'area' | 'label' | 'path' | 'target'>): Omit<SearchEntry, 'order'> => ({
   synonyms: [], description: '', alias: '', tab: '', section: '', anchor: '', group: '', process: '', value: '', toggle: false, checked: false,
-  setPath: '', reason: '', icon: undefined, ...e,
+  setPath: '', reason: '', icon: undefined, tags: [], ...e,
 })
 
 /**
@@ -300,8 +309,10 @@ export function buildSearchIndex(ctx: IndexContext): SearchEntry[] {
     out.push(base({ key: `process.${p.id}`, type: 'process', area: 'processes', label: p.title, alias: p.alias, path: 'Процессы и шаги', tab: 'processes', process: p.id,
       target: `process-${p.id}`, value: `${p.steps.length} ${plural(p.steps.length, 'шаг', 'шага', 'шагов')}` }))
     for (const st of p.steps) {
+      /* Такт 87: подсказки каталога у шага — части и ракурсы, по ним шаг находится. */
+      const tags = st.hints.flatMap((h) => { const c = h.kind === 'catalog' ? catalogHint(h.id) : undefined; return c ? [catalogLabel(c)] : [] })
       out.push(base({ key: `step.${st.id}`, type: 'step', area: 'processes', label: st.title, description: st.description, path: `Процессы → ${p.title}`,
-        tab: 'processes', process: p.id, target: `step-${st.id}`, value: STEP_KINDS.find(k => k.value === st.kind)?.label ?? st.kind }))
+        tab: 'processes', process: p.id, target: `step-${st.id}`, value: STEP_KINDS.find(k => k.value === st.kind)?.label ?? st.kind, tags }))
     }
   }
   for (const s of SHOWCASE_INDEX) {
@@ -335,6 +346,8 @@ interface Prepared {
   label: string
   labelT: string[]
   syn: { text: string, n: string, t: string[] }[]
+  /** Подсказки каталога шага — такт 87. */
+  tag: { text: string, n: string, t: string[] }[]
   desc: string
   descT: string[]
   alias: string
@@ -354,18 +367,22 @@ function prepare(e: SearchEntry): Prepared {
   p = {
     e, label, labelT: tokens(label), desc, descT: tokens(desc), alias, aliasT: tokens(alias), key, keyT: tokens(key),
     syn: e.synonyms.map((text) => { const n = normalizeText(text); return { text, n, t: tokens(n) } }),
+    tag: e.tags.map((text) => { const n = normalizeText(text); return { text, n, t: tokens(n) } }),
   }
   cache.set(e, p)
   return p
 }
 
-interface WordHit { level: number, field: 'label' | 'synonym' | 'description' | 'alias' | 'key', synonym?: string }
+interface WordHit { level: number, field: 'label' | 'synonym' | 'description' | 'tag' | 'alias' | 'key', synonym?: string }
 function wordHit(p: Prepared, w: string): WordHit | null {
   const starts = (t: string[]) => t.some(x => x.startsWith(w))
   if (starts(p.labelT)) return { level: LABEL, field: 'label' }
   const s = p.syn.find(x => starts(x.t))
   if (s) return { level: SYNONYM, field: 'synonym', synonym: s.text }
   if (starts(p.descT)) return { level: DESCRIPTION, field: 'description' }
+  /* Такт 87: подсказка каталога шага — уровень описания; пояснение строки называет подсказку. */
+  const tag = p.tag.find(x => starts(x.t))
+  if (tag) return { level: DESCRIPTION, field: 'tag', synonym: tag.text }
   if (starts(p.aliasT)) return { level: ALIAS, field: 'alias' }
   if (starts(p.keyT)) return { level: ALIAS, field: 'key' }
   if (w.length < 3) return null
@@ -373,6 +390,8 @@ function wordHit(p: Prepared, w: string): WordHit | null {
   const s2 = p.syn.find(x => x.n.includes(w))
   if (s2) return { level: MIDDLE, field: 'synonym', synonym: s2.text }
   if (p.desc.includes(w)) return { level: MIDDLE, field: 'description' }
+  const tag2 = p.tag.find(x => x.n.includes(w))
+  if (tag2) return { level: MIDDLE, field: 'tag', synonym: tag2.text }
   if (p.alias.includes(w)) return { level: MIDDLE, field: 'alias' }
   if (p.key.includes(w)) return { level: MIDDLE, field: 'key' }
   return null
@@ -400,7 +419,8 @@ function rank(p: Prepared, qn: string, words: string[]): SearchHit | null {
   const e = p.e
   const hint = weak.field === 'synonym'
     ? `по запросу «${weak.synonym}»`
-    : weak.field === 'description' ? e.description : weak.field === 'alias' ? `алиас ${e.alias}` : weak.field === 'key' ? `ключ ${e.key}` : ''
+    : weak.field === 'tag' ? `фото-подсказка «${weak.synonym}»`
+      : weak.field === 'description' ? e.description : weak.field === 'alias' ? `алиас ${e.alias}` : weak.field === 'key' ? `ключ ${e.key}` : ''
   return { entry: e, tier, hint }
 }
 

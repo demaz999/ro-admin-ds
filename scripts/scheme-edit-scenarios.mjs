@@ -107,6 +107,12 @@ async function openPage(width = 1440) {
       page.blind.push(sel.length > 110 ? `${sel.slice(0, 107)}…` : sel)
       return p
     },
+    /** Курсор на элемент реальным вводом — такт 87: кнопки плитки и миниатюры видны на наведении. */
+    async hover(sel) {
+      const p = await this.point(sel)
+      await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p.x, y: p.y })
+      await sleep(200)
+    },
     /** Реальный клик мышью по элементу: выражение `sel` возвращает элемент. */
     async click(sel) {
       const p = await this.point(sel)
@@ -362,6 +368,29 @@ function kit(page) {
     net: (side, name) => page.click(`document.querySelector('[data-side=${side}] [data-network="${name}"] [data-slot=choice-control], [data-side=${side}] [data-network="${name}"][data-slot=choice] [data-slot=choice-control]')`),
     stepAct: (id, act) => page.click(`document.querySelector('[data-step-row="${id}"] [data-act=${act}]')`),
     overlayStepEdit: id => page.click(`document.querySelector('[data-overlay-step="${id}"] [data-slot=table-row-action]')`),
+    /* ---------- такт 87: фото-подсказки ---------- */
+    /** «Выбрать из каталога» в ячейке шага. */
+    catalogFrom: id => page.click(`document.querySelector('[data-step-row="${id}"] [data-act=hint-catalog]')`),
+    /** Плитка каталога — нажатие по плитке выбирает. */
+    tile: id => page.click(`document.querySelector('[data-side=catalog] [data-catalog-item="${id}"]')`),
+    /** Кнопка «открыть крупно» плитки — видна на наведении: прогон ставит курсор на плитку, затем нажимает. */
+    async tileOpen(id) {
+      await page.hover(`document.querySelector('[data-side=catalog] [data-catalog-item="${id}"]')`)
+      await page.click(`document.querySelector('[data-side=catalog] [data-catalog-item="${id}"] [data-slot=media-gallery-item-open]')`)
+    },
+    category: id => page.click(`document.querySelector('[data-side=catalog] [data-catalog-categories] [data-slot=section-nav-item][data-value=${id}]')`),
+    /** Миниатюра ячейки шага либо «+N» (`more`). */
+    thumb: (id, k) => page.click(k === 'more' ? `document.querySelector('[data-hint-thumbs="${id}"] [data-slot=thumb-strip-more]')` : `document.querySelectorAll('[data-hint-thumbs="${id}"] [data-slot=thumb-strip-item]')[${k}]`),
+    /** Миниатюра сайда шага: «глаз» либо крестик — половины видны на наведении. */
+    async sideThumb(hint, half) {
+      await page.hover(`document.querySelector('[data-side=step] [data-hint="${hint}"]')`)
+      await page.click(`document.querySelector('[data-side=step] [data-hint="${hint}"] [data-slot=step-thumb-${half}]')`)
+    },
+    /** Действие строки массовой заливки: `fill-replace` либо `fill-toggle`. */
+    fillAct: (id, act) => page.click(`document.querySelector('[data-side=fill] [data-fill-row="${id}"] [data-act=${act}]')`),
+    fillAll: () => page.click(`document.querySelector('[data-side=fill] [data-field=fill-all] [data-slot=choice-control], [data-side=fill] [data-field=fill-all][data-slot=choice] [data-slot=choice-control]')`),
+    /** Стрелка просмотра крупно: `next` либо `prev`. */
+    viewerArrow: dir => page.click(`document.querySelector('[data-slot=lightbox] button[aria-label="${dir === 'next' ? 'Следующий кадр' : 'Предыдущий кадр'}"]')`),
     /* ---------- П8, такт 72: «Витрина», новая схема, плашка ---------- */
     /** Клик по элементу из выражения. */
     clickEl: sel => page.click(sel),
@@ -728,6 +757,9 @@ function kit(page) {
               bar: bar && bar.dataset.state === 'open' && getComputedStyle(bar).display !== 'none' ? t(bar.querySelector('[data-slot=action-bar-count]').textContent) : null,
               flags: bar && getComputedStyle(bar).display !== 'none' ? Object.fromEntries([...bar.querySelectorAll('[data-flag]')].map(x => [x.dataset.flag, check(x.querySelector('[data-slot=choice-control]') ?? x)])) : null,
               upload: el.querySelector('[data-upload-zone]')?.dataset.uploadZone ?? null,
+              /* Такт 87: миниатюры фото-подсказок в ячейке — подписи видимых и хвост «+N». */
+              thumbs: Object.fromEntries([...el.querySelectorAll('[data-hint-thumbs]')].map(x => [x.dataset.hintThumbs,
+                [...x.querySelectorAll('[data-slot=thumb-strip-item]')].map(b => b.getAttribute('aria-label')).concat(x.querySelector('[data-slot=thumb-strip-more]') ? [t(x.querySelector('[data-slot=thumb-strip-more]').textContent)] : [])])),
               kindMenu: !!document.querySelector('[data-kind-menu]'),
               dragging: el.querySelector('[data-dragging]')?.dataset.reorderId ?? null,
             } })(),
@@ -773,12 +805,50 @@ function kit(page) {
               networks: nets.filter(c => ctl(c).getAttribute('aria-checked') === 'true').map(c => c.dataset.network),
               denied: nets.filter(c => ctl(c).disabled).map(c => c.dataset.network + ' | ' + t(c.querySelector('[data-slot=choice-reason]')?.textContent) + (lit(c.querySelector('[data-slot=choice-reason]')) ? '' : ' | бледно')),
               hint: t(el.querySelector('[data-step-hint-status]')?.textContent),
+              /* Такт 87: раздел «Фото-подсказки» — миниатюры черновика сайда по порядку. */
+              hints: [...el.querySelectorAll('[data-step-hint-list] [data-hint]')].map(x => x.dataset.hint),
               links: [...el.querySelectorAll('[data-field=sdLinks] [data-slot=select-chip]')].map(c => t(c.textContent)),
               /* Секция «Нейросети» в окне сайда: верх секции виден. */
               networksInView: (() => { const sec = el.querySelector('[data-step-section=networks]'); const body = el.querySelector('[data-slot=modal-card-body]'); if (!sec || !body) return null
                 const a = sec.getBoundingClientRect(); const b = body.getBoundingClientRect(); return a.top >= b.top - 1 && a.top < b.bottom })(),
             } })(),
           focusNetwork: document.activeElement?.closest?.('[data-network]')?.dataset.network ?? null,
+          /* ---------- такт 87: каталог фото-подсказок, массовая заливка, просмотр крупно ---------- */
+          catalog: (() => { const el = document.querySelector('[data-side=catalog]'); if (!el) return null
+            const btn = el.querySelector('[data-act=catalog-confirm]')
+            return {
+              target: el.dataset.target, title: t(el.querySelector('[data-slot=modal-card-title]')?.textContent), sub: t(el.querySelector('[data-slot=modal-card-subtitle]')?.textContent),
+              back: !!el.querySelector('[data-modal-back]'),
+              query: el.querySelector('[data-field=catalog-search] input, input[data-field=catalog-search]')?.value ?? null,
+              category: el.querySelector('[data-catalog-categories] [data-slot=section-nav-item][aria-current=true]')?.dataset.value ?? null,
+              counts: Object.fromEntries([...el.querySelectorAll('[data-catalog-categories] [data-slot=section-nav-item]')].map(b => [b.dataset.value, Number(t(b.querySelector('[data-slot=section-nav-count]')?.textContent))])),
+              items: [...el.querySelectorAll('[data-catalog-item]')].map(x => x.dataset.catalogItem),
+              picked: [...el.querySelectorAll('[data-catalog-item][data-selected]:not([data-disabled])')].map(x => x.dataset.catalogItem),
+              attached: [...el.querySelectorAll('[data-catalog-item][data-disabled]')].map(x => x.dataset.catalogItem),
+              marks: [...el.querySelectorAll('[data-catalog-item] [data-slot=highlight-text-match]')].map(x => t(x.textContent)),
+              note: t(el.querySelector('[data-slot=modal-card-note]')?.textContent),
+              confirm: btn ? t(btn.textContent) + (btn.disabled ? ' · выкл' : '') : null,
+              empty: t(el.querySelector('[data-catalog-empty] [data-slot=empty-title]')?.textContent) || null,
+              emptyDesc: t(el.querySelector('[data-catalog-empty] [data-slot=empty-description]')?.textContent) || null,
+            } })(),
+          fill: (() => { const el = document.querySelector('[data-side=fill]'); if (!el) return null
+            const btn = el.querySelector('[data-act=fill-apply]')
+            return {
+              sub: t(el.querySelector('[data-slot=modal-card-subtitle]')?.textContent),
+              all: el.querySelector('[data-field=fill-all] [data-slot=choice-control], [data-field=fill-all][data-slot=choice] [data-slot=choice-control]')?.getAttribute('aria-checked') ?? null,
+              only: t(el.querySelector('[data-fill-only]')?.textContent) || null,
+              /* Строка: шаг · оценка · подсказка · причина · заполняется либо нет. */
+              groups: [...el.querySelectorAll('[data-fill-group]')].map(g => ({ id: g.dataset.fillGroup, legend: t(g.querySelector('[data-slot=field-set-legend]')?.textContent),
+                rows: [...g.querySelectorAll('[data-fill-row]')].map(r => { const ids = [...r.querySelectorAll('[data-slot=table-cell-identity]')]
+                  return [r.dataset.fillRow, t(r.querySelector('[data-fill-match]')?.textContent), t(ids[1]?.querySelector('[data-slot=table-cell-text]')?.textContent),
+                    t(ids[1]?.querySelector('[data-slot=table-cell-identity-description]')?.textContent), r.hasAttribute('data-included') ? 'заполнить' : 'не заполнять'].join(' · ') }) })),
+              empty: t(el.querySelector('[data-fill-empty] [data-slot=empty-title]')?.textContent) || null,
+              apply: btn ? t(btn.textContent) + (btn.disabled ? ' · выкл' : '') : null,
+            } })(),
+          viewer: (() => { const el = document.querySelector('[data-slot=lightbox]'); if (!el) return null
+            const pick = el.querySelector('[data-act=viewer-pick]')
+            return { counter: t(el.querySelector('[data-slot=lightbox-bar] [data-slot=badge]')?.textContent), caption: t(el.querySelector('[data-slot=lightbox-caption]')?.textContent),
+              src: (el.querySelector('[data-slot=frame-stage] img')?.getAttribute('src') ?? '').split('/').pop(), pick: pick ? t(pick.textContent) + (pick.disabled ? ' · выкл' : '') : null } })(),
           netSide: (() => { const el = document.querySelector('[data-side=networks]'); if (!el) return null
             return { sub: t(el.querySelector('[data-slot=modal-card-subtitle]')?.textContent),
               states: Object.fromEntries([...el.querySelectorAll('[data-networks-list] [data-network]')].map(c => [c.dataset.network,
@@ -1446,7 +1516,8 @@ const SCENARIOS = {
         { kind: 'removed', title: 'Удалено · 1', items: ['Шаг «Страховой полис» | процесс «Осмотр документов ТС»'] }] }],
     ['«Открыть процесс» у повторяемого — полноэкранный оверлей', async (K) => { await K.act('publish-cancel'); await K.processAct('p-damage', 'process-open') },
       { surface: 'process-overlay', surfaces: ['process-overlay'], 'overlay.title': 'Осмотр повреждений', 'overlay.full': true, 'overlay.placement': 'full', writes: 2 }],
-    ['«Заполнить изображения» — вне стенда (r2 §9)', async (K) => { await K.key('Escape'); await K.act('fill-images') }, { surface: '', notices: ['Массовая заливка изображений — вне стенда'], writes: 2 }],
+    ['«Заполнить изображения» — сайд массовой заливки фото-подсказок (такт 87; до него — «вне стенда», r2 §9)', async (K) => { await K.key('Escape'); await K.act('fill-images') },
+      { surface: 'fill', notices: [], 'fill.sub': 'Подобрано 3 из 3', writes: 2 }],
   ], { query: 'tab=processes' }],
   'СС-39': ['процессы: массовый выбор шагов сквозь процессы, флаги в трёх состояниях, фото, нейросети; toast «Применено к N · Отменить» (r2 §6; аудит, «Отмена при автосейве»)', [
     ['выбрать два шага «Осмотра автомобиля» и ПТС — панель «Выбрано: 3 шага», флаги трёх состояний', async (K) => { await K.stepCheck('s-vin-glass'); await K.stepCheck('s-vin-metal'); await K.stepCheck('s-pts') },
@@ -1484,7 +1555,7 @@ const SCENARIOS = {
     ['«Загрузить» раскрывает загрузчик в ячейке, сайда нет', K => K.hint('s-vin-metal'), { 'proc.upload': 's-vin-metal', surface: '', writes: 0 }],
     ['нажатие на зону — подсказка загружена без «Сохранить», статус на месте, загрузчик свёрнут', async (K) => { await K.uploadZone('s-vin-metal'); await K.settled() },
       { 'proc.rows.p-auto.1': "2 · VIN на металле · Основной · 1 фото · Распознавание VIN · 1 · Все установлены · Обязательный", 'proc.upload': null, saveLog: ['saving', 'saved'], notices: [], writes: 1 }],
-    ['«Редактировать» у «VIN под стеклом» — ещё одна подсказка', async (K) => { await K.hint('s-vin-glass'); await K.uploadZone('s-vin-glass'); await K.settled() },
+    ['«Загрузить» у «VIN под стеклом» — ещё одна подсказка (такт 87: «Редактировать» макета — «Загрузить» и «Выбрать из каталога»)', async (K) => { await K.hint('s-vin-glass'); await K.uploadZone('s-vin-glass'); await K.settled() },
       { 'proc.rows.p-auto.0': "1 · VIN под стеклом · Основной · 1 фото · Распознавание VIN, Распознавание шильдиков · 6 · Все установлены · Обязательный", writes: 2 }],
     ['тип шага в строке: «Вид справа» — «Техническое фото»', async (K) => { await K.stepKind('s-right', 'tech'); await K.settled() },
       { 'proc.rows.p-auto.3': "4 · Вид справа · Техническое фото · 2–7 фото · Ракурсы авто · Правая сторона · Не установлена", 'proc.kindMenu': false, surface: '', writes: 3 }],
@@ -1499,19 +1570,19 @@ const SCENARIOS = {
     ['«Отменить» — процесс на месте', async (K) => { await K.undo(); await K.settled() }, { 'proc.cards.1': 'Осмотр документов · 1 шаг · docs_inspection', writes: 4 }],
     ['карандаш строки — сайд шага (такт 71)', K => K.stepEdit('s-front'), { surface: 'step', 'stepSide.title': 'Редактирование шага — Передняя часть', notices: [], writes: 4 }],
   ], { query: 'tab=processes' }],
-  'СС-52': ['сайд шага: шесть секций — «Основное», «Поведение», «Съёмка», «Нейросети» с недоступными компании, «Подсказки», «Связи»; «Сохранить» одной записью, «Отмена» отбрасывает (r2 §6, §8; аудит, «Принцип: всё редактирование сущности — в сайде»)', [
+  'СС-52': ['сайд шага: шесть секций — «Основное», «Поведение», «Съёмка», «Нейросети» с недоступными компании, «Фото-подсказки» (такт 87; до него — «Подсказки»), «Связи»; «Сохранить» одной записью, «Отмена» отбрасывает (r2 §6, §8; аудит, «Принцип: всё редактирование сущности — в сайде»)', [
     ['карандаш «Передней части» — сайд шага, шесть секций, значения шага', K => K.stepEdit('s-front'),
       { surface: 'step', focusIn: 'step', stepSide: { title: 'Редактирование шага — Передняя часть', sub: 'Процесс «Осмотр автомобиля»', host: 'page',
-        legends: ['Основное', 'Поведение', 'Съёмка', 'Нейросети · выбрано 2', 'Подсказки', 'Связи'], name: 'Передняя часть', order: 3, flags: ['sd-required'],
+        legends: ['Основное', 'Поведение', 'Съёмка', 'Нейросети · выбрано 2', 'Фото-подсказки · 8', 'Связи'], name: 'Передняя часть', order: 3, flags: ['sd-required'],
         networks: ['Ракурсы авто · Передняя', 'Оценка повреждений'],
         denied: ['Детектор подмены снимка | Недоступна компании «Демо Страхование» — подключается через менеджера', 'Оценка износа шин | Недоступна компании «Демо Страхование» — подключается через менеджера'],
-        hint: '8 · Все установлены', links: [], networksInView: false }, writes: 0 }],
+        hint: '8 · Все установлены', hints: ['car-front', 'car-front-left', 'car-front-right', 'up-front-1', 'up-front-2', 'up-front-3', 'up-front-4', 'up-front-5'], links: [], networksInView: false }, writes: 0 }],
     ['правки и «Отмена» — строка прежняя, фокус на карандаше строки', async (K) => { await K.typeInto('sdTitle', ' авто'); await K.check('sd-web'); await K.act('step-cancel') },
       { surface: '', 'proc.rows.p-auto.2': '3 · Передняя часть · Основной · 2–7 фото · Ракурсы авто · Передняя, Оценка повреждений · 8 · Все установлены · Обязательный', focusStep: 's-front', writes: 0 }],
-    ['снова: название, «Можно в web», нейросеть, подсказка, поле формы — «Сохранить» одной записью', async (K) => {
+    ['снова: название, «Доступен в web», нейросеть, подсказка, поле формы — «Сохранить» одной записью', async (K) => {
       await K.stepEdit('s-front'); await K.typeInto('sdTitle', ' авто'); await K.check('sd-web'); await K.net('step', 'Распознавание госномера'); await K.act('step-hint-upload')
       await K.pick('sdLinks', 'Автомобиль · Госномер'); await K.act('step-save'); await K.settled() },
-      { surface: '', notices: [], 'proc.rows.p-auto.2': '3 · Передняя часть авто · Основной · 2–7 фото · Ракурсы авто · Передняя, Оценка повреждений, Распознавание госномера · 9 · Все установлены · Обязательный, Можно в web', saveLog: ['saving', 'saved'], writes: 1 }],
+      { surface: '', notices: [], 'proc.rows.p-auto.2': '3 · Передняя часть авто · Основной · 2–7 фото · Ракурсы авто · Передняя, Оценка повреждений, Распознавание госномера · 9 · Все установлены · Обязательный, Доступен в web', saveLog: ['saving', 'saved'], writes: 1 }],
     ['«Настроить нейросети» в строке «Вида справа» — сайд шага, секция «Нейросети» в окне, фокус на первом флажке', K => K.stepAct('s-right', 'step-networks'),
       { surface: 'step', 'stepSide.title': 'Редактирование шага — Вид справа', 'stepSide.networksInView': true, focusNetwork: 'Распознавание VIN', writes: 1 }],
     ['нажатие на недоступную компании нейросеть — не выбирается', K => K.net('step', 'Детектор подмены снимка'), { 'stepSide.networks': ['Ракурсы авто · Правая сторона'], writes: 1 }, { blind: true }],
@@ -1857,6 +1928,146 @@ const SCENARIOS = {
       { searchFocus: true, ctrlF: [true], selRange: [0, 4], 'find.counter': '1 из 4' }],
     ['набор заменяет запрос — режим «найдено» снят, выдача по новому запросу', K => K.type('блок'),
       { query: 'блок', find: null, searchOpen: true, 'results.0.path': 'Настройки → Общие' }],
+  ]],
+  /* ============================ такт 87: каталог фото-подсказок, массовая заливка, сайд шага ============================ */
+  'СС-75': ['каталог фото-подсказок из ячейки шага: категория шага выбрана заранее, выбор нескольких, «Добавить» — одной записью с «Отменить» (ревью 4.3; решение 4 оркестратора 2026-10-08)', [
+    ['«Выбрать из каталога» у «VIN на металле» — сайд каталога: «Транспорт» выбран заранее, 16 подсказок', K => K.catalogFrom('s-vin-metal'),
+      { surface: 'catalog', focusIn: 'catalog', catalog: { target: 'cell', title: 'Каталог фото-подсказок', sub: 'Для шага «VIN на металле»', back: false, query: '', category: 'vehicle',
+        counts: { all: 30, vehicle: 16, realty: 8, documents: 6 }, items: ['car-front', 'car-front-left', 'car-front-right', 'car-rear', 'car-rear-left', 'car-rear-right', 'car-left', 'car-right',
+          'car-vin-glass', 'car-vin-body', 'car-plate', 'car-odometer', 'car-wheel', 'car-interior', 'car-engine', 'car-damage'], picked: [], attached: [], marks: [], note: 'Выбрано: 0',
+        confirm: 'Добавить · выкл', empty: null, emptyDesc: null }, writes: 0 }],
+    ['нажатие по плиткам «VIN на кузове» и «Табличка изготовителя» — «Выбрано: 2»', async (K) => { await K.tile('car-vin-body'); await K.tile('car-plate') },
+      { 'catalog.picked': ['car-vin-body', 'car-plate'], 'catalog.note': 'Выбрано: 2', 'catalog.confirm': 'Добавить', writes: 0 }],
+    ['повторное нажатие снимает выбор', K => K.tile('car-plate'), { 'catalog.picked': ['car-vin-body'], 'catalog.note': 'Выбрано: 1' }],
+    ['«Добавить» — подсказка у шага сразу, одной записью; статус и миниатюра в ячейке', async (K) => { await K.act('catalog-confirm'); await K.settled() },
+      { surface: '', notices: ['К шагу «VIN на металле» добавлена 1 подсказка'], 'proc.rows.p-auto.1': "2 · VIN на металле · Основной · 1 фото · Распознавание VIN · 1 · Все установлены · Обязательный",
+        'proc.thumbs.s-vin-metal': ['VIN на кузове · выбитый номер'], saveLog: ['saving', 'saved'], writes: 1, focusAct: 'hint-catalog' }],
+    ['«Отменить» — подсказки у шага нет', async (K) => { await K.undo(); await K.settled() }, { 'proc.rows.p-auto.1': "2 · VIN на металле · Основной · 1 фото · Распознавание VIN · Не установлена · Обязательный", 'proc.thumbs.s-vin-metal': undefined, writes: 2 }],
+    ['снова «VIN на кузове» и каталог ещё раз — плитка отмечена и выключена: «Уже у шага»', async (K) => {
+      await K.catalogFrom('s-vin-metal'); await K.tile('car-vin-body'); await K.act('catalog-confirm'); await K.settled(); await K.wait(3200); await K.catalogFrom('s-vin-metal') },
+      { surface: 'catalog', 'catalog.attached': ['car-vin-body'], 'catalog.picked': [], 'catalog.note': 'Выбрано: 0', writes: 3 }],
+    ['нажатие по выключенной плитке — выбора нет; «Отмена» — записи нет', async (K) => { await K.tile('car-vin-body'); await K.act('catalog-cancel') },
+      { surface: '', 'proc.rows.p-auto.1': "2 · VIN на металле · Основной · 1 фото · Распознавание VIN · 1 · Все установлены · Обязательный", notices: [], saveLog: [], writes: 3 }, { blind: true }],
+  ], { query: 'tab=processes' }],
+  'СС-76': ['каталог: поиск по части, ракурсу и связанным словам; категории с числом; пусто в категории — «Искать во всех категориях» (ревью 4.3; паттерн «выбор из справочника»)', [
+    ['«кузов» — одна подсказка, совпадение подсвечено; число по категориям', async (K) => { await K.catalogFrom('s-vin-metal'); await K.fill('[data-field=catalog-search]', 'кузов') },
+      { 'catalog.query': 'кузов', 'catalog.items': ['car-vin-body'], 'catalog.marks': ['кузов'], 'catalog.counts': { all: 1, vehicle: 1, realty: 0, documents: 0 } }],
+    ['категория «Документы» — ничего, найдено в других категориях', K => K.category('documents'),
+      { 'catalog.category': 'documents', 'catalog.items': [], 'catalog.empty': 'Ничего не найдено по «кузов»', 'catalog.emptyDesc': 'Найдено в других категориях: 1' }],
+    ['«Искать во всех категориях» — «Все»', K => K.act('catalog-all'), { 'catalog.category': 'all', 'catalog.items': ['car-vin-body'], 'catalog.empty': null }],
+    ['«полис» — по части; «пол» основой «пол$» полис не находит', async (K) => { await K.fill('[data-field=catalog-search]', 'полис') },
+      { 'catalog.items': ['doc-policy'], 'catalog.counts': { all: 1, vehicle: 0, realty: 0, documents: 1 } }],
+    ['«пол» — пол и полис (начало слова в подписи)', K => K.fill('[data-field=catalog-search]', 'пол'), { 'catalog.items': ['doc-policy', 'realty-floor'] }],
+    ['«фара» — по связанному слову, подсветки нет', K => K.fill('[data-field=catalog-search]', 'фара'), { 'catalog.items': ['car-front'], 'catalog.marks': [] }],
+    ['пустой запрос, «Недвижимость» — 8 кадров', async (K) => { await K.clear('[data-field=catalog-search]'); await K.category('realty') },
+      { 'catalog.query': '', 'catalog.category': 'realty', 'catalog.items': ['realty-facade', 'realty-cladding', 'realty-roof', 'realty-territory', 'realty-room', 'realty-floor', 'realty-ceiling', 'realty-pipes'],
+        'catalog.counts': { all: 30, vehicle: 16, realty: 8, documents: 6 } }],
+  ], { query: 'tab=processes' }],
+  'СС-77': ['сайд шага: раздел «Фото-подсказки» — миниатюры; «Из каталога» — каталог поверх сайда, подсказки в черновик сайда; «Сохранить» — одной записью (ревью Ш-2; решение 6)', [
+    ['карандаш «Передней части» — раздел «Фото-подсказки · 8», миниатюры по порядку', K => K.stepEdit('s-front'),
+      { surface: 'step', 'stepSide.legends': ['Основное', 'Поведение', 'Съёмка', 'Нейросети · выбрано 2', 'Фото-подсказки · 8', 'Связи'], 'stepSide.hint': '8 · Все установлены',
+        'stepSide.hints': ['car-front', 'car-front-left', 'car-front-right', 'up-front-1', 'up-front-2', 'up-front-3', 'up-front-4', 'up-front-5'] }],
+    ['«Из каталога» — каталог поверх сайда шага: стек из двух слоёв; ракурсы шага отмечены и выключены', K => K.act('step-hint-catalog'),
+      { surface: 'catalog', surfaces: ['step', 'catalog'], focusIn: 'catalog', 'catalog.target': 'side', 'catalog.sub': 'Для шага «Передняя часть»', 'catalog.category': 'vehicle',
+        'catalog.attached': ['car-front', 'car-front-left', 'car-front-right'], 'catalog.picked': [] }],
+    ['«Правая сторона» и «Колесо» — «Добавить»: в черновик сайда, записи нет; фокус на «Из каталога»', async (K) => { await K.tile('car-right'); await K.tile('car-wheel'); await K.act('catalog-confirm') },
+      { surface: 'step', surfaces: ['step'], focusIn: 'step', focusAct: 'step-hint-catalog', 'stepSide.legends.4': 'Фото-подсказки · 10',
+        'stepSide.hints': ['car-front', 'car-front-left', 'car-front-right', 'up-front-1', 'up-front-2', 'up-front-3', 'up-front-4', 'up-front-5', 'car-right', 'car-wheel'], writes: 0 }],
+    ['«Из каталога», Esc — закрыт только каталог, сайд шага открыт', async (K) => { await K.act('step-hint-catalog'); await K.key('Escape') },
+      { surface: 'step', surfaces: ['step'], focusIn: 'step', writes: 0 }],
+    ['«Загрузить» — свой файл в черновик сайда', K => K.act('step-hint-upload'), { 'stepSide.legends.4': 'Фото-подсказки · 11', 'stepSide.hints.10': 'up-new-1', writes: 0 }],
+    ['«Сохранить» — одна запись: 11 подсказок, в ячейке первые три и «+8»', async (K) => { await K.act('step-save'); await K.settled() },
+      { surface: '', 'proc.rows.p-auto.2': "3 · Передняя часть · Основной · 2–7 фото · Ракурсы авто · Передняя, Оценка повреждений · 11 · Все установлены · Обязательный", 'proc.thumbs.s-front': ['Передняя часть · анфас', 'Передняя часть · три четверти слева', 'Передняя часть · три четверти справа', '+8'],
+        saveLog: ['saving', 'saved'], writes: 1 }],
+  ], { query: 'tab=processes' }],
+  'СС-78': ['сайд шага: убрать подсказку крестиком миниатюры, «глаз» — просмотр крупно; «Отмена» отбрасывает; дифф показывает убранную (ревью Ш-2; решение 6)', [
+    ['крестик у «front-5.jpg» — 7 подсказок в черновике, записи нет', async (K) => { await K.stepEdit('s-front'); await K.sideThumb('up-front-5', 'remove') },
+      { 'stepSide.legends.4': 'Фото-подсказки · 7', 'stepSide.hints': ['car-front', 'car-front-left', 'car-front-right', 'up-front-1', 'up-front-2', 'up-front-3', 'up-front-4'], writes: 0 }],
+    ['«Отмена» — в строке по-прежнему 8', K => K.act('step-cancel'), { surface: '', 'proc.rows.p-auto.2': "3 · Передняя часть · Основной · 2–7 фото · Ракурсы авто · Передняя, Оценка повреждений · 8 · Все установлены · Обязательный", writes: 0 }],
+    ['снова: «глаз» у «три четверти слева» — просмотр крупно поверх сайда', async (K) => { await K.stepEdit('s-front'); await K.sideThumb('car-front-left', 'open') },
+      { surface: 'step', viewer: { counter: '2 из 8', caption: 'Передняя часть · три четверти слева', src: 'car-front-left.svg', pick: null } }],
+    ['Esc — закрыт только просмотр; крестик у «три четверти слева», «Сохранить»', async (K) => { await K.key('Escape'); await K.sideThumb('car-front-left', 'remove'); await K.act('step-save'); await K.settled() },
+      { surface: '', viewer: null, 'proc.rows.p-auto.2': "3 · Передняя часть · Основной · 2–7 фото · Ракурсы авто · Передняя, Оценка повреждений · 7 · Все установлены · Обязательный", writes: 1 }],
+    ['дифф публикации: «подсказок: 8 → 7» и какая убрана', async (K) => { await K.publish(); await K.area('processes') },
+      { surface: 'publish', 'diff.open.0.groups.0': { kind: 'changed', title: 'Изменено · 1', items: ['Шаг «Передняя часть» | 2–7 фото, подсказок: 8 → 2–7 фото, подсказок: 7 (− «Передняя часть · три четверти слева»)'] } }],
+  ], { query: 'tab=processes' }],
+  'СС-79': ['массовая заливка: подбор по названию шага и типу объекта, «Требует внимания» первой группой, «Не заполнять», «Установить» без окна подтверждения, «Отменить»; шаги с подсказками не тронуты (ревью 4.4; решение 5)', [
+    ['«Заполнить изображения» — сайд: «Подобрано 3 из 3»; «Вид справа» — «Похоже», первой группой', K => K.act('fill-images'),
+      { surface: 'fill', focusIn: 'fill', fill: { sub: 'Подобрано 3 из 3', all: 'false', only: null, groups: [
+        { id: 'attention', legend: 'Требует внимания · 1', rows: ['s-right · Похоже · Правая сторона · профиль · по названию шага · похожих ещё 2 · заполнить'] },
+        { id: 'matched', legend: 'Подобрано · 2', rows: ['s-vin-metal · Совпадает · VIN на кузове · выбитый номер · по названию шага · заполнить', 's-pts · Совпадает · ПТС · разворот с данными · по названию шага · заполнить'] }],
+      empty: null, apply: 'Установить подсказки у 3 шагов' }, writes: 0 }],
+    ['«Не заполнять» у ПТС — «Подобрано 2 из 3»', K => K.fillAct('s-pts', 'fill-toggle'),
+      { 'fill.sub': 'Подобрано 2 из 3', 'fill.groups.1.rows.1': 's-pts · Совпадает · ПТС · разворот с данными · по названию шага · не заполнять', 'fill.apply': 'Установить подсказки у 2 шагов' }],
+    ['«Установить подсказки у 2 шагов» — одна запись без окна подтверждения; «VIN под стеклом» и «Передняя часть» прежние', async (K) => { await K.act('fill-apply'); await K.settled() },
+      { surface: '', notices: ['Подсказки установлены у 2 шагов'], 'proc.rows.p-auto': ["1 · VIN под стеклом · Основной · 1 фото · Распознавание VIN, Распознавание шильдиков · 5 · Все установлены · Обязательный", "2 · VIN на металле · Основной · 1 фото · Распознавание VIN · 1 · Все установлены · Обязательный", "3 · Передняя часть · Основной · 2–7 фото · Ракурсы авто · Передняя, Оценка повреждений · 8 · Все установлены · Обязательный", "4 · Вид справа · Основной · 2–7 фото · Ракурсы авто · Правая сторона · 1 · Все установлены"],
+        'proc.rows.p-docs': ["1 · Паспорт ТС (ПТС) · Техническое фото · 2 фото · Сканер документов · Не установлена · Из галереи, Скан документов"], 'proc.thumbs.s-right': ['Правая сторона · профиль'], saveLog: ['saving', 'saved'], writes: 1 }],
+    ['«Отменить» — подсказок у шагов снова нет', async (K) => { await K.undo(); await K.settled() },
+      { 'proc.rows.p-auto.1': "2 · VIN на металле · Основной · 1 фото · Распознавание VIN · Не установлена · Обязательный", 'proc.rows.p-auto.3': "4 · Вид справа · Основной · 2–7 фото · Ракурсы авто · Правая сторона · Не установлена", writes: 2 }],
+  ], { query: 'tab=processes' }],
+  'СС-80': ['массовая заливка: «Заменить» — каталог вторым слоем сайда, выбор одной; «←» и Esc — назад к списку; «Показать все шаги» (ревью 4.4; решение 5)', [
+    ['«Заменить» у «Вид справа» — второй слой: «←», предложение отмечено, «Заменить»', async (K) => { await K.act('fill-images'); await K.fillAct('s-right', 'fill-replace') },
+      { surface: 'fill', fill: null, catalog: { target: 'fill', title: 'Подсказка для шага «Вид справа»', sub: 'Каталог фото-подсказок · выберите одну', back: true, query: '', category: 'vehicle',
+        counts: { all: 30, vehicle: 16, realty: 8, documents: 6 }, items: ['car-front', 'car-front-left', 'car-front-right', 'car-rear', 'car-rear-left', 'car-rear-right', 'car-left', 'car-right',
+          'car-vin-glass', 'car-vin-body', 'car-plate', 'car-odometer', 'car-wheel', 'car-interior', 'car-engine', 'car-damage'], picked: ['car-right'], attached: [], marks: [],
+        note: 'Выбрано: 1', confirm: 'Заменить', empty: null, emptyDesc: null } }],
+    ['«Три четверти справа» передней части — выбор одной: прежний снят', K => K.tile('car-front-right'), { 'catalog.picked': ['car-front-right'], 'catalog.note': 'Выбрано: 1' }],
+    ['«Заменить» — назад к списку: строка «Выбрано вручную»', K => K.act('catalog-confirm'),
+      { surface: 'fill', catalog: null, 'fill.groups.0.rows': ['s-right · Выбрано вручную · Передняя часть · три четверти справа · выбрано в каталоге · заполнить'], 'fill.sub': 'Подобрано 3 из 3' }],
+    ['«Заменить» у «VIN на металле», Esc — назад к списку, сайд открыт', async (K) => { await K.fillAct('s-vin-metal', 'fill-replace'); await K.key('Escape') },
+      { surface: 'fill', catalog: null, 'fill.sub': 'Подобрано 3 из 3', 'fill.groups.1.rows.0': 's-vin-metal · Совпадает · VIN на кузове · выбитый номер · по названию шага · заполнить' }],
+    ['«←» во втором слое — назад к списку', async (K) => { await K.fillAct('s-vin-metal', 'fill-replace'); await K.backLayer() }, { surface: 'fill', catalog: null }],
+    ['«Показать все шаги» — шаги с подсказками: не заполняются по умолчанию', K => K.fillAll(),
+      { 'fill.all': 'true', 'fill.sub': 'Подобрано 3 из 5', 'fill.groups': [
+        { id: 'attention', legend: 'Требует внимания · 3', rows: ['s-vin-glass · Похоже · VIN на кузове · выбитый номер · по части названия шага · не заполнять',
+          's-front · Нет предложения · Нет предложения · подходящие подсказки уже у шага · не заполнять',
+          's-right · Выбрано вручную · Передняя часть · три четверти справа · выбрано в каталоге · заполнить'] },
+        { id: 'matched', legend: 'Подобрано · 2', rows: ['s-vin-metal · Совпадает · VIN на кузове · выбитый номер · по названию шага · заполнить', 's-pts · Совпадает · ПТС · разворот с данными · по названию шага · заполнить'] }] }],
+    ['«Заполнить» у «VIN под стеклом», «Установить подсказки у 4 шагов» — подсказка добавлена к пяти прежним', async (K) => { await K.fillAct('s-vin-glass', 'fill-toggle'); await K.act('fill-apply'); await K.settled() },
+      { surface: '', notices: ['Подсказки установлены у 4 шагов'], 'proc.rows.p-auto': ["1 · VIN под стеклом · Основной · 1 фото · Распознавание VIN, Распознавание шильдиков · 6 · Все установлены · Обязательный", "2 · VIN на металле · Основной · 1 фото · Распознавание VIN · 1 · Все установлены · Обязательный", "3 · Передняя часть · Основной · 2–7 фото · Ракурсы авто · Передняя, Оценка повреждений · 8 · Все установлены · Обязательный", "4 · Вид справа · Основной · 2–7 фото · Ракурсы авто · Правая сторона · 1 · Все установлены"],
+        'proc.rows.p-docs': ["1 · Паспорт ТС (ПТС) · Техническое фото · 2 фото · Сканер документов · 1 · Все установлены · Из галереи, Скан документов"], 'proc.thumbs.s-right': ['Передняя часть · три четверти справа'], writes: 1 }],
+  ], { query: 'tab=processes' }],
+  'СС-81': ['массовая заливка только выбранных шагов — из панели массовых действий (решение 5)', [
+    ['выбрать «VIN на металле» и ПТС, «Заполнить изображения» на панели — две строки, «Только выбранные шаги — 2»', async (K) => { await K.stepCheck('s-vin-metal'); await K.stepCheck('s-pts'); await K.act('bulk-fill') },
+      { surface: 'fill', fill: { sub: 'Подобрано 2 из 2', all: 'false', only: 'Только выбранные шаги — 2', groups: [
+        { id: 'matched', legend: 'Подобрано · 2', rows: ['s-vin-metal · Совпадает · VIN на кузове · выбитый номер · по названию шага · заполнить', 's-pts · Совпадает · ПТС · разворот с данными · по названию шага · заполнить'] }],
+      empty: null, apply: 'Установить подсказки у 2 шагов' } }],
+    ['«Установить» — только выбранные; «Вид справа» без подсказки', async (K) => { await K.act('fill-apply'); await K.settled() },
+      { surface: '', notices: ['Подсказки установлены у 2 шагов'], 'proc.rows.p-auto.1': "2 · VIN на металле · Основной · 1 фото · Распознавание VIN · 1 · Все установлены · Обязательный", 'proc.rows.p-auto.3': "4 · Вид справа · Основной · 2–7 фото · Ракурсы авто · Правая сторона · Не установлена", 'proc.rows.p-docs.0': "1 · Паспорт ТС (ПТС) · Техническое фото · 2 фото · Сканер документов · 1 · Все установлены · Из галереи, Скан документов", writes: 1 }],
+    ['снова на тех же шагах — подсказки у них есть: строк нет, «Показать все шаги»', async (K) => { await K.wait(3200); await K.act('bulk-fill') },
+      { 'fill.groups': [], 'fill.empty': 'У всех шагов есть фото-подсказки', 'fill.apply': 'Установить подсказки у 0 шагов · выкл' }],
+  ], { query: 'tab=processes' }],
+  'СС-82': ['массовая заливка: «Нет предложения» — тип объекта схемы «Недвижимость»; «Выбрать из каталога» — категория типа объекта, выбор вручную (ревью 4.4)', [
+    ['«Заполнить изображения» — две строки «Нет предложения» в «Требует внимания», ПТС — «Совпадает»', K => K.act('fill-images'),
+      { fill: { sub: 'Подобрано 1 из 3', all: 'false', only: null, groups: [
+        { id: 'attention', legend: 'Требует внимания · 2', rows: ['s-vin-metal · Нет предложения · Нет предложения · в каталоге нет подходящей подсказки · не заполнять',
+          's-right · Нет предложения · Нет предложения · в каталоге нет подходящей подсказки · не заполнять'] },
+        { id: 'matched', legend: 'Подобрано · 1', rows: ['s-pts · Совпадает · ПТС · разворот с данными · по названию шага · заполнить'] }],
+      empty: null, apply: 'Установить подсказки у 1 шага' } }],
+    ['«Выбрать из каталога» у «VIN на металле» — категория «Недвижимость» выбрана заранее, выбора нет', K => K.fillAct('s-vin-metal', 'fill-replace'),
+      { 'catalog.title': 'Подсказка для шага «VIN на металле»', 'catalog.category': 'realty', 'catalog.picked': [], 'catalog.confirm': 'Заменить · выкл' }],
+    ['«Транспорт», «VIN на кузове», «Заменить» — строка выбрана вручную', async (K) => { await K.category('vehicle'); await K.tile('car-vin-body'); await K.act('catalog-confirm') },
+      { catalog: null, 'fill.sub': 'Подобрано 2 из 3', 'fill.groups.0.rows.0': 's-vin-metal · Выбрано вручную · VIN на кузове · выбитый номер · выбрано в каталоге · заполнить' }],
+  ], { query: 'tab=processes&type=house' }],
+  'СС-83': ['миниатюры фото-подсказок в ячейке: до трёх и «+N»; нажатие — просмотр крупно со счётчиком и стрелками; из каталога — «Выбрать» в полосе просмотра (ревью Ш-5; решения 4, 6)', [
+    ['старт: миниатюры у шагов с подсказками', null, { 'proc.thumbs': {
+      's-vin-glass': ['VIN под стеклом · через лобовое стекло', 'Своя загрузка · vin-1.jpg', 'Своя загрузка · vin-2.jpg', '+2'],
+      's-front': ['Передняя часть · анфас', 'Передняя часть · три четверти слева', 'Передняя часть · три четверти справа', '+5'] } }],
+    ['вторая миниатюра «Передней части» — просмотр крупно: «2 из 8»', K => K.thumb('s-front', 1),
+      { viewer: { counter: '2 из 8', caption: 'Передняя часть · три четверти слева', src: 'car-front-left.svg', pick: null } }],
+    ['стрелка вперёд — «3 из 8»', K => K.viewerArrow('next'), { 'viewer.counter': '3 из 8', 'viewer.caption': 'Передняя часть · три четверти справа' }],
+    ['Esc; «+5» — первая скрытая: своя загрузка', async (K) => { await K.key('Escape'); await K.thumb('s-front', 'more') },
+      { viewer: { counter: '4 из 8', caption: 'Своя загрузка · front-1.jpg', src: 'upload.svg', pick: null } }],
+    ['Esc; каталог «VIN на металле», «открыть крупно» у «Колеса» — в полосе «Выбрать»', async (K) => { await K.key('Escape'); await K.catalogFrom('s-vin-metal'); await K.tileOpen('car-wheel') },
+      { surface: 'catalog', viewer: { counter: '13 из 16', caption: 'Колесо · крупно', src: 'car-wheel.svg', pick: 'Выбрать' } }],
+    ['«Выбрать» в полосе — «Выбрано»; Esc — каталог: плитка выбрана', async (K) => { await K.act('viewer-pick'); await K.key('Escape') },
+      { surface: 'catalog', viewer: null, 'catalog.picked': ['car-wheel'], 'catalog.note': 'Выбрано: 1' }],
+  ], { query: 'tab=processes' }],
+  'СС-84': ['поиск по фото-подсказке шага и действие «Заполнить изображения» из выдачи (такт 87: поиск — по новому полю)', [
+    ['«анфас» — шаг «Передняя часть» по своей подсказке', async (K) => { await K.searchClick(); await K.type('анфас') },
+      { results: [{ path: 'Процессы → Осмотр автомобиля', items: ['Передняя часть | фото-подсказка «Передняя часть · анфас»'] }] }],
+    ['«заполнить изоб», Enter — таб «Процессы и шаги», сайд массовой заливки', async (K) => { await K.fill('[data-field=search]', 'заполнить изоб'); await K.key('Enter') },
+      { tab: 'processes', surface: 'fill', 'fill.sub': 'Подобрано 3 из 3', query: '' }],
   ]],
 }
 

@@ -11,8 +11,9 @@ import {
   PHOTO_RESOLUTIONS, PROCESS_DEFAULTS, REGION_MATRICES, ROLE_LADDER, ROLES, SCHEME_TYPES, SECTION_ANCHORS, SECTIONS, STATUS_DICTIONARIES, STEP_DEFAULTS,
   STEP_FLAGS, STEP_KINDS, STEP_METHODS, suggestAlias, TABS, VIDEO_RESOLUTIONS,
   INDUSTRIES, SHOWCASE_IMAGE, SHOWCASE_OBJECTS, SHOWCASE_STATUS, SPHERES,
-  type BehaviorSettings, type Dataset, type FieldDraft, type FormulaSettings, type GroupDraft, type NetworkState, type PdfTemplate, type PdfTemplateDraft,
-  type ProcessDraft, type SaveState, type SectionId, type StepDraft, type TabId,
+  catalogCounts, catalogHint, catalogLabel, HINT_CATEGORIES, HINT_MATCH_LABEL, hintLabel, hintSrc, hintStatus, searchCatalog,
+  type BehaviorSettings, type Dataset, type FieldDraft, type FillRow, type FormulaSettings, type GroupDraft, type HintCategoryFilter, type HintMatch,
+  type NetworkState, type PdfTemplate, type PdfTemplateDraft, type ProcessDraft, type SaveState, type SectionId, type StepDraft, type StepHint, type TabId,
 } from '~/stands/scheme-edit/model'
 import demo from '~/stands/scheme-edit/demo-data.json'
 import { useReorder } from '~/stands/scheme-edit/reorder'
@@ -72,6 +73,12 @@ import { useReorder } from '~/stands/scheme-edit/reorder'
  * «Из схемы» — модули чипами со снятием, «Как устроена схема» — статусы `Chip neutral` со стрелками. Пустые состояния табов
  * (№ 65) — `Empty` с действием; у новой схемы «Форма» и «Процессы и шаги» неактивны до первого сохранения, причину держит
  * обёртка с `tabindex` и `Tooltip` (№ 66); плашка «Сохранение теперь автоматическое» — `Callout closable` (№ 67).
+ * **Такт 87 — фото-подсказки** (`docs/scheme-edit-review.md`, 4.3, 4.4, Ш-2, Т-2, Ш-5): в ячейке шага — статус, до трёх
+ * миниатюр с «+N» (`ThumbStrip`), «Загрузить» и «Выбрать из каталога»; сайд «Каталог фото-подсказок» — поиск, категории
+ * колонкой (`SectionNav`), сетка `MediaGallery` с выбором нескольких, просмотр крупно (`Lightbox`, `FrameStage`), подвал
+ * «Выбрано: N · Добавить»; сайд «Заполнить фото-подсказки» — подбор по названию шага и типу объекта, «Требует внимания»
+ * первой группой, «Заменить» — каталог вторым слоем, «Не заполнять», «Показать все шаги», «Установить подсказки у N шагов»;
+ * в сайде шага — раздел «Фото-подсказки» (`StepThumb` с удалением, «Из каталога», «Загрузить») и полные подписи признаков.
  *
  * ## Поведение — модель `~/stands/scheme-edit/model.ts`
  *
@@ -119,6 +126,13 @@ import { useReorder } from '~/stands/scheme-edit/reorder'
  * | `?saved=1` | новая схема (`?data=new`) уже сохранялась: «Форма» и «Процессы и шаги» доступны — их пустые состояния (такт 72) |
  * | `?card=needs` · `published` | статус витринной карточки при загрузке: «Требует оформления», «Опубликована на витрине» (такт 72) |
  * | `?hint=off` | плашка «Сохранение теперь автоматическое» закрыта при загрузке (такт 72) |
+ * | `?open=catalog` | сайд «Каталог фото-подсказок» из ячейки шага: `?step=` — этот шаг, без него — «VIN на металле» (такт 87) |
+ * | `?open=step-catalog` | каталог поверх сайда шага: `?step=` — этот шаг, без него — «Передняя часть» (такт 87) |
+ * | `?catq=кузов` · `?category=vehicle` · `realty` · `documents` · `all` · `?picked=car-front,car-right` | каталог: запрос, категория, выбранные подсказки (такт 87) |
+ * | `?open=catalog-view` | каталог и просмотр крупно первой подсказки сетки (такт 87) |
+ * | `?open=fill` | сайд «Заполнить фото-подсказки»: `?fill=all` — «Показать все шаги»; с `?steps=` — только выбранные шаги (такт 87) |
+ * | `?open=fill-catalog` | массовая заливка, второй слой — каталог для строки: `?row=` — этот шаг, без него — «Вид справа» (такт 87) |
+ * | `?open=hint-view` | просмотр крупно фото-подсказок шага из ячейки: `?step=` — этот шаг, без него — «Передняя часть» (такт 87) |
  */
 definePageMeta({ layout: 'admin' })
 useHead({ title: 'Редактирование схемы осмотра — стенд' })
@@ -129,8 +143,9 @@ const q = (k: string) => String(route.query[k] ?? '')
 const D = demo as unknown as Record<'main' | 'fresh', Dataset>
 /** Окна и выделение «Формы» открывают таб «Форма» (такт 69). */
 const FORM_OPEN = ['field', 'new-field', 'group', 'new-group']
-/** Окна «Процессов и шагов» открывают свой таб (такт 71). */
-const PROCESS_OPEN = ['process', 'new-process', 'step', 'new-step', 'networks', 'overlay', 'overlay-filled', 'overlay-step']
+/** Окна «Процессов и шагов» открывают свой таб (такт 71); такт 87 — каталог, массовая заливка и просмотр подсказок. */
+const PROCESS_OPEN = ['process', 'new-process', 'step', 'new-step', 'networks', 'overlay', 'overlay-filled', 'overlay-step',
+  'catalog', 'step-catalog', 'catalog-view', 'fill', 'fill-catalog', 'hint-view']
 const tabAtLoad = FORM_OPEN.includes(q('open')) || q('selected') ? 'form' : q('steps') || q('upload') || PROCESS_OPEN.includes(q('open')) ? 'processes' : TABS.find(t => t.id === q('tab'))?.id
 const saveAtLoad = (['saving', 'error'] as SaveState[]).find(s => s === q('save'))
 const m = createModel(q('data') === 'new' ? D.fresh : D.main, {
@@ -484,6 +499,7 @@ function openEntry(e: SearchEntry) {
   if (side === 'field') openField('')
   if (side === 'group') openGroup('')
   if (side === 'process') openProcess('')
+  if (side === 'fill') openFill()
 }
 function pick(row: Row) {
   if (row.kind === 'hit') openEntry(row.hit.entry)
@@ -856,7 +872,150 @@ function upload(processId: string, stepId: string, count = 1) {
 function dropFiles(event: DragEvent, processId: string, stepId: string) {
   upload(processId, stepId, event.dataTransfer?.files.length || 1)
 }
-const hintText = (n: number) => (n ? `${n} · Все установлены` : 'Не установлена')
+/** Миниатюры подсказок шага для `ThumbStrip`: картинка и подпись — часть и ракурс либо имя своего файла (такт 87). */
+const thumbs = (hints: readonly StepHint[]) => hints.map(h => ({ src: hintSrc(h), label: hintLabel(h) }))
+
+/* ------------------------------ просмотр крупно — такт 87 ------------------------------ */
+/**
+ * Просмотр фото-подсказок крупно — `Lightbox` кита с `FrameStage`: из ячейки шага (миниатюры и «+N»), из сайда шага («глаз»
+ * миниатюры) и из каталога (кнопка в углу плитки; там в полосе — «Выбрать»). Счётчик, стрелки и подпись — части и ракурса.
+ */
+interface ViewerItem { src: string, caption: string, pick: string }
+const viewer = ref<{ items: ViewerItem[], index: number } | null>(null)
+const viewerOpen = computed({ get: () => !!viewer.value, set: (v) => { if (!v) viewer.value = null } })
+const viewerItem = computed(() => viewer.value?.items[viewer.value.index] ?? null)
+function viewHints(hints: readonly StepHint[], index: number) {
+  if (hints.length) viewer.value = { items: hints.map(h => ({ src: hintSrc(h), caption: hintLabel(h), pick: '' })), index: Math.min(index, hints.length - 1) }
+}
+function viewerStep(index: number) {
+  if (viewer.value) viewer.value.index = Math.min(Math.max(0, index - 1), viewer.value.items.length - 1)
+}
+
+/* ------------------------------ каталог фото-подсказок — такт 87, 4.3 ------------------------------ */
+/**
+ * Сайд «Каталог фото-подсказок» — паттерн «выбор из справочника» (`spec-audit.md`): поиск, категории колонкой (категория
+ * шага выбрана заранее), сетка `MediaGallery` с выбором нескольких, просмотр крупно, подвал «Выбрано: N · Добавить».
+ * Откуда открыт — туда и отдаёт выбор: ячейка шага — сразу в черновик схемы одной записью; сайд шага — в черновик сайда;
+ * строка массовой заливки — замена подсказки строки (второй слой сайда заливки, выбор одной).
+ */
+type CatalogTarget = 'cell' | 'side' | 'fill'
+const cat = ref({ target: 'cell' as CatalogTarget, process: '', step: '', query: '', category: 'all' as HintCategoryFilter, picked: [] as string[] })
+const catalogItems = computed(() => searchCatalog(cat.value.query, cat.value.category))
+const catalogNumbers = computed(() => catalogCounts(cat.value.query))
+const catalogQuery = computed({ get: () => cat.value.query, set: (v) => { cat.value.query = v } })
+const catalogCategory = computed<string>({ get: () => cat.value.category, set: (v) => { cat.value.category = v as HintCategoryFilter } })
+/** Шаг, для которого открыт каталог: строка таблицы, черновик сайда шага либо строка заливки. */
+const catalogStep = computed(() => {
+  if (cat.value.target === 'side') return { title: sd.value.title || 'Новый шаг', hints: sd.value.hints }
+  const st = m.processes.value.find(p => p.id === cat.value.process)?.steps.find(x => x.id === cat.value.step)
+  return { title: st?.title ?? '', hints: st?.hints ?? [] }
+})
+/** Подсказки каталога, которые уже у шага: плитка отмечена и выключена — «Уже у шага». В замене строки заливки — нет. */
+const attached = computed(() => new Set(cat.value.target === 'fill' ? [] : catalogStep.value.hints.filter(h => h.kind === 'catalog').map(h => h.id)))
+const catalogTitle = computed(() => (cat.value.target === 'fill' ? `Подсказка для шага «${catalogStep.value.title}»` : 'Каталог фото-подсказок'))
+const catalogSubtitle = computed(() => (cat.value.target === 'fill' ? 'Каталог фото-подсказок · выберите одну' : `Для шага «${catalogStep.value.title}»`))
+/** Пустая выдача: найдено в других категориях — переход ко всем; иначе — подсказка, по чему ищется. */
+const catalogElsewhere = computed(() => (cat.value.category === 'all' ? 0 : catalogNumbers.value.all))
+function openCatalog(target: CatalogTarget, processId = '', stepId = '') {
+  if (target === 'cell' && !m.canEdit()) return
+  const pid = target === 'side' ? sdHost.value.process : processId
+  cat.value = { target, process: pid, step: target === 'side' ? sd.value.id : stepId, query: '', category: m.hintCategory(pid), picked: [] }
+  if (target === 'fill') {
+    const choice = fill.value.choice[stepId] ?? fillRowsNow.value.find(r => r.stepId === stepId)?.proposal.hint?.id
+    cat.value.picked = choice ? [choice] : []
+    fill.value.layer = 'catalog'
+    return
+  }
+  m.openSide('catalog')
+}
+/** Выбор плитки: в замене строки — одна подсказка, иначе — несколько. */
+function togglePick(id: string) {
+  const list = cat.value.picked
+  if (cat.value.target === 'fill') cat.value.picked = list[0] === id ? [] : [id]
+  else cat.value.picked = list.includes(id) ? list.filter(x => x !== id) : [...list, id]
+}
+/** «Добавить» — ячейка: одна запись с «Отменить»; сайд шага: подсказки в черновик сайда. «Заменить» — выбор строки заливки. */
+function confirmCatalog() {
+  const ids = cat.value.picked.filter(id => !attached.value.has(id))
+  if (!ids.length) return
+  if (cat.value.target === 'fill') {
+    fill.value.choice[cat.value.step] = ids[0]!
+    fill.value.skip[cat.value.step] = false
+    closeFillCatalog()
+    return
+  }
+  if (cat.value.target === 'side') sd.value.hints.push(...ids.map(id => ({ kind: 'catalog' as const, id })))
+  else m.addCatalogHints(cat.value.process, cat.value.step, ids)
+  m.closeSurface()
+}
+function cancelCatalog() {
+  if (cat.value.target === 'fill') closeFillCatalog()
+  else m.closeSurface()
+}
+/** Просмотр крупно из каталога — подсказки сетки по порядку, в полосе просмотра — «Выбрать». */
+function viewCatalog(id: string) {
+  const list = catalogItems.value
+  viewer.value = { items: list.map(c => ({ src: c.src, caption: catalogLabel(c), pick: c.id })), index: Math.max(0, list.findIndex(c => c.id === id)) }
+}
+
+/* ------------------------------ массовая заливка — такт 87, 4.4 ------------------------------ */
+/**
+ * Сайд «Заполнить фото-подсказки» (решение 5 оркестратора 2026-10-08): строки шагов без подсказок — «Показать все шаги»
+ * добавляет остальные; у строки — предложение из каталога по названию шага и типу объекта с оценкой и причиной второй
+ * строкой. «Требует внимания» — первой группой: «Похоже» и «Нет предложения». Предложение стоит заранее у шагов без
+ * подсказок; «Не заполнять» убирает строку из установки, «Заполнить» возвращает; у шага с подсказками строка по умолчанию не
+ * заполняется. «Заменить» — каталог вторым слоем сайда, выбор одной. Подвал — «Установить подсказки у N шагов», без окна
+ * подтверждения; после — уведомление с «Отменить». Черновик — здесь, до «Установить».
+ */
+const fill = ref({ all: false, only: [] as string[], layer: 'list' as 'list' | 'catalog', choice: {} as Record<string, string>, skip: {} as Record<string, boolean> })
+const fillRowsNow = computed<FillRow[]>(() => m.fillRows(fill.value.all, fill.value.only))
+interface FillView { row: FillRow, hint: string, included: boolean, manual: boolean }
+const fillViews = computed<FillView[]>(() => fillRowsNow.value.map((row) => {
+  const manual = fill.value.choice[row.stepId]
+  const hint = manual ?? row.proposal.hint?.id ?? ''
+  /* По умолчанию заполняется шаг без подсказок, у которого есть предложение. */
+  const skip = fill.value.skip[row.stepId] ?? !(row.count === 0 && !!row.proposal.hint)
+  return { row, hint, included: !!hint && !skip, manual: !!manual }
+}))
+const fillIncluded = computed(() => fillViews.value.filter(v => v.included))
+const FILL_GROUPS: { id: 'attention' | 'matched', title: string, test: (m: HintMatch) => boolean }[] = [
+  { id: 'attention', title: 'Требует внимания', test: x => x !== 'match' },
+  { id: 'matched', title: 'Подобрано', test: x => x === 'match' },
+]
+const fillGroups = computed(() => FILL_GROUPS.map(g => ({ ...g, rows: fillViews.value.filter(v => g.test(v.row.proposal.match)) })).filter(g => g.rows.length))
+const fillSubtitle = computed(() => `Подобрано ${fillIncluded.value.length} из ${fillViews.value.length}`)
+const fillApplyText = computed(() => `Установить подсказки у ${fillIncluded.value.length} ${plural(fillIncluded.value.length, 'шага', 'шагов', 'шагов')}`)
+/** Оценка строки — метка-контур тоном: «Совпадает» — успех, «Похоже» — предупреждение, «Нет предложения» — нейтральная; выбранное вручную — бренд. */
+const MATCH_TONE: Record<HintMatch, 'success' | 'warning' | 'neutral'> = { match: 'success', similar: 'warning', none: 'neutral' }
+/** Подпись подсказки каталога по id: часть и ракурс; пусто — подсказки нет. */
+const catalogName = (id: string) => { const c = catalogHint(id); return c ? catalogLabel(c) : '' }
+/** Вторая строка шага: процесс и подсказки, которые уже есть. */
+const fillWhere = (r: FillRow) => (r.count ? `${r.process} · уже ${r.count} ${plural(r.count, 'подсказка', 'подсказки', 'подсказок')}` : r.process)
+function openFill(only: readonly string[] = []) {
+  if (!m.canEdit()) return
+  fill.value = { all: false, only: [...only], layer: 'list', choice: {}, skip: {} }
+  m.openSide('fill')
+}
+function fillToggle(stepId: string) {
+  const v = fillViews.value.find(x => x.row.stepId === stepId)
+  if (v) fill.value.skip[stepId] = v.included
+}
+function closeFillCatalog() { fill.value.layer = 'list' }
+function applyFill() {
+  if (m.applyHints(fillIncluded.value.map(v => ({ stepId: v.row.stepId, hint: v.hint })))) m.closeSurface()
+}
+
+/** Сайд каталога и сайд массовой заливки — одно окно: заливка показывает каталог вторым слоем, как дифф версии в истории. */
+const hintsSurface = computed(() => (m.topSurface.value?.id === 'catalog' || m.topSurface.value?.id === 'fill' ? m.topSurface.value.id : ''))
+const hintsOpen = computed({ get: () => !!hintsSurface.value, set: (v) => { if (!v && hintsSurface.value) m.closeSurface() } })
+const catalogShown = computed(() => hintsSurface.value === 'catalog' || (hintsSurface.value === 'fill' && fill.value.layer === 'catalog'))
+/** Esc во втором слое заливки — назад к списку, сайд остаётся. */
+function onHintsEscape(event: KeyboardEvent) {
+  if (hintsSurface.value === 'fill' && fill.value.layer === 'catalog') {
+    event.preventDefault()
+    closeFillCatalog()
+  }
+}
 
 /* ------------------------------ сайды процесса и шага, оверлей — П7, часть 2, такт 71 ------------------------------ */
 const copy = <T>(x: T): T => JSON.parse(JSON.stringify(x))
@@ -926,7 +1085,7 @@ const overlaySubtitle = computed(() => (ro.value ? 'Повторяемый пр�
  * Сайд шага — № 63 (пробел макета): шесть секций аудита — «Основное», «Поведение», «Съёмка», «Нейросети», «Подсказки»,
  * «Связи». Открывается с полотна (пишет в черновик схемы) либо поверх оверлея (пишет в черновик оверлея).
  */
-const EMPTY_STEP: StepDraft = { id: '', title: '', kind: 'main', method: '1 фото', networks: [], hints: 0, ...copy(STEP_DEFAULTS), order: 1 }
+const EMPTY_STEP: StepDraft = { id: '', title: '', kind: 'main', method: '1 фото', networks: [], hints: [], ...copy(STEP_DEFAULTS), order: 1 }
 const sd = ref<StepDraft>(copy(EMPTY_STEP))
 const sdTitle = ref('')
 const sdInvalid = ref(false)
@@ -953,8 +1112,12 @@ function focusStepSection(section: string) {
     el?.querySelector<HTMLElement>('[data-slot=choice-control]:not(:disabled)')?.focus({ preventScroll: true })
   }, 80))
 }
-const stepOpen = surface('step')
+/** Сайд шага открыт и под каталогом фото-подсказок поверх него (стек «шаг → каталог», такт 87). */
+const stepOpen = stacked('step')
 const stepOrderMax = computed(() => hostSteps.value.length + (sd.value.id ? 0 : 1))
+/** Раздел «Фото-подсказки» сайда шага — такт 87, Ш-2: «Загрузить» — свой файл в черновик сайда, крестик миниатюры — убрать. */
+function uploadSideHint() { sd.value.hints.push(...m.newUploads(sd.value.hints, 1)) }
+function removeSideHint(id: string) { sd.value.hints = sd.value.hints.filter(h => h.id !== id) }
 function toggleNetwork(name: string) {
   const list = sd.value.networks
   sd.value.networks = list.includes(name) ? list.filter(x => x !== name) : [...list, name]
@@ -1014,6 +1177,47 @@ function saveNetworksSide() {
       od.value.steps = m.placeStep([], { ...copy(EMPTY_STEP), title: 'Повреждение — общий план', description: 'Снимите повреждённую деталь целиком с расстояния 1–2 метра', method: '2–7 фото', networks: ['Оценка повреждений'], required: true, order: 1 })
     }
     if (q('open') === 'overlay-step') openStep(repeatable.id, '', true)
+  }
+}
+
+/* Оснастка приёмки (такт 87): каталог из ячейки и поверх сайда шага, запрос, категория и выбор, просмотр крупно, заливка. */
+{
+  const procs = m.processes.value
+  const ownerOf = (id: string) => procs.find(x => x.steps.some(st => st.id === id))
+  const stepAt = (fallback: string) => (ownerOf(q('step')) ? q('step') : fallback)
+  const tune = () => {
+    if (q('catq')) cat.value.query = q('catq')
+    if (['all', ...HINT_CATEGORIES.map(c => c.id)].includes(q('category'))) cat.value.category = q('category') as HintCategoryFilter
+    if (q('picked')) cat.value.picked = q('picked').split(',').filter(id => !!catalogHint(id))
+  }
+  /*
+   * Второй слой поверх первого (просмотр над каталогом, каталог над сайдом шага) открывается после монтирования: два окна,
+   * открытые сразу при загрузке, дают предупреждение браузера «Blocked aria-hidden» — фокус первого окна остаётся под
+   * `aria-hidden` второго. Нажатиями этого нет: окно поверх открывается, когда фокус уже в нижнем.
+   */
+  const later = (fn: () => void) => onMounted(() => { setTimeout(fn, 120) })
+  if (q('open') === 'catalog' || q('open') === 'catalog-view') {
+    const id = stepAt('s-vin-metal')
+    const owner = ownerOf(id)
+    if (owner) { openCatalog('cell', owner.id, id); tune() }
+    if (q('open') === 'catalog-view') later(() => { if (catalogItems.value[0]) viewCatalog(catalogItems.value[0].id) })
+  }
+  if (q('open') === 'step-catalog') {
+    const id = stepAt('s-front')
+    const owner = ownerOf(id)
+    if (owner) { openStep(owner.id, id); later(() => { openCatalog('side'); tune() }) }
+  }
+  if (q('open') === 'fill' || q('open') === 'fill-catalog') {
+    openFill(m.ui.selectedSteps)
+    if (q('fill') === 'all') fill.value.all = true
+    if (q('open') === 'fill-catalog') {
+      const row = fillRowsNow.value.find(r => r.stepId === (q('row') || 's-right'))
+      if (row) { openCatalog('fill', row.processId, row.stepId); tune() }
+    }
+  }
+  if (q('open') === 'hint-view') {
+    const id = stepAt('s-front')
+    viewHints(ownerOf(id)?.steps.find(st => st.id === id)?.hints ?? [], 0)
   }
 }
 
@@ -2445,7 +2649,10 @@ if (import.meta.client) {
       <TabsContent value="processes">
         <!-- Просмотр прошлой версии (решение 4 такта 70, правило строк 108 и 125): флажки — «только чтение», действия — под `inert`. -->
         <div class="flex flex-col gap-3 pt-6" data-processes :data-readonly="ro || undefined">
-          <!-- Действия таба — № 43 (`32765:6553`): «Заполнить изображения» — заглушка (r2 §9), «Вставить шаг из другой схемы» — № 70. -->
+          <!--
+            Действия таба — № 43 (`32765:6553`): «Заполнить изображения» — сайд массовой заливки фото-подсказок (такт 87, 4.4; до такта
+            87 — заглушка r2 §9), «Вставить шаг из другой схемы» — № 70.
+          -->
           <div :inert="ro" class="flex flex-wrap items-center gap-3" data-processes-actions>
             <Button v-if="m.processes.value.length" variant="outline" show-icon data-act="process-add" @click="openProcess('')">
               <template #icon>
@@ -2459,7 +2666,7 @@ if (import.meta.client) {
               </template>
               Вставить шаг из другой схемы
             </Button>
-            <Button variant="outline" show-icon class="ml-auto" data-act="fill-images" @click="m.fillImages()">
+            <Button variant="outline" show-icon class="ml-auto" data-act="fill-images" @click="openFill()">
               <template #icon>
                 <Icon name="auto-fix" :size="16" />
               </template>
@@ -2496,6 +2703,10 @@ if (import.meta.client) {
                 </Field>
                 <Button variant="secondary" data-act="bulk-networks" @click="openNetworks()">
                   Настроить нейросети
+                </Button>
+                <!-- Такт 87, решение 5: массовая заливка только выбранных шагов. -->
+                <Button variant="secondary" data-act="bulk-fill" @click="openFill(m.ui.selectedSteps)">
+                  Заполнить изображения
                 </Button>
                 <Button variant="outline" data-act="steps-clear" @click="m.clearStepSelection()">
                   Снять выделение
@@ -2680,26 +2891,34 @@ if (import.meta.client) {
                     </ButtonAction>
                   </div>
                 </TableCell>
-                <!-- Фото-подсказка — № 47 (`32765:6709`, `32765:6773`): статус на месте, загрузка инлайн в ячейке, без «Сохранить». -->
-                <TableCell variant="slot" class="h-auto w-44 flex-col items-start gap-2 px-4 pt-4 pb-3" :data-step-hints="st.hints">
-                  <Badge size="sm" :variant="st.hints ? 'success' : 'warning'" data-hint-status>
-                    {{ hintText(st.hints) }}
+                <!--
+                  Фото-подсказка — № 47 (`32765:6709`, `32765:6773`): статус на месте, загрузка инлайн в ячейке, без «Сохранить». Такт 87
+                  (Ш-5, решения 4 и 6): до трёх миниатюр и «+N» — `ThumbStrip`, нажатие — просмотр крупно; «Загрузить» и «Выбрать из
+                  каталога» рядом — у шага с подсказками тоже (удаление — в сайде шага, раздел «Фото-подсказки»).
+                -->
+                <TableCell variant="slot" class="h-auto w-44 flex-col items-start gap-2 px-4 pt-4 pb-3" :data-step-hints="st.hints.length">
+                  <Badge size="sm" :variant="st.hints.length ? 'success' : 'warning'" data-hint-status>
+                    {{ hintStatus(st.hints.length) }}
                   </Badge>
-                  <div :inert="ro" class="flex w-full flex-col items-start gap-2">
-                    <ButtonAction size="sm" :show-icon="false" :data-act="st.hints ? 'hint-edit' : 'hint-upload'" @click="toggleUpload(st.id)">
-                      {{ uploadOpen === st.id ? 'Свернуть' : st.hints ? 'Редактировать' : 'Загрузить' }}
+                  <ThumbStrip v-if="st.hints.length" :items="thumbs(st.hints)" :label="`Фото-подсказки шага «${st.title}»`" :data-hint-thumbs="st.id" @open="viewHints(st.hints, $event)" />
+                  <div :inert="ro" class="flex w-full flex-col items-start gap-1">
+                    <ButtonAction size="sm" :show-icon="false" data-act="hint-upload" @click="toggleUpload(st.id)">
+                      {{ uploadOpen === st.id ? 'Свернуть' : 'Загрузить' }}
+                    </ButtonAction>
+                    <ButtonAction size="sm" :show-icon="false" data-act="hint-catalog" @click="openCatalog('cell', p.id, st.id)">
+                      Выбрать из каталога
                     </ButtonAction>
                     <button
                       v-if="uploadOpen === st.id"
                       type="button"
-                      class="w-full"
+                      class="w-full pt-1"
                       :data-upload-zone="st.id"
                       @click="upload(p.id, st.id)"
                       @dragover.prevent
                       @drop.prevent="dropFiles($event, p.id, st.id)"
                     >
                       <FileUpload>
-                        {{ st.hints ? 'Добавить подсказку' : 'Загрузить подсказку' }}
+                        {{ st.hints.length ? 'Добавить подсказку' : 'Загрузить подсказку' }}
                         <template #hint>
                           или перетащите файл сюда
                         </template>
@@ -3319,6 +3538,7 @@ if (import.meta.client) {
             </div>
           </FieldSet>
 
+          <!-- Такт 87: текстовая подсказка — в «Съёмке»: она стоит над видоискателем экрана съёмки; раздел «Подсказки» стал «Фото-подсказками». -->
           <FieldSet legend="Съёмка" data-step-section="shooting">
             <Field label="Способ съёмки" data-field="sdMethod">
               <Select v-model="sd.method" :items="STEP_METHODS" placeholder="" :show-icon="false" :searchable="false" />
@@ -3331,6 +3551,9 @@ if (import.meta.client) {
                 Скан документов
               </Checkbox>
             </div>
+            <Field label="Текстовая подсказка" hint="Строка над видоискателем на экране съёмки">
+              <Textarea v-model="sd.tip" placeholder="Например, Держите телефон горизонтально" data-field="sdTip" />
+            </Field>
           </FieldSet>
 
           <!-- Нейросети: недоступная компании — «гасит» по компании (макет `32765:6702`): флажок выключен, причина `reason` полным контрастом (карточка А, такт 74). -->
@@ -3350,25 +3573,45 @@ if (import.meta.client) {
             </div>
           </FieldSet>
 
-          <FieldSet legend="Подсказки" data-step-section="hints">
-            <Field label="Фото-подсказка">
-              <div class="flex w-full flex-col items-start gap-2">
-                <Badge :variant="sd.hints ? 'success' : 'warning'" data-step-hint-status>
-                  {{ hintText(sd.hints) }}
-                </Badge>
-                <button type="button" class="w-full" data-act="step-hint-upload" @click="sd.hints += 1">
-                  <FileUpload>
-                    {{ sd.hints ? 'Добавить подсказку' : 'Загрузить подсказку' }}
-                    <template #hint>
-                      или перетащите файл сюда
-                    </template>
-                  </FileUpload>
-                </button>
+          <!--
+            Раздел «Фото-подсказки» — такт 87 (Ш-2, решение 6): всё редактирование подсказок шага — здесь. Миниатюры — `StepThumb`
+            кита: на наведении «глаз» — просмотр крупно, крестик — убрать из шага; подсказка миниатюры — часть и ракурс либо имя
+            своего файла. «Из каталога» — каталог поверх сайда; «Загрузить» — свой файл. Всё — в черновик сайда до «Сохранить».
+          -->
+          <FieldSet :legend="`Фото-подсказки · ${sd.hints.length}`" data-step-section="photo-hints">
+            <div class="flex flex-col items-start gap-3">
+              <Badge :variant="sd.hints.length ? 'success' : 'warning'" data-step-hint-status>
+                {{ hintStatus(sd.hints.length) }}
+              </Badge>
+              <div v-if="sd.hints.length" class="flex flex-wrap gap-2" data-step-hint-list>
+                <TooltipProvider>
+                  <StepThumb
+                    v-for="(h, k) in sd.hints"
+                    :key="h.id"
+                    :src="hintSrc(h)"
+                    :alt="hintLabel(h)"
+                    :reason="hintLabel(h)"
+                    :data-hint="h.id"
+                    @open="viewHints(sd.hints, k)"
+                    @remove="removeSideHint(h.id)"
+                  />
+                </TooltipProvider>
               </div>
-            </Field>
-            <Field label="Текстовая подсказка" hint="Строка над видоискателем на экране съёмки">
-              <Textarea v-model="sd.tip" placeholder="Например, Держите телефон горизонтально" data-field="sdTip" />
-            </Field>
+              <div class="flex flex-wrap items-center gap-3">
+                <Button variant="outline" show-icon data-act="step-hint-catalog" @click="openCatalog('side')">
+                  <template #icon>
+                    <Icon name="image" :size="16" />
+                  </template>
+                  Из каталога
+                </Button>
+                <Button variant="outline" show-icon data-act="step-hint-upload" @click="uploadSideHint()">
+                  <template #icon>
+                    <Icon name="add" :size="16" />
+                  </template>
+                  Загрузить
+                </Button>
+              </div>
+            </div>
           </FieldSet>
 
           <FieldSet legend="Связи" data-step-section="links">
@@ -3424,6 +3667,175 @@ if (import.meta.client) {
         </ModalCardFooter>
       </ModalCardContent>
     </ModalCard>
+
+    <!--
+      ============================ каталог фото-подсказок и массовая заливка — такт 87 (ревью 4.3, 4.4) ============================
+      Одно окно-сайд 642: каталог из ячейки шага либо поверх сайда шага; заливка — список строк, «Заменить» — каталог вторым слоем
+      с «←», как дифф версии в истории. Категории — `SectionNav` колонкой слева, сетка — `MediaGallery` (решение 4).
+    -->
+    <ModalCard v-model:open="hintsOpen">
+      <ModalCardContent placement="edge" :data-side="catalogShown ? 'catalog' : 'fill'" :data-target="catalogShown ? cat.target : undefined" @escape-key-down="onHintsEscape">
+        <template v-if="catalogShown">
+          <ModalCardHeader v-if="cat.target === 'fill'" back :title="catalogTitle" :subtitle="catalogSubtitle" @back="closeFillCatalog()" />
+          <ModalCardHeader v-else :title="catalogTitle" :subtitle="catalogSubtitle" />
+          <ModalCardBody class="flex flex-col gap-4">
+            <Input v-model="catalogQuery" placeholder="Поиск по части и ракурсу" data-field="catalog-search" />
+            <div class="flex items-start gap-6">
+              <SectionNav v-model="catalogCategory" aria-label="Категории каталога" class="sticky top-0 max-w-44" data-catalog-categories>
+                <SectionNavItem value="all" label="Все" :count="catalogNumbers.all" />
+                <SectionNavItem v-for="c in HINT_CATEGORIES" :key="c.id" :value="c.id" :label="c.label" :count="catalogNumbers[c.id]" />
+              </SectionNav>
+              <div class="min-w-0 flex-1">
+                <MediaGallery v-if="catalogItems.length" size="md" data-catalog-grid>
+                  <MediaGalleryItem
+                    v-for="c in catalogItems"
+                    :key="c.id"
+                    size="md"
+                    class="w-44"
+                    :src="c.src"
+                    :alt="catalogLabel(c)"
+                    selectable
+                    :selected="attached.has(c.id) || cat.picked.includes(c.id)"
+                    :disabled="attached.has(c.id)"
+                    open-label="Открыть крупно"
+                    :data-catalog-item="c.id"
+                    @toggle="togglePick(c.id)"
+                    @open="viewCatalog(c.id)"
+                  >
+                    <template #title>
+                      <HighlightText :text="c.part" :query="cat.query" />
+                    </template>
+                    <template #subtitle>
+                      <HighlightText :text="attached.has(c.id) ? 'Уже у шага' : c.angle" :query="cat.query" />
+                    </template>
+                  </MediaGalleryItem>
+                </MediaGallery>
+                <Empty
+                  v-else
+                  :title="`Ничего не найдено по «${cat.query}»`"
+                  :description="catalogElsewhere ? `Найдено в других категориях: ${catalogElsewhere}` : 'Ищется по части и ракурсу и по связанным словам: «фара», «кузов», «полис»'"
+                  data-catalog-empty
+                >
+                  <template v-if="catalogElsewhere" #action>
+                    <Button variant="outline" data-act="catalog-all" @click="catalogCategory = 'all'">
+                      Искать во всех категориях
+                    </Button>
+                  </template>
+                </Empty>
+              </div>
+            </div>
+          </ModalCardBody>
+          <ModalCardFooter>
+            <template #note>
+              Выбрано: {{ cat.picked.length }}
+            </template>
+            <Button variant="secondary" data-act="catalog-cancel" @click="cancelCatalog()">
+              Отмена
+            </Button>
+            <Button :disabled="!cat.picked.length" data-act="catalog-confirm" @click="confirmCatalog()">
+              {{ cat.target === 'fill' ? 'Заменить' : 'Добавить' }}
+            </Button>
+          </ModalCardFooter>
+        </template>
+
+        <template v-else>
+          <ModalCardHeader title="Заполнить фото-подсказки" :subtitle="fillSubtitle" />
+          <ModalCardBody class="flex flex-col gap-6">
+            <div class="flex flex-wrap items-center gap-4">
+              <Switch v-model="fill.all" data-field="fill-all">
+                Показать все шаги
+              </Switch>
+              <ToolbarText v-if="fill.only.length" data-fill-only>
+                Только выбранные шаги — {{ fill.only.length }}
+              </ToolbarText>
+            </div>
+            <!--
+              Строка — шаг и его процесс с оценкой подбора; ниже — предложенная подсказка, причина второй строкой, «Заменить» и «Не
+              заполнять». Строка, которая не заполняется, приглушена (`Card dimmed`), действия остаются.
+            -->
+            <FieldSet v-for="g in fillGroups" :key="g.id" :legend="`${g.title} · ${g.rows.length}`" :data-fill-group="g.id">
+              <div class="flex flex-col gap-2">
+                <Card
+                  v-for="v in g.rows"
+                  :key="v.row.stepId"
+                  size="sm"
+                  :dimmed="!v.included && !!v.hint"
+                  class="flex flex-col gap-3"
+                  :data-fill-row="v.row.stepId"
+                  :data-included="v.included || undefined"
+                >
+                  <div class="flex items-center gap-3">
+                    <TableCellIdentity>
+                      {{ v.row.title }}
+                      <template #description>
+                        {{ fillWhere(v.row) }}
+                      </template>
+                    </TableCellIdentity>
+                    <Badge appearance="outline" :variant="v.manual ? 'default' : MATCH_TONE[v.row.proposal.match]" data-fill-match>
+                      {{ v.manual ? 'Выбрано вручную' : HINT_MATCH_LABEL[v.row.proposal.match] }}
+                    </Badge>
+                  </div>
+                  <div class="flex items-center gap-4">
+                    <MediaGalleryItem size="sm" :src="catalogHint(v.hint)?.src ?? ''" :alt="catalogName(v.hint)" class="w-24 shrink-0" />
+                    <TableCellIdentity>
+                      {{ catalogName(v.hint) || 'Нет предложения' }}
+                      <template #description>
+                        {{ v.manual ? 'выбрано в каталоге' : v.row.proposal.reason }}
+                      </template>
+                    </TableCellIdentity>
+                    <div class="flex shrink-0 flex-col items-end gap-1">
+                      <ButtonAction size="sm" :show-icon="false" data-act="fill-replace" @click="openCatalog('fill', v.row.processId, v.row.stepId)">
+                        {{ v.hint ? 'Заменить' : 'Выбрать из каталога' }}
+                      </ButtonAction>
+                      <ButtonAction v-if="v.hint" size="sm" variant="muted" :show-icon="false" data-act="fill-toggle" @click="fillToggle(v.row.stepId)">
+                        {{ v.included ? 'Не заполнять' : 'Заполнить' }}
+                      </ButtonAction>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            </FieldSet>
+            <Empty
+              v-if="!fillViews.length"
+              title="У всех шагов есть фото-подсказки"
+              description="Включите «Показать все шаги», чтобы добавить подсказки и к ним"
+              data-fill-empty
+            />
+          </ModalCardBody>
+          <ModalCardFooter>
+            <Button variant="secondary" data-act="fill-cancel" @click="m.closeSurface()">
+              Отмена
+            </Button>
+            <Button :disabled="!fillIncluded.length" data-act="fill-apply" @click="applyFill()">
+              {{ fillApplyText }}
+            </Button>
+          </ModalCardFooter>
+        </template>
+      </ModalCardContent>
+    </ModalCard>
+
+    <!--
+      ============================ просмотр фото-подсказок крупно — такт 87: `Lightbox` с `FrameStage` ============================
+      Монтируется при открытии: портал окна, смонтированный при загрузке страницы, встаёт в `body` раньше порталов сайдов и
+      оказывается под ними — просмотр из каталога не нажимался бы (ловушка такта 87).
+    -->
+    <Lightbox v-if="viewer" v-model:open="viewerOpen" :index="(viewer?.index ?? 0) + 1" :total="viewer?.items.length ?? 0" :caption="viewerItem?.caption ?? ''" @update:index="viewerStep">
+      <template v-if="viewerItem?.pick" #actions>
+        <Button
+          :variant="cat.picked.includes(viewerItem.pick) ? 'secondary' : 'default'"
+          :show-icon="cat.picked.includes(viewerItem.pick)"
+          :disabled="attached.has(viewerItem.pick)"
+          data-act="viewer-pick"
+          @click="togglePick(viewerItem.pick)"
+        >
+          <template #icon>
+            <Icon name="check" :size="16" />
+          </template>
+          {{ attached.has(viewerItem.pick) ? 'Уже у шага' : cat.picked.includes(viewerItem.pick) ? 'Выбрано' : 'Выбрать' }}
+        </Button>
+      </template>
+      <FrameStage v-if="viewerItem" :src="viewerItem.src" :alt="viewerItem.caption" />
+    </Lightbox>
 
     <!-- ============================ сайд группы — № 68: поля по блоку «Настройки группы» `33179:4467` ============================ -->
     <ModalCard v-model:open="groupOpen">

@@ -4,12 +4,14 @@ import {
   type ShowcaseMetric, type ShowcaseProblem, type StepFlag,
 } from './catalogs'
 import { diffConfigs, formatDate, plural, summarize, validateConfig } from './diff'
+import { catalogHint, categoryAtOpen, proposeHint, stepCategory, type HintProposal, type StepHint } from './hints'
 import {
   buildSearchIndex, groupHits, modifiedKeys, QUICK_LINKS, READONLY_REASON, runSearch, SEARCH_SCOPES, toggleNotice,
   type ActionKey, type SearchEntry, type SearchScope,
 } from './search'
 
 export * from './catalogs'
+export * from './hints'
 
 /**
  * Модель состояния страницы «Редактирование схемы осмотра» (VA-16377) — такты 61–65, порции П1–П5.
@@ -56,7 +58,10 @@ export * from './catalogs'
  * (`searchIndex`), выдача по охвату (`search`, `searchGroups`, `setScope`, `cycleScope`, `expand`), переключение булевой
  * настройки из выдачи с отменой (`toggleFromSearch`), действия (`runAction`), «Недавние» (`recentPlaces`, `setRecent`), режим
  * «найдено» (`openResult`, `findHits`, `findStep`, `exitFind`, счётчики `findCounts`), фильтр «Изменено в черновике»
- * (`setModified`, `changedKeys`). Индекс и сопоставление — `search.ts`.
+ * (`setModified`, `changedKeys`). Индекс и сопоставление — `search.ts`. **Такт 87 — фото-подсказки** (`scheme-edit-review.md`,
+ * 4.3, 4.4): подсказки шага — список элементов каталога и своих загрузок (`StepHint`), счёт и статус — из списка; добавление
+ * из каталога (`addCatalogHints`), массовая заливка — строки подбора (`fillRows`) и установка одной записью с отменой
+ * (`applyHints`). Каталог, поиск по нему и подбор — `hints.ts`.
  */
 
 export type TabId = 'settings' | 'form' | 'processes' | 'showcase'
@@ -278,7 +283,7 @@ export type FieldDraft = FormField & { order: number }
 export type GroupDraft = Omit<FormGroup, 'fields'>
 /**
  * Шаг процесса — строка таблицы шагов макета `32765:6652` (такт 70): название, описание, тип шага, способ съёмки,
- * нейросети, число фото-подсказок; флаги — строка «Флаги» панели массовых действий `32765:6585`. Набор данных хранит
+ * нейросети, фото-подсказки; флаги — строка «Флаги» панели массовых действий `32765:6585`. Набор данных хранит
  * только отличия от `STEP_DEFAULTS`.
  */
 export interface ProcessStep extends Record<StepFlag, boolean> {
@@ -288,8 +293,11 @@ export interface ProcessStep extends Record<StepFlag, boolean> {
   kind: string
   method: string
   networks: string[]
-  /** Фото-подсказок загружено: 0 — «Не установлена». */
-  hints: number
+  /**
+   * Фото-подсказки шага — такт 87: элементы каталога и свои загрузки по порядку; пусто — «Не установлена». До такта 87 —
+   * число загруженных.
+   */
+  hints: StepHint[]
   /** Сайд шага (такт 71): текстовая подсказка на экране шага, связанные поля формы (id), словарь комментариев шага. */
   tip: string
   links: string[]
@@ -409,8 +417,25 @@ export type SectionStatus = 'none' | 'on' | 'off' | 'attention'
 
 /** Открытая поверхность — r2 §7: сайд, модалка-гейт, оверлей; стек — снизу вверх. */
 export interface Surface { kind: 'side' | 'modal' | 'overlay', id: string }
-/** Сайд, который открывает страница по действию из выдачи поиска (такт 86): его черновик живёт на странице. */
-export type ActionSide = 'field' | 'group' | 'process'
+/**
+ * Сайд, который открывает страница по действию из выдачи поиска (такт 86): его черновик живёт на странице. Такт 87 — `fill`,
+ * массовая заливка фото-подсказок.
+ */
+export type ActionSide = 'field' | 'group' | 'process' | 'fill'
+
+/**
+ * Строка массовой заливки фото-подсказок — такт 87 (`scheme-edit-review.md`, 4.4): шаг, его процесс, предложение из каталога
+ * с оценкой и причиной. Выбор строки (заменить, не заполнять) держит сайд — страница.
+ */
+export interface FillRow {
+  processId: string
+  stepId: string
+  title: string
+  process: string
+  /** Подсказок у шага сейчас. */
+  count: number
+  proposal: HintProposal
+}
 
 /** Набор демо-данных: у набора с версиями черновик задан правками поверх current, у новой схемы — конфигурацией. */
 export interface Dataset {
@@ -1019,9 +1044,72 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   function setStepKind(processId: string, stepId: string, kind: string) { patchStep(processId, stepId, (st) => { st.kind = kind }) }
   /**
    * Инлайн-загрузка фото-подсказок в ячейке (аудит, «Принцип: атрибут — инлайн по месту»): применяется сразу, без
-   * «Сохранить»; статус меняется на месте — «Не установлена» → «N · Все установлены».
+   * «Сохранить»; статус меняется на месте — «Не установлена» → «N · Все установлены». Такт 87: загрузка — свой файл в конец
+   * списка подсказок шага; на стенде имя файла — `foto-N.jpg` по номеру своей загрузки у шага.
    */
-  function uploadHints(processId: string, stepId: string, count = 1) { patchStep(processId, stepId, (st) => { st.hints += Math.max(1, count) }) }
+  function uploadHints(processId: string, stepId: string, count = 1) {
+    patchStep(processId, stepId, (st) => { st.hints.push(...newUploads(st.hints, Math.max(1, count))) })
+  }
+  let uploadSeq = 0
+  /** Свои загрузки на стенде: `foto-N.jpg` — номер своей загрузки у шага; id — сквозной счётчик модели. */
+  function newUploads(have: readonly StepHint[], count: number): StepHint[] {
+    const n = have.filter(h => h.kind === 'upload').length
+    return Array.from({ length: count }, (_, k) => ({ kind: 'upload' as const, id: `up-new-${++uploadSeq}`, name: `foto-${n + k + 1}.jpg` }))
+  }
+  /**
+   * Подсказки из каталога в ячейке шага — такт 87, 4.3: сайд каталога отдаёт выбранные одной записью, уже прикреплённые
+   * пропускаются; уведомление с «Отменить» (аудит, «Отмена при автосейве»).
+   */
+  function addCatalogHints(processId: string, stepId: string, ids: readonly string[]): number {
+    const before = processesCopy()
+    const st = before.find(p => p.id === processId)?.steps.find(x => x.id === stepId)
+    if (!st) return 0
+    const fresh = ids.filter(id => catalogHint(id) && !st.hints.some(h => h.kind === 'catalog' && h.id === id))
+    if (!fresh.length) return 0
+    if (!patchStep(processId, stepId, (x) => { x.hints.push(...fresh.map(id => ({ kind: 'catalog' as const, id }))) })) return 0
+    notify(`К шагу «${st.title}» ${plural(fresh.length, 'добавлена', 'добавлены', 'добавлено')} ${fresh.length} ${plural(fresh.length, 'подсказка', 'подсказки', 'подсказок')}`,
+      'ok', true, () => writeProcesses(before))
+    return fresh.length
+  }
+  /** Категория каталога, выбранная заранее для шага процесса: тип объекта процесса, без него — тип схемы (4.3). */
+  function hintCategory(processId: string) {
+    return categoryAtOpen(shown.value.processes.find(p => p.id === processId)?.objectType ?? '', shown.value.settings.general.schemeType)
+  }
+  /**
+   * Строки массовой заливки — 4.4: шаги всех процессов (`only` — выбранные на панели), по умолчанию — без подсказок; `all` —
+   * «Показать все шаги». У каждой — предложение из каталога по названию шага и типу объекта (`hints.ts`, `proposeHint`).
+   */
+  function fillRows(all: boolean, only: readonly string[] = []): FillRow[] {
+    const scheme = shown.value.settings.general.schemeType
+    const out: FillRow[] = []
+    for (const p of shown.value.processes) {
+      for (const st of p.steps) {
+        if (only.length && !only.includes(st.id)) continue
+        if (!all && st.hints.length) continue
+        out.push({ processId: p.id, stepId: st.id, title: st.title, process: p.title, count: st.hints.length, proposal: proposeHint(st, stepCategory(p.objectType, scheme)) })
+      }
+    }
+    return out
+  }
+  /**
+   * «Установить подсказки у N шагов» — 4.4: подсказка каталога добавляется к шагу одной записью на все строки, без окна
+   * подтверждения; уведомление «Подсказки установлены у N шагов» с «Отменить» возвращает прежние списки.
+   */
+  function applyHints(entries: readonly { stepId: string, hint: string }[]): number {
+    if (ui.viewing) { notify('Прошлая версия открыта только для чтения', 'err'); return 0 }
+    const before = processesCopy()
+    const list = processesCopy()
+    let n = 0
+    for (const { stepId, hint } of entries) {
+      const st = list.flatMap(p => p.steps).find(x => x.id === stepId)
+      if (!st || !catalogHint(hint) || st.hints.some(h => h.kind === 'catalog' && h.id === hint)) continue
+      st.hints.push({ kind: 'catalog', id: hint })
+      n++
+    }
+    if (!n || !writeProcesses(list)) return 0
+    notify(`Подсказки установлены у ${n} ${plural(n, 'шага', 'шагов', 'шагов')}`, 'ok', true, () => writeProcesses(before))
+    return n
+  }
   /** Удаление шага в строке — уведомление с «Отменить» (аудит, «Точечные фиксы», «Отмена при автосейве»). */
   function removeStep(processId: string, stepId: string) {
     const before = processesCopy()
@@ -1133,8 +1221,10 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     if (ui.viewing) { notify('Прошлая версия открыта только для чтения', 'err'); return false }
     return true
   }
-  /** «Заполнить изображения» и «Вставить шаг из другой схемы» — вне стенда (r2 §8, §9). */
-  function fillImages() { notify('Массовая заливка изображений — вне стенда') }
+  /**
+   * «Вставить шаг из другой схемы» — вне стенда (r2 §8). «Заполнить изображения» — с такта 87 сайд массовой заливки
+   * (`fillRows`, `applyHints`); до такта 87 — уведомление «вне стенда».
+   */
   function pasteStep() { notify('Выбор шага из другой схемы — вне стенда') }
 
   /* ------------------------------ «Витрина» — П8, такт 72 ------------------------------ */
@@ -1406,9 +1496,8 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
         return 'field'
       case 'add-group': return canEdit() && setTab('form') ? 'group' : null
       case 'add-process': return canEdit() && setTab('processes') ? 'process' : null
-      case 'fill-images':
-        if (canEdit() && setTab('processes')) fillImages()
-        return null
+      /* Такт 87: «Заполнить изображения» — сайд массовой заливки на табе «Процессы и шаги». */
+      case 'fill-images': return canEdit() && setTab('processes') ? 'fill' : null
       default: return null
     }
   }
@@ -1540,7 +1629,7 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     formGroups, formGroup, selectGroup, fieldApprovalReason, fieldError, saveField, removeField, toggleField, selectionState, toggleAllFields,
     clearFieldSelection, bulkFields, fillAliases, pasteFromScheme, saveGroup, removeGroup, moveField,
     processes, selectedSteps, toggleStep, processSelection, toggleProcessSteps, clearStepSelection, flagState, bulkFlag, bulkMethod, bulkDeleteSteps,
-    setStepKind, uploadHints, removeStep, removeProcess, moveStep, fillImages, pasteStep,
+    setStepKind, uploadHints, newUploads, addCatalogHints, hintCategory, fillRows, applyHints, removeStep, removeProcess, moveStep, pasteStep,
     processError, saveProcess, stepError, placeStep, saveStep, networkState, bulkNetworks, openOverlay, canEdit,
     phaseLocked, PHASE_REASON, tabLocked,
     showcase, showcaseReason, setShowcase, setIndustry, setProblem, setMetric, addMetric, removeMetric, template, fromTemplate, applyTemplate,

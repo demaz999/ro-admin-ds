@@ -28,4 +28,12 @@ export const SCHEME_COVERAGE_STATES = [
    * фильтр «Изменено в черновике», режим «найдено» на «Настройках», «Форме» и по изменённому.
    */
   'q=фото', 'q=фото&scope=settings', 'q=hfpvsn', 'recent=demo', 'modified=list', 'find=фото', 'find=госномер', 'modified=1',
+  /*
+   * Такт 87, фото-подсказки: каталог из ячейки (поиск с подсветкой, пустая выдача в категории, выбор), каталог поверх сайда
+   * шага с отмеченными «Уже у шага», просмотр крупно из каталога и из ячейки; массовая заливка — подбор, все шаги, «Нет
+   * предложения» (тип «Недвижимость»), только выбранные, второй слой «Заменить».
+   */
+  'open=catalog', 'open=catalog&catq=кузов', 'open=catalog&catq=кузов&category=documents', 'open=catalog&category=realty&picked=realty-facade,realty-roof',
+  'open=step-catalog', 'open=catalog-view', 'open=hint-view', 'open=fill', 'open=fill&fill=all', 'open=fill&type=house',
+  'open=fill&steps=s-vin-metal,s-pts', 'open=fill-catalog',
 ] as const

@@ -15,6 +15,8 @@ import { clearMatches, highlightMatches, queryWords } from '~/components/ui/high
  * П3: вариант `Button variant="outline"` — мастер кита 1 `btn_outline` `1990:226`; события `edit` и `action` у
  * `TableRowActions`.
  * Такт 68: ось `readonly` у `Field` и десяти контролов — матрица «обычное · только чтение · выключено».
+ * Такт 86: `SearchResult`, `HighlightText`, счётчик `SectionNavItem count`.
+ * Такт 87: оси `MediaGalleryItem` — выбор, «уже у шага», «открыть крупно», подпись; `ThumbStrip` (карточка 10).
  */
 definePageMeta({ layout: false })
 useHead({ title: 'Редактирование схемы осмотра — матрицы' })
@@ -216,6 +218,39 @@ clearMatches()`
 
 const SECTION_NAV_COUNT_EXAMPLE = `<!-- режим «найдено» страницы схемы: число совпадений раздела у правого края строки; 0 показывается -->
 <SectionNavItem value="anomalies" label="Аномалии" status="on" :count="2" />`
+
+/* ------------------------------ Такт 87: фото-подсказки ------------------------------ */
+const HINT = (id: string) => `/scheme-edit/hints/${id}.svg`
+const UPLOAD = HINT('upload')
+const tilePicked = ref<string[]>(['car-right'])
+const tileLog = ref('—')
+function tileToggle(id: string) {
+  tilePicked.value = tilePicked.value.includes(id) ? tilePicked.value.filter(x => x !== id) : [...tilePicked.value, id]
+  tileLog.value = `toggle: ${id}`
+}
+const THUMBS = [
+  { src: HINT('car-front'), label: 'Передняя часть · анфас' },
+  { src: HINT('car-front-left'), label: 'Передняя часть · три четверти слева' },
+  { src: HINT('car-front-right'), label: 'Передняя часть · три четверти справа' },
+  { src: UPLOAD, label: 'Своя загрузка · front-1.jpg' },
+  { src: UPLOAD, label: 'Своя загрузка · front-2.jpg' },
+]
+const thumbLog = ref('—')
+const GALLERY_SELECT_EXAMPLE = `<!-- плитка выбора: нажатие, пробел и Enter — событие toggle; флажок в левом верхнем углу -->
+<MediaGallery size="md">
+  <MediaGalleryItem
+    v-for="c in items" :key="c.id" size="md" class="w-44" :src="c.src" :alt="c.label"
+    selectable :selected="picked.includes(c.id)" :disabled="attached.has(c.id)"
+    open-label="Открыть крупно" @toggle="toggle(c.id)" @open="view(c.id)"
+  >
+    <template #title><HighlightText :text="c.part" :query="query" /></template>   <!-- 13/16 medium -->
+    <template #subtitle>{{ c.angle }}</template>                                   <!-- 13/16 --muted-foreground -->
+  </MediaGalleryItem>
+</MediaGallery>
+<!-- без новых осей и слотов — прежняя плитка: корень и есть картинка -->
+<MediaGalleryItem size="sm" :src="src" class="w-24" />`
+const THUMB_STRIP_EXAMPLE = `<!-- до max миниатюр 28 × 20, остаток — «+N»; нажатие — номер миниатюры с нуля, по «+N» — первая скрытая -->
+<ThumbStrip :items="hints.map(h => ({ src: h.src, label: h.label }))" :max="3" label="Фото-подсказки шага «Передняя часть»" @open="k => view(k)" />`
 
 /** Подсветка на странице — пример `highlightMatches` на узлах матрицы: все совпадения и текущее. */
 const pagePainted = ref('—')
@@ -801,6 +836,105 @@ onBeforeUnmount(() => clearMatches())
         </SectionNav>
       </div>
       <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ SECTION_NAV_COUNT_EXAMPLE }}</pre>
+    </section>
+
+    <!-- ============================ Такт 87: фото-подсказки ============================ -->
+    <section class="flex flex-col gap-4" data-matrix="media-gallery-select">
+      <Heading>MediaGalleryItem · selectable, selected, disabled, openLabel, подпись — плитка каталога фото-подсказок</Heading>
+      <div class="flex flex-wrap items-start gap-4">
+        <div class="flex flex-col gap-2" data-case="rest">
+          <ToolbarText>покой</ToolbarText>
+          <MediaGalleryItem size="md" class="w-44" :src="HINT('car-front')" alt="Передняя часть · анфас" selectable :selected="tilePicked.includes('car-front')" open-label="Открыть крупно" @toggle="tileToggle('car-front')" @open="tileLog = 'open: car-front'">
+            <template #title>
+              Передняя часть
+            </template>
+            <template #subtitle>
+              Анфас
+            </template>
+          </MediaGalleryItem>
+        </div>
+        <div class="flex flex-col gap-2" data-case="hover">
+          <ToolbarText>наведение (demoHover)</ToolbarText>
+          <MediaGalleryItem size="md" class="w-44" :src="HINT('car-left')" alt="Левая сторона · профиль" selectable open-label="Открыть крупно" demo-hover>
+            <template #title>
+              Левая сторона
+            </template>
+            <template #subtitle>
+              Профиль
+            </template>
+          </MediaGalleryItem>
+        </div>
+        <div class="flex flex-col gap-2" data-case="selected">
+          <ToolbarText>выбрана</ToolbarText>
+          <MediaGalleryItem size="md" class="w-44" :src="HINT('car-right')" alt="Правая сторона · профиль" selectable :selected="tilePicked.includes('car-right')" open-label="Открыть крупно" @toggle="tileToggle('car-right')" @open="tileLog = 'open: car-right'">
+            <template #title>
+              Правая сторона
+            </template>
+            <template #subtitle>
+              Профиль
+            </template>
+          </MediaGalleryItem>
+        </div>
+        <div class="flex flex-col gap-2" data-case="disabled">
+          <ToolbarText>уже у шага (disabled)</ToolbarText>
+          <MediaGalleryItem size="md" class="w-44" :src="HINT('car-vin-glass')" alt="VIN под стеклом · через лобовое стекло" selectable selected disabled open-label="Открыть крупно">
+            <template #title>
+              VIN под стеклом
+            </template>
+            <template #subtitle>
+              Уже у шага
+            </template>
+          </MediaGalleryItem>
+        </div>
+        <div class="flex flex-col gap-2" data-case="query">
+          <ToolbarText>подпись с подсветкой запроса</ToolbarText>
+          <MediaGalleryItem size="md" class="w-44" :src="HINT('car-vin-body')" alt="VIN на кузове · выбитый номер" selectable open-label="Открыть крупно">
+            <template #title>
+              <HighlightText text="VIN на кузове" query="кузов" />
+            </template>
+            <template #subtitle>
+              <HighlightText text="Выбитый номер" query="кузов" />
+            </template>
+          </MediaGalleryItem>
+        </div>
+        <div class="flex flex-col gap-2" data-case="plain">
+          <ToolbarText>без осей: прежняя плитка sm, без картинки — подложка</ToolbarText>
+          <div class="flex gap-2">
+            <MediaGalleryItem size="sm" :src="HINT('doc-pts')" class="w-24" />
+            <MediaGalleryItem size="sm" class="w-24" />
+          </div>
+        </div>
+      </div>
+      <ToolbarText>
+        Событие: {{ tileLog }} · выбрано: {{ tilePicked.join(', ') || '—' }}
+      </ToolbarText>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ GALLERY_SELECT_EXAMPLE }}</pre>
+    </section>
+
+    <section class="flex flex-col gap-4" data-matrix="thumb-strip">
+      <Heading>ThumbStrip — полоса миниатюр фото-подсказок в ячейке шага: до трёх и «+N» (карточка 10)</Heading>
+      <div class="flex flex-wrap items-start gap-10">
+        <div class="flex flex-col gap-2" data-case="one">
+          <ToolbarText>одна</ToolbarText>
+          <ThumbStrip :items="THUMBS.slice(0, 1)" @open="thumbLog = `open: ${$event}`" />
+        </div>
+        <div class="flex flex-col gap-2" data-case="three">
+          <ToolbarText>три — без хвоста</ToolbarText>
+          <ThumbStrip :items="THUMBS.slice(0, 3)" @open="thumbLog = `open: ${$event}`" />
+        </div>
+        <div class="flex flex-col gap-2" data-case="more">
+          <ToolbarText>пять — «+2»</ToolbarText>
+          <ThumbStrip :items="THUMBS" :max="3" label="Фото-подсказки шага «Передняя часть»" @open="thumbLog = `open: ${$event}`" />
+        </div>
+        <div class="flex flex-col gap-2" data-case="uploads">
+          <ToolbarText>свои загрузки</ToolbarText>
+          <ThumbStrip :items="THUMBS.slice(3)" @open="thumbLog = `open: ${$event}`" />
+        </div>
+      </div>
+      <ToolbarText>
+        Событие: {{ thumbLog }}
+      </ToolbarText>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ THUMB_STRIP_EXAMPLE }}</pre>
     </section>
   </main>
 </template>
