@@ -9,6 +9,9 @@
   сама пилюля и хвостовой контрол. Их наведения поэтому не совпадают —
   разбор в `index.ts` и `docs/naming.md`.
 
+  Такт 88: ось `pressable` — чип-вариант, пилюля целиком кнопка без хвоста; наведение и фокус — как у
+  интерактивного фильтр-чипа и кнопок кита. Разбор — `index.ts`, «Чип-вариант».
+
   Такт 26: вариант `neutral` — неинтерактивная метка значения, решение владельца.
   Подложка `muted`, текст `foreground`, наведения, роли и `tabindex` нет; `active`,
   `count`, `marker` и `trailing` у него погашены, хвост всегда `none`. Собственного
@@ -54,6 +57,12 @@ const props = withDefaults(defineProps<{
    * место слота `leading`.
    */
   image?: string
+  /**
+   * Такт 88: чип-вариант — пилюля целиком кнопка (`<button>`), хвоста нет: нажатие подставляет значение (вариант текста
+   * из словаря). `active` — значение уже выбрано, `aria-pressed`. Наведение и `active` — как у фильтр-чипа, фокус с
+   * клавиатуры — кольцо кита 2 `--ring`. Разбор — `index.ts`, «Чип-вариант».
+   */
+  pressable?: boolean
 }>(), {
   variant: 'default',
   active: false,
@@ -62,13 +71,16 @@ const props = withDefaults(defineProps<{
   trailing: 'remove',
   expanded: false,
   image: undefined,
+  pressable: false,
 })
 
 const emit = defineEmits<{ remove: [], toggle: [] }>()
 
 /** Нейтральная метка гасит всё интерактивное и всё фильтровое. */
 const neutral = computed(() => props.variant === 'neutral')
-const trailing = computed(() => (neutral.value ? 'none' : props.trailing))
+/** Чип-вариант — кнопка целиком: хвостового контрола у него нет (такт 88). */
+const pressable = computed(() => !neutral.value && props.pressable)
+const trailing = computed(() => (neutral.value || pressable.value ? 'none' : props.trailing))
 const active = computed(() => !neutral.value && props.active)
 
 /** Ноль — значащее значение счётчика, поэтому проверяем на пустую строку, а не на falsy. */
@@ -104,11 +116,25 @@ function onRootKeydown(event: KeyboardEvent) {
 </script>
 
 <template>
-  <span
+  <!--
+    Корень — `<span>`; у чипа-варианта (такт 88) — `<button>`: Enter и пробел нажимают его сами, имя для чтения с экрана —
+    подпись, `aria-pressed` — выбран ли вариант.
+  -->
+  <component
+    :is="pressable ? 'button' : 'span'"
     data-slot="chip"
     :data-variant="props.variant"
     :data-active="active ? '' : undefined"
-    :class="[chipVariants({ variant: props.variant, active, interactive: trailing !== 'none' }), trailing === 'expand' ? 'cursor-pointer' : '']"
+    :data-pressable="pressable ? '' : undefined"
+    :type="pressable ? 'button' : undefined"
+    :aria-pressed="pressable ? active : undefined"
+    :class="[
+      chipVariants({ variant: props.variant, active, interactive: pressable || trailing !== 'none' }),
+      trailing === 'expand' || pressable ? 'cursor-pointer' : '',
+      pressable ? 'max-w-full' : '',
+      /* Такт 88: фокус с клавиатуры у нажимаемой пилюли — кольцо кита 2 `--ring`; раньше у раскрывающего чипа его не было. */
+      pressable || trailing === 'expand' ? 'outline-none focus-visible:ring-2 focus-visible:ring-ring' : '',
+    ]"
     :role="trailing === 'expand' ? 'button' : undefined"
     :tabindex="trailing === 'expand' ? 0 : undefined"
     :aria-expanded="trailing === 'expand' ? props.expanded : undefined"
@@ -138,8 +164,8 @@ function onRootKeydown(event: KeyboardEvent) {
       <slot name="leading" />
     </span>
 
-    <!-- Внутренняя группа `txt_bulb` мастера: зазор 4, а не 8. -->
-    <span class="flex items-center gap-1">
+    <!-- Внутренняя группа `txt_bulb` мастера: зазор 4 (у корня — 8). Чип-вариант не шире контейнера: подпись — многоточием. -->
+    <span class="flex items-center gap-1" :class="pressable ? 'min-w-0' : ''">
       <span
         v-if="props.marker && !neutral"
         data-slot="chip-marker"
@@ -147,7 +173,7 @@ function onRootKeydown(event: KeyboardEvent) {
         :class="active ? 'bg-primary-foreground' : 'bg-accent-soft'"
       />
 
-      <span data-slot="chip-label">
+      <span data-slot="chip-label" :class="pressable ? 'truncate' : ''">
         <slot />
       </span>
 
@@ -211,5 +237,5 @@ function onRootKeydown(event: KeyboardEvent) {
         <Icon name="close" :size="9.4" />
       </slot>
     </button>
-  </span>
+  </component>
 </template>

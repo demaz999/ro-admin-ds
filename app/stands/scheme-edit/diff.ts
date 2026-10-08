@@ -6,6 +6,7 @@ import {
   COORDS_MODES, DURATION_MODES, OBJECT_TYPES, SHOWCASE_STATUS,
 } from './catalogs'
 import { hintLabel } from './hints'
+import { REPEAT_TEXT_FIELDS } from './repeat-texts'
 
 /**
  * Дифф конфигураций схемы, валидация и каталог настроек — такт 64, порция П4 (`docs/scheme-edit.md`, 6.2).
@@ -271,6 +272,13 @@ export function diffConfigs(from: SchemeConfig, to: SchemeConfig): SchemeDiff {
     if (changedAttrs.length) {
       const list = (x: typeof p) => changedAttrs.map(([key, label, items]) => `${label}: ${items?.find(i => i.value === x[key])?.label ?? fieldValue(x[key])}`).join(', ')
       processes.push({ kind: 'changed', unit: 'attr', item: { label: `Процесс «${p.title}»: настройки процесса`, before: list(old), after: list(p) } })
+    }
+    /* Такт 88: тексты в приложении повторяемого процесса — одной строкой, списком сменившихся (как настройки процесса). */
+    const text = (x: typeof p, key: (typeof REPEAT_TEXT_FIELDS)[number]['key']) => x.texts?.[key]?.trim() ?? ''
+    const changedTexts = REPEAT_TEXT_FIELDS.filter(f => text(old, f.key) !== text(p, f.key))
+    if (changedTexts.length) {
+      const list = (x: typeof p) => changedTexts.map(f => `${f.diff}: ${text(x, f.key) || 'пусто'}`).join(', ')
+      processes.push({ kind: 'changed', unit: 'attr', item: { label: `Процесс «${p.title}»: тексты в приложении`, before: list(old), after: list(p) } })
     }
     const sa = new Map(old.steps.map(x => [x.id, x]))
     const sb = new Map(p.steps.map(x => [x.id, x]))

@@ -36,4 +36,14 @@ export const SCHEME_COVERAGE_STATES = [
   'open=catalog', 'open=catalog&catq=кузов', 'open=catalog&catq=кузов&category=documents', 'open=catalog&category=realty&picked=realty-facade,realty-roof',
   'open=step-catalog', 'open=catalog-view', 'open=hint-view', 'open=fill', 'open=fill&fill=all', 'open=fill&type=house',
   'open=fill&steps=s-vin-metal,s-pts', 'open=fill-catalog',
+  /*
+   * Такт 88, вставка из другой схемы и тексты процесса: сайд вставки полей — схемы, поиск, пустой поиск, группы донора, поля с
+   * конфликтом алиаса и выбором; сайд вставки шагов — схемы, шаги с выбором и процесс-цель; оверлей с разделом «Тексты в
+   * приложении» — без типа объекта, с типом, заполненный, поповер «Все варианты», на чтение.
+   */
+  'open=paste-fields', 'open=paste-fields&pasteq=квартир', 'open=paste-fields&pasteq=трактор', 'open=paste-fields&donor=d-osago',
+  'open=paste-fields&donor=d-osago&part=dg-lead&pick=df-number,df-date,df-phone', 'open=paste-steps',
+  'open=paste-steps&donor=d-osago&part=dp-auto&pick=ds-rear,ds-left&target=p-docs',
+  'open=overlay-texts', 'open=overlay-texts&otype=car', 'open=overlay-texts&otype=car&texts=filled', 'open=overlay-variants&otype=house',
+  'view=v2&open=overlay-texts',
 ] as const

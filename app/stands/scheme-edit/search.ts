@@ -26,6 +26,9 @@ import type { Rule, SchemeConfig, TabId } from './model'
  *
  * **Такт 87:** шаг находится и по части и ракурсу своих фото-подсказок каталога (`tags`) — уровень описания, пояснение
  * строки — «фото-подсказка «…»».
+ *
+ * **Такт 88:** повторяемый процесс находится по своим текстам в приложении (`tags`, `tagHint`) — уровень описания, пояснение
+ * строки — «текст в приложении «…»»; вставленные из другой схемы поля и шаги — обычные записи индекса.
  */
 
 export type SearchType = 'setting' | 'field' | 'group' | 'step' | 'process' | 'showcase' | 'action'
@@ -181,9 +184,12 @@ export interface SearchEntry {
   icon?: IconName
   /**
    * Подписи фото-подсказок каталога у шага — такт 87: шаг находится по части и ракурсу своей подсказки, пояснение строки —
-   * «фото-подсказка «…»». Свои загрузки подписи части и ракурса не несут.
+   * «фото-подсказка «…»». Свои загрузки подписи части и ракурса не несут. Такт 88: у повторяемого процесса — тексты в
+   * приложении, пояснение — «текст в приложении «…»».
    */
   tags: string[]
+  /** Чем назван тег в пояснении строки: «фото-подсказка» (по умолчанию), «текст в приложении». */
+  tagHint: string
 }
 
 export interface IndexContext {
@@ -276,7 +282,7 @@ function showcaseValue(key: string, config: SchemeConfig): string {
 
 const base = (e: Partial<SearchEntry> & Pick<SearchEntry, 'key' | 'type' | 'area' | 'label' | 'path' | 'target'>): Omit<SearchEntry, 'order'> => ({
   synonyms: [], description: '', alias: '', tab: '', section: '', anchor: '', group: '', process: '', value: '', toggle: false, checked: false,
-  setPath: '', reason: '', icon: undefined, tags: [], ...e,
+  setPath: '', reason: '', icon: undefined, tags: [], tagHint: 'фото-подсказка', ...e,
 })
 
 /**
@@ -306,8 +312,10 @@ export function buildSearchIndex(ctx: IndexContext): SearchEntry[] {
     }
   }
   for (const p of config.processes) {
+    /* Такт 88: тексты в приложении повторяемого процесса — процесс находится по ним, уровень описания. */
+    const texts = p.repeatable ? Object.values(p.texts ?? {}).map(x => x.trim()).filter(Boolean) : []
     out.push(base({ key: `process.${p.id}`, type: 'process', area: 'processes', label: p.title, alias: p.alias, path: 'Процессы и шаги', tab: 'processes', process: p.id,
-      target: `process-${p.id}`, value: `${p.steps.length} ${plural(p.steps.length, 'шаг', 'шага', 'шагов')}` }))
+      target: `process-${p.id}`, value: `${p.steps.length} ${plural(p.steps.length, 'шаг', 'шага', 'шагов')}`, tags: texts, tagHint: 'текст в приложении' }))
     for (const st of p.steps) {
       /* Такт 87: подсказки каталога у шага — части и ракурсы, по ним шаг находится. */
       const tags = st.hints.flatMap((h) => { const c = h.kind === 'catalog' ? catalogHint(h.id) : undefined; return c ? [catalogLabel(c)] : [] })
@@ -419,7 +427,7 @@ function rank(p: Prepared, qn: string, words: string[]): SearchHit | null {
   const e = p.e
   const hint = weak.field === 'synonym'
     ? `по запросу «${weak.synonym}»`
-    : weak.field === 'tag' ? `фото-подсказка «${weak.synonym}»`
+    : weak.field === 'tag' ? `${e.tagHint} «${weak.synonym}»`
       : weak.field === 'description' ? e.description : weak.field === 'alias' ? `алиас ${e.alias}` : weak.field === 'key' ? `ключ ${e.key}` : ''
   return { entry: e, tier, hint }
 }

@@ -391,6 +391,20 @@ function kit(page) {
     fillAll: () => page.click(`document.querySelector('[data-side=fill] [data-field=fill-all] [data-slot=choice-control], [data-side=fill] [data-field=fill-all][data-slot=choice] [data-slot=choice-control]')`),
     /** Стрелка просмотра крупно: `next` либо `prev`. */
     viewerArrow: dir => page.click(`document.querySelector('[data-slot=lightbox] button[aria-label="${dir === 'next' ? 'Следующий кадр' : 'Предыдущий кадр'}"]')`),
+    /* ---------- такт 88: вставка из другой схемы, тексты повторяемого процесса ---------- */
+    /** Строка схемы-донора — первый уровень сайда вставки. */
+    pasteScheme: id => page.click(`document.querySelector('[data-side=paste] [data-paste-scheme="${id}"]')`),
+    /** Группа или процесс донора — второй уровень. */
+    pastePart: id => page.click(`document.querySelector('[data-side=paste] [data-paste-part="${id}"]')`),
+    /** Флажок строки поля или шага — третий уровень. */
+    pasteCheck: id => page.click(`document.querySelector('[data-side=paste] [data-paste-row="${id}"] [data-slot=choice-control]')`),
+    pasteAll: () => page.click(`document.querySelector('[data-side=paste] [data-paste-all] [data-slot=choice-control], [data-side=paste] [data-paste-all][data-slot=choice-control]')`),
+    /** Чип-вариант текста повторяемого процесса. */
+    textChip: (key, v) => page.click(`document.querySelector('[data-overlay-texts] [data-text=${key}] [data-text-chips] [data-variant="${v}"]')`),
+    /** «Все варианты» у поля текста — поповер. */
+    textVariants: key => page.click(`document.querySelector('[data-overlay-texts] [data-text=${key}] [data-act=text-variants]')`),
+    /** Вариант в поповере «Все варианты». */
+    variantPick: v => page.click(`document.querySelector('[data-variants] [data-variant="${v}"]')`),
     /* ---------- П8, такт 72: «Витрина», новая схема, плашка ---------- */
     /** Клик по элементу из выражения. */
     clickEl: sel => page.click(sel),
@@ -871,6 +885,60 @@ function kit(page) {
               full: (() => { const r = el.getBoundingClientRect(); return Math.round(r.left) === 0 && Math.round(r.top) === 0 && Math.round(r.width) === innerWidth && Math.round(r.height) === innerHeight })(),
             } })(),
           focusOverlayStep: document.activeElement?.closest?.('[data-overlay-step]')?.dataset.overlayStep ?? null,
+          /* ---------- такт 88: вставка из другой схемы, тексты повторяемого процесса ---------- */
+          paste: (() => { const el = document.querySelector('[data-side=paste]'); if (!el) return null
+            const btn = el.querySelector('[data-act=paste-confirm]')
+            const all = el.querySelector('[data-paste-all] [data-slot=choice-control], [data-paste-all][data-slot=choice-control]')
+            return {
+              kind: el.dataset.kind, level: el.dataset.level,
+              title: t(el.querySelector('[data-slot=modal-card-title]')?.textContent), sub: t(el.querySelector('[data-slot=modal-card-subtitle]')?.textContent),
+              back: !!el.querySelector('[data-modal-back]'),
+              query: el.querySelector('[data-field=paste-search] input, input[data-field=paste-search]')?.value ?? null,
+              /* Схемы: группа — «легенда», строка — «id · название вторая строка». */
+              groups: [...el.querySelectorAll('[data-paste-group]')].map(g => ({ legend: t(g.querySelector('[data-slot=field-set-legend]')?.textContent),
+                rows: [...g.querySelectorAll('[data-paste-scheme]')].map(r => r.dataset.pasteScheme + ' · ' + t(r.innerText)) })),
+              marks: [...el.querySelectorAll('[data-paste-scheme] [data-slot=highlight-text-match]')].map(x => t(x.textContent)),
+              empty: t(el.querySelector('[data-paste-empty] [data-slot=empty-title]')?.textContent) || null,
+              parts: [...el.querySelectorAll('[data-paste-part]')].map(r => r.dataset.pastePart + ' · ' + t(r.innerText) + (r.disabled ? ' · выкл' : '')),
+              target: t(el.querySelector('[data-field=paste-target] [data-slot=field-input]')?.textContent) || null,
+              /* Строка поля или шага: id · имя · пояснение (конфликт алиаса, подсказки и нейросети) · алиас либо способ · тип · выбрано. */
+              rows: [...el.querySelectorAll('[data-paste-row]')].map(r => [r.dataset.pasteRow,
+                t(r.querySelector('[data-slot=table-cell-identity] [data-slot=table-cell-text]')?.textContent ?? r.querySelector('[data-slot=table-cell-identity]')?.textContent),
+                t(r.querySelector('[data-slot=table-cell-identity-description]')?.textContent),
+                t(r.querySelector('[data-paste-alias], [data-paste-method]')?.textContent), t(r.querySelector('[data-slot=chip]')?.textContent),
+                r.querySelector('[data-slot=choice-control]')?.getAttribute('aria-checked') === 'true' ? 'выбрано' : ''].filter(Boolean).join(' · ')),
+              all: all?.getAttribute('aria-checked') ?? null,
+              note: t(el.querySelector('[data-slot=modal-card-note]')?.textContent),
+              confirm: btn ? t(btn.textContent) + (btn.disabled ? ' · выкл' : '') : null,
+            } })(),
+          /* Уведомления не закрывают кнопки подвала открытого окна (такт 88): null — уведомлений нет. */
+          toastClear: (() => { const toasts = [...document.querySelectorAll('[data-slot=toast]')].map(x => x.getBoundingClientRect()); if (!toasts.length) return null
+            const acts = [...document.querySelectorAll('[data-slot=modal-card-actions]')].map(x => x.getBoundingClientRect()).filter(r => r.width > 0)
+            return toasts.every(a => acts.every(b => a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom)) })(),
+          /* Фокус в сайде вставки: строка схемы, группы (процесса), флажок строки поля (шага). */
+          focusPaste: (() => { const a = document.activeElement; if (!a?.closest?.('[data-side=paste]')) return null
+            if (a.dataset.pasteScheme) return 'scheme ' + a.dataset.pasteScheme
+            if (a.dataset.pastePart) return 'part ' + a.dataset.pastePart
+            const row = a.closest('[data-paste-row]'); if (row) return 'row ' + row.dataset.pasteRow
+            return a.dataset.act ?? a.dataset.slot ?? a.tagName.toLowerCase() })(),
+          /* Раздел «Тексты в приложении» оверлея: кнопка заполнения и её подсказка, значения полей, чипы-варианты («*» — выбран). */
+          texts: (() => { const el = document.querySelector('[data-overlay-texts]'); if (!el) return null
+            const fill = el.querySelector('[data-act=texts-fill]')
+            return {
+              fill: fill ? (fill.disabled ? 'выкл' : 'вкл') : null,
+              fillHint: t(el.querySelector('[data-texts-fill] [data-slot=field-hint]')?.textContent),
+              values: Object.fromEntries([...el.querySelectorAll('[data-text]')].map(f => [f.dataset.text, f.querySelector('input[data-slot=field-input]')?.value ?? null])),
+              chips: Object.fromEntries([...el.querySelectorAll('[data-text]')].map(f => [f.dataset.text,
+                [...f.querySelectorAll('[data-text-chips] [data-slot=chip][data-pressable]')].map(c => t(c.textContent) + (c.getAttribute('aria-pressed') === 'true' ? ' *' : ''))])),
+              hints: Object.fromEntries([...el.querySelectorAll('[data-text]')].map(f => [f.dataset.text, t(f.querySelector('[data-slot=field-hint]')?.textContent)])),
+            } })(),
+          /* Поповер «Все варианты»: поле, запрос, группы по типу объекта («*» — выбран), пустая выдача. */
+          variants: (() => { const el = document.querySelector('[data-variants]'); if (!el) return null
+            return { key: el.dataset.variants, query: el.querySelector('[data-field=variants-search] input, input[data-field=variants-search]')?.value ?? null,
+              groups: [...el.querySelectorAll('[data-variant-group]')].map(g => t(g.querySelector('[data-slot=list-group-header]')?.textContent) + ': '
+                + [...g.querySelectorAll('[data-slot=list-item]')].map(i => t(i.textContent) + (i.hasAttribute('data-selected') ? ' *' : '')).join(', ')),
+              marks: [...el.querySelectorAll('[data-slot=highlight-text-match]')].map(x => t(x.textContent)),
+              empty: t(el.querySelector('[data-variants-empty] [data-slot=empty-title]')?.textContent) || null } })(),
           /* ---------- такт 72: выделение в поле ввода — решение чата, внешняя проверка тактов 67–70 ---------- */
           selRange: (() => { const a = document.activeElement; return a?.matches?.('input, textarea') ? [a.selectionStart, a.selectionEnd] : null })(),
           /* ---------- П8, такт 72: «Витрина», пустые состояния, новая схема, плашка ---------- */
@@ -1486,10 +1554,11 @@ const SCENARIOS = {
     ['переименовать группу — название в списке и в заголовке панели', async (K) => { await K.act('group-edit'); await K.fill('[data-field=gdTitle]', 'Транспортное средство'); await K.act('group-save'); await K.settled() },
       { 'form.groups': ['Заявка', 'Транспортное средство', 'Кузов и комплектация'], 'form.title': 'Транспортное средство · 4 поля', writes: 2 }],
   ], { query: 'tab=form&group=g-car' }],
-  'СС-60': ['«Вставить из другой схемы»: кнопка даёт уведомление-заглушку (r2 §8; аудит, «„Вставить поле из другой схемы“ → типовой паттерн „выбор из справочника“»)', [
-    ['«Вставить из другой схемы»', K => K.act('field-paste'), { notices: ['Выбор поля из другой схемы — вне стенда'], surface: '', 'form.title': 'Заявка · 3 поля', writes: 0 }],
-    ['«Процессы и шаги» (такт 70): «Вставить шаг из другой схемы»', async (K) => { await K.tab('processes'); await K.act('step-paste') },
-      { notices: ['Выбор шага из другой схемы — вне стенда'], surface: '', 'proc.cards.0': 'Осмотр автомобиля · 4 шага · auto_inspection', writes: 0 }],
+  'СС-60': ['«Вставить из другой схемы»: с такта 88 — сайд выбора из справочника на «Форме» и на «Процессах» (ревью 4.5; до такта 88 — уведомление-заглушка, r2 §8; аудит, «„Вставить поле из другой схемы“ → типовой паттерн „выбор из справочника“»)', [
+    ['«Вставить из другой схемы» — сайд вставки полей в выбранную группу', K => K.act('field-paste'),
+      { notices: [], surface: 'paste', focusIn: 'paste', 'paste.kind': 'fields', 'paste.title': 'Вставить поля из другой схемы', 'paste.sub': 'В группу «Заявка»', 'form.title': 'Заявка · 3 поля', writes: 0 }],
+    ['«Отмена» — сайд закрыт, записи нет; «Процессы и шаги»: «Вставить шаг из другой схемы» — сайд вставки шагов', async (K) => { await K.act('paste-cancel'); await K.tab('processes'); await K.act('step-paste') },
+      { notices: [], surface: 'paste', 'paste.kind': 'steps', 'paste.title': 'Вставить шаги из другой схемы', 'paste.sub': 'В процесс «Осмотр автомобиля»', 'proc.cards.0': 'Осмотр автомобиля · 4 шага · auto_inspection', writes: 0 }],
   ], { query: 'tab=form' }],
   /* ============================ П7, часть 1, такт 70 ============================ */
   'СС-38': ['процессы: карточки процессов; добавить и изменить процесс в сайде — три секции макета, «Сохранить» одной записью, «Отмена» отбрасывает; «Открыть процесс» у повторяемого — оверлей (r2 §6, §7; макеты `33245:5722`, `33245:6032`)', [
@@ -1595,7 +1664,7 @@ const SCENARIOS = {
   'СС-53': ['оверлей повторяемого процесса: форма и шаги вместе; стек «оверлей → сайд», Esc закрывает верхний слой, фокус возвращается к триггеру своего слоя; «Сохранить» оверлея — одной записью (r2 §7; аудит, «Клавиатура и фокус»)', [
     ['«Открыть процесс» — оверлей во всё окно: форма процесса и шаги, шагов нет', K => K.processAct('p-damage', 'process-open'),
       { surface: 'process-overlay', focusIn: 'overlay', overlay: { title: 'Осмотр повреждений', sub: 'Повторяемый процесс · форма и шаги вместе', placement: 'full', name: 'Осмотр повреждений', alias: 'damage_inspection',
-        steps: [], empty: 'В процессе нет шагов', acts: ['overlay-alias-suggest', 'overlay-step-add', 'overlay-cancel', 'overlay-save'], ro: false, fieldsRo: false, full: true }, writes: 0 }],
+        steps: [], empty: 'В процессе нет шагов', acts: ['overlay-alias-suggest', 'texts-fill', ...Array(6).fill('text-variants'), 'overlay-step-add', 'overlay-cancel', 'overlay-save'], ro: false, fieldsRo: false, full: true }, writes: 0 }],
     ['Tab по кругу — фокус остаётся в оверлее', K => K.tabs(30), { surface: 'process-overlay', focusIn: 'overlay' }],
     ['«Добавить шаг» — сайд шага поверх оверлея: стек из двух слоёв, фокус в сайде', K => K.act('overlay-step-add'),
       { surface: 'step', surfaces: ['process-overlay', 'step'], focusIn: 'step', 'stepSide.title': 'Добавление шага', 'stepSide.sub': 'Процесс «Осмотр повреждений»', 'stepSide.host': 'overlay', 'overlay.title': 'Осмотр повреждений' }],
@@ -2069,6 +2138,159 @@ const SCENARIOS = {
     ['«заполнить изоб», Enter — таб «Процессы и шаги», сайд массовой заливки', async (K) => { await K.fill('[data-field=search]', 'заполнить изоб'); await K.key('Enter') },
       { tab: 'processes', surface: 'fill', 'fill.sub': 'Подобрано 3 из 3', query: '' }],
   ]],
+  /* ============================ такт 88: вставка из другой схемы, тексты повторяемого процесса ============================ */
+  'СС-85': ['вставка полей из другой схемы: схема → группа → поля; конфликт алиаса виден до вставки; «Вставить N полей в группу «…»» — одной записью с «Отменить» (ревью 4.5; решение 3 оркестратора 2026-10-08)', [
+    ['«Вставить из другой схемы» — схемы компании «Демо Страхование» и отобранные шаблоны; кнопка выключена', K => K.act('field-paste'),
+      { surface: 'paste', focusIn: 'paste', paste: { kind: 'fields', level: 'schemes', title: 'Вставить поля из другой схемы', sub: 'В группу «Заявка»', back: false, query: '',
+        groups: [{ legend: 'Схемы компании «Демо Страхование»', rows: ['d-osago · ОСАГО — осмотр легкового автомобиля Осмотр транспорта · 2 группы · 9 полей',
+          'd-flat · Осмотр квартиры перед страхованием Осмотр недвижимости · 2 группы · 7 полей'] },
+        { legend: 'Отобранные шаблоны', rows: ['d-machine · Осмотр спецтехники в лизинге Осмотр оборудования · 2 группы · 6 полей'] }],
+        marks: [], empty: null, parts: [], target: null, rows: [], all: null, note: 'Выбрано: 0', confirm: 'Вставить в группу «Заявка» · выкл' }, writes: 0 }],
+    ['«ОСАГО…» — второй уровень: группы полей, «←»; фокус на первой группе', K => K.pasteScheme('d-osago'),
+      { 'paste.level': 'parts', 'paste.title': 'ОСАГО — осмотр легкового автомобиля', 'paste.sub': 'Группы полей схемы', 'paste.back': true,
+        'paste.parts': ['dg-lead · Заявка Lead · 4 поля', 'dg-car · Автомобиль Car · 5 полей'], focusPaste: 'part dg-lead', writes: 0 }],
+    ['«Заявка» — поля группы: тип, алиас; «алиас policy_number уже есть — будет policy_number_2»', K => K.pastePart('dg-lead'),
+      { 'paste.level': 'items', 'paste.title': 'Заявка', 'paste.sub': 'ОСАГО — осмотр легкового автомобиля', 'paste.rows': [
+        'df-number · Номер полиса · алиас policy_number уже есть — будет policy_number_2 · policy_number · Текст', 'df-date · Дата осмотра · inspection_date · Дата',
+        'df-phone · Телефон клиента · client_phone · Текст', 'df-email · Email клиента · client_email · Текст'], 'paste.all': 'false', focusPaste: 'row df-number', writes: 0 }],
+    ['выбрать три поля — «Вставить 3 поля в группу «Заявка»»', async (K) => { await K.pasteCheck('df-number'); await K.pasteCheck('df-date'); await K.pasteCheck('df-phone') },
+      { 'paste.all': 'mixed', 'paste.note': 'Выбрано: 3', 'paste.confirm': 'Вставить 3 поля в группу «Заявка»', 'paste.rows.0': 'df-number · Номер полиса · алиас policy_number уже есть — будет policy_number_2 · policy_number · Текст · выбрано', writes: 0 }],
+    ['«Вставить» — поля в конце группы, алиас с суффиксом; одна запись, уведомление с «Отменить»; фокус на «Вставить из другой схемы»', async (K) => { await K.act('paste-confirm'); await K.settled() },
+      { surface: '', notices: ['Вставлены 3 поля в группу «Заявка»'], 'form.title': 'Заявка · 6 полей', 'form.rows': ['1 · Номер полиса · policy_number · Текст · Обязательное',
+        '2 · Страхователь · insurer · Текст · Обязательное', '3 · Дата начала полиса · policy_start · Дата · Только web', '4 · Номер полиса · policy_number_2 · Текст · Обязательное',
+        '5 · Дата осмотра · inspection_date · Дата · Обязательное', '6 · Телефон клиента · client_phone · Текст · Обязательное'], saveLog: ['saving', 'saved'], writes: 1, focusAct: 'field-paste' }],
+    ['«Отменить» — группа прежняя', async (K) => { await K.undo(); await K.settled() },
+      { 'form.title': 'Заявка · 3 поля', 'form.rows.length': 3, writes: 2 }],
+    ['снова: «Номер полиса» — «Вставить 1 поле в группу «Заявка»»', async (K) => {
+      await K.wait(3200); await K.act('field-paste'); await K.pasteScheme('d-osago'); await K.pastePart('dg-lead'); await K.pasteCheck('df-number') },
+      { 'paste.confirm': 'Вставить 1 поле в группу «Заявка»', 'paste.note': 'Выбрано: 1', writes: 2 }],
+    ['«Вставить» и дифф публикации: поле добавлено с алиасом policy_number_2', async (K) => { await K.act('paste-confirm'); await K.settled(); await K.publish(); await K.area('form') },
+      { surface: 'publish', 'form.rows.3': '4 · Номер полиса · policy_number_2 · Текст · Обязательное', 'diff.open.0.groups.0': { kind: 'added', title: 'Добавлено · 2',
+        items: ['Поле «Номер полиса» | группа «Заявка», алиас policy_number_2', 'Поле «Цвет кузова» | группа «Автомобиль», алиас body_color'] }, writes: 3 }],
+  ], { query: 'tab=form' }],
+  'СС-86': ['вставка шагов из другой схемы: схема → процесс → шаги; процесс-цель; шаги — в конец процесса с фото-подсказками и нейросетями, одной записью с «Отменить» (ревью 4.5; решение 3)', [
+    ['«Вставить шаг из другой схемы» — схемы с числом процессов и шагов; цель — первый обычный процесс', K => K.act('step-paste'),
+      { surface: 'paste', paste: { kind: 'steps', level: 'schemes', title: 'Вставить шаги из другой схемы', sub: 'В процесс «Осмотр автомобиля»', back: false, query: '',
+        groups: [{ legend: 'Схемы компании «Демо Страхование»', rows: ['d-osago · ОСАГО — осмотр легкового автомобиля Осмотр транспорта · 2 процесса · 7 шагов',
+          'd-flat · Осмотр квартиры перед страхованием Осмотр недвижимости · 1 процесс · 5 шагов'] },
+        { legend: 'Отобранные шаблоны', rows: ['d-machine · Осмотр спецтехники в лизинге Осмотр оборудования · 2 процесса · 6 шагов'] }],
+        marks: [], empty: null, parts: [], target: null, rows: [], all: null, note: 'Выбрано: 0', confirm: 'Вставить в процесс «Осмотр автомобиля» · выкл' }, writes: 0 }],
+    ['«ОСАГО…» — процессы схемы', K => K.pasteScheme('d-osago'),
+      { 'paste.sub': 'Процессы схемы', 'paste.parts': ['dp-auto · Осмотр автомобиля auto_inspection · 5 шагов', 'dp-docs · Документы docs · 2 шага'], focusPaste: 'part dp-auto' }],
+    ['«Осмотр автомобиля» — шаги: тип, способ, подсказки и нейросети второй строкой; процесс-цель', K => K.pastePart('dp-auto'),
+      { 'paste.level': 'items', 'paste.target': 'Осмотр автомобиля', 'paste.rows': [
+        'ds-rear · Задняя часть · 3 фото-подсказки · Оценка повреждений · 2–7 фото · Основной', 'ds-left · Вид слева · 1 фото-подсказка · Ракурсы авто · Левая сторона · 2–7 фото · Основной',
+        'ds-odometer · Одометр · 1 фото-подсказка · без нейросетей · 1 фото · Основной', 'ds-interior · Салон · 1 фото-подсказка · без нейросетей · 2 фото · Основной',
+        'ds-wheels · Колёса · 2 фото-подсказки · Оценка повреждений · 2–7 фото · Основной'] }],
+    ['выбрать «Задняя часть» и «Вид слева»; процесс-цель «Осмотр документов»', async (K) => { await K.pasteCheck('ds-rear'); await K.pasteCheck('ds-left'); await K.select('paste-target', 'Осмотр документов') },
+      { 'paste.target': 'Осмотр документов', 'paste.confirm': 'Вставить 2 шага в процесс «Осмотр документов»', 'paste.note': 'Выбрано: 2', writes: 0 }],
+    ['«Вставить» — шаги в конце процесса с подсказками и нейросетями; одна запись, уведомление с «Отменить»', async (K) => { await K.act('paste-confirm'); await K.settled() },
+      { surface: '', notices: ['Вставлены 2 шага в процесс «Осмотр документов»'], 'proc.cards.1': 'Осмотр документов · 3 шага · docs_inspection', 'proc.rows.p-docs': [
+        '1 · Паспорт ТС (ПТС) · Техническое фото · 2 фото · Сканер документов · Не установлена · Из галереи, Скан документов',
+        '2 · Задняя часть · Основной · 2–7 фото · Оценка повреждений · 3 · Все установлены · Обязательный',
+        '3 · Вид слева · Основной · 2–7 фото · Ракурсы авто · Левая сторона · 1 · Все установлены'],
+      'proc.thumbs.s-paste-1': ['Задняя часть · анфас', 'Задняя часть · три четверти слева', 'Задняя часть · три четверти справа'], saveLog: ['saving', 'saved'], writes: 1, focusAct: 'step-paste' }],
+    ['поиск «задняя» — вставленный шаг в «Процессы → Осмотр документов»', async (K) => { await K.searchClick(); await K.type('задняя') },
+      { results: [{ path: 'Процессы → Осмотр документов', items: ['Задняя часть'] }] }],
+    ['Esc; «Отменить» — шагов нет', async (K) => { await K.key('Escape'); await K.undo(); await K.settled() },
+      { 'proc.cards.1': 'Осмотр документов · 1 шаг · docs_inspection', 'proc.rows.p-docs.length': 1, writes: 2 }],
+  ], { query: 'tab=processes' }],
+  'СС-86/новая': ['вставка шагов в схеме без процессов — отказ с причиной (ревью 4.5)', [
+    ['«Вставить шаг из другой схемы» — сайда нет, уведомление', K => K.act('step-paste'),
+      { surface: '', notices: ['В схеме нет процессов для шагов — сначала добавьте процесс'], writes: 1 }],
+  ], { query: 'data=new&saved=1&tab=processes' }],
+  'СС-87': ['навигация внутри сайда вставки: «←» и Esc — уровень назад, выбор сбрасывается, фокус — на строке, с которой пришли; Esc на первом уровне закрывает сайд (паттерн «выбор из справочника»)', [
+    ['группа «Автомобиль»: «Автомобиль» донора — три алиаса уже есть', async (K) => { await K.act('field-paste'); await K.pasteScheme('d-osago'); await K.pastePart('dg-car') },
+      { 'paste.sub': 'ОСАГО — осмотр легкового автомобиля', 'paste.rows': ['df-vin · VIN · алиас vin уже есть — будет vin_2 · vin · Текст',
+        'df-plate · Госномер · алиас regnum уже есть — будет regnum_2 · regnum · Текст', 'df-brand · Марка · brand · Текст', 'df-model · Модель · model · Текст',
+        'df-mileage · Пробег · алиас mileage уже есть — будет mileage_2 · mileage · Число'], 'paste.confirm': 'Вставить в группу «Автомобиль» · выкл' }],
+    ['флажок шапки — все пять', K => K.pasteAll(), { 'paste.all': 'true', 'paste.note': 'Выбрано: 5', 'paste.confirm': 'Вставить 5 полей в группу «Автомобиль»' }],
+    ['«←» — группы схемы, выбор сброшен, фокус на «Автомобиле»', K => K.backLayer(),
+      { 'paste.level': 'parts', 'paste.note': 'Выбрано: 0', 'paste.confirm': 'Вставить в группу «Автомобиль» · выкл', focusPaste: 'part dg-car', surface: 'paste' }],
+    ['Esc — схемы, фокус на «ОСАГО…»', K => K.key('Escape'), { 'paste.level': 'schemes', 'paste.back': false, focusPaste: 'scheme d-osago', surface: 'paste' }],
+    ['Esc на первом уровне — сайд закрыт без записи, фокус на «Вставить из другой схемы»', K => K.key('Escape'), { surface: '', paste: null, focusAct: 'field-paste', writes: 0 }],
+    ['снова — сайд с первого уровня', K => K.act('field-paste'), { 'paste.level': 'schemes', 'paste.query': '', writes: 0 }],
+  ], { query: 'tab=form&group=g-car' }],
+  'СС-88': ['поиск схемы-донора по названию: слова с начала слова, подсветка; пусто — «Ничего не найдено»; схемы той же компании — по компании-владельцу (ревью 4.5; аудит, «выбор из справочника»)', [
+    ['«квартир» — одна схема компании, совпадение подсвечено', async (K) => { await K.act('field-paste'); await K.fill('[data-field=paste-search]', 'квартир') },
+      { 'paste.query': 'квартир', 'paste.groups': [{ legend: 'Схемы компании «Демо Страхование»', rows: ['d-flat · Осмотр квартиры перед страхованием Осмотр недвижимости · 2 группы · 7 полей'] }],
+        'paste.marks': ['квартир'], 'paste.empty': null }],
+    ['«лизинг спец» — шаблон, слова в любом порядке', K => K.fill('[data-field=paste-search]', 'лизинг спец'),
+      { 'paste.groups': [{ legend: 'Отобранные шаблоны', rows: ['d-machine · Осмотр спецтехники в лизинге Осмотр оборудования · 2 группы · 6 полей'] }], 'paste.marks': ['спец', 'лизинг'] }],
+    ['«трактор» — «Ничего не найдено»', K => K.fill('[data-field=paste-search]', 'трактор'), { 'paste.groups': [], 'paste.empty': 'Ничего не найдено по «трактор»' }],
+    ['пустой запрос — снова все три', K => K.clear('[data-field=paste-search]'), { 'paste.query': '', 'paste.groups.length': 2, 'paste.empty': null }],
+    ['компания-владелец «Пример Лизинг» — схем компании нет, только шаблоны', async (K) => {
+      await K.key('Escape'); await K.tab('settings'); await K.fill('[data-field=owner]', 'Пример Лизинг'); await K.blur(); await K.settled(); await K.tab('form'); await K.act('field-paste') },
+      { 'g.owner': 'Пример Лизинг', 'paste.groups': [{ legend: 'Отобранные шаблоны', rows: ['d-machine · Осмотр спецтехники в лизинге Осмотр оборудования · 2 группы · 6 полей'] }] }],
+  ], { query: 'tab=form' }],
+  'СС-89': ['тексты в приложении: вариант чипом — до трёх вариантов по типу объекта процесса; «Сохранить» оверлея — одна запись; дифф и поиск по текстам (ревью 4.6; решения 4, 5 оркестратора)', [
+    ['«Открыть процесс» — раздел «Тексты в приложении»: тип объекта не выбран — варианты разных типов', K => K.processAct('p-damage', 'process-open'),
+      { surface: 'process-overlay', texts: { fill: 'выкл', fillHint: 'Сначала выберите тип объекта съёмки в разделе «Поведение»',
+        values: { item: '', add: '', before: '', more: '', finish: '', empty: '' },
+        chips: { item: ['Повреждение', 'Дефект', 'Документ'], add: ['Добавить повреждение', 'Добавить дефект', 'Добавить документ'],
+          before: ['Снимите повреждение целиком, затем крупно', 'Снимите дефект целиком, затем крупно', 'Снимите документ целиком, без бликов'],
+          more: ['Есть ещё повреждения?', 'Есть ещё дефекты?', 'Есть ещё документы?'], finish: ['Повреждений больше нет', 'Дефектов больше нет', 'Документов больше нет'],
+          empty: ['Повреждения ещё не добавлены', 'Дефекты ещё не добавлены', 'Документы ещё не добавлены'] },
+        hints: { item: 'Список повторов — с номером: «Повреждение 1», «Повреждение 2»', add: 'Под списком повторов — начинает новый повтор', before: 'Перед первым шагом каждого повтора',
+          more: 'После повтора — ответ кнопкой добавления или завершения', finish: 'Рядом с вопросом «Есть ещё?» — завершает процесс', empty: 'Экран списка, пока повторов нет' } }, writes: 0 }],
+    ['тип объекта «Легковой автомобиль» — варианты типа, заполнение включено', K => K.select('odObjectType', 'Легковой автомобиль'),
+      { 'texts.fill': 'вкл', 'texts.fillHint': 'Только пустые поля — заполненные не меняются', 'texts.chips.item': ['Повреждение', 'Деталь кузова', 'Колесо'],
+        'texts.chips.add': ['Добавить повреждение', 'Добавить деталь', 'Добавить колесо'], writes: 0 }],
+    ['чип «Деталь кузова» — в поле, чип выбран; чип «Добавить деталь»', async (K) => { await K.textChip('item', 'Деталь кузова'); await K.textChip('add', 'Добавить деталь') },
+      { 'texts.values.item': 'Деталь кузова', 'texts.values.add': 'Добавить деталь', 'texts.chips.item': ['Повреждение', 'Деталь кузова *', 'Колесо'],
+        'texts.chips.add': ['Добавить повреждение', 'Добавить деталь *', 'Добавить колесо'], writes: 0 }],
+    ['свой текст в поле — ни один чип не выбран', K => K.fill('[data-overlay-texts] [data-text=more]', 'Ещё повреждённые детали есть?'),
+      { 'texts.values.more': 'Ещё повреждённые детали есть?', 'texts.chips.more': ['Есть ещё повреждения?', 'Есть ещё повреждённые детали?', 'Есть ещё колёса для съёмки?'], writes: 0 }],
+    ['«Сохранить» оверлея — одна запись', async (K) => { await K.act('overlay-save'); await K.settled() },
+      { surface: '', saveLog: ['saving', 'saved'], writes: 1 }],
+    ['поиск «добавить деталь» — процесс по тексту в приложении', async (K) => { await K.searchClick(); await K.type('добавить деталь') },
+      { results: [{ path: 'Процессы и шаги', items: ['Осмотр повреждений | текст в приложении «Добавить деталь»'] }] }],
+    ['дифф публикации: тип объекта и тексты в приложении', async (K) => { await K.key('Escape'); await K.publish(); await K.area('processes') },
+      { surface: 'publish', 'diff.open.0.groups': [{ kind: 'changed', title: 'Изменено · 2', items: [
+        'Процесс «Осмотр повреждений»: настройки процесса | тип объекта: пусто → тип объекта: Легковой автомобиль',
+        'Процесс «Осмотр повреждений»: тексты в приложении | название повтора: пусто, кнопка добавления: пусто, вопрос «Есть ещё?»: пусто → название повтора: Деталь кузова, кнопка добавления: Добавить деталь, вопрос «Есть ещё?»: Ещё повреждённые детали есть?'] },
+        { kind: 'removed', title: 'Удалено · 1', items: ['Шаг «Страховой полис» | процесс «Осмотр документов»'] }] }],
+  ], { query: 'tab=processes' }],
+  'СС-90': ['тексты в приложении: вариант из поповера «Все варианты» — поиск, группы по типу объекта; Esc закрывает только поповер (ревью 4.6; решение 4)', [
+    ['«Все варианты» у названия повтора — группы всех типов объекта', async (K) => { await K.processAct('p-damage', 'process-open'); await K.textVariants('item') },
+      { surface: 'process-overlay', variants: { key: 'item', query: '', groups: ['Легковой автомобиль: Повреждение, Деталь кузова, Колесо', 'Грузовой транспорт: Повреждение, Ось, Секция кузова',
+        'Мототехника: Повреждение, Деталь', 'Недвижимость: Дефект, Помещение, Комната', 'Документ: Документ, Страница'], marks: [], empty: null } }],
+    ['поиск «помещ» — один вариант, подсветка', K => K.fill('[data-variants] [data-field=variants-search]', 'помещ'),
+      { 'variants.groups': ['Недвижимость: Помещение'], 'variants.marks': ['Помещ'] }],
+    ['«Помещение» — в поле, поповер закрыт, фокус на «Все варианты»', K => K.variantPick('Помещение'),
+      { variants: null, 'texts.values.item': 'Помещение', surface: 'process-overlay', focusAct: 'text-variants', writes: 0 }],
+    ['тип «Недвижимость» — его группа первой, выбранный вариант отмечен', async (K) => { await K.select('odObjectType', 'Недвижимость'); await K.textVariants('item') },
+      { 'variants.groups.0': 'Недвижимость: Дефект, Помещение *, Комната', 'texts.chips.item': ['Дефект', 'Помещение *', 'Комната'] }],
+    ['«трактор» — пусто', K => K.fill('[data-variants] [data-field=variants-search]', 'трактор'), { 'variants.groups': [], 'variants.empty': 'Ничего не найдено по «трактор»' }],
+    ['Esc — закрыт только поповер, оверлей открыт, значение прежнее', K => K.key('Escape'),
+      { variants: null, surface: 'process-overlay', surfaces: ['process-overlay'], 'texts.values.item': 'Помещение', writes: 0 }],
+  ], { query: 'tab=processes' }],
+  'СС-91': ['тексты в приложении: «Заполнить по типу объекта» — только пустые, набор уже выбранного варианта; «Отменить» в уведомлении; повтор — пустых нет (ревью 4.6; решение 4)', [
+    ['тип «Недвижимость», чип «Помещение» у названия повтора', async (K) => { await K.processAct('p-damage', 'process-open'); await K.select('odObjectType', 'Недвижимость'); await K.textChip('item', 'Помещение') },
+      { 'texts.values': { item: 'Помещение', add: '', before: '', more: '', finish: '', empty: '' }, 'texts.fill': 'вкл', writes: 0 }],
+    ['«Заполнить по типу объекта» — пять пустых из набора «Помещение»; записи нет, уведомление с «Отменить» — над кнопками подвала', K => K.act('texts-fill'),
+      { notices: ['Заполнено 5 текстов по типу «Недвижимость»'], toastClear: true, 'texts.values': { item: 'Помещение', add: 'Добавить помещение', before: 'Снимите помещение от входа',
+        more: 'Есть ещё помещения?', finish: 'Все помещения сняты', empty: 'Помещения ещё не добавлены' }, surface: 'process-overlay', writes: 0 }],
+    ['«Отменить» — пустые снова пусты, выбранное прежнее', K => K.undo(),
+      { 'texts.values': { item: 'Помещение', add: '', before: '', more: '', finish: '', empty: '' }, surface: 'process-overlay', writes: 0 }],
+    ['свой текст кнопки добавления, «Заполнить» — заданные не меняются', async (K) => { await K.fill('[data-overlay-texts] [data-text=add]', 'Ещё помещение'); await K.act('texts-fill') },
+      { notices: ['Заполнены 4 текста по типу «Недвижимость»'], 'texts.values': { item: 'Помещение', add: 'Ещё помещение', before: 'Снимите помещение от входа',
+        more: 'Есть ещё помещения?', finish: 'Все помещения сняты', empty: 'Помещения ещё не добавлены' }, surface: 'process-overlay' }],
+    ['ещё раз — пустых нет', async (K) => { await K.wait(3200); await K.act('texts-fill') }, { notices: ['Пустых текстов нет: заполненные не меняются'], writes: 0 }],
+    ['«Отмена» оверлея — записи нет; снова — тексты процесса пусты', async (K) => { await K.act('overlay-cancel'); await K.processAct('p-damage', 'process-open') },
+      { 'texts.values': { item: '', add: '', before: '', more: '', finish: '', empty: '' }, writes: 0 }],
+  ], { query: 'tab=processes' }],
+  'СС-92': ['тексты в приложении без типа объекта: «Заполнить по типу объекта» выключена, причина подсказкой рядом; варианты всех типов (ревью 4.6; решение 4)', [
+    ['оверлей: тип объекта не выбран — кнопка выключена с причиной', K => K.processAct('p-damage', 'process-open'),
+      { 'texts.fill': 'выкл', 'texts.fillHint': 'Сначала выберите тип объекта съёмки в разделе «Поведение»', 'texts.chips.item': ['Повреждение', 'Дефект', 'Документ'] }],
+    ['нажатие по выключенной — без правки и уведомления', K => K.act('texts-fill'),
+      { notices: [], 'texts.values': { item: '', add: '', before: '', more: '', finish: '', empty: '' }, writes: 0 }, { blind: true }],
+    ['чип без типа — «Дефект» в поле; тип «Документ» — набор документа, «Дефект» остаётся своим текстом', async (K) => { await K.textChip('item', 'Дефект'); await K.select('odObjectType', 'Документ') },
+      { 'texts.values.item': 'Дефект', 'texts.chips.item': ['Документ', 'Страница'], 'texts.fill': 'вкл' }],
+    ['«Заполнить» — пустые из основного набора документа: «Дефект» не из словаря типа', K => K.act('texts-fill'),
+      { notices: ['Заполнено 5 текстов по типу «Документ»'], 'texts.values': { item: 'Дефект', add: 'Добавить документ', before: 'Снимите документ целиком, без бликов',
+        more: 'Есть ещё документы?', finish: 'Документов больше нет', empty: 'Документы ещё не добавлены' } }],
+  ], { query: 'tab=processes' }],
 }
 
 /* ------------------------------ прогон ------------------------------ */

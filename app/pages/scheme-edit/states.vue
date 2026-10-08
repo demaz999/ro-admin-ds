@@ -2,6 +2,7 @@
 import { onBeforeUnmount, ref } from 'vue'
 import { formulaPreview } from '~/components/ui/formula-input'
 import { clearMatches, highlightMatches, queryWords } from '~/components/ui/highlight-text'
+import { variantChips, variantGroups } from '~/stands/scheme-edit/repeat-texts'
 
 /**
  * Матрицы компонентов страницы «Редактирование схемы осмотра» — стенд, такты 61–62. Примеры вызова для фронтов.
@@ -17,6 +18,8 @@ import { clearMatches, highlightMatches, queryWords } from '~/components/ui/high
  * Такт 68: ось `readonly` у `Field` и десяти контролов — матрица «обычное · только чтение · выключено».
  * Такт 86: `SearchResult`, `HighlightText`, счётчик `SectionNavItem count`.
  * Такт 87: оси `MediaGalleryItem` — выбор, «уже у шага», «открыть крупно», подпись; `ThumbStrip` (карточка 10).
+ * Такт 88: ось `Chip pressable` — чип-вариант; композиции страницы — строки вставки из другой схемы (поле с конфликтом
+ * алиаса, шаг с подсказками) и поле текста повторяемого процесса с вариантами.
  */
 definePageMeta({ layout: false })
 useHead({ title: 'Редактирование схемы осмотра — матрицы' })
@@ -251,6 +254,46 @@ const GALLERY_SELECT_EXAMPLE = `<!-- плитка выбора: нажатие, 
 <MediaGalleryItem size="sm" :src="src" class="w-24" />`
 const THUMB_STRIP_EXAMPLE = `<!-- до max миниатюр 28 × 20, остаток — «+N»; нажатие — номер миниатюры с нуля, по «+N» — первая скрытая -->
 <ThumbStrip :items="hints.map(h => ({ src: h.src, label: h.label }))" :max="3" label="Фото-подсказки шага «Передняя часть»" @open="k => view(k)" />`
+
+/* ------------------------------ Такт 88: вставка из другой схемы, тексты повторяемого процесса ------------------------------ */
+const chipValue = ref('Повреждение')
+const chipLog = ref('—')
+const CHIP_PRESSABLE_EXAMPLE = `<!-- чип-вариант: пилюля целиком — кнопка; active — значение уже выбрано (aria-pressed); подпись не шире контейнера -->
+<Chip v-for="v in variants" :key="v" pressable :active="value === v" :title="v" @click="value = v">{{ v }}</Chip>
+<!-- рядом — «Все варианты»: прежний чип с раскрытием, триггер поповера -->
+<PopoverTrigger as-child><Chip trailing="expand" :expanded="open">Все варианты</Chip></PopoverTrigger>`
+const pastePicked = ref<string[]>(['df-number'])
+function pasteDemoToggle(id: string) {
+  pastePicked.value = pastePicked.value.includes(id) ? pastePicked.value.filter(x => x !== id) : [...pastePicked.value, id]
+}
+const PASTE_ROWS_EXAMPLE = `<!-- строка поля донора: флажок, имя, конфликт алиаса пояснением под именем, алиас, тип -->
+<TableRow :state="picked ? 'selected' : 'default'">
+  <TableCell variant="slot" align="start" class="w-10 justify-center px-2"><Checkbox v-model="picked" :aria-label="field.title" /></TableCell>
+  <TableCell variant="slot" class="h-auto min-w-0 flex-1 flex-col items-start px-4 pt-4.5 pb-3 contain-inline-size">
+    <TableCellIdentity class="w-full flex-none">
+      {{ field.title }}
+      <template v-if="conflict" #description>алиас {{ field.alias }} уже есть — будет {{ newAlias }}</template>
+    </TableCellIdentity>
+  </TableCell>
+  <TableCell align="start" class="w-40 px-4">{{ field.alias }}</TableCell>
+  <TableCell variant="slot" align="start" class="w-28 px-4"><Chip variant="neutral">Текст</Chip></TableCell>
+</TableRow>
+<!-- схема донора и группа — строка-переход ListRow, как список версий истории -->
+<ListRow @click="openScheme(id)"><HighlightText :text="title" :query="query" /><template #secondary>Осмотр транспорта · 2 группы · 9 полей</template></ListRow>`
+const textEmpty = ref('')
+const textPicked = ref('Деталь кузова')
+const textOwn = ref('Найденное повреждение')
+const textRo = ref('Повреждение')
+const textVariantsOpen = ref(false)
+const REPEAT_TEXT_EXAMPLE = `<Field label="Название повтора" hint="Список повторов — с номером: «Повреждение 1», «Повреждение 2»">
+  <div class="flex flex-col gap-2">
+    <Autocomplete v-model="texts.item" :items="variants.map(v => ({ value: v, label: v }))" placeholder="Например, Повреждение" :show-icon="false" />
+    <div class="flex flex-wrap items-center gap-2">
+      <Chip v-for="v in chips" :key="v" pressable :active="texts.item === v" :title="v" @click="texts.item = v">{{ v }}</Chip>
+      <Popover v-model:open="open">…«Все варианты»: Input поиска, SelectGroup по типу объекта, SelectItem…</Popover>
+    </div>
+  </div>
+</Field>`
 
 /** Подсветка на странице — пример `highlightMatches` на узлах матрицы: все совпадения и текущее. */
 const pagePainted = ref('—')
@@ -935,6 +978,204 @@ onBeforeUnmount(() => clearMatches())
         Событие: {{ thumbLog }}
       </ToolbarText>
       <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ THUMB_STRIP_EXAMPLE }}</pre>
+    </section>
+
+    <!-- ============================ Такт 88: вставка из другой схемы, тексты повторяемого процесса ============================ -->
+    <section class="flex flex-col gap-4" data-matrix="chip-pressable">
+      <Heading>Chip · pressable — чип-вариант: пилюля целиком кнопка, хвоста нет</Heading>
+      <div class="flex flex-wrap items-start gap-10">
+        <div class="flex flex-col gap-2" data-case="rest">
+          <ToolbarText>покой и выбран (active), нажатие подставляет вариант</ToolbarText>
+          <div class="flex flex-wrap items-center gap-2">
+            <Chip v-for="v in ['Повреждение', 'Деталь кузова', 'Колесо']" :key="v" pressable :active="chipValue === v" :title="v" @click="chipValue = v; chipLog = `click: ${v}`">
+              {{ v }}
+            </Chip>
+            <Chip trailing="expand">
+              Все варианты
+            </Chip>
+          </div>
+        </div>
+        <div class="flex w-80 flex-col gap-2" data-case="long">
+          <ToolbarText>не шире контейнера 320 — подпись многоточием, полный текст в title</ToolbarText>
+          <Chip pressable title="Положите документ на ровную поверхность и снимите целиком без бликов">
+            Положите документ на ровную поверхность и снимите целиком без бликов
+          </Chip>
+        </div>
+        <div class="flex flex-col gap-2" data-case="filter">
+          <ToolbarText>без оси — прежние фильтр-чип и метка</ToolbarText>
+          <div class="flex flex-wrap items-center gap-2">
+            <Chip>Фильтр</Chip>
+            <Chip active>
+              Включён
+            </Chip>
+            <Chip variant="neutral">
+              Метка
+            </Chip>
+          </div>
+        </div>
+      </div>
+      <ToolbarText>
+        Событие: {{ chipLog }} · значение: {{ chipValue }}
+      </ToolbarText>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ CHIP_PRESSABLE_EXAMPLE }}</pre>
+    </section>
+
+    <section class="flex flex-col gap-4" data-matrix="paste-rows">
+      <Heading>Вставка из другой схемы — композиция: схема строкой-переходом, поле донора с конфликтом алиаса, шаг с подсказками</Heading>
+      <div class="flex flex-wrap items-start gap-10">
+        <div class="flex w-120 flex-col gap-2" data-case="schemes">
+          <ToolbarText>схема и группа — ListRow с подсветкой запроса «осаго»</ToolbarText>
+          <ListRow>
+            <HighlightText text="ОСАГО — осмотр легкового автомобиля" query="осаго" />
+            <template #secondary>
+              Осмотр транспорта · 2 группы · 9 полей
+            </template>
+          </ListRow>
+          <ListRow>
+            Заявка
+            <template #secondary>
+              Lead · 4 поля
+            </template>
+          </ListRow>
+          <ListRow disabled>
+            Пустая группа
+            <template #secondary>
+              Empty · 0 полей
+            </template>
+          </ListRow>
+        </div>
+        <div class="flex w-144 flex-col gap-2" data-case="rows">
+          <ToolbarText>поля: обычная · выбрана · конфликт алиаса; шаг с подсказками</ToolbarText>
+          <Table>
+            <TableRow>
+              <TableHead variant="column" class="w-10 justify-center px-2" aria-label="Выбор полей" />
+              <TableHead variant="column" class="min-w-0 flex-1 px-4">
+                Поле
+              </TableHead>
+              <TableHead variant="column" class="w-40 px-4">
+                Алиас
+              </TableHead>
+              <TableHead variant="column" class="w-28 px-4">
+                Тип
+              </TableHead>
+            </TableRow>
+            <TableRow v-for="r in [{ id: 'df-number', title: 'Номер полиса', alias: 'policy_number', next: 'policy_number_2', type: 'Текст' }, { id: 'df-date', title: 'Дата осмотра', alias: 'inspection_date', next: '', type: 'Дата' }, { id: 'df-phone', title: 'Телефон клиента', alias: 'client_phone', next: '', type: 'Текст' }]" :key="r.id" :state="pastePicked.includes(r.id) ? 'selected' : 'default'">
+              <TableCell variant="slot" align="start" class="w-10 justify-center px-2">
+                <Checkbox :model-value="pastePicked.includes(r.id)" :aria-label="r.title" @update:model-value="pasteDemoToggle(r.id)" />
+              </TableCell>
+              <TableCell variant="slot" class="h-auto min-w-0 flex-1 flex-col items-start px-4 pt-4.5 pb-3 contain-inline-size">
+                <TableCellIdentity class="w-full flex-none">
+                  {{ r.title }}
+                  <template v-if="r.next" #description>
+                    алиас {{ r.alias }} уже есть — будет {{ r.next }}
+                  </template>
+                </TableCellIdentity>
+              </TableCell>
+              <TableCell align="start" class="w-40 px-4">
+                {{ r.alias }}
+              </TableCell>
+              <TableCell variant="slot" align="start" class="w-28 px-4">
+                <Chip variant="neutral">
+                  {{ r.type }}
+                </Chip>
+              </TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell variant="slot" align="start" class="w-10 justify-center px-2">
+                <Checkbox aria-label="Задняя часть" />
+              </TableCell>
+              <TableCell variant="slot" class="h-auto min-w-0 flex-1 flex-col items-start px-4 pt-4.5 pb-3 contain-inline-size">
+                <TableCellIdentity class="w-full flex-none">
+                  Задняя часть
+                  <template #description>
+                    3 фото-подсказки · Оценка повреждений
+                  </template>
+                </TableCellIdentity>
+              </TableCell>
+              <TableCell variant="slot" align="start" class="w-40 px-4">
+                <Chip variant="neutral">
+                  Основной
+                </Chip>
+              </TableCell>
+              <TableCell align="start" class="w-28 px-4">
+                2–7 фото
+              </TableCell>
+            </TableRow>
+          </Table>
+        </div>
+      </div>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ PASTE_ROWS_EXAMPLE }}</pre>
+    </section>
+
+    <section class="flex flex-col gap-4" data-matrix="repeat-text">
+      <Heading>Текст повторяемого процесса — композиция: Autocomplete с вариантами словаря, чипы-варианты, «Все варианты»</Heading>
+      <div class="flex flex-wrap items-start gap-10">
+        <div class="flex w-110 flex-col gap-2" data-case="no-type">
+          <ToolbarText>тип объекта не выбран — варианты разных типов</ToolbarText>
+          <Field label="Название повтора" hint="Список повторов — с номером: «Повреждение 1», «Повреждение 2»">
+            <div class="flex flex-col gap-2">
+              <Autocomplete v-model="textEmpty" :items="variantGroups('', 'item').flatMap(g => g.items).map(v => ({ value: v, label: v }))" placeholder="Например, Повреждение" :show-icon="false" />
+              <div class="flex flex-wrap items-center gap-2">
+                <Chip v-for="v in variantChips('', 'item')" :key="v" pressable :active="textEmpty === v" :title="v" @click="textEmpty = v">
+                  {{ v }}
+                </Chip>
+                <Chip trailing="expand">
+                  Все варианты
+                </Chip>
+              </div>
+            </div>
+          </Field>
+        </div>
+        <div class="flex w-110 flex-col gap-2" data-case="picked">
+          <ToolbarText>легковой автомобиль, вариант выбран чипом; «Все варианты» открыт</ToolbarText>
+          <Field label="Название повтора" hint="Список повторов — с номером: «Повреждение 1», «Повреждение 2»">
+            <div class="flex flex-col gap-2">
+              <Autocomplete v-model="textPicked" :items="variantChips('car', 'item').map(v => ({ value: v, label: v }))" placeholder="Например, Повреждение" :show-icon="false" />
+              <div class="flex flex-wrap items-center gap-2">
+                <Chip v-for="v in variantChips('car', 'item')" :key="v" pressable :active="textPicked === v" :title="v" @click="textPicked = v">
+                  {{ v }}
+                </Chip>
+                <Popover v-model:open="textVariantsOpen">
+                  <PopoverTrigger as-child>
+                    <Chip trailing="expand" :expanded="textVariantsOpen">
+                      Все варианты
+                    </Chip>
+                  </PopoverTrigger>
+                  <PopoverContent :width="360" align="start" :side-offset="4" class="flex flex-col p-1">
+                    <div class="max-h-80 overflow-y-auto">
+                      <SelectGroup v-for="g in variantGroups('car', 'item')" :key="g.type" :header="g.label">
+                        <SelectItem v-for="v in g.items" :key="v" :selected="textPicked === v" @click="textPicked = v; textVariantsOpen = false">
+                          {{ v }}
+                        </SelectItem>
+                      </SelectGroup>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+          </Field>
+        </div>
+        <div class="flex w-110 flex-col gap-2" data-case="own">
+          <ToolbarText>свой текст — ни один чип не выбран</ToolbarText>
+          <Field label="Название повтора">
+            <div class="flex flex-col gap-2">
+              <Autocomplete v-model="textOwn" :items="[]" placeholder="Например, Повреждение" :show-icon="false" />
+              <div class="flex flex-wrap items-center gap-2">
+                <Chip v-for="v in variantChips('car', 'item')" :key="v" pressable :title="v" @click="textOwn = v">
+                  {{ v }}
+                </Chip>
+              </div>
+            </div>
+          </Field>
+        </div>
+        <div class="flex w-110 flex-col gap-2" data-case="readonly">
+          <ToolbarText>только чтение — просмотр версии: поле осью readonly, чипов-вариантов нет (части правки не рисуются)</ToolbarText>
+          <Field label="Название повтора" readonly>
+            <Autocomplete v-model="textRo" :items="[]" placeholder="Например, Повреждение" :show-icon="false" />
+          </Field>
+        </div>
+      </div>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ REPEAT_TEXT_EXAMPLE }}</pre>
     </section>
   </main>
 </template>

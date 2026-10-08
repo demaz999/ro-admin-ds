@@ -152,10 +152,16 @@ function pick(label: string) {
           </div>
         </div>
 
+        <!--
+          Такт 88: крестик — не остановка Tab. У пустого поля он есть, пока поле в фокусе (`isFloating`): Tab переводил фокус
+          на крестик, поле теряло фокус, крестик пропадал вместе с фокусом — фокус уходил со страницы (в окне — на `body`).
+          Очистка — нажатием, с клавиатуры — стиранием текста; вид прежний. Строка 225 реестра расхождений `docs/scheme-edit.md`.
+        -->
         <button
           v-if="props.clearable && isFloating && !ro"
           data-slot="field-clear"
           type="button"
+          tabindex="-1"
           :disabled="props.disabled"
           class="flex size-5 shrink-0 items-center justify-center rounded-full p-1.5 text-field-clear-foreground"
           :class="variant === 'elevated' ? 'bg-field-clear-elevated' : 'bg-field-clear'"

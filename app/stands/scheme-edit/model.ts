@@ -1,10 +1,13 @@
 import { computed, reactive } from 'vue'
+import { matchRanges, queryWords } from '~/components/ui/highlight-text'
 import {
-  ALIAS_RE, DETECTOR_GROUPS, DETECTOR_IDS, DETECTORS_ON, FIELD_SAMPLES, FINISH_CLASSES, showcaseTemplate, SPHERES, suggestAlias, SYSTEM_VARIABLES,
+  ALIAS_RE, DETECTOR_GROUPS, DETECTOR_IDS, DETECTORS_ON, FIELD_SAMPLES, FINISH_CLASSES, OBJECT_TYPES, showcaseTemplate, SPHERES, suggestAlias, SYSTEM_VARIABLES,
   type ShowcaseMetric, type ShowcaseProblem, type StepFlag,
 } from './catalogs'
 import { diffConfigs, formatDate, plural, summarize, validateConfig } from './diff'
+import { DONOR_SCHEMES, type DonorSchemeRaw } from './donors'
 import { catalogHint, categoryAtOpen, proposeHint, stepCategory, type HintProposal, type StepHint } from './hints'
+import { EMPTY_REPEAT_TEXTS, fillRepeatTexts, type RepeatTexts } from './repeat-texts'
 import {
   buildSearchIndex, groupHits, modifiedKeys, QUICK_LINKS, READONLY_REASON, runSearch, SEARCH_SCOPES, toggleNotice,
   type ActionKey, type SearchEntry, type SearchScope,
@@ -12,6 +15,7 @@ import {
 
 export * from './catalogs'
 export * from './hints'
+export * from './repeat-texts'
 
 /**
  * Модель состояния страницы «Редактирование схемы осмотра» (VA-16377) — такты 61–65, порции П1–П5.
@@ -61,7 +65,12 @@ export * from './hints'
  * (`setModified`, `changedKeys`). Индекс и сопоставление — `search.ts`. **Такт 87 — фото-подсказки** (`scheme-edit-review.md`,
  * 4.3, 4.4): подсказки шага — список элементов каталога и своих загрузок (`StepHint`), счёт и статус — из списка; добавление
  * из каталога (`addCatalogHints`), массовая заливка — строки подбора (`fillRows`) и установка одной записью с отменой
- * (`applyHints`). Каталог, поиск по нему и подбор — `hints.ts`.
+ * (`applyHints`). Каталог, поиск по нему и подбор — `hints.ts`. **Такт 88 — вставка из другой схемы и тексты процесса**
+ * (`scheme-edit-review.md`, 4.5, 4.6): схемы-доноры (`donorSchemes`, `donorGroups` — той же компании и отобранные шаблоны,
+ * поиск по названию), план вставки полей с разрешением конфликта алиаса (`fieldPastePlan`), вставка полей и шагов одной записью
+ * с отменой (`pasteFields`, `pasteSteps`, процессы-цели `pasteTargets`); тексты повторяемого процесса (`Process.texts`) и
+ * «Заполнить по типу объекта» — только пустые, с отменой (`fillTexts`). Доноры — `donors.ts`, словарь текстовок —
+ * `repeat-texts.ts`.
  */
 
 export type TabId = 'settings' | 'form' | 'processes' | 'showcase'
@@ -328,9 +337,15 @@ export interface Process {
   prepHint: string
   duration: 'auto' | 'manual' | 'off'
   durationMin: number
+  /**
+   * Тексты в приложении — такт 88 (`scheme-edit-review.md`, 4.6): название повтора, кнопка добавления, подсказка перед
+   * повтором, вопрос «Есть ещё?», кнопка завершения, текст пустого списка. Правятся в оверлее повторяемого процесса.
+   */
+  texts: RepeatTexts
 }
 export const PROCESS_DEFAULTS: Omit<Process, 'id' | 'title' | 'alias' | 'repeatable' | 'steps'> = {
   formula: '', icon: '', hidden: false, pickSteps: false, objectType: '', coords: '', prepHint: '', duration: 'auto', durationMin: 10,
+  texts: { ...EMPTY_REPEAT_TEXTS },
 }
 /** Черновик сайда процесса и оверлея: `id` пуст у нового; порядковый номер — `order`; шаги правит только оверлей. */
 export type ProcessDraft = Process & { order: number }
@@ -498,9 +513,43 @@ function withFormDefaults(config: SchemeConfig): SchemeConfig {
       return { ...x, dependent: !!x.dependsOn || x.dependent }
     }),
   }))
-  /* Процессы и шаги (такты 70–71): недостающие атрибуты и флаги — из значений по умолчанию. */
-  config.processes = config.processes.map(p => ({ ...PROCESS_DEFAULTS, ...p, steps: p.steps.map(st => ({ ...clone(STEP_DEFAULTS), ...st })) }))
+  /* Процессы и шаги (такты 70–71): недостающие атрибуты и флаги — из значений по умолчанию; тексты в приложении — такт 88. */
+  config.processes = config.processes.map(p => ({
+    ...PROCESS_DEFAULTS, ...p, texts: { ...EMPTY_REPEAT_TEXTS, ...p.texts }, steps: p.steps.map(st => ({ ...clone(STEP_DEFAULTS), ...st })),
+  }))
   return config
+}
+
+/**
+ * Схема-донор «Вставить из другой схемы» — такт 88: группы и процессы в виде схемы стенда, недостающие атрибуты — из
+ * значений по умолчанию, как у набора данных.
+ */
+export interface DonorScheme {
+  id: string
+  title: string
+  schemeType: string
+  owner: string
+  template: boolean
+  groups: FormGroup[]
+  processes: Process[]
+}
+function donorScheme(raw: DonorSchemeRaw): DonorScheme {
+  return {
+    id: raw.id, title: raw.title, schemeType: raw.schemeType, owner: raw.owner, template: raw.template,
+    groups: raw.groups.map(g => ({ ...GROUP_DEFAULTS, ...g, fields: g.fields.map(f => ({ ...FIELD_DEFAULTS, ...f, dependent: false })) })),
+    processes: raw.processes.map(p => ({
+      ...PROCESS_DEFAULTS, ...p, repeatable: false, texts: { ...EMPTY_REPEAT_TEXTS },
+      steps: p.steps.map(st => ({ ...clone(STEP_DEFAULTS), ...clone(st) })),
+    })),
+  }
+}
+/** Строка плана вставки поля: поле донора, алиас после вставки и конфликт с алиасом группы-цели. */
+export interface PasteFieldRow { field: FormField, alias: string, conflict: boolean }
+/** Занятый алиас — с суффиксом `_2`, `_3`: первый, которого нет среди занятых (прецедент `suggestAlias`). */
+function withSuffix(alias: string, taken: readonly string[]): string {
+  let k = 2
+  while (taken.includes(`${alias}_${k}`)) k++
+  return `${alias}_${k}`
 }
 
 function setPath(root: unknown, path: string, value: unknown): boolean {
@@ -920,9 +969,6 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     if (!writeGroups(groups)) return
     notify(`Применено к ${empty.length} ${fieldsDative(empty.length)}`, 'ok', true, () => writeGroups(before))
   }
-  /** «Вставить из другой схемы» — заглушка кнопкой (r2 §8; аудит, «„Вставить поле из другой схемы“»). */
-  function pasteFromScheme() { notify('Выбор поля из другой схемы — вне стенда') }
-
   let groupSeq = 0
   /** «Сохранить» сайда группы: название обязательно, алиас — латиницей и не повторяется среди групп. */
   function saveGroup(d: GroupDraft): boolean {
@@ -1221,11 +1267,106 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     if (ui.viewing) { notify('Прошлая версия открыта только для чтения', 'err'); return false }
     return true
   }
+  /* ------------------------------ вставка из другой схемы — такт 88 ------------------------------ */
   /**
-   * «Вставить шаг из другой схемы» — вне стенда (r2 §8). «Заполнить изображения» — с такта 87 сайд массовой заливки
-   * (`fillRows`, `applyHints`); до такта 87 — уведомление «вне стенда».
+   * «Вставить из другой схемы» — `scheme-edit-review.md`, 4.5; паттерн «выбор из справочника» (`spec-audit.md`): схема →
+   * группа (процесс) → поля (шаги). До такта 88 — уведомление «вне стенда» (r2 §8). Навигацию внутри сайда держит страница,
+   * модель отдаёт доноров, план вставки и операции. Вставка — одна запись автосохранением, уведомление с «Отменить».
    */
-  function pasteStep() { notify('Выбор шага из другой схемы — вне стенда') }
+  const donors: DonorScheme[] = DONOR_SCHEMES.map(donorScheme)
+  const donorById = (id: string): DonorScheme | null => donors.find(d => d.id === id) ?? null
+  /** Слово запроса — начало слова в названии, иначе середина слова от трёх знаков (сопоставление поиска страницы). */
+  const titleFits = (title: string, words: readonly string[]) => words.every(w => matchRanges(title, [w]).length > 0)
+  /**
+   * Схемы-доноры по умолчанию — 4.5: той же компании, что схема (компания-владелец), и отобранные шаблоны; запрос сужает
+   * список по названию. Группа без схем пропадает.
+   */
+  function donorGroups(query = ''): { id: 'company' | 'templates', title: string, schemes: DonorScheme[] }[] {
+    const owner = shown.value.settings.general.owner
+    const words = queryWords(query)
+    return [
+      { id: 'company' as const, title: `Схемы компании «${owner}»`, schemes: donors.filter(d => !d.template && !!owner && d.owner === owner && titleFits(d.title, words)) },
+      { id: 'templates' as const, title: 'Отобранные шаблоны', schemes: donors.filter(d => d.template && titleFits(d.title, words)) },
+    ].filter(g => g.schemes.length)
+  }
+  /**
+   * План вставки полей группы-донора в группу `targetId` — 4.5: конфликт алиаса виден до вставки. Занятый в группе-цели алиас
+   * получает суффикс `_2`, `_3`; новый алиас не совпадает ни с алиасом группы-цели, ни с алиасами самой группы-донора.
+   */
+  function fieldPastePlan(targetId: string, donorId: string, groupId: string): PasteFieldRow[] {
+    const g = donorById(donorId)?.groups.find(x => x.id === groupId)
+    const target = draft.config.form.groups.find(x => x.id === targetId)
+    if (!g || !target) return []
+    const own = new Set(target.fields.map(f => f.alias).filter(Boolean))
+    const taken = [...own, ...g.fields.map(f => f.alias).filter(Boolean)]
+    return g.fields.map((f) => {
+      if (!f.alias || !own.has(f.alias)) return { field: f, alias: f.alias, conflict: false }
+      const alias = withSuffix(f.alias, taken)
+      taken.push(alias)
+      return { field: f, alias, conflict: true }
+    })
+  }
+  let pasteSeq = 0
+  /** Вставка полей в конец группы-цели: алиасы по плану, зависимость — только внутри вставленных. */
+  function pasteFields(targetId: string, donorId: string, groupId: string, ids: readonly string[]): number {
+    if (!canEdit()) return 0
+    const plan = fieldPastePlan(targetId, donorId, groupId).filter(r => ids.includes(r.field.id))
+    if (!plan.length) return 0
+    const before = groupsCopy()
+    const groups = groupsCopy()
+    const g = groups.find(x => x.id === targetId)
+    if (!g) return 0
+    const idOf = new Map(plan.map(r => [r.field.id, `f-paste-${++pasteSeq}`]))
+    for (const r of plan) {
+      const dependsOn = r.field.dependsOn ? idOf.get(r.field.dependsOn) ?? '' : ''
+      g.fields.push({ ...clone(r.field), id: idOf.get(r.field.id)!, alias: r.alias, dependsOn, dependent: !!dependsOn })
+    }
+    if (!writeGroups(groups)) return 0
+    const n = plan.length
+    notify(`${plural(n, 'Вставлено', 'Вставлены', 'Вставлено')} ${n} ${fieldsWord(n)} в группу «${g.title}»`, 'ok', true, () => writeGroups(before))
+    return n
+  }
+  /**
+   * Процессы, куда вставляются шаги, — обычные: шаги повторяемого правит оверлей (строка 150 реестра расхождений).
+   * Конфигурация на экране: в просмотре версии вставки нет.
+   */
+  const pasteTargets = computed(() => processes.value.filter(p => !p.repeatable))
+  /** Вставка шагов в конец процесса — 4.5: с фото-подсказками и нейросетями; свои загрузки донора — копией файла. */
+  function pasteSteps(targetId: string, donorId: string, processId: string, ids: readonly string[]): number {
+    if (!canEdit()) return 0
+    const steps = donorById(donorId)?.processes.find(x => x.id === processId)?.steps.filter(st => ids.includes(st.id)) ?? []
+    if (!steps.length) return 0
+    const before = processesCopy()
+    const list = processesCopy()
+    const p = list.find(x => x.id === targetId)
+    if (!p) return 0
+    for (const st of steps) {
+      const hints = st.hints.map(h => (h.kind === 'upload' ? { ...h, id: `up-paste-${++pasteSeq}` } : { ...h }))
+      p.steps.push({ ...clone(st), id: `s-paste-${++pasteSeq}`, hints })
+    }
+    if (!writeProcesses(list)) return 0
+    const n = steps.length
+    notify(`${plural(n, 'Вставлен', 'Вставлены', 'Вставлено')} ${n} ${stepsWord(n)} в процесс «${p.title}»`, 'ok', true, () => writeProcesses(before))
+    return n
+  }
+
+  /* ------------------------------ тексты повторяемого процесса — такт 88 ------------------------------ */
+  /**
+   * «Заполнить по типу объекта» — `scheme-edit-review.md`, 4.6: пустые тексты черновика оверлея — из словаря типа объекта
+   * процесса, заполненные не меняются. Правка черновика оверлея (транзакция процесса — строка 149): записи нет, «Отменить» в
+   * уведомлении возвращает прежние тексты черновика.
+   */
+  function fillTexts(d: ProcessDraft): number {
+    const type = OBJECT_TYPES.find(t => t.value === d.objectType)
+    if (!type) { notify('Сначала выберите тип объекта съёмки', 'err'); return 0 }
+    const before = { ...d.texts }
+    const { texts, filled } = fillRepeatTexts(d.texts, d.objectType)
+    if (!filled.length) { notify('Пустых текстов нет: заполненные не меняются'); return 0 }
+    d.texts = texts
+    const n = filled.length
+    notify(`${plural(n, 'Заполнен', 'Заполнены', 'Заполнено')} ${n} ${plural(n, 'текст', 'текста', 'текстов')} по типу «${type.label}»`, 'ok', true, () => { d.texts = before })
+    return n
+  }
 
   /* ------------------------------ «Витрина» — П8, такт 72 ------------------------------ */
   /**
@@ -1627,10 +1768,11 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     set, setTab, setSection, rememberScroll, back, retry, notify, dismissNotice, dump,
     neighbourSection, stepSection, goToFields, openSide, closeSurface,
     formGroups, formGroup, selectGroup, fieldApprovalReason, fieldError, saveField, removeField, toggleField, selectionState, toggleAllFields,
-    clearFieldSelection, bulkFields, fillAliases, pasteFromScheme, saveGroup, removeGroup, moveField,
+    clearFieldSelection, bulkFields, fillAliases, saveGroup, removeGroup, moveField,
     processes, selectedSteps, toggleStep, processSelection, toggleProcessSteps, clearStepSelection, flagState, bulkFlag, bulkMethod, bulkDeleteSteps,
-    setStepKind, uploadHints, newUploads, addCatalogHints, hintCategory, fillRows, applyHints, removeStep, removeProcess, moveStep, pasteStep,
+    setStepKind, uploadHints, newUploads, addCatalogHints, hintCategory, fillRows, applyHints, removeStep, removeProcess, moveStep,
     processError, saveProcess, stepError, placeStep, saveStep, networkState, bulkNetworks, openOverlay, canEdit,
+    donorById, donorGroups, fieldPastePlan, pasteFields, pasteTargets, pasteSteps, fillTexts,
     phaseLocked, PHASE_REASON, tabLocked,
     showcase, showcaseReason, setShowcase, setIndustry, setProblem, setMetric, addMetric, removeMetric, template, fromTemplate, applyTemplate,
     modules, visibleModules, hiddenModules, flow, hideModule, showModule, publishShowcase, closeHint,

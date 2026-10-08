@@ -12,8 +12,10 @@ import {
   STEP_FLAGS, STEP_KINDS, STEP_METHODS, suggestAlias, TABS, VIDEO_RESOLUTIONS,
   INDUSTRIES, SHOWCASE_IMAGE, SHOWCASE_OBJECTS, SHOWCASE_STATUS, SPHERES,
   catalogCounts, catalogHint, catalogLabel, HINT_CATEGORIES, HINT_MATCH_LABEL, hintLabel, hintSrc, hintStatus, searchCatalog,
-  type BehaviorSettings, type Dataset, type FieldDraft, type FillRow, type FormulaSettings, type GroupDraft, type HintCategoryFilter, type HintMatch,
-  type NetworkState, type PdfTemplate, type PdfTemplateDraft, type ProcessDraft, type SaveState, type SectionId, type StepDraft, type StepHint, type TabId,
+  fillRepeatTexts, knownObjectType, REPEAT_TEXT_FIELDS, textVariants, variantChips, variantGroups,
+  type BehaviorSettings, type Dataset, type DonorScheme, type FieldDraft, type FillRow, type FormulaSettings, type GroupDraft, type HintCategoryFilter, type HintMatch,
+  type NetworkState, type PdfTemplate, type PdfTemplateDraft, type ProcessDraft, type ProcessStep, type RepeatTextKey, type SaveState, type SectionId, type StepDraft,
+  type StepHint, type TabId,
 } from '~/stands/scheme-edit/model'
 import demo from '~/stands/scheme-edit/demo-data.json'
 import { useReorder } from '~/stands/scheme-edit/reorder'
@@ -79,6 +81,12 @@ import { useReorder } from '~/stands/scheme-edit/reorder'
  * «Выбрано: N · Добавить»; сайд «Заполнить фото-подсказки» — подбор по названию шага и типу объекта, «Требует внимания»
  * первой группой, «Заменить» — каталог вторым слоем, «Не заполнять», «Показать все шаги», «Установить подсказки у N шагов»;
  * в сайде шага — раздел «Фото-подсказки» (`StepThumb` с удалением, «Из каталога», «Загрузить») и полные подписи признаков.
+ * **Такт 88 — вставка из другой схемы и тексты процесса** (`docs/scheme-edit-review.md`, 4.5, 4.6): сайд «Вставить поля /
+ * шаги из другой схемы» — паттерн «выбор из справочника»: схема (той же компании и отобранные шаблоны, поиск по названию) →
+ * группа или процесс (`ListRow`) → поля или шаги (`Table` с флажками, тип, алиас либо способ съёмки); конфликт алиаса — до
+ * вставки; «←» и Esc — уровень назад; подвал «Вставить N … в …». В оверлее повторяемого процесса — раздел «Тексты в
+ * приложении»: шесть полей `Autocomplete` с вариантами словаря по типу объекта, до трёх вариантов чипами (`Chip pressable`),
+ * «Все варианты» — поповер с поиском и группами по типу объекта; «Заполнить по типу объекта» — только пустые, с «Отменить».
  *
  * ## Поведение — модель `~/stands/scheme-edit/model.ts`
  *
@@ -133,6 +141,10 @@ import { useReorder } from '~/stands/scheme-edit/reorder'
  * | `?open=fill` | сайд «Заполнить фото-подсказки»: `?fill=all` — «Показать все шаги»; с `?steps=` — только выбранные шаги (такт 87) |
  * | `?open=fill-catalog` | массовая заливка, второй слой — каталог для строки: `?row=` — этот шаг, без него — «Вид справа» (такт 87) |
  * | `?open=hint-view` | просмотр крупно фото-подсказок шага из ячейки: `?step=` — этот шаг, без него — «Передняя часть» (такт 87) |
+ * | `?open=paste-fields` · `paste-steps` | сайд «Вставить поля / шаги из другой схемы»: поля — в выбранную группу «Формы» (`?group=`), шаги — в процесс `?target=`, без него — первый обычный (такт 88) |
+ * | `?pasteq=квартир` · `?donor=d-osago` · `?part=dg-lead` · `?pick=df-number,df-date` | сайд вставки: запрос списка схем; схема-донор — второй уровень; группа или процесс донора — третий; выбранные поля или шаги (такт 88) |
+ * | `?open=overlay-texts` · `overlay-variants` | оверлей повторяемого процесса, раздел «Тексты в приложении» в окне; `overlay-variants` — открыт поповер «Все варианты» у названия повтора (такт 88) |
+ * | `?otype=car` · `?texts=filled` | тип объекта процесса в черновике оверлея; тексты заполнены основным набором типа (такт 88) |
  */
 definePageMeta({ layout: 'admin' })
 useHead({ title: 'Редактирование схемы осмотра — стенд' })
@@ -141,11 +153,14 @@ const route = useRoute()
 const q = (k: string) => String(route.query[k] ?? '')
 
 const D = demo as unknown as Record<'main' | 'fresh', Dataset>
-/** Окна и выделение «Формы» открывают таб «Форма» (такт 69). */
-const FORM_OPEN = ['field', 'new-field', 'group', 'new-group']
-/** Окна «Процессов и шагов» открывают свой таб (такт 71); такт 87 — каталог, массовая заливка и просмотр подсказок. */
+/** Окна и выделение «Формы» открывают таб «Форма» (такт 69); такт 88 — вставка полей из другой схемы. */
+const FORM_OPEN = ['field', 'new-field', 'group', 'new-group', 'paste-fields']
+/**
+ * Окна «Процессов и шагов» открывают свой таб (такт 71); такт 87 — каталог, массовая заливка и просмотр подсказок; такт 88 —
+ * вставка шагов и тексты повторяемого процесса.
+ */
 const PROCESS_OPEN = ['process', 'new-process', 'step', 'new-step', 'networks', 'overlay', 'overlay-filled', 'overlay-step',
-  'catalog', 'step-catalog', 'catalog-view', 'fill', 'fill-catalog', 'hint-view']
+  'catalog', 'step-catalog', 'catalog-view', 'fill', 'fill-catalog', 'hint-view', 'paste-steps', 'overlay-texts', 'overlay-variants']
 const tabAtLoad = FORM_OPEN.includes(q('open')) || q('selected') ? 'form' : q('steps') || q('upload') || PROCESS_OPEN.includes(q('open')) ? 'processes' : TABS.find(t => t.id === q('tab'))?.id
 const saveAtLoad = (['saving', 'error'] as SaveState[]).find(s => s === q('save'))
 const m = createModel(q('data') === 'new' ? D.fresh : D.main, {
@@ -1017,6 +1032,141 @@ function onHintsEscape(event: KeyboardEvent) {
   }
 }
 
+/* ------------------------------ вставка из другой схемы — такт 88, 4.5 ------------------------------ */
+/**
+ * Сайд «Вставить поля / шаги из другой схемы» — паттерн «выбор из справочника» (`spec-audit.md`; решение 3 оркестратора
+ * 2026-10-08): навигация внутри одного сайда «схема → группа (процесс) → поля (шаги)»; «←» и Esc — уровень назад, Esc на
+ * первом уровне закрывает сайд. Схемы — той же компании и отобранные шаблоны, поиск по названию (`ListRow`, как список версий
+ * истории, № 56); поля и шаги — `Table` с флажками, типом, алиасом либо способом съёмки; конфликт алиаса виден до вставки.
+ * Подвал — «Вставить N … в …». Выбор живёт в открытой группе (процессе): возврат на уровень назад его сбрасывает.
+ */
+type PasteKind = 'fields' | 'steps'
+type PasteLevel = 'schemes' | 'parts' | 'items'
+const paste = ref({ kind: 'fields' as PasteKind, query: '', scheme: '', part: '', picked: [] as string[], target: '' })
+const pasteOpen = surface('paste')
+const pasteLevel = computed<PasteLevel>(() => (!paste.value.scheme ? 'schemes' : !paste.value.part ? 'parts' : 'items'))
+const pasteDonor = computed(() => m.donorById(paste.value.scheme))
+const pasteSchemes = computed(() => m.donorGroups(paste.value.query))
+const pasteQuery = computed({ get: () => paste.value.query, set: (v) => { paste.value.query = v } })
+const schemeTypeName = (v: string) => SCHEME_TYPES.find(t => t.value === v)?.label ?? v
+const fieldsText = (n: number) => `${n} ${plural(n, 'поле', 'поля', 'полей')}`
+/** Вторая строка схемы: тип и состав — группы и поля у вставки полей, процессы и шаги у вставки шагов. */
+function donorMeta(d: DonorScheme) {
+  const what = paste.value.kind === 'fields'
+    ? `${d.groups.length} ${plural(d.groups.length, 'группа', 'группы', 'групп')} · ${fieldsText(d.groups.reduce((n, g) => n + g.fields.length, 0))}`
+    : `${d.processes.length} ${plural(d.processes.length, 'процесс', 'процесса', 'процессов')} · ${stepsWord(d.processes.reduce((n, p) => n + p.steps.length, 0))}`
+  return `${schemeTypeName(d.schemeType)} · ${what}`
+}
+/** Второй уровень — группы либо процессы донора: алиас и число полей (шагов); пустые выключены. */
+const pasteParts = computed(() => {
+  const d = pasteDonor.value
+  if (!d) return []
+  return paste.value.kind === 'fields'
+    ? d.groups.map(g => ({ id: g.id, title: g.title, meta: `${g.alias || 'алиас не задан'} · ${fieldsText(g.fields.length)}`, empty: !g.fields.length }))
+    : d.processes.map(p => ({ id: p.id, title: p.title, meta: `${p.alias || 'алиас не задан'} · ${stepsWord(p.steps.length)}`, empty: !p.steps.length }))
+})
+const pastePart = computed(() => pasteParts.value.find(x => x.id === paste.value.part) ?? null)
+/** Поля открытой группы с планом алиасов: конфликт с группой-целью виден до вставки. */
+const pasteFieldRows = computed(() => (paste.value.kind === 'fields' && pasteLevel.value === 'items' && fg.value
+  ? m.fieldPastePlan(fg.value.id, paste.value.scheme, paste.value.part)
+  : []))
+/** Шаги открытого процесса донора. */
+const pasteStepRows = computed<ProcessStep[]>(() => (paste.value.kind === 'steps' && pasteLevel.value === 'items'
+  ? pasteDonor.value?.processes.find(p => p.id === paste.value.part)?.steps ?? []
+  : []))
+const pasteRowIds = computed(() => (paste.value.kind === 'fields' ? pasteFieldRows.value.map(r => r.field.id) : pasteStepRows.value.map(s => s.id)))
+const pasteAll = computed<'all' | 'some' | 'none'>(() => {
+  const n = pasteRowIds.value.filter(id => paste.value.picked.includes(id)).length
+  return n === 0 ? 'none' : n === pasteRowIds.value.length ? 'all' : 'some'
+})
+/** Что переносится с шагом — вторая строка шага: фото-подсказки и нейросети. */
+function stepCarry(st: ProcessStep) {
+  const n = st.hints.length
+  const hints = n ? `${n} ${plural(n, 'фото-подсказка', 'фото-подсказки', 'фото-подсказок')}` : 'без фото-подсказок'
+  return `${hints} · ${st.networks.length ? st.networks.join(', ') : 'без нейросетей'}`
+}
+/** Процессы-цели вставки шагов — обычные процессы схемы (шаги повторяемого правит оверлей). */
+const pasteTargetItems = computed(() => m.pasteTargets.value.map(p => ({ value: p.id, label: p.title })))
+const pasteTarget = computed<string>({ get: () => paste.value.target, set: (v) => { paste.value.target = v } })
+const pasteWhere = computed(() => (paste.value.kind === 'fields'
+  ? `в группу «${fg.value?.title ?? ''}»`
+  : `в процесс «${m.processes.value.find(p => p.id === paste.value.target)?.title ?? ''}»`))
+const pasteTitle = computed(() => {
+  if (pasteLevel.value === 'items') return pastePart.value?.title ?? ''
+  if (pasteLevel.value === 'parts') return pasteDonor.value?.title ?? ''
+  return paste.value.kind === 'fields' ? 'Вставить поля из другой схемы' : 'Вставить шаги из другой схемы'
+})
+const pasteSubtitle = computed(() => {
+  if (pasteLevel.value === 'items') return pasteDonor.value?.title ?? ''
+  if (pasteLevel.value === 'parts') return paste.value.kind === 'fields' ? 'Группы полей схемы' : 'Процессы схемы'
+  return `${pasteWhere.value.charAt(0).toUpperCase()}${pasteWhere.value.slice(1)}`
+})
+const pasteConfirmText = computed(() => {
+  const n = paste.value.picked.length
+  if (!n) return `Вставить ${pasteWhere.value}`
+  return `Вставить ${n} ${paste.value.kind === 'fields' ? plural(n, 'поле', 'поля', 'полей') : plural(n, 'шаг', 'шага', 'шагов')} ${pasteWhere.value}`
+})
+/** Фокус после смены уровня — строка, с которой пришли, либо первая строка уровня: содержимое сайда сменилось целиком. */
+function focusPaste(sel: string) {
+  nextTick(() => setTimeout(() => document.querySelector<HTMLElement>(`[data-side=paste] ${sel}`)?.focus(), 0))
+}
+function openPaste(kind: PasteKind) {
+  if (!m.canEdit()) return
+  if (kind === 'fields' && !fg.value) { m.notify('В форме нет групп — сначала добавьте группу', 'err'); return }
+  const target = m.pasteTargets.value[0]?.id ?? ''
+  if (kind === 'steps' && !target) { m.notify('В схеме нет процессов для шагов — сначала добавьте процесс', 'err'); return }
+  paste.value = { kind, query: '', scheme: '', part: '', picked: [], target }
+  m.openSide('paste')
+}
+function pasteGo(scheme: string) {
+  paste.value.scheme = scheme
+  paste.value.part = ''
+  paste.value.picked = []
+  focusPaste('[data-paste-part]:not(:disabled)')
+}
+function pasteOpenPart(part: string) {
+  paste.value.part = part
+  paste.value.picked = []
+  focusPaste('[data-paste-row] [data-slot=choice-control]')
+}
+/** «←» и Esc — уровень назад: выбор полей (шагов) сбрасывается, фокус — на строке, с которой пришли. */
+function pasteBack() {
+  const p = paste.value
+  if (p.part) {
+    const from = p.part
+    p.part = ''
+    p.picked = []
+    focusPaste(`[data-paste-part="${from}"]`)
+  }
+  else if (p.scheme) {
+    const from = p.scheme
+    p.scheme = ''
+    focusPaste(`[data-paste-scheme="${from}"]`)
+  }
+}
+/** Esc на втором и третьем уровне — назад; на первом закрывает сайд (обычное поведение окна). */
+function onPasteEscape(event: KeyboardEvent) {
+  if (!paste.value.scheme) return
+  event.preventDefault()
+  pasteBack()
+}
+function pasteToggle(id: string) {
+  const list = paste.value.picked
+  paste.value.picked = list.includes(id) ? list.filter(x => x !== id) : [...list, id]
+}
+/** Флажок шапки: из «все» — снять, иначе — выбрать все строки открытой группы (процесса). */
+function pasteToggleAll() {
+  paste.value.picked = pasteAll.value === 'all' ? [] : [...pasteRowIds.value]
+}
+/** «Вставить N …» — одна запись с «Отменить»; сайд закрывается, фокус — на кнопке, которая его открыла. */
+function confirmPaste() {
+  const p = paste.value
+  const n = p.kind === 'fields'
+    ? (fg.value ? m.pasteFields(fg.value.id, p.scheme, p.part, p.picked) : 0)
+    : m.pasteSteps(p.target, p.scheme, p.part, p.picked)
+  if (n) m.closeSurface()
+}
+
 /* ------------------------------ сайды процесса и шага, оверлей — П7, часть 2, такт 71 ------------------------------ */
 const copy = <T>(x: T): T => JSON.parse(JSON.stringify(x))
 /**
@@ -1080,6 +1230,29 @@ function saveOverlay() {
 /** Удаление шага в оверлее — правка черновика оверлея: «Отмена» оверлея его вернёт. */
 function removeOverlayStep(id: string) { od.value.steps = od.value.steps.filter(x => x.id !== id) }
 const overlaySubtitle = computed(() => (ro.value ? 'Повторяемый процесс · только чтение' : 'Повторяемый процесс · форма и шаги вместе'))
+
+/* ---------- тексты в приложении — такт 88, 4.6 ---------- */
+/**
+ * Раздел «Тексты в приложении» оверлея (решения 4, 5 оркестратора 2026-10-08): шесть текстов экрана повторяемого процесса.
+ * Поле — `Autocomplete` с вариантами словаря по типу объекта процесса (без типа — всех типов); под полем до трёх вариантов
+ * чипами (`Chip pressable`) и «Все варианты» — поповер с поиском и группами по типу объекта. Правка — черновик оверлея: в схему
+ * уходит по «Сохранить» оверлея одной записью. «Заполнить по типу объекта» — только пустые, с «Отменить» (`m.fillTexts`).
+ */
+const textsTyped = computed(() => knownObjectType(od.value.objectType))
+const textsFillHint = computed(() => (textsTyped.value ? 'Только пустые поля — заполненные не меняются' : 'Сначала выберите тип объекта съёмки в разделе «Поведение»'))
+const textItems = (key: RepeatTextKey) => textVariants(od.value.objectType, key).map(v => ({ value: v, label: v }))
+/** Поповер «Все варианты» открыт у одного поля; запрос поиска — свой у каждого открытия. */
+const variantsOpen = ref<RepeatTextKey | ''>('')
+const variantQuery = ref('')
+function openVariants(key: RepeatTextKey, open: boolean) {
+  if (open) { variantQuery.value = ''; variantsOpen.value = key }
+  else if (variantsOpen.value === key) variantsOpen.value = ''
+}
+/** Вариант чипом или из поповера — в поле черновика оверлея; поповер закрывается, фокус — на «Все варианты». */
+function pickText(key: RepeatTextKey, value: string) {
+  od.value.texts[key] = value
+  if (variantsOpen.value === key) variantsOpen.value = ''
+}
 
 /**
  * Сайд шага — № 63 (пробел макета): шесть секций аудита — «Основное», «Поведение», «Съёмка», «Нейросети», «Подсказки»,
@@ -1156,6 +1329,13 @@ function saveNetworksSide() {
   m.closeSurface()
 }
 
+/*
+ * Второй слой поверх первого (просмотр над каталогом, каталог над сайдом шага, сайд шага над оверлеем) оснастка открывает после
+ * монтирования: два окна, открытые сразу при загрузке, дают предупреждение браузера «Blocked aria-hidden» — фокус первого окна
+ * остаётся под `aria-hidden` второго. Нажатиями этого нет: окно поверх открывается, когда фокус уже в нижнем (такты 87, 88).
+ */
+const afterMount = (fn: () => void) => onMounted(() => { setTimeout(fn, 120) })
+
 /* Оснастка приёмки (такт 71): сайды процесса и шага, нейросети выбранных шагов, оверлей. */
 {
   const procs = m.processes.value
@@ -1176,7 +1356,8 @@ function saveNetworksSide() {
     if (q('open') === 'overlay-filled') {
       od.value.steps = m.placeStep([], { ...copy(EMPTY_STEP), title: 'Повреждение — общий план', description: 'Снимите повреждённую деталь целиком с расстояния 1–2 метра', method: '2–7 фото', networks: ['Оценка повреждений'], required: true, order: 1 })
     }
-    if (q('open') === 'overlay-step') openStep(repeatable.id, '', true)
+    /* Такт 88 (решение 1 оркестратора): сайд шага поверх оверлея — после монтирования, как каталог над сайдом шага. */
+    if (q('open') === 'overlay-step') afterMount(() => openStep(repeatable.id, '', true))
   }
 }
 
@@ -1190,12 +1371,8 @@ function saveNetworksSide() {
     if (['all', ...HINT_CATEGORIES.map(c => c.id)].includes(q('category'))) cat.value.category = q('category') as HintCategoryFilter
     if (q('picked')) cat.value.picked = q('picked').split(',').filter(id => !!catalogHint(id))
   }
-  /*
-   * Второй слой поверх первого (просмотр над каталогом, каталог над сайдом шага) открывается после монтирования: два окна,
-   * открытые сразу при загрузке, дают предупреждение браузера «Blocked aria-hidden» — фокус первого окна остаётся под
-   * `aria-hidden` второго. Нажатиями этого нет: окно поверх открывается, когда фокус уже в нижнем.
-   */
-  const later = (fn: () => void) => onMounted(() => { setTimeout(fn, 120) })
+  /* Второй слой поверх первого — после монтирования (`afterMount`). */
+  const later = afterMount
   if (q('open') === 'catalog' || q('open') === 'catalog-view') {
     const id = stepAt('s-vin-metal')
     const owner = ownerOf(id)
@@ -1218,6 +1395,36 @@ function saveNetworksSide() {
   if (q('open') === 'hint-view') {
     const id = stepAt('s-front')
     viewHints(ownerOf(id)?.steps.find(st => st.id === id)?.hints ?? [], 0)
+  }
+}
+
+/*
+ * Оснастка приёмки (такт 88): сайд вставки из другой схемы — уровни, запрос, выбор, процесс-цель; оверлей с разделом
+ * «Тексты в приложении» — тип объекта, заполненные тексты, поповер «Все варианты».
+ */
+{
+  if (q('open') === 'paste-fields' || q('open') === 'paste-steps') {
+    const kind: PasteKind = q('open') === 'paste-fields' ? 'fields' : 'steps'
+    openPaste(kind)
+    const d = m.donorById(q('donor'))
+    const parts = kind === 'fields' ? d?.groups : d?.processes
+    const part = parts?.find(x => x.id === q('part'))
+    const rows = part ? ('fields' in part ? part.fields.map(f => f.id) : part.steps.map(st => st.id)) : []
+    paste.value.query = q('pasteq')
+    if (d) paste.value.scheme = d.id
+    if (part) paste.value.part = part.id
+    if (q('pick')) paste.value.picked = q('pick').split(',').filter(id => rows.includes(id))
+    if (m.pasteTargets.value.some(p => p.id === q('target'))) paste.value.target = q('target')
+  }
+  const repeatable = m.processes.value.find(x => x.repeatable)
+  if ((q('open') === 'overlay-texts' || q('open') === 'overlay-variants') && repeatable) {
+    openOverlay(repeatable.id)
+    if (OBJECT_TYPES.some(t => t.value === q('otype'))) od.value.objectType = q('otype')
+    if (q('texts') === 'filled') od.value.texts = fillRepeatTexts(od.value.texts, od.value.objectType).texts
+    afterMount(() => {
+      document.querySelector('[data-overlay-texts]')?.scrollIntoView({ block: 'start' })
+      if (q('open') === 'overlay-variants') openVariants('item', true)
+    })
   }
 }
 
@@ -1254,6 +1461,26 @@ function closeHint() {
 if (q('hint') === 'off') m.closeHint()
 onMounted(() => {
   try { if (sessionStorage.getItem(HINT_KEY) === 'closed') m.closeHint() } catch {}
+})
+
+/* ------------------------------ уведомления над подвалом окна — такт 88 ------------------------------ */
+/**
+ * Угол уведомлений — справа внизу, там же кнопки подвала сайда и оверлея. Уведомление с «Отменить» у «Заполнить по типу
+ * объекта» и отказы сайдов приходят при открытом окне и закрывали бы «Сохранить» на 3–6 с. Уведомления поднимаются над
+ * кнопками подвала, которые лежат под их углом (прецедент — над панелью выделения «Свободной съёмки», такт 55); окно по центру
+ * угла не касается — место прежнее. Строка 224 реестра расхождений.
+ */
+const toastBottom = ref<string | undefined>(undefined)
+/** Отступ угла и ширина уведомления — `Toaster` (`right-6`, `w-90`). */
+const TOAST_ZONE = 24 + 360
+function placeToasts() {
+  const tops = [...document.querySelectorAll('[data-slot=modal-card-actions]')]
+    .filter(x => x.closest('[data-slot=modal-card]')?.getAttribute('data-state') !== 'closed').map(x => x.getBoundingClientRect())
+    .filter(r => r.width > 0 && r.right > window.innerWidth - TOAST_ZONE).map(r => r.top)
+  toastBottom.value = tops.length ? `${Math.round(window.innerHeight - Math.min(...tops)) + 12}px` : undefined
+}
+watch([() => m.ui.surfaces.length, () => m.notices.length], () => {
+  if (import.meta.client) nextTick(() => setTimeout(placeToasts, 0))
 })
 
 if (import.meta.client) {
@@ -2489,9 +2716,9 @@ if (import.meta.client) {
                   </template>
                   Добавить поле
                 </Button>
-                <!-- «Вставить из другой схемы» — № 70: заглушка кнопкой (r2 §8). -->
+                <!-- «Вставить из другой схемы» — № 70: с такта 88 сайд выбора из справочника (ревью 4.5; до такта 88 — заглушка, r2 §8). -->
                 <Field hint="Алиас переносится целиком с группой">
-                  <Button variant="outline" show-icon data-act="field-paste" @click="m.pasteFromScheme()">
+                  <Button variant="outline" show-icon data-act="field-paste" @click="openPaste('fields')">
                     <template #icon>
                       <Icon name="copy" :size="16" />
                     </template>
@@ -2660,7 +2887,7 @@ if (import.meta.client) {
               </template>
               Добавить процесс
             </Button>
-            <Button variant="outline" show-icon data-act="step-paste" @click="m.pasteStep()">
+            <Button variant="outline" show-icon data-act="step-paste" @click="openPaste('steps')">
               <template #icon>
                 <Icon name="copy" :size="16" />
               </template>
@@ -3397,7 +3624,8 @@ if (import.meta.client) {
               </Field>
             </FieldSet>
             <FieldSet legend="Подсказки">
-              <Field :readonly="ro" label="Подсказка на экране подготовки" hint="Исполнитель видит её перед началом каждого повторения">
+              <!-- Такт 88: подсказка перед каждым повтором — в «Текстах в приложении»; эта — один раз, перед процессом (строка 222). -->
+              <Field :readonly="ro" label="Подсказка на экране подготовки" hint="Исполнитель видит её перед началом процесса">
                 <Textarea v-model="od.prepHint" placeholder="Например, Снимайте каждое повреждение отдельно" data-field="odPrepHint" />
               </Field>
               <Field :readonly="ro" label="Подсказка «Обычно занимает N минут»">
@@ -3407,6 +3635,75 @@ if (import.meta.client) {
                   </RadioGroupItem>
                 </RadioGroup>
               </Field>
+            </FieldSet>
+
+            <!--
+              Тексты в приложении — такт 88 (ревью 4.6; решения 4, 5 оркестратора): шесть текстов экрана повторяемого процесса,
+              у каждого — где его видит исполнитель. Поле — `Autocomplete` с вариантами словаря по типу объекта процесса; под ним
+              до трёх вариантов чипами (`Chip pressable`) и «Все варианты» — поповер с поиском и группами по типу объекта.
+              «Заполнить по типу объекта» — только пустые, с «Отменить»; без типа объекта выключена, причина — подсказкой рядом.
+            -->
+            <FieldSet legend="Тексты в приложении" data-overlay-texts>
+              <ModalCardText>
+                Тексты экранов этого процесса в мобильном приложении. Варианты — из словаря по типу объекта съёмки
+              </ModalCardText>
+              <div :inert="ro" class="flex" data-texts-fill>
+                <Field :readonly="ro" :hint="textsFillHint">
+                  <Button variant="outline" show-icon :disabled="!textsTyped" data-act="texts-fill" @click="m.fillTexts(od)">
+                    <template #icon>
+                      <Icon name="auto-fix" :size="16" />
+                    </template>
+                    Заполнить по типу объекта
+                  </Button>
+                </Field>
+              </div>
+              <!-- Поля с чипами — через 16: при шаге группы полей 8 подсказка поля сливалась с подписью следующего. -->
+              <div class="flex flex-col gap-4">
+                <Field v-for="f in REPEAT_TEXT_FIELDS" :key="f.key" :readonly="ro" :label="f.label" :hint="f.hint" :data-text="f.key">
+                  <div class="flex flex-col gap-2">
+                    <Autocomplete v-model="od.texts[f.key]" :items="textItems(f.key)" :placeholder="f.placeholder" :show-icon="false" />
+                    <div v-if="!ro" class="flex flex-wrap items-center gap-2" data-text-chips>
+                      <Chip
+                        v-for="v in variantChips(od.objectType, f.key)"
+                        :key="v"
+                        pressable
+                        :active="od.texts[f.key] === v"
+                        :title="v"
+                        :data-variant="v"
+                        @click="pickText(f.key, v)"
+                      >
+                        {{ v }}
+                      </Chip>
+                      <Popover :open="variantsOpen === f.key" @update:open="openVariants(f.key, $event)">
+                        <PopoverTrigger as-child>
+                          <Chip trailing="expand" :expanded="variantsOpen === f.key" data-act="text-variants">
+                            Все варианты
+                          </Chip>
+                        </PopoverTrigger>
+                        <PopoverContent :width="360" align="start" :side-offset="4" class="flex flex-col p-1" :data-variants="f.key">
+                          <div class="p-2">
+                            <Input v-model="variantQuery" placeholder="Поиск по вариантам" data-field="variants-search" />
+                          </div>
+                          <div class="max-h-80 overflow-y-auto">
+                            <SelectGroup v-for="g in variantGroups(od.objectType, f.key, variantQuery)" :key="g.type" :header="g.label" :data-variant-group="g.type">
+                              <SelectItem v-for="v in g.items" :key="v" :selected="od.texts[f.key] === v" :data-variant="v" @click="pickText(f.key, v)">
+                                <HighlightText :text="v" :query="variantQuery" />
+                              </SelectItem>
+                            </SelectGroup>
+                            <Empty
+                              v-if="!variantGroups(od.objectType, f.key, variantQuery).length"
+                              :title="`Ничего не найдено по «${variantQuery.trim()}»`"
+                              description="Свой текст — набором в поле"
+                              class="px-4 py-6"
+                              data-variants-empty
+                            />
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+                </Field>
+              </div>
             </FieldSet>
           </div>
 
@@ -3815,6 +4112,152 @@ if (import.meta.client) {
     </ModalCard>
 
     <!--
+      ============================ вставка из другой схемы — такт 88 (ревью 4.5; решение 3 оркестратора) ============================
+      Сайд 642, паттерн «выбор из справочника»: схема → группа (процесс) → поля (шаги) внутри одного сайда; «←» и Esc — уровень
+      назад. Схемы и группы — строки-переходы `ListRow` (как список версий истории, № 56); поля и шаги — `Table` с флажками.
+    -->
+    <ModalCard v-model:open="pasteOpen">
+      <ModalCardContent placement="edge" data-side="paste" :data-kind="paste.kind" :data-level="pasteLevel" @escape-key-down="onPasteEscape">
+        <ModalCardHeader v-if="pasteLevel === 'schemes'" :title="pasteTitle" :subtitle="pasteSubtitle" />
+        <ModalCardHeader v-else back :title="pasteTitle" :subtitle="pasteSubtitle" @back="pasteBack()" />
+        <ModalCardBody class="flex flex-col gap-4">
+          <!-- Первый уровень — схемы: той же компании и отобранные шаблоны, поиск по названию. -->
+          <template v-if="pasteLevel === 'schemes'">
+            <Input v-model="pasteQuery" placeholder="Поиск схемы по названию" data-field="paste-search" />
+            <FieldSet v-for="g in pasteSchemes" :key="g.id" :legend="g.title" :data-paste-group="g.id">
+              <div class="flex flex-col gap-2">
+                <ListRow v-for="d in g.schemes" :key="d.id" :data-paste-scheme="d.id" @click="pasteGo(d.id)">
+                  <HighlightText :text="d.title" :query="paste.query" />
+                  <template #secondary>
+                    {{ donorMeta(d) }}
+                  </template>
+                </ListRow>
+              </div>
+            </FieldSet>
+            <Empty
+              v-if="!pasteSchemes.length"
+              :title="`Ничего не найдено по «${paste.query.trim()}»`"
+              description="Ищется по названию среди схем компании и отобранных шаблонов"
+              data-paste-empty
+            />
+          </template>
+
+          <!-- Второй уровень — группы полей либо процессы схемы. -->
+          <div v-else-if="pasteLevel === 'parts'" class="flex flex-col gap-2" data-paste-parts>
+            <ListRow v-for="x in pasteParts" :key="x.id" :disabled="x.empty" :data-paste-part="x.id" @click="pasteOpenPart(x.id)">
+              {{ x.title }}
+              <template #secondary>
+                {{ x.meta }}
+              </template>
+            </ListRow>
+          </div>
+
+          <!-- Третий уровень — поля группы: тип, алиас, конфликт алиаса до вставки. -->
+          <Table v-else-if="paste.kind === 'fields'" data-paste-table>
+            <TableRow>
+              <TableHead variant="column" class="w-10 justify-center px-2" aria-label="Выбор полей группы">
+                <Checkbox :model-value="pasteAll === 'all'" :indeterminate="pasteAll === 'some'" data-paste-all @update:model-value="pasteToggleAll()" />
+              </TableHead>
+              <TableHead variant="column" class="min-w-0 flex-1 px-4">
+                Поле
+              </TableHead>
+              <TableHead variant="column" class="w-40 px-4">
+                Алиас
+              </TableHead>
+              <TableHead variant="column" class="w-28 px-4">
+                Тип
+              </TableHead>
+            </TableRow>
+            <TableRow
+              v-for="r in pasteFieldRows"
+              :key="r.field.id"
+              :state="paste.picked.includes(r.field.id) ? 'selected' : 'default'"
+              :data-paste-row="r.field.id"
+              :data-conflict="r.conflict || undefined"
+            >
+              <TableCell variant="slot" align="start" class="w-10 justify-center px-2">
+                <Checkbox :model-value="paste.picked.includes(r.field.id)" :aria-label="r.field.title" @update:model-value="pasteToggle(r.field.id)" />
+              </TableCell>
+              <TableCell variant="slot" class="h-auto min-w-0 flex-1 flex-col items-start px-4 pt-4.5 pb-3 contain-inline-size">
+                <TableCellIdentity class="w-full flex-none">
+                  {{ r.field.title }}
+                  <template v-if="r.conflict" #description>
+                    алиас {{ r.field.alias }} уже есть — будет {{ r.alias }}
+                  </template>
+                </TableCellIdentity>
+              </TableCell>
+              <TableCell align="start" class="w-40 px-4" data-paste-alias>
+                {{ r.field.alias || 'не задан' }}
+              </TableCell>
+              <TableCell variant="slot" align="start" class="w-28 px-4">
+                <Chip variant="neutral">
+                  {{ typeLabel(r.field.type) }}
+                </Chip>
+              </TableCell>
+            </TableRow>
+          </Table>
+
+          <!-- Третий уровень — шаги процесса: процесс-цель, тип и способ съёмки; подсказки и нейросети переносятся с шагом. -->
+          <template v-else>
+            <Field label="Вставить в процесс" orientation="left" :control-height="40" data-field="paste-target">
+              <div class="w-72">
+                <Select v-model="pasteTarget" :items="pasteTargetItems" placeholder="" :show-icon="false" :searchable="false" />
+              </div>
+            </Field>
+            <Table data-paste-table>
+              <TableRow>
+                <TableHead variant="column" class="w-10 justify-center px-2" aria-label="Выбор шагов процесса">
+                  <Checkbox :model-value="pasteAll === 'all'" :indeterminate="pasteAll === 'some'" data-paste-all @update:model-value="pasteToggleAll()" />
+                </TableHead>
+                <TableHead variant="column" class="min-w-0 flex-1 px-4">
+                  Шаг
+                </TableHead>
+                <TableHead variant="column" class="w-40 px-4">
+                  Тип шага
+                </TableHead>
+                <TableHead variant="column" class="w-28 px-4">
+                  Способ
+                </TableHead>
+              </TableRow>
+              <TableRow v-for="st in pasteStepRows" :key="st.id" :state="paste.picked.includes(st.id) ? 'selected' : 'default'" :data-paste-row="st.id">
+                <TableCell variant="slot" align="start" class="w-10 justify-center px-2">
+                  <Checkbox :model-value="paste.picked.includes(st.id)" :aria-label="st.title" @update:model-value="pasteToggle(st.id)" />
+                </TableCell>
+                <TableCell variant="slot" class="h-auto min-w-0 flex-1 flex-col items-start px-4 pt-4.5 pb-3 contain-inline-size">
+                  <TableCellIdentity class="w-full flex-none">
+                    {{ st.title }}
+                    <template #description>
+                      {{ stepCarry(st) }}
+                    </template>
+                  </TableCellIdentity>
+                </TableCell>
+                <TableCell variant="slot" align="start" class="w-40 px-4">
+                  <Chip variant="neutral">
+                    {{ kindLabel(st.kind) }}
+                  </Chip>
+                </TableCell>
+                <TableCell align="start" class="w-28 px-4" data-paste-method>
+                  {{ st.method }}
+                </TableCell>
+              </TableRow>
+            </Table>
+          </template>
+        </ModalCardBody>
+        <ModalCardFooter>
+          <template #note>
+            Выбрано: {{ paste.picked.length }}
+          </template>
+          <Button variant="secondary" data-act="paste-cancel" @click="m.closeSurface()">
+            Отмена
+          </Button>
+          <Button :disabled="!paste.picked.length" data-act="paste-confirm" @click="confirmPaste()">
+            {{ pasteConfirmText }}
+          </Button>
+        </ModalCardFooter>
+      </ModalCardContent>
+    </ModalCard>
+
+    <!--
       ============================ просмотр фото-подсказок крупно — такт 87: `Lightbox` с `FrameStage` ============================
       Монтируется при открытии: портал окна, смонтированный при загрузке страницы, встаёт в `body` раньше порталов сайдов и
       оказывается под ними — просмотр из каталога не нажимался бы (ловушка такта 87).
@@ -4015,7 +4458,7 @@ if (import.meta.client) {
       </ModalCardContent>
     </ModalCard>
 
-    <Toaster>
+    <Toaster :bottom="toastBottom">
       <Toast
         v-for="n in m.notices"
         :key="n.id"
