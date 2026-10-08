@@ -111,7 +111,8 @@
         ["form.groups.1.fields.3", { "id": "f-color", "title": "Цвет кузова", "alias": "body_color", "type": "text", "required": false, "webOnly": false, "dependent": false }],
         ["processes.1.steps", [{ "id": "s-pts", "title": "Паспорт ТС (ПТС)", "description": "Разворот с основными данными автомобиля", "kind": "tech", "method": "2 фото", "networks": ["Сканер документов"], "hints": [], "gallery": true, "docScan": true }]]
       ]
-    }
+    },
+    "tariff": { "company": "Демо Страхование", "group": "g-kasko", "scheme": "s-car" }
   },
   "fresh": {
     "snapshots": [],

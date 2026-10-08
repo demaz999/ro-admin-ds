@@ -11,6 +11,7 @@ import {
   PHOTO_RESOLUTIONS, PROCESS_DEFAULTS, REGION_MATRICES, ROLE_LADDER, ROLES, SCHEME_TYPES, SECTION_ANCHORS, SECTIONS, STATUS_DICTIONARIES, STEP_DEFAULTS,
   STEP_FLAGS, STEP_KINDS, STEP_METHODS, suggestAlias, TABS, VIDEO_RESOLUTIONS,
   INDUSTRIES, SHOWCASE_IMAGE, SHOWCASE_OBJECTS, SHOWCASE_STATUS, SPHERES,
+  PRICE_SOURCES, SITE_CATALOG, tariffPeriodText, tariffsHref, type PriceSource,
   catalogCounts, catalogHint, catalogLabel, HINT_CATEGORIES, HINT_MATCH_LABEL, hintLabel, hintSrc, hintStatus, searchCatalog,
   fillRepeatTexts, knownObjectType, REPEAT_TEXT_FIELDS, textVariants, variantChips, variantGroups,
   buildDemo, type DemoSource, type HelpKey, type HelpPreviewView,
@@ -96,6 +97,11 @@ import { useReorder } from '~/stands/scheme-edit/reorder'
  * «?» с превью (`HelpPreview`, слот `help` у `SettingRow` и `Field`) — у отказа от осмотра, промежуточного экрана, блока
  * дополнительных файлов, режима выполнения, телефона, подсказки и галочки экрана подтверждения; в строке поля «Формы» — «Где
  * увидит исполнитель»; в разделе «Тексты в приложении» оверлея — фрагмент экрана списка повторов.
+ * **Такт 90 — витрина: цена из тарифа и превью страницы** (`docs/scheme-edit-review.md`, 4.7, 4.8): у «Цены «от»» — источник
+ * радио-карточками («Из тарифа» по умолчанию, «Указать вручную», «Не показывать»); из тарифа — `PriceRange` нижней границы цены
+ * для не клиента и «Открыть тарификацию», вручную — поле с предупреждением ниже тарифа. «Предпросмотр страницы» у статуса
+ * витрины — `ModalCard placement="full"`: «Компьютер / Телефон», «Страница сценария / Карточка в каталоге», статус карточки и
+ * будущий адрес над рамкой `AppPreviewBrowser`, страница — `ScenarioPreview`; метка «Не заполнено» ведёт к полю таба.
  *
  * ## Поведение — модель `~/stands/scheme-edit/model.ts`
  *
@@ -157,6 +163,8 @@ import { useReorder } from '~/stands/scheme-edit/reorder'
  * | `?open=demo` · `?screen=step:p-auto:s-front` · `?demo=map` · `?mark=setting:general.behavior.refuse` | демо-осмотр: экран, режим «Карта», обведённый элемент (такт 89) |
  * | `?app=full` · `checklist` | настройки приложения в черновике: отказ разрешён, промежуточный экран, телефон поддержки; `checklist` — и режим «Чек-лист» (такт 89) |
  * | `?help=refuse` · `confirmHint` · `confirmCheckbox` · `mobileMode` · `phone` · `startAfterCreate` · `forbidExtraFiles` · `field:f-vin` | открытый поповер «?» с превью (такт 89) |
+ * | `?price=tariff` · `manual` · `low` · `hidden` | источник цены «от» в черновике; `low` — вручную 500 ₽, ниже тарифа: предупреждение (такт 90) |
+ * | `?open=site` · `?device=phone` · `?site=card` | превью публичной страницы: оверлей на табе «Витрина», телефон, карточка в каталоге (такт 90) |
  */
 definePageMeta({ layout: 'admin' })
 useHead({ title: 'Редактирование схемы осмотра — стенд' })
@@ -173,7 +181,10 @@ const FORM_OPEN = ['field', 'new-field', 'group', 'new-group', 'paste-fields']
  */
 const PROCESS_OPEN = ['process', 'new-process', 'step', 'new-step', 'networks', 'overlay', 'overlay-filled', 'overlay-step',
   'catalog', 'step-catalog', 'catalog-view', 'fill', 'fill-catalog', 'hint-view', 'paste-steps', 'overlay-texts', 'overlay-variants']
-const tabAtLoad = FORM_OPEN.includes(q('open')) || q('selected') ? 'form' : q('steps') || q('upload') || PROCESS_OPEN.includes(q('open')) ? 'processes' : TABS.find(t => t.id === q('tab'))?.id
+/** Превью публичной страницы открывается с таба «Витрина»: туда возвращается фокус (такт 90). */
+const SHOWCASE_OPEN = ['site']
+const tabAtLoad = FORM_OPEN.includes(q('open')) || q('selected') ? 'form' : q('steps') || q('upload') || PROCESS_OPEN.includes(q('open')) ? 'processes'
+  : SHOWCASE_OPEN.includes(q('open')) ? 'showcase' : TABS.find(t => t.id === q('tab'))?.id
 const saveAtLoad = (['saving', 'error'] as SaveState[]).find(s => s === q('save'))
 const m = createModel(q('data') === 'new' ? D.fresh : D.main, {
   tab: tabAtLoad,
@@ -192,6 +203,9 @@ if (sectionAtLoad) m.setSection(sectionAtLoad)
 if (q('open') === 'comments') m.openSide('comments')
 if (q('type') === 'house') m.draft.config.settings.general.schemeType = 'house'
 if (q('card') === 'needs' || q('card') === 'published') m.draft.config.showcase.status = q('card') as 'needs' | 'published'
+/* Оснастка приёмки (такт 90): источник цены «от» как данные; `low` — ручная цена 500 ₽ ниже тарифа. */
+if (PRICE_SOURCES.some(x => x.value === q('price'))) m.draft.config.showcase.priceSource = q('price') as PriceSource
+if (q('price') === 'low') Object.assign(m.draft.config.showcase, { priceSource: 'manual', priceFrom: 500 })
 
 /** Конфигурация на экране: черновик либо открытый на просмотр снимок. */
 const general = computed(() => m.shown.value.settings.general)
@@ -1588,6 +1602,13 @@ const HELP_MOBILE: HelpKey[] = ['mobileMode', 'phone', 'startAfterCreate']
   }
 }
 
+/* Оснастка приёмки (такт 90): превью публичной страницы — устройство и вид. */
+if (q('open') === 'site') {
+  m.openSite()
+  if (q('device') === 'phone') m.setSiteDevice('phone')
+  if (q('site') === 'card') m.setSiteView('card')
+}
+
 /* ------------------------------ «Витрина» — П8, такт 72 ------------------------------ */
 const sc = computed(() => m.showcase.value)
 /** Статус карточки — тон плашки: требует оформления — предупреждение, черновик — нейтральный, опубликована — успех. */
@@ -1603,6 +1624,50 @@ function setPrice(text: string) {
   const digits = String(text).replace(/\D/g, '')
   m.setShowcase('priceFrom', digits ? Number(digits) : null)
 }
+/**
+ * Источник цены «от» — такт 90 (ревью 4.7; решение 3 оркестратора 2026-10-08): радио-карточки «Из тарифа» (по умолчанию),
+ * «Указать вручную», «Не показывать». Из тарифа — нижняя граница цены для не клиента и «Открыть тарификацию»; вручную — поле,
+ * ниже тарифа — предупреждение под полем.
+ */
+const priceSource = computed<string>({ get: () => sc.value.priceSource, set: v => m.setPriceSource(v as PriceSource) })
+const price = computed(() => m.price.value)
+/** Пояснение цены из тарифа: период и схема тарификации; схемы нет — причина. */
+const tariffNote = computed(() => {
+  const t = price.value.tariff
+  return t ? `${tariffPeriodText(t)} · «${t.scheme.name}», ${t.group.name}` : 'схемы нет в тарификации'
+})
+const tariffLink = computed(() => {
+  const t = price.value.tariff
+  return tariffsHref(t ? { company: t.company, group: t.group.id, scheme: t.scheme.id } : null)
+})
+
+/* ---------- превью публичной страницы — такт 90, ревью 4.8 ---------- */
+/**
+ * «Предпросмотр страницы» (решение 5): полноэкранный оверлей — «Компьютер / Телефон», «Страница сценария / Карточка в каталоге»,
+ * над рамкой статус карточки и будущий адрес; метка «Не заполнено» закрывает оверлей и ставит фокус в поле таба.
+ */
+const siteOpen = surface('site')
+const siteDevice = computed<string>({ get: () => m.ui.site.device, set: v => m.setSiteDevice(v === 'phone' ? 'phone' : 'desktop') })
+const siteView = computed<string>({ get: () => m.ui.site.view, set: v => m.setSiteView(v === 'card' ? 'card' : 'page') })
+/** Статус карточки — тон метки, как у плашки статуса (строка 154). */
+const SITE_STATUS_BADGE = { needs: 'warning', draft: 'neutral', published: 'success' } as const
+const siteSubtitle = computed(() => {
+  const by = ro.value ? `По версии от ${m.history.value.find(v => v.id === m.ui.viewing)?.date ?? ''}` : 'По черновику'
+  return `${by} · вид сайта условный: дизайн-системы сайта в репо нет`
+})
+/** Будущий адрес страницы; у опубликованной карточки — адрес страницы. Без продающего названия адреса нет. */
+const siteAddress = computed(() => {
+  const s = m.site.value
+  if (!s.address) return 'Адрес страницы появится с продающим названием'
+  return `${s.status === 'published' ? 'Адрес страницы' : 'Будущий адрес'}: https://${s.address}`
+})
+const siteGaps = computed(() => {
+  const list = m.site.value.gapList
+  return list.length ? `Не заполнено: ${list.map(g => g.label).join(', ')}` : 'Все поля витрины заполнены'
+})
+/** Адрес в рамке: страница сценария либо каталог. */
+const siteUrl = computed(() => (m.ui.site.view === 'card' ? SITE_CATALOG : m.site.value.address || `${SITE_CATALOG}/…`))
+
 /** Сферы применения — в пределах выбранной индустрии (каскад тегов). */
 const sphereItems = computed(() => SPHERES.filter(x => x.industry === sc.value.industry).map(({ value, label }) => ({ value, label })))
 const objectItems = computed(() => [{ value: general.value.schemeType, label: SHOWCASE_OBJECTS[general.value.schemeType] ?? schemeTypeLabel.value }])
@@ -3386,13 +3451,25 @@ if (import.meta.client) {
             Статус карточки — № 50 (`32765:11448`): `Callout` в тоне статуса (строка 32). «Опубликовать на витрину» — «вооружает»:
             выключена, пока схема не опубликована в ядре; причина — текстом плашки (макет: «Доступно после публикации схемы в ядре»).
           -->
+          <!--
+            Такт 90 (решение 5): «Предпросмотр страницы» — у статуса витрины, всегда и в просмотре версии (страница по снимку);
+            «Опубликовать на витрину» — до публикации карточки, в просмотре версии под `inert`.
+          -->
           <Callout :tone="CARD_TONE[sc.status]" :title="`Статус витрины: ${SHOWCASE_STATUS[sc.status]}`" data-showcase-status>
             {{ cardText }}
-            <template v-if="sc.status !== 'published'" #actions>
-              <div :inert="ro" class="flex">
-                <Button variant="secondary" :disabled="!!m.showcaseReason.value" data-act="publish-showcase" @click="m.publishShowcase()">
-                  Опубликовать на витрину
+            <template #actions>
+              <div class="flex flex-wrap gap-3">
+                <Button variant="outline" show-icon data-act="site-preview" @click="m.openSite()">
+                  <template #icon>
+                    <Icon name="visibility" :size="16" />
+                  </template>
+                  Предпросмотр страницы
                 </Button>
+                <div v-if="sc.status !== 'published'" :inert="ro" class="flex">
+                  <Button variant="secondary" :disabled="!!m.showcaseReason.value" data-act="publish-showcase" @click="m.publishShowcase()">
+                    Опубликовать на витрину
+                  </Button>
+                </div>
               </div>
             </template>
           </Callout>
@@ -3418,9 +3495,37 @@ if (import.meta.client) {
                 </FileUpload>
               </button>
             </Field>
-            <Field :readonly="ro" label="Цена от, ₽" orientation="left" label-width="form" hint="Необязательное поле" data-field="scPrice">
-              <div class="w-40">
-                <Input :model-value="sc.priceFrom == null ? '' : String(sc.priceFrom)" placeholder="" :show-icon="false" @update:model-value="setPrice(String($event ?? ''))" />
+            <!--
+              Цена «от» — № 106 (такт 90, ревью 4.7; решение 3): источник — радио-карточки, как «Дедлайн проверки» (№ 23); под ними —
+              цена из тарифа (`PriceRange` и «Открыть тарификацию») либо ручная цена с предупреждением ниже тарифа.
+            -->
+            <Field :readonly="ro" label="Цена «от»" orientation="left" label-width="form" data-field="scPrice">
+              <div class="flex flex-col gap-3">
+                <RadioGroup v-model="priceSource" :readonly="ro" class="grid grid-cols-3 gap-2" data-radio="priceSource">
+                  <RadioGroupItem v-for="x in PRICE_SOURCES" :key="x.value" variant="card" :value="x.value" :checked="priceSource === x.value" :data-price-source="x.value">
+                    {{ x.label }}
+                    <template #description>
+                      {{ x.description }}
+                    </template>
+                  </RadioGroupItem>
+                </RadioGroup>
+                <div v-if="priceSource === 'tariff'" class="flex flex-wrap items-baseline gap-x-6 gap-y-2" data-price-tariff>
+                  <PriceRange label="На витрине" :min="price.value" :note="tariffNote" />
+                  <Hyperlink :href="tariffLink" target="_blank" rel="noopener" size="sm" data-link="tariffs">
+                    Открыть тарификацию
+                  </Hyperlink>
+                </div>
+                <Field
+                  v-else-if="priceSource === 'manual'"
+                  :readonly="ro"
+                  :hint="price.warning || price.hint"
+                  :hint-tone="price.warning ? 'warning' : 'default'"
+                  data-field="scPriceValue"
+                >
+                  <div class="w-price-input">
+                    <Input :model-value="sc.priceFrom == null ? '' : String(sc.priceFrom)" placeholder="" unit="₽" numeric :show-icon="false" @update:model-value="setPrice(String($event ?? ''))" />
+                  </div>
+                </Field>
               </div>
             </Field>
             <Field :readonly="ro" label="Теги" orientation="left" label-width="form">
@@ -4158,6 +4263,62 @@ if (import.meta.client) {
                 </template>
               </SelectItem>
             </SelectGroup>
+          </div>
+        </ModalCardBody>
+      </ModalCardContent>
+    </ModalCard>
+
+    <!--
+      ============================ превью публичной страницы — № 107, 108, такт 90: `ModalCard placement="full"` (ревью 4.8; решение 5) ============================
+      Шапка — «Предпросмотр страницы сценария», вид сайта условный; «Компьютер / Телефон», «Страница сценария / Карточка в
+      каталоге», «Вернуться к витрине». Над рамкой — статус карточки, будущий адрес и незаполненное; метка «Не заполнено» в
+      странице закрывает оверлей и ставит фокус в поле таба. Esc закрывает.
+    -->
+    <ModalCard v-model:open="siteOpen">
+      <ModalCardContent placement="full" data-overlay="site" :data-device="m.ui.site.device" :data-view="m.ui.site.view">
+        <ModalCardHeader title="Предпросмотр страницы сценария" :subtitle="siteSubtitle">
+          <template #actions>
+            <Tabs v-model="siteDevice">
+              <TabsList variant="segmented">
+                <TabsTrigger value="desktop" variant="segmented" data-site-device="desktop">
+                  Компьютер
+                </TabsTrigger>
+                <TabsTrigger value="phone" variant="segmented" data-site-device="phone">
+                  Телефон
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <Tabs v-model="siteView">
+              <TabsList variant="segmented">
+                <TabsTrigger value="page" variant="segmented" data-site-view="page">
+                  Страница сценария
+                </TabsTrigger>
+                <TabsTrigger value="card" variant="segmented" data-site-view="card">
+                  Карточка в каталоге
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <Button variant="secondary" data-act="site-close" @click="m.closeSurface()">
+              Вернуться к витрине
+            </Button>
+          </template>
+        </ModalCardHeader>
+        <ModalCardBody class="flex flex-col gap-4">
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-2" data-site-info>
+            <Badge :variant="SITE_STATUS_BADGE[m.site.value.status]" data-site-status>
+              {{ m.site.value.statusLabel }}
+            </Badge>
+            <ToolbarText data-site-address>
+              {{ siteAddress }}
+            </ToolbarText>
+            <ToolbarText data-site-gaps>
+              {{ siteGaps }}
+            </ToolbarText>
+          </div>
+          <div class="flex min-h-0 flex-1 justify-center" data-site-frame>
+            <AppPreviewBrowser :device="m.ui.site.device" :url="siteUrl" :label="m.ui.site.view === 'card' ? 'Каталог сценариев на сайте' : 'Страница сценария на сайте'">
+              <ScenarioPreview :page="m.site.value" :view="m.ui.site.view" @gap="m.siteGo($event.field)" />
+            </AppPreviewBrowser>
           </div>
         </ModalCardBody>
       </ModalCardContent>

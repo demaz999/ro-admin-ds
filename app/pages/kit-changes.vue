@@ -316,6 +316,15 @@ const ro = ref({ name: 'КАСКО — осмотр', text: 'Осмотр авт
             </RadioGroup>
             <span class="text-xs text-muted-foreground">второй вариант — tone="destructive"; первый — без пропа, прежний</span>
           </template>
+          <template v-else-if="c.id === 'icon-warning'">
+            <span class="flex items-center gap-4 text-xs">
+              <Icon name="warning" :size="11" />
+              <Icon name="warning" :size="16" />
+              <Icon name="warning" :size="24" />
+              <code>warning</code>
+            </span>
+            <span class="text-xs text-muted-foreground">11 — в кнопке «Осмотр невозможен» экрана приложения, в боксе 12</span>
+          </template>
           <template v-else-if="c.id === 'icon-error'">
             <span class="flex items-center gap-4 text-xs">
               <Icon name="error" :size="16" />

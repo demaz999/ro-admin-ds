@@ -2,13 +2,15 @@ import { computed, reactive } from 'vue'
 import { matchRanges, queryWords } from '~/components/ui/highlight-text'
 import {
   ALIAS_RE, DETECTOR_GROUPS, DETECTOR_IDS, DETECTORS_ON, FIELD_SAMPLES, FINISH_CLASSES, OBJECT_TYPES, showcaseTemplate, SPHERES, suggestAlias, SYSTEM_VARIABLES,
-  type ShowcaseMetric, type ShowcaseProblem, type StepFlag,
+  type PriceSource, type ShowcaseMetric, type ShowcaseProblem, type StepFlag,
 } from './catalogs'
 import { buildDemo, fieldPreview, helpPreview, type DemoEdit, type DemoSource, type HelpKey } from './demo'
 import { diffConfigs, formatDate, plural, summarize, validateConfig } from './diff'
 import { DONOR_SCHEMES, type DonorSchemeRaw } from './donors'
 import { catalogHint, categoryAtOpen, proposeHint, stepCategory, type HintProposal, type StepHint } from './hints'
 import { EMPTY_REPEAT_TEXTS, fillRepeatTexts, type RepeatTexts } from './repeat-texts'
+import { buildSitePreview, priceSearchValue, showcasePrice } from './site'
+import { tariffPrice, type TariffLink } from './tariff'
 import {
   buildSearchIndex, groupHits, modifiedKeys, QUICK_LINKS, READONLY_REASON, runSearch, SEARCH_SCOPES, toggleNotice,
   type ActionKey, type SearchEntry, type SearchScope,
@@ -18,6 +20,8 @@ export * from './catalogs'
 export * from './demo'
 export * from './hints'
 export * from './repeat-texts'
+export * from './site'
+export * from './tariff'
 
 /**
  * Модель состояния страницы «Редактирование схемы осмотра» (VA-16377) — такты 61–65, порции П1–П5.
@@ -76,7 +80,12 @@ export * from './repeat-texts'
  * конфигурации на экране (`demo` — `demo.ts`, `buildDemo`), оверлей демо-осмотра — открытый экран, режим «По шагам / Карта»,
  * обведённые элементы, история переходов (`openDemo`, `demoGo`, `demoStep`, `setDemoMode`), «Изменить» строки «Из чего
  * собран экран» — переход поиска к настройке либо место сущности (`demoEdit`); превью у «?» — `helpView`, `fieldView`. «Предпросмотр»
- * (`preview`) открывает демо-осмотр; до такта 89 — уведомление-заглушка.
+ * (`preview`) открывает демо-осмотр; до такта 89 — уведомление-заглушка. **Такт 90 — витрина: цена из тарифа и превью страницы**
+ * (`scheme-edit-review.md`, 4.7, 4.8): источник цены «от» (`Showcase.priceSource`, `setPriceSource`) — из тарифа по умолчанию,
+ * вручную, не показывать; цена схемы в тарификации (`tariff` — `tariff.ts`, соответствие схемы — поле `tariff` набора данных) и
+ * цена на витрине с предупреждением ручной цены ниже тарифа (`price` — `site.ts`); превью публичной страницы сценария —
+ * данные из полей витрины и незаполненное (`site`), оверлей (`openSite`, `setSiteDevice`, `setSiteView`), переход от метки
+ * «Не заполнено» к полю таба (`siteGo`). Дифф и поиск — по источнику цены.
  */
 
 export type TabId = 'settings' | 'form' | 'processes' | 'showcase'
@@ -371,6 +380,9 @@ export interface Showcase {
   summary: string
   /** Изображение карточки — имя файла; пусто — не загружено. */
   image: string
+  /** Источник цены «от» — такт 90: из тарифа (по умолчанию), вручную, не показывать. */
+  priceSource: PriceSource
+  /** Ручная цена «от», ₽ — у источника «вручную»; при смене источника помнится. */
   priceFrom: number | null
   industry: string
   spheres: string[]
@@ -382,7 +394,7 @@ export interface Showcase {
 }
 /** Значения по умолчанию витрины: набор данных хранит только отличия; пары и метрики — из шаблона типа схемы. */
 export const SHOWCASE_DEFAULTS: Omit<Showcase, 'problems' | 'metrics' | 'description'> = {
-  status: 'needs', title: '', summary: '', image: '', priceFrom: null, industry: '', spheres: [], hiddenModules: [],
+  status: 'needs', title: '', summary: '', image: '', priceSource: 'tariff', priceFrom: null, industry: '', spheres: [], hiddenModules: [],
 }
 /** Модуль «Из схемы» — ИИ-модуль либо проверка, включённые в настройках схемы (аудит, «Стержневой принцип», п. 1). */
 export interface SchemeModule { key: string, label: string }
@@ -462,6 +474,11 @@ export interface FillRow {
 export interface Dataset {
   snapshots: Snapshot[]
   draft: { author: string, editedAt: string, config?: SchemeConfig, patch?: [string, unknown][] }
+  /**
+   * Соответствие схеме страницы «Тарификация» — такт 90 (решение 3 оркестратора 2026-10-08): компания, группа и схема тарификации.
+   * Нет — схемы в тарификации нет (новая схема): цены из тарифа нет.
+   */
+  tariff?: TariffLink
 }
 
 export interface ModelOptions {
@@ -660,6 +677,8 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
      * экрана; наведение держит страница), история переходов по кнопкам экрана — для «Вернуться к осмотру».
      */
     demo: { screen: '', mode: 'steps' as 'steps' | 'map', mark: [] as string[], back: [] as string[] },
+    /** Превью публичной страницы — такт 90: устройство рамки и вид — страница сценария либо карточка в каталоге. */
+    site: { device: 'desktop' as 'desktop' | 'phone', view: 'page' as 'page' | 'card' },
   })
 
   /** Конфигурация на экране: открытый снимок либо черновик. */
@@ -1463,6 +1482,38 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   /** Плашка «Сохранение теперь автоматическое» — одноразовая ориентация: закрытая не возвращается (СС-56). */
   function closeHint() { ui.hintClosed = true }
 
+  /* ------------------------------ витрина: цена из тарифа и превью страницы — такт 90 ------------------------------ */
+  /**
+   * Цена схемы в тарификации (решения 3, 4): текущий период по часам стенда, вилка роли «не клиент» схемы соответствия —
+   * чистые функции `tariff.ts` над данными страницы «Тарификация». Соответствия нет (новая схема) — `null`.
+   */
+  const tariff = computed(() => (data.tariff ? tariffPrice(data.tariff, now().slice(0, 7)) : null))
+  /** Цена «от» на витрине по источнику конфигурации на экране; ручная ниже тарифа — предупреждение (`site.ts`). */
+  const price = computed(() => showcasePrice(shown.value.showcase, tariff.value))
+  /** Источник цены «от»: правка карточки — черновик, как у прочих полей витрины. */
+  function setPriceSource(source: PriceSource): boolean { return setShowcase('priceSource', source) }
+  /**
+   * Превью публичной страницы сценария (решение 5, ревью 4.8): данные из полей витрины на экране, незаполненное — места и
+   * поля таба. Модули и статусы — те же, что в блоке «Из схемы».
+   */
+  const site = computed(() => buildSitePreview(shown.value, {
+    price: price.value, modules: visibleModules.value.map(x => x.label), hiddenModules: hiddenModules.value.length, flow: flow.value,
+  }))
+  /** «Предпросмотр страницы» — оверлей превью; открывается и в просмотре версии: страница по снимку. */
+  function openSite() {
+    if (!ui.surfaces.some(x => x.id === 'site')) ui.surfaces.push({ kind: 'overlay', id: 'site' })
+  }
+  function setSiteDevice(device: 'desktop' | 'phone') { ui.site.device = device }
+  function setSiteView(view: 'page' | 'card') { ui.site.view = view }
+  /**
+   * Метка «Не заполнено» (решение 5): оверлей закрывается, таб «Витрина», фокус — в поле; тем же переходом, что поиск
+   * (`goTo`): поле ставится в верхнюю треть окна.
+   */
+  function siteGo(field: string) {
+    if (topSurface.value?.id === 'site') closeSurface()
+    goTo({ tab: 'showcase', section: '', anchor: '', group: '', target: field }, true)
+  }
+
   /* ------------------------------ поиск как в IDE — такт 86 ------------------------------ */
   /**
    * Индекс страницы — `search.ts`: настройки, группы и поля, процессы и шаги, поля витрины, действия; значения и причины
@@ -1470,7 +1521,7 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
    */
   const searchIndex = computed<SearchEntry[]>(() => buildSearchIndex({
     config: shown.value, rules: rules.value, viewing: !!ui.viewing, phaseLocked: phaseLocked.value, phaseReason: PHASE_REASON,
-    hasCurrent: !!current.value, dirty: dirty.value,
+    hasCurrent: !!current.value, dirty: dirty.value, price: priceSearchValue(price.value),
   }))
   /** «Изменено в черновике» доступно, когда есть с чем сравнить: опубликованная версия, черновик на экране. */
   const modifiedAvailable = computed(() => !!current.value && !ui.viewing)
@@ -1829,7 +1880,7 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     return JSON.stringify({
       draft: draft.config, author: draft.author, versions: snapshots.map(s => s.id), current: current.value?.id ?? null,
       publish: publishState.value, save: save.state, writes: save.writes,
-      ui: { tab: ui.tab, hintClosed: ui.hintClosed, section: ui.section, anchor: ui.anchor, scroll: ui.scroll, viewing: ui.viewing, surfaces: ui.surfaces.map(x => x.id), historyVersion: ui.historyVersion, group: ui.group, selectedFields: ui.selectedFields, selectedSteps: ui.selectedSteps, demo: ui.demo },
+      ui: { tab: ui.tab, hintClosed: ui.hintClosed, section: ui.section, anchor: ui.anchor, scroll: ui.scroll, viewing: ui.viewing, surfaces: ui.surfaces.map(x => x.id), historyVersion: ui.historyVersion, group: ui.group, selectedFields: ui.selectedFields, selectedSteps: ui.selectedSteps, demo: ui.demo, site: ui.site },
       search: { query: ui.query, scope: ui.scope, modified: ui.modified, find: ui.find, recent: ui.recent },
     })
   }
@@ -1854,6 +1905,7 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     phaseLocked, PHASE_REASON, tabLocked,
     showcase, showcaseReason, setShowcase, setIndustry, setProblem, setMetric, addMetric, removeMetric, template, fromTemplate, applyTemplate,
     modules, visibleModules, hiddenModules, flow, hideModule, showModule, publishShowcase, closeHint,
+    tariff, price, setPriceSource, site, openSite, setSiteDevice, setSiteView, siteGo,
     undo, addReason, removeReason, toggleGroup, resetCosts, detectorsOn, detectorSetState, toggleDetectorSet, setDetector, saveTemplate, removeTemplate,
   }
 }

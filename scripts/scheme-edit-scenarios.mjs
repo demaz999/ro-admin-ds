@@ -434,6 +434,16 @@ function kit(page) {
     helpOpen: key => page.click(`document.querySelector('[data-help="${key}"] [data-help-preview]')`),
     /** «Открыть в демо-осмотре» в открытом поповере «?». */
     helpAction: () => page.click(`document.querySelector('[data-slot=help-preview] [data-help-action]')`),
+    /* ---------- такт 90: цена «от» и превью публичной страницы ---------- */
+    /** Источник цены «от» — радио-карточка по `data-price-source`: текст карточки склеивает подпись и описание (ловушка такта 69). */
+    priceSource: v => page.click(`document.querySelector('[data-radio=priceSource] [data-price-source=${v}] [data-slot=choice-control]')`),
+    /** «Предпросмотр страницы» и курсор в угол окна: оверлей встаёт под неподвижный курсор (ловушка такта 89). */
+    async siteOpen() { await page.click(Q.act('site-preview')); await page.mouseTo(8, 892) },
+    /** «Компьютер / Телефон» и «Страница сценария / Карточка в каталоге». */
+    siteDevice: d => page.click(`document.querySelector('[data-site-device=${d}]')`),
+    siteView: v => page.click(`document.querySelector('[data-site-view=${v}]')`),
+    /** Метка «Не заполнено» в странице: место — `data-gap`. */
+    siteGap: key => page.click(`document.querySelector('[data-overlay=site] [data-gap="${key}"]')`),
     /* ---------- П8, такт 72: «Витрина», новая схема, плашка ---------- */
     /** Клик по элементу из выражения. */
     clickEl: sel => page.click(sel),
@@ -1016,7 +1026,14 @@ function kit(page) {
               status: t(status?.querySelector('[data-slot=callout-title]')?.textContent), tone: status?.dataset.tone ?? null,
               text: t(status?.querySelector('[data-slot=callout-text]')?.textContent),
               publish: btn ? (btn.disabled ? 'off' : 'on') : null,
-              title: val('scTitle'), summary: val('scSummary'), price: val('scPrice'),
+              title: val('scTitle'), summary: val('scSummary'),
+              /* Такт 90: ручная цена — поле scPriceValue (у «Из тарифа» и «Не показывать» его нет); источник — отмеченная карточка;
+                 цена из тарифа — части вилки по листьям (Vue сжимает пробел между элементами); подсказка ручной цены — текст и тон. */
+              price: (v => v == null ? null : t(v))(val('scPriceValue')),
+              priceSource: el.querySelector('[data-radio=priceSource] [data-slot=choice-control][aria-checked=true]')?.closest('[data-price-source]')?.dataset.priceSource ?? null,
+              tariff: (pr => { if (!pr) return null; const leaf = x => x.children.length ? [...x.children].map(leaf).filter(Boolean).join(' ') : t(x.textContent); return leaf(pr) })(el.querySelector('[data-price-tariff] [data-slot=price-range]')),
+              tariffLink: (a => a ? a.getAttribute('href') + ' | ' + a.getAttribute('target') : null)(el.querySelector('[data-link=tariffs]')),
+              priceHint: (h => h ? t(h.textContent) + ' | ' + (h.dataset.tone ?? 'default') : null)(el.querySelector('[data-field=scPriceValue] [data-slot=field-hint]')),
               image: t(el.querySelector('[data-act=showcase-image]')?.textContent),
               industry: t(el.querySelector('[data-field=scIndustry] [data-slot=field-input]')?.textContent) || null,
               spheres: [...el.querySelectorAll('[data-field=scSpheres] [data-slot=select-chip]')].map(c => t(c.textContent)),
@@ -1031,7 +1048,8 @@ function kit(page) {
               flow: [...el.querySelectorAll('[data-flow] [data-slot=chip]')].map(c => t(c.textContent)),
               /* Просмотр версии: поля «только чтение», действия под inert, крестиков у модулей нет. */
               ro: { fields: [...el.querySelectorAll('[data-slot=field-wrapper]')].every(x => 'readonly' in x.dataset),
-                actsInert: [...el.querySelectorAll('[data-act]')].every(x => !!x.closest('[inert]')), removable: el.querySelectorAll('[data-slot=chip-remove]').length },
+                /* Такт 90: «Предпросмотр страницы» — просмотр, в версии доступен: правкой не считается. */
+                actsInert: [...el.querySelectorAll('[data-act]')].filter(x => x.dataset.act !== 'site-preview').every(x => !!x.closest('[inert]')), removable: el.querySelectorAll('[data-slot=chip-remove]').length },
             } })(),
           hint: t(document.querySelector('[data-autosave-hint] [data-slot=callout-text]')?.textContent) || null,
           /* Двухфазность новой схемы: выключенные табы и обёртки с причиной; подсказка — текст открытой подсказки. */
@@ -1042,6 +1060,43 @@ function kit(page) {
           /* Кольцо кита у вкладки с причиной в фокусе — слой after обёртки (такт 73): тень кольца не пуста. */
           lockRing: document.activeElement?.dataset?.slot === 'tabs-trigger-reason' ? getComputedStyle(document.activeElement, '::after').boxShadow !== 'none' : null,
           emptyActs: [...document.querySelectorAll('[data-slot=tabs-content][data-state=active] [data-slot=empty] [data-act]')].map(b => b.dataset.act),
+          /*
+           * Такт 90: превью публичной страницы — заголовок, устройство и вид, статус карточки, адрес, незаполненное над рамкой, рамка
+           * (устройство, адрес, ширина тела), разделы страницы, метки «Не заполнено» по местам, первый экран, пары, метрики, шаги,
+           * модули, карточка каталога.
+           */
+          site: (() => { const el = document.querySelector('[data-overlay=site]'); if (!el) return null
+            const one = (root, sel) => root?.querySelector(sel) ?? null
+            const txt = x => (x ? t(x.textContent) : null)
+            const frame = one(el, '[data-slot=app-preview-browser]')
+            const hero = one(el, '[data-section=hero]')
+            const card = one(el, '[data-slot=scenario-preview-card]')
+            const pic = x => (x ? x.getAttribute('src').split('/').pop() : null)
+            const price = p => (p ? t(p.firstElementChild?.textContent ?? p.textContent) : null)
+            const tags = root => (root ? [...root.querySelectorAll('[data-slot=scenario-preview-tag]')].map(x => t(x.textContent)) : [])
+            const grid = hero?.firstElementChild
+            return {
+              title: txt(one(el, '[data-slot=modal-card-title]')), subtitle: txt(one(el, '[data-slot=modal-card-subtitle]')),
+              device: el.dataset.device, view: el.dataset.view,
+              status: txt(one(el, '[data-site-status]')), address: txt(one(el, '[data-site-address]')), gapsText: txt(one(el, '[data-site-gaps]')),
+              frame: frame?.dataset.device ?? null, url: txt(one(frame, '[data-slot=app-preview-browser-url]')),
+              frameWidth: Math.round(one(frame, '[data-slot=app-preview-browser-body]')?.getBoundingClientRect().width ?? 0),
+              sections: [...el.querySelectorAll('[data-section]')].map(x => x.dataset.section),
+              gaps: [...el.querySelectorAll('[data-gap]')].map(x => x.dataset.gap),
+              hero: hero ? {
+                tags: tags(one(hero, '[data-part=tags]')), title: txt(one(hero, '[data-part=title]')), summary: txt(one(hero, '[data-part=summary]')),
+                price: price(one(hero, '[data-part=price]')), image: pic(one(hero, 'img')), action: txt(one(hero, '[data-part=action]')),
+                columns: grid ? (getComputedStyle(grid).gridTemplateColumns === 'none' ? 1 : getComputedStyle(grid).gridTemplateColumns.split(' ').length) : null,
+              } : null,
+              pairs: [...el.querySelectorAll('[data-slot=scenario-preview-pair]')].map(p => [...p.querySelectorAll('[data-part], [data-gap]')].map(x => (x.dataset.gap ? 'gap:' + x.dataset.gap : t(x.textContent))).join(' | ')),
+              metrics: [...el.querySelectorAll('[data-slot=scenario-preview-metric]')].map(m => [...m.querySelectorAll('[data-part], [data-gap]')].map(x => (x.dataset.gap ? 'gap:' + x.dataset.gap : t(x.textContent))).join(' | ')),
+              steps: [...el.querySelectorAll('[data-slot=scenario-preview-step] [data-part=step]')].map(x => t(x.textContent)),
+              modules: tags(one(el, '[data-section=modules]')),
+              card: card ? {
+                title: txt(one(card, '[data-part=title]')), summary: txt(one(card, '[data-part=summary]')), price: price(one(card, '[data-part=price]')),
+                tags: tags(card), image: pic(one(card, 'img')), width: Math.round(card.getBoundingClientRect().width),
+              } : null,
+            } })(),
         })
       })()`)
       return JSON.parse(s)
@@ -1790,17 +1845,18 @@ const SCENARIOS = {
       { versions: 1, 'showcase.publish': 'on', 'showcase.text': 'Карточка появится на витрине после публикации', notices: ['Схема опубликована: версия от 03.10.2026, 09:00'] }],
     ['«Опубликовать на витрину» — карточка на витрине', async (K) => { await K.act('publish-showcase'); await K.settled() },
       { 'sc.status': 'published', 'showcase.status': 'Статус витрины: Опубликована на витрине', 'showcase.tone': 'success', 'showcase.publish': null, notices: ['Карточка опубликована на витрине'] }],
-    ['правка опубликованной карточки — снова черновик, кнопка вернулась', async (K) => { await K.fill('[data-field=scPrice]', '1990'); await K.settled() },
-      { 'showcase.price': '1990', 'sc.priceFrom': 1990, 'sc.status': 'draft', 'showcase.status': 'Статус витрины: Черновик карточки', 'showcase.publish': 'on' }],
+    /* Такт 90 (решение 3): у новой схемы цена «от» — из тарифа по умолчанию; ручная цена — после «Указать вручную». */
+    ['правка опубликованной карточки — «Указать вручную», 1990: снова черновик, кнопка вернулась', async (K) => { await K.priceSource('manual'); await K.settled(); await K.fill('[data-field=scPriceValue]', '1990'); await K.settled() },
+      { 'showcase.price': '1 990', 'sc.priceFrom': 1990, 'sc.priceSource': 'manual', 'sc.status': 'draft', 'showcase.status': 'Статус витрины: Черновик карточки', 'showcase.publish': 'on' }],
   ], { query: 'data=new&now=2026-10-03T09:00:00' }],
   'СС-43': ['витрина: карточка и «Зачем нужен осмотр» — ввод, теги каскадом, четыре пары, метрики (r2 §7; аудит, «Структура таба», «Стержневой принцип: три типа данных»)', [
-    ['старт: карточка, теги, шаблон по типу объекта', null, { 'showcase.title': 'Дистанционный осмотр автомобиля перед страхованием', 'showcase.price': '2599', 'showcase.industry': 'Страхование',
+    ['старт: карточка, теги, шаблон по типу объекта; цена «от» — из тарифа (такт 90), ручная 2599 помнится', null, { 'showcase.title': 'Дистанционный осмотр автомобиля перед страхованием', 'showcase.price': null, 'showcase.priceSource': 'tariff', 'sc.priceFrom': 2599, 'showcase.industry': 'Страхование',
       'showcase.spheres': ['ПСО — предстраховой осмотр'], 'showcase.object': 'Транспорт', 'showcase.problems.length': 4, 'showcase.metrics.length': 2,
       'showcase.problems.0': 'Дорого и долго | Выезд эксперта занимает дни и стоит денег | Клиент снимает автомобиль сам за 10–15 минут',
       'showcase.template': 'Заполнено шаблоном для типа «Осмотр транспорта» — отредактируйте текст под конкретный кейс или оставьте как есть' }],
     ['краткое описание — запись автосохранением', async (K) => { await K.typeIn("document.querySelector('[data-field=scSummary] textarea')", 'Осмотр по фото за 15 минут'); await K.settled() },
       { 'showcase.summary': 'Осмотр по фото за 15 минут', 'sc.summary': 'Осмотр по фото за 15 минут', saveLog: ['saving', 'saved'] }],
-    ['цена «от» — только цифры', async (K) => { await K.fill('[data-field=scPrice]', '3 490 ₽'); await K.settled() }, { 'showcase.price': '3490', 'sc.priceFrom': 3490 }],
+    ['цена «от» — «Указать вручную», только цифры', async (K) => { await K.priceSource('manual'); await K.settled(); await K.fill('[data-field=scPriceValue]', '3 490 ₽'); await K.settled() }, { 'showcase.price': '3 490', 'sc.priceFrom': 3490, 'sc.priceSource': 'manual' }],
     ['изображение — загрузка нажатием', async (K) => { await K.act('showcase-image'); await K.settled() }, { 'sc.image': 'showcase-cover.jpg', 'showcase.image': 'Изображение загружено · showcase-cover.jpg нажмите, чтобы заменить' }],
     ['индустрия «Лизинг» — сферы другой индустрии сняты', async (K) => { await K.select('scIndustry', 'Лизинг'); await K.settled() },
       { 'showcase.industry': 'Лизинг', 'showcase.spheres': [], 'sc.industry': 'leasing', 'sc.spheres': [] }],
@@ -2487,6 +2543,91 @@ const SCENARIOS = {
     ['свой текст кнопки добавления — экран списка, кнопка обведена', K => K.fill('[data-overlay-texts] [data-text=add]', 'Добавить деталь'),
       { 'textsPreview.parts': ['process · Осмотр повреждений', 'empty · Пока ничего не добавлено', 'add · Добавить деталь ◉'], writes: 0 }],
   ], { query: 'tab=processes' }],
+  /* ============================ такт 90: витрина — цена из тарифа и превью страницы ============================ */
+  'СС-103': ['витрина: цена «от» из тарифа по умолчанию — нижняя граница цены для не клиента по текущему периоду «Тарификации» (ревью 4.7; решения 3, 4)', [
+    ['старт: «Из тарифа», на витрине от 700 ₽, период и схема тарификации; «Открыть тарификацию» — панель схемы в новой вкладке', null,
+      { 'showcase.priceSource': 'tariff', 'showcase.tariff': 'На витрине от 700 ₽ · текущий тариф с января 2026 · «Осмотр легкового автомобиля», КАСКО',
+        'showcase.tariffLink': '/tariffs?tab=schemes&open=scheme&scheme=s-car | _blank', 'showcase.price': null, 'showcase.priceHint': null, 'sc.priceSource': 'tariff', writes: 0 }],
+    ['поиск «цена из тарифа» — значение строки с источником', async (K) => { await K.searchClick(); await K.type('цена из тарифа') },
+      { searchOpen: true, 'results.0.path': 'Витрина → Витринная карточка', 'results.0.items.0': 'Цена «от» | по запросу «цена из тарифа»', 'rowsX.0': 'showcase · Цена «от» · из тарифа — от 700 ₽ ·  ·  · Цена' }],
+    ['«Предпросмотр страницы» — первый экран: от 700 ₽', async (K) => { await K.key('Escape'); await K.siteOpen() },
+      { surface: 'site', 'site.view': 'page', 'site.device': 'desktop', 'site.hero.price': 'от 700 ₽', 'site.status': 'Черновик карточки',
+        'site.address': 'Будущий адрес: https://example.com/scenarios/distantsionnyy-osmotr-avtomobilya-pered-strakhovaniem',
+        'site.url': 'example.com/scenarios/distantsionnyy-osmotr-avtomobilya-pered-strakhovaniem' }],
+    ['«Карточка в каталоге» — та же цена, адрес каталога', K => K.siteView('card'),
+      { 'site.view': 'card', 'site.sections': ['catalog'], 'site.card.price': 'от 700 ₽', 'site.url': 'example.com/scenarios' }],
+  ], { query: 'tab=showcase&now=2026-10-03T09:00:00' }],
+  'СС-104': ['витрина: ручная цена — прежнее значение помнится; ниже тарифа — предупреждение под полем; на странице — ручная цена (решение 3)', [
+    ['«Указать вручную» — поле с ручной ценой 2 599, подсказка — цена по тарифу; карточка в черновике', async (K) => { await K.priceSource('manual'); await K.settled() },
+      { 'showcase.priceSource': 'manual', 'showcase.price': '2 599', 'showcase.priceHint': 'По тарифу для не клиента — от 700 ₽ | default', 'showcase.tariff': null,
+        'sc.priceSource': 'manual', 'sc.priceFrom': 2599, saveLog: ['saving', 'saved'] }],
+    ['500 ₽ — ниже тарифа: предупреждение под полем', async (K) => { await K.fill('[data-field=scPriceValue]', '500'); await K.settled() },
+      { 'showcase.price': '500', 'sc.priceFrom': 500, 'showcase.priceHint': 'Ниже тарифа: для не клиента — от 700 ₽ | warning' }],
+    ['«Предпросмотр страницы» — на первом экране от 500 ₽', K => K.siteOpen(), { surface: 'site', 'site.hero.price': 'от 500 ₽' }],
+    ['дифф публикации — источник и ручная цена в области «Витрина»', async (K) => { await K.key('Escape'); await K.publish(); await K.area('showcase') },
+      { surface: 'publish', 'diff.areas.3': { id: 'showcase', count: '2 изменения', tone: 'changed' },
+        'diff.open.0.groups.0': { kind: 'changed', title: 'Изменено · 2', items: ['Цена «от»: источник | из тарифа → вручную', 'Цена «от» вручную | 2599 → 500'] } }],
+    ['ручная выше тарифа — предупреждения нет', async (K) => { await K.key('Escape'); await K.fill('[data-field=scPriceValue]', '900'); await K.settled() },
+      { surface: '', 'showcase.price': '900', 'showcase.priceHint': 'По тарифу для не клиента — от 700 ₽ | default' }],
+    ['«Из тарифа» — снова от 700 ₽; ручная 900 помнится', async (K) => { await K.priceSource('tariff'); await K.settled() },
+      { 'showcase.priceSource': 'tariff', 'showcase.price': null, 'sc.priceFrom': 900, 'showcase.tariff': 'На витрине от 700 ₽ · текущий тариф с января 2026 · «Осмотр легкового автомобиля», КАСКО' }],
+  ], { query: 'tab=showcase&now=2026-10-03T09:00:00' }],
+  'СС-105': ['витрина: «Не показывать» убирает цену со страницы сценария и из карточки каталога; метки «Не заполнено» у цены нет (решения 3, 5)', [
+    ['«Не показывать» — ни цены из тарифа, ни поля', async (K) => { await K.priceSource('hidden'); await K.settled() },
+      { 'showcase.priceSource': 'hidden', 'showcase.tariff': null, 'showcase.price': null, 'sc.priceSource': 'hidden', saveLog: ['saving', 'saved'] }],
+    ['превью — на первом экране цены нет; незаполненное — краткое описание и изображение', K => K.siteOpen(),
+      { surface: 'site', 'site.hero.price': null, 'site.gaps': ['summary', 'image'], 'site.gapsText': 'Не заполнено: Краткое описание, Изображение' }],
+    ['карточка в каталоге — без цены', K => K.siteView('card'), { 'site.card.price': null, 'site.gaps': ['image', 'summary'] }],
+    ['поиск «цена» — «не показывается»', async (K) => { await K.key('Escape'); await K.searchClick(); await K.type('цена') },
+      { 'rowsX.0': 'showcase · Цена «от» · не показывается ·  ·  · Цена' }],
+  ], { query: 'tab=showcase&now=2026-10-03T09:00:00' }],
+  'СС-106': ['витрина: превью публичной страницы — «Компьютер / Телефон», «Страница сценария / Карточка в каталоге»; над рамкой статус и будущий адрес; Esc и «Вернуться к витрине» (ревью 4.8; решение 5)', [
+    ['«Предпросмотр страницы» — компьютер, страница сценария: разделы по ревью 4.8', K => K.siteOpen(),
+      { surface: 'site', 'site.title': 'Предпросмотр страницы сценария', 'site.subtitle': 'По черновику · вид сайта условный: дизайн-системы сайта в репо нет',
+        'site.device': 'desktop', 'site.view': 'page', 'site.frame': 'desktop', 'site.status': 'Черновик карточки',
+        'site.sections': ['hero', 'why', 'flow', 'modules'], 'site.gaps': ['summary', 'image'],
+        'site.hero': { tags: ['Страхование', 'ПСО — предстраховой осмотр', 'Транспорт'], title: 'Дистанционный осмотр автомобиля перед страхованием', summary: null, price: 'от 700 ₽', image: null, action: 'Оставить заявку', columns: 2 },
+        'site.pairs.0': 'Дорого и долго | Выезд эксперта занимает дни и стоит денег | Клиент снимает автомобиль сам за 10–15 минут', 'site.pairs.length': 4,
+        'site.metrics': ['50–80 % | Снижение выездов', 'до 10 раз | Ускорение получения материалов'],
+        'site.steps': ['Создание', 'Выполнение', 'ИИ-анализ', 'Экспертиза', 'Завершение'],
+        'site.modules': ['Распознавание повреждений', 'Распознавание VIN', 'Проверка геолокации', 'Контроль качества съёмки'] }],
+    ['«Телефон» — экран 375, первый экран столбиком', K => K.siteDevice('phone'),
+      { 'site.device': 'phone', 'site.frame': 'phone', 'site.frameWidth': 375, 'site.hero.columns': 1, 'site.sections': ['hero', 'why', 'flow', 'modules'] }],
+    ['«Карточка в каталоге» на телефоне — карточка во всю ширину', K => K.siteView('card'),
+      { 'site.view': 'card', 'site.sections': ['catalog'], 'site.url': 'example.com/scenarios', 'site.card.width': 335,
+        'site.card.title': 'Дистанционный осмотр автомобиля перед страхованием', 'site.card.tags': ['Страхование', 'ПСО — предстраховой осмотр', 'Транспорт'] }],
+    ['«Компьютер» — карточка в колонке каталога 336', K => K.siteDevice('desktop'), { 'site.device': 'desktop', 'site.card.width': 336 }],
+    ['Esc — оверлей закрыт, фокус на «Предпросмотр страницы»', K => K.key('Escape'), { surface: '', site: null, focusAct: 'site-preview' }],
+    ['снова — устройство и вид прежние', K => K.siteOpen(), { surface: 'site', 'site.device': 'desktop', 'site.view': 'card' }],
+    ['«Вернуться к витрине» — оверлей закрыт, фокус на «Предпросмотр страницы»; правок нет', K => K.act('site-close'),
+      { surface: '', site: null, focusAct: 'site-preview', 'sc.status': 'draft', writes: 0 }],
+  ], { query: 'tab=showcase&now=2026-10-03T09:00:00' }],
+  'СС-107': ['витрина: «Не заполнено» ведёт к полю таба — оверлей закрывается, фокус в поле; заполненное пропадает из незаполненного (решение 5)', [
+    ['превью — метки у краткого описания и изображения', K => K.siteOpen(), { 'site.gaps': ['summary', 'image'] }],
+    ['«Не заполнено · Краткое описание» — оверлей закрыт, фокус в поле', K => K.siteGap('summary'), { surface: '', site: null, tab: 'showcase', focusField: 'scSummary' }],
+    ['набор описания; превью — описание на первом экране, осталось изображение', async (K) => { await K.type('Осмотр по фото за 15 минут'); await K.settled(); await K.siteOpen() },
+      { 'sc.summary': 'Осмотр по фото за 15 минут', 'site.hero.summary': 'Осмотр по фото за 15 минут', 'site.gaps': ['image'], 'site.gapsText': 'Не заполнено: Изображение' }],
+    ['«Не заполнено · Изображение» — фокус на зоне загрузки', K => K.siteGap('image'), { surface: '', site: null, focusField: 'scImage' }],
+    ['загрузка изображения; превью — картинка, незаполненного нет', async (K) => { await K.act('showcase-image'); await K.settled(); await K.siteOpen() },
+      { 'site.hero.image': 'car-front-left.svg', 'site.gaps': [], 'site.gapsText': 'Все поля витрины заполнены' }],
+  ], { query: 'tab=showcase&now=2026-10-03T09:00:00' }],
+  'СС-108': ['новая схема: схемы нет в тарификации — цены из тарифа нет; превью — первый экран из меток «Не заполнено»; цена ведёт к источнику, ручная — к полю (решения 3, 5)', [
+    ['таб «Витрина» — «Из тарифа»: «—», схемы нет в тарификации', K => K.tab('showcase'),
+      { 'showcase.priceSource': 'tariff', 'showcase.tariff': 'На витрине — · схемы нет в тарификации', 'showcase.tariffLink': '/tariffs?tab=schemes | _blank' }],
+    ['превью — статус, адреса нет, пять меток', K => K.siteOpen(),
+      { 'site.status': 'Требует оформления', 'site.address': 'Адрес страницы появится с продающим названием', 'site.url': 'example.com/scenarios/…',
+        'site.gaps': ['tags', 'title', 'summary', 'price', 'image'], 'site.gapsText': 'Не заполнено: Индустрия, Продающее название, Краткое описание, Цена «от», Изображение',
+        'site.hero.tags': ['Транспорт'] }],
+    ['«Не заполнено · Цена «от»» — фокус на источнике цены', K => K.siteGap('price'), { surface: '', site: null, focusField: 'scPrice' }],
+    ['«Указать вручную» — сравнить не с чем; превью — метка ведёт к полю цены', async (K) => { await K.priceSource('manual'); await K.settled(); await K.siteOpen(); await K.siteGap('price') },
+      { 'showcase.priceHint': 'Схемы нет в тарификации — сравнить не с чем | default', surface: '', focusField: 'scPriceValue' }],
+  ], { query: 'data=new&now=2026-10-03T09:00:00' }],
+  'СС-109': ['просмотр версии: «Предпросмотр страницы» доступен — страница по снимку; метка ведёт к полю только для чтения (решение 5; правило «Такт 68»)', [
+    ['«Предпросмотр страницы» у версии от 14.08.2026 — подзаголовок по версии, метки снимка', K => K.siteOpen(),
+      { surface: 'site', 'site.subtitle': 'По версии от 14.08.2026, 10:20 · вид сайта условный: дизайн-системы сайта в репо нет', 'site.status': 'Черновик карточки',
+        'site.gaps': ['tags', 'title', 'summary', 'image'], 'site.hero.price': 'от 700 ₽' }],
+    ['«Не заполнено · Продающее название» — поле только для чтения в фокусе', K => K.siteGap('title'), { surface: '', site: null, focusField: 'scTitle', focusRo: true, writes: 0 }],
+  ], { query: 'view=v1&tab=showcase&now=2026-10-03T09:00:00' }],
 }
 
 /* ------------------------------ прогон ------------------------------ */

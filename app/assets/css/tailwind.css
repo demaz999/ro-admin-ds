@@ -198,6 +198,16 @@
     /* Телефон превью приложения — такт 89 (`ui/app-preview`): корпус 220 — макет U829JoK7KMZV8do3KNkWBh, узел 33694:3884.
        Утилита — w-app-phone; высоты корпуса — --spacing-app-phone-*. */
     --container-app-phone: 220px;
+    /* Превью публичной страницы сценария — такт 90 (рамка браузера `ui/app-preview`, разделы страницы `ui/scenario-preview`;
+       ревью docs/scheme-edit-review.md, 4.8). ДС сайта в репо нет: размеры условные. browser-phone — ширина экрана телефона
+       375 (логическая ширина 375 × 812, ревью 4.1); browser-desktop — окно браузера компьютера 1280; site — колонка содержимого
+       страницы 1040; site-card — карточка каталога 336: треть колонки за вычетом двух зазоров 16; site-wide — точка раскладки
+       страницы по ширине рамки (контейнерный запрос `@site-wide:`): уже — раскладка телефона. */
+    --container-browser-phone: 375px;
+    --container-browser-desktop: 1280px;
+    --container-site: 1040px;
+    --container-site-card: 336px;
+    --container-site-wide: 640px;
     --text-4xl--letter-spacing: 0;
 
     /* Вспышка шага после перехода «Показать в структуре» — спека VA-9265 §15.3,
@@ -462,6 +472,15 @@
     --color-app-note: var(--app-note);
     --color-app-highlight: var(--app-highlight);
 
+    /* Превью публичной страницы сценария — такт 90 (`ui/scenario-preview`): страница сайта на ролях `--site-*`. */
+    --color-site-page: var(--site-page);
+    --color-site-band: var(--site-band);
+    --color-site-surface: var(--site-surface);
+    --color-site-border: var(--site-border);
+    --color-site-foreground: var(--site-foreground);
+    --color-site-accent: var(--site-accent);
+    --color-site-accent-foreground: var(--site-accent-foreground);
+
     /* Расширения темы как утилиты: bg-primary-hover, text-foreground-secondary… */
     --color-foreground-hover: var(--foreground-hover);
     --color-foreground-disabled: var(--foreground-disabled);
@@ -724,6 +743,15 @@
     --app-note: var(--secondary);                   /* подсказка на экране — accent/surface_soft */
     --app-highlight: var(--ring);                   /* обводка элемента — accent/default */
     --shadow-app-highlight: 0 0 16px 0 color-mix(in srgb, var(--primary) 32%, transparent); /* 33694:3918 — 0 0 16, 32 % */
+    /* Превью публичной страницы сценария — такт 90 (`ui/scenario-preview`; ревью docs/scheme-edit-review.md, 4.8). ДС сайта в
+       репо нет, вид сайта условный: роли страницы стоят на ролях кита. ДС сайта заменит их значения — одной правкой здесь. */
+    --site-page: var(--background);                 /* фон страницы — bg/page */
+    --site-band: var(--secondary);                  /* полоса первого экрана, кружок номера шага — accent/surface_soft */
+    --site-surface: var(--card);                    /* карточки пар, метрик и каталога, метки */
+    --site-border: var(--border);                   /* рамка карточек и меток — border/default */
+    --site-foreground: var(--foreground);           /* fg/primary; второстепенный текст — на ступени --opacity-on-tone (правило такта 50) */
+    --site-accent: var(--primary);                  /* «Оставить заявку», номер шага, значение метрики — accent/default */
+    --site-accent-foreground: var(--primary-foreground); /* bg/page на «Оставить заявку» */
     --popover-scroll-thumb: var(--border-neutral);  /* решение: border/neutral_soft — серый бегунок на белой плашке */
     --tag: var(--secondary);                        /* решение: accent/surface_soft — подложка неактивного тега */
     /* Чип — компонент кита 1, мастер `badge` 747:2464. Заливка привязана там к

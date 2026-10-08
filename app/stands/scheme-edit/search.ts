@@ -126,7 +126,7 @@ export const SHOWCASE_INDEX: { key: string, label: string, card: string, target:
   { key: 'showcase.title', label: 'Продающее название', card: 'Витринная карточка', target: 'scTitle', synonyms: ['маркетинговое название', 'заголовок карточки'] },
   { key: 'showcase.summary', label: 'Краткое описание', card: 'Витринная карточка', target: 'scSummary', synonyms: ['описание для витрины'] },
   { key: 'showcase.image', label: 'Изображение карточки', card: 'Витринная карточка', target: 'scImage', synonyms: ['картинка', 'обложка'] },
-  { key: 'showcase.priceFrom', label: 'Цена «от»', card: 'Витринная карточка', target: 'scPrice', synonyms: ['стоимость осмотра'] },
+  { key: 'showcase.priceFrom', label: 'Цена «от»', card: 'Витринная карточка', target: 'scPrice', synonyms: ['стоимость осмотра', 'цена из тарифа', 'источник цены'] },
   { key: 'showcase.industry', label: 'Индустрия', card: 'Витринная карточка', target: 'scIndustry', synonyms: ['теги', 'отрасль'] },
   { key: 'showcase.spheres', label: 'Сфера применения', card: 'Витринная карточка', target: 'scSpheres', synonyms: ['теги', 'сферы'] },
   { key: 'showcase.object', label: 'Объект', card: 'Витринная карточка', target: 'scObject', synonyms: ['теги'] },
@@ -200,6 +200,8 @@ export interface IndexContext {
   phaseReason: string
   hasCurrent: boolean
   dirty: boolean
+  /** Цена «от» на витрине с источником — такт 90: «из тарифа — от 700 ₽», «вручную — от 2 599 ₽», «не показывается». */
+  price?: string
 }
 
 export const READONLY_REASON = 'Прошлая версия открыта только для чтения'
@@ -262,7 +264,7 @@ function actionReason(key: ActionKey, ctx: IndexContext): string {
 }
 
 /** Значения полей витрины для строки выдачи. */
-function showcaseValue(key: string, config: SchemeConfig): string {
+function showcaseValue(key: string, config: SchemeConfig, ctx?: Pick<IndexContext, 'price'>): string {
   const sc = config.showcase
   const n = (k: number, one: string, few: string, many: string) => `${k} ${plural(k, one, few, many)}`
   switch (key) {
@@ -270,7 +272,8 @@ function showcaseValue(key: string, config: SchemeConfig): string {
     case 'showcase.title': return sc.title || 'не задано'
     case 'showcase.summary': return sc.summary || 'не задано'
     case 'showcase.image': return sc.image ? 'загружено' : 'не загружено'
-    case 'showcase.priceFrom': return sc.priceFrom == null ? 'не задана' : `от ${grouped(sc.priceFrom)} ₽`
+    /* Такт 90: значение — с источником цены (тариф, вручную, не показывается); без контекста — ручная цена. */
+    case 'showcase.priceFrom': return ctx?.price ?? (sc.priceFrom == null ? 'не задана' : `от ${grouped(sc.priceFrom)} ₽`)
     case 'showcase.industry': return INDUSTRIES.find(x => x.value === sc.industry)?.label ?? 'не выбрана'
     case 'showcase.spheres': return sc.spheres.length === 1 ? (SPHERES.find(x => x.value === sc.spheres[0])?.label ?? '') : sc.spheres.length ? n(sc.spheres.length, 'сфера', 'сферы', 'сфер') : 'не выбрано'
     case 'showcase.object': return SHOWCASE_OBJECTS[config.settings.general.schemeType] ?? ''
@@ -325,7 +328,7 @@ export function buildSearchIndex(ctx: IndexContext): SearchEntry[] {
   }
   for (const s of SHOWCASE_INDEX) {
     out.push(base({ key: s.key, type: 'showcase', area: 'showcase', label: s.label, synonyms: s.synonyms, path: `Витрина → ${s.card}`, tab: 'showcase',
-      target: s.target, value: showcaseValue(s.key, config) }))
+      target: s.target, value: showcaseValue(s.key, config, ctx) }))
   }
   for (const a of SEARCH_ACTIONS) {
     out.push(base({ key: `action.${a.key}`, type: 'action', area: 'actions', label: a.label, synonyms: a.synonyms, path: 'Действия', target: '', icon: a.icon,
@@ -538,7 +541,7 @@ export function groupHits(hits: readonly SearchHit[], scope: SearchScope, expand
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
 const SHOWCASE_FIELDS: Record<string, string[]> = {
-  'showcase.publish': ['status'], 'showcase.title': ['title'], 'showcase.summary': ['summary'], 'showcase.image': ['image'], 'showcase.priceFrom': ['priceFrom'],
+  'showcase.publish': ['status'], 'showcase.title': ['title'], 'showcase.summary': ['summary'], 'showcase.image': ['image'], 'showcase.priceFrom': ['priceSource', 'priceFrom'],
   'showcase.industry': ['industry'], 'showcase.spheres': ['spheres'], 'showcase.description': ['description'], 'showcase.problems': ['problems'],
   'showcase.metrics': ['metrics'], 'showcase.modules': ['hiddenModules'],
 }

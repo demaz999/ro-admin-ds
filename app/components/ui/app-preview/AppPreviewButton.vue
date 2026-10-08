@@ -11,7 +11,7 @@ import { APP_HIGHLIGHT, APP_PRESSABLE } from '.'
  * | вариант | вид | источник |
  * |---|---|---|
  * | `primary` | заливка `--app-accent`, текст `--app-accent-foreground` | «Продолжить» `33694:3923` |
- * | `refuse` | контур 1 `--app-danger`, текст и глиф 12 `--app-danger` через 8, поверхность `--app-surface` | «Осмотр невозможен» `33694:3918`, решение 3 оркестратора: «контурная, тон ошибки, с иконкой» |
+ * | `refuse` | контур 1 `--app-danger`, текст и глиф `--app-danger` через 8, поверхность `--app-surface`; глиф — треугольник `warning` 11 в боксе 12 (такт 90, решение 1 оркестратора; до такта 90 — `error` 12) | «Осмотр невозможен» `33694:3918`, `alert-triangle` `33694:3920` — 11 × 10 в боксе 12; решение 3 оркестратора такта 89: «контурная, тон ошибки, с иконкой» |
  * | `outline` | контур 1 `--app-accent`, текст `--app-accent` | второстепенное действие экрана — по аналогии с `refuse` |
  * | `link` | текст `--app-accent` без поверхности | «Пропустить шаг» — по аналогии |
  *
@@ -51,7 +51,10 @@ const look = computed(() => cn(
     :class="look"
     @click="emit('press')"
   >
-    <Icon v-if="props.variant === 'refuse'" name="error" :size="12" />
+    <!-- Глиф «Осмотр невозможен» — треугольник 11 × 9.5 в боксе 12, как вектор 11 × 10 в боксе 12 макета (такт 90). -->
+    <span v-if="props.variant === 'refuse'" data-slot="app-preview-button-icon" class="flex size-3 shrink-0 items-center justify-center">
+      <Icon name="warning" :size="11" />
+    </span>
     <slot />
   </button>
   <div
@@ -61,7 +64,10 @@ const look = computed(() => cn(
     :data-highlighted="props.highlighted || undefined"
     :class="look"
   >
-    <Icon v-if="props.variant === 'refuse'" name="error" :size="12" />
+    <!-- Глиф «Осмотр невозможен» — треугольник 11 × 9.5 в боксе 12, как вектор 11 × 10 в боксе 12 макета (такт 90). -->
+    <span v-if="props.variant === 'refuse'" data-slot="app-preview-button-icon" class="flex size-3 shrink-0 items-center justify-center">
+      <Icon name="warning" :size="11" />
+    </span>
     <slot />
   </div>
 </template>

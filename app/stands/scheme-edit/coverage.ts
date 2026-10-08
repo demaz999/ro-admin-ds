@@ -56,4 +56,12 @@ export const SCHEME_COVERAGE_STATES = [
   'open=demo&app=full&screen=confirm', 'open=demo&app=full&screen=call', 'open=demo&app=full&screen=refuse', 'open=demo&app=full&demo=map',
   'data=new&open=demo&screen=form:none', 'data=new&open=demo&demo=map', 'view=v1&open=demo',
   'help=refuse', 'app=full&help=confirmCheckbox', 'app=full&help=phone', 'help=startAfterCreate', 'tab=form&help=field:f-vin', 'tab=form&help=field:f-start',
+  /*
+   * Такт 90, витрина: цена «от» — вручную, вручную ниже тарифа с предупреждением, не показывать (из тарифа и без тарифа — состояния
+   * такта 72 `tab=showcase`, `data=new&tab=showcase`); превью публичной страницы — компьютер и телефон, страница и карточка в
+   * каталоге, новая схема, просмотр версии, без цены.
+   */
+  'tab=showcase&price=manual', 'tab=showcase&price=low', 'tab=showcase&price=hidden',
+  'open=site', 'open=site&device=phone', 'open=site&site=card', 'open=site&device=phone&site=card', 'data=new&open=site', 'view=v1&open=site',
+  'open=site&price=hidden',
 ] as const

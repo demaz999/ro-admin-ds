@@ -3,7 +3,8 @@ import { onBeforeUnmount, ref } from 'vue'
 import { formulaPreview } from '~/components/ui/formula-input'
 import { clearMatches, highlightMatches, queryWords } from '~/components/ui/highlight-text'
 import { variantChips, variantGroups } from '~/stands/scheme-edit/repeat-texts'
-import { createModel, type Dataset } from '~/stands/scheme-edit/model'
+import { createModel, PRICE_SOURCES, SHOWCASE_IMAGE_SRC, type Dataset } from '~/stands/scheme-edit/model'
+import type { ScenarioPage } from '~/components/ui/scenario-preview'
 import demoData from '~/stands/scheme-edit/demo-data.json'
 
 /**
@@ -25,6 +26,9 @@ import demoData from '~/stands/scheme-edit/demo-data.json'
  * Такт 89: семейство «Превью приложения» (`AppPreview`, части, `AppPreviewScreen`, `AppPreviewThumb` — карточка 11) и «?» с
  * превью `HelpPreview` (карточка 12); слот `help` у `SettingRow` и `Field`, вторая строка якоря `SectionNavAnchor`. Экраны — из
  * демо-данных страницы схемы той же сборкой, что демо-осмотр (`buildDemo`).
+ * Такт 90: рамка браузера `AppPreviewBrowser` (карточка 13) и семейство «Превью страницы сценария» (`ScenarioPreview` и части —
+ * карточка 14); композиция страницы — «Цена «от»» с источником. Страницы — из демо-данных страницы схемы той же сборкой, что
+ * превью на табе «Витрина» (`buildSitePreview`).
  */
 definePageMeta({ layout: false })
 useHead({ title: 'Редактирование схемы осмотра — матрицы' })
@@ -361,6 +365,52 @@ function clearDemo() {
   pagePainted.value = '—'
 }
 onBeforeUnmount(() => clearMatches())
+
+/* ------------------------------ такт 90: превью публичной страницы, цена «от» ------------------------------ */
+/** Страница сценария черновика демо-данных: краткое описание и изображение не заполнены. */
+const siteGaps: ScenarioPage = appModel.site.value
+/** Та же страница заполненной целиком. */
+const siteFull: ScenarioPage = {
+  ...siteGaps,
+  summary: 'Клиент снимает автомобиль сам по подсказкам приложения — осмотр за 15 минут без выезда эксперта',
+  image: SHOWCASE_IMAGE_SRC.vehicle!,
+  gaps: {},
+}
+/** Новая схема: метки «Не заполнено» у первого экрана. */
+const siteFresh: ScenarioPage = createModel((demoData as unknown as Record<'fresh', Dataset>).fresh).site.value
+/** Незаполненные части — пара и метрика, пустой список метрик. */
+const PAIRS_GAP = [siteFull.pairs[0]!, { problem: 'Хаос в материалах', effect: '', solution: '' }]
+const METRICS_GAP = [siteFull.metrics[0]!, { label: '', value: '' }]
+const gapLog = ref('—')
+const priceSourceDemo = ref('tariff')
+const priceManualDemo = ref('500')
+const SITE_EXAMPLE = `<!-- рамка браузера: компьютер либо телефон; тело — прокрутка и @container, высоту задаёт раскладка -->
+<AppPreviewBrowser :device="device" url="example.com/scenarios/osmotr-avtomobilya" class="h-full">
+  <!-- страница сценария из данных; view="card" — карточка в каталоге; метка «Не заполнено» — событие gap с полем таба -->
+  <ScenarioPreview :page="page" :view="view" @gap="gap => goToField(gap.field)" />
+</AppPreviewBrowser>
+<!-- части отдельно — внутри контейнера @container: раскладка по его ширине -->
+<ScenarioPreviewHero title="Дистанционный осмотр автомобиля" summary="Осмотр за 15 минут" :price="700" :tags="['Страхование']" :gaps="{ image: { field: 'scImage', label: 'Изображение' } }" @gap="…" />
+<ScenarioPreviewSection title="Зачем нужен осмотр" description="…">
+  <ScenarioPreviewPairs :pairs="pairs" :gaps="{ 1: { field: 'scEffect1', label: 'Проблемы и решения, пара 2' } }" />
+  <ScenarioPreviewMetrics :metrics="metrics" :empty="{ field: 'scMetrics', label: 'Метрики' }" />
+</ScenarioPreviewSection>
+<ScenarioPreviewSection title="Как устроена схема" tone="band"><ScenarioPreviewSteps :steps="steps" /></ScenarioPreviewSection>
+<ScenarioPreviewTags size="md" :items="modules" />
+<ScenarioPreviewCard title="…" summary="…" :price="700" :tags="tags" />
+<ScenarioPreviewGap label="Краткое описание" @go="goToField('scSummary')" />`
+const PRICE_EXAMPLE = `<!-- композиция страницы: источник цены — радио-карточки, под ними цена из тарифа либо ручная цена -->
+<Field label="Цена «от»" orientation="left" label-width="form">
+  <RadioGroup v-model="source" class="grid grid-cols-3 gap-2">
+    <RadioGroupItem v-for="x in sources" :key="x.value" variant="card" :value="x.value" :checked="source === x.value">
+      {{ x.label }}<template #description>{{ x.description }}</template>
+    </RadioGroupItem>
+  </RadioGroup>
+  <PriceRange label="На витрине" :min="700" note="текущий тариф с января 2026 · «Осмотр легкового автомобиля», КАСКО" />
+  <Hyperlink href="/tariffs?tab=schemes&open=scheme&scheme=s-car" target="_blank" rel="noopener" size="sm">Открыть тарификацию</Hyperlink>
+  <!-- вручную: ниже тарифа — подсказка тоном предупреждения -->
+  <Field hint="Ниже тарифа: для не клиента — от 700 ₽" hint-tone="warning"><Input v-model="price" unit="₽" numeric /></Field>
+</Field>`
 </script>
 
 <template>
@@ -1400,6 +1450,126 @@ onBeforeUnmount(() => clearMatches())
         </div>
       </div>
       <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ HELP_PREVIEW_EXAMPLE }}</pre>
+    </section>
+
+    <!-- ============================ Такт 90: превью публичной страницы сценария, цена «от» ============================ -->
+    <section class="flex flex-col gap-4" data-matrix="app-preview-browser">
+      <Heading>AppPreviewBrowser — рамка браузера: компьютер и телефон (карточка 13)</Heading>
+      <div class="flex flex-wrap items-start gap-10">
+        <div class="flex w-full max-w-4xl flex-col gap-2" data-case="desktop">
+          <ToolbarText>компьютер — окно до 1280, три точки и адресная строка; тело — прокрутка и @container</ToolbarText>
+          <AppPreviewBrowser url="example.com/scenarios/distantsionnyy-osmotr-avtomobilya-pered-strakhovaniem" class="h-120">
+            <ScenarioPreview :page="siteFull" />
+          </AppPreviewBrowser>
+        </div>
+        <div class="flex flex-col gap-2" data-case="phone">
+          <ToolbarText>телефон — корпус, строка состояния, адресная строка; экран 375</ToolbarText>
+          <AppPreviewBrowser device="phone" url="example.com/scenarios/distantsionnyy-osmotr-avtomobilya-pered-strakhovaniem" class="h-160">
+            <ScenarioPreview :page="siteFull" />
+          </AppPreviewBrowser>
+        </div>
+      </div>
+    </section>
+
+    <section class="flex flex-col gap-4" data-matrix="scenario-preview">
+      <Heading>ScenarioPreview — страница сценария из данных: незаполненное, карточка в каталоге, новая схема (карточка 14)</Heading>
+      <div class="flex flex-wrap items-start gap-10">
+        <div class="flex w-full max-w-4xl flex-col gap-2" data-case="gaps">
+          <ToolbarText>черновик демо-данных: краткое описание и изображение — метки «Не заполнено»</ToolbarText>
+          <AppPreviewBrowser url="example.com/scenarios/distantsionnyy-osmotr-avtomobilya-pered-strakhovaniem" class="h-120">
+            <ScenarioPreview :page="siteGaps" @gap="gapLog = `gap: ${$event.field}`" />
+          </AppPreviewBrowser>
+        </div>
+        <div class="flex flex-col gap-2" data-case="card">
+          <ToolbarText>карточка в каталоге — телефон</ToolbarText>
+          <AppPreviewBrowser device="phone" url="example.com/scenarios" class="h-160">
+            <ScenarioPreview :page="siteGaps" view="card" @gap="gapLog = `gap: ${$event.field}`" />
+          </AppPreviewBrowser>
+        </div>
+        <div class="flex w-full max-w-4xl flex-col gap-2" data-case="fresh">
+          <ToolbarText>новая схема — первый экран из меток: индустрия, название, описание, цена (схемы нет в тарификации), изображение</ToolbarText>
+          <AppPreviewBrowser url="example.com/scenarios/…" class="h-120">
+            <ScenarioPreview :page="siteFresh" @gap="gapLog = `gap: ${$event.field}`" />
+          </AppPreviewBrowser>
+        </div>
+      </div>
+      <ToolbarText>Событие: {{ gapLog }}</ToolbarText>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ SITE_EXAMPLE }}</pre>
+    </section>
+
+    <section class="flex flex-col gap-4" data-matrix="scenario-preview-parts">
+      <Heading>Части страницы сценария — ScenarioPreviewHero, Section, Pairs, Metrics, Steps, Tags, Card, Gap; раскладка по ширине контейнера</Heading>
+      <div class="flex flex-wrap items-start gap-6" data-case="gap-tags">
+        <ScenarioPreviewGap label="Краткое описание" @go="gapLog = 'gap: scSummary'" />
+        <div class="w-80">
+          <ScenarioPreviewGap block label="Изображение" @go="gapLog = 'gap: scImage'" />
+        </div>
+        <ScenarioPreviewTags :items="siteFull.tags" />
+        <ScenarioPreviewTags size="md" :items="siteFull.modules" />
+      </div>
+      <div class="flex flex-wrap items-start gap-10">
+        <div class="@container flex w-browser-phone flex-col gap-2 border border-dashed border-border" data-case="narrow">
+          <ToolbarText>контейнер 375 — раскладка телефона</ToolbarText>
+          <ScenarioPreviewHero :title="siteFull.title" :summary="siteFull.summary" :image="siteFull.image" :price="siteFull.price" :tags="siteFull.tags" />
+          <ScenarioPreviewSection title="Как устроена схема" tone="band">
+            <ScenarioPreviewSteps :steps="siteFull.steps" />
+          </ScenarioPreviewSection>
+          <ScenarioPreviewSection title="Сценарии осмотра">
+            <ScenarioPreviewCard :title="siteFull.title" :summary="siteFull.summary" :image="siteFull.image" :price="siteFull.price" :tags="siteFull.tags" />
+          </ScenarioPreviewSection>
+        </div>
+        <div class="@container flex w-full max-w-4xl flex-col gap-2 border border-dashed border-border" data-case="wide">
+          <ToolbarText>контейнер шире 640 — раскладка компьютера; у пары, метрики и списка метрик — «Не заполнено»</ToolbarText>
+          <ScenarioPreviewHero :title="siteFull.title" :price="null" :tags="siteFull.tags" :gaps="siteGaps.gaps" @gap="gapLog = `gap: ${$event.field}`" />
+          <ScenarioPreviewSection title="Зачем нужен осмотр" :description="siteFull.description">
+            <ScenarioPreviewPairs :pairs="PAIRS_GAP" :gaps="{ 1: { field: 'scEffect1', label: 'Проблемы и решения, пара 2' } }" @gap="gapLog = `gap: ${$event.field}`" />
+            <ScenarioPreviewMetrics :metrics="METRICS_GAP" :gaps="{ 1: { field: 'scMetric1', label: 'Метрика 2' } }" @gap="gapLog = `gap: ${$event.field}`" />
+            <ScenarioPreviewMetrics :metrics="[]" :empty="{ field: 'scMetrics', label: 'Метрики' }" @gap="gapLog = `gap: ${$event.field}`" />
+          </ScenarioPreviewSection>
+          <ScenarioPreviewSection title="Как устроена схема" tone="band">
+            <ScenarioPreviewSteps :steps="siteFull.steps" />
+          </ScenarioPreviewSection>
+        </div>
+      </div>
+      <ToolbarText>Событие: {{ gapLog }}</ToolbarText>
+    </section>
+
+    <section class="flex flex-col gap-4" data-matrix="price-source">
+      <Heading>Цена «от» — композиция страницы: источник радио-карточками; из тарифа — PriceRange и «Открыть тарификацию»; вручную — предупреждение ниже тарифа</Heading>
+      <div class="flex max-w-settings flex-col gap-6">
+        <Field label="Цена «от»" orientation="left" label-width="form">
+          <div class="flex flex-col gap-3">
+            <RadioGroup v-model="priceSourceDemo" class="grid grid-cols-3 gap-2">
+              <RadioGroupItem v-for="x in PRICE_SOURCES" :key="x.value" variant="card" :value="x.value" :checked="priceSourceDemo === x.value">
+                {{ x.label }}
+                <template #description>
+                  {{ x.description }}
+                </template>
+              </RadioGroupItem>
+            </RadioGroup>
+            <div v-if="priceSourceDemo === 'tariff'" class="flex flex-wrap items-baseline gap-x-6 gap-y-2" data-case="tariff">
+              <PriceRange label="На витрине" :min="700" note="текущий тариф с января 2026 · «Осмотр легкового автомобиля», КАСКО" />
+              <Hyperlink href="/tariffs?tab=schemes&open=scheme&scheme=s-car" target="_blank" rel="noopener" size="sm">
+                Открыть тарификацию
+              </Hyperlink>
+            </div>
+            <Field v-else-if="priceSourceDemo === 'manual'" :hint="Number(priceManualDemo) < 700 ? 'Ниже тарифа: для не клиента — от 700 ₽' : 'По тарифу для не клиента — от 700 ₽'" :hint-tone="Number(priceManualDemo) < 700 ? 'warning' : 'default'" data-case="manual">
+              <div class="w-price-input">
+                <Input v-model="priceManualDemo" placeholder="" unit="₽" numeric :show-icon="false" />
+              </div>
+            </Field>
+          </div>
+        </Field>
+        <Field label="Цена «от»" orientation="left" label-width="form" data-case="no-tariff">
+          <div class="flex flex-wrap items-baseline gap-x-6 gap-y-2">
+            <PriceRange label="На витрине" :min="null" note="схемы нет в тарификации" />
+            <Hyperlink href="/tariffs?tab=schemes" target="_blank" rel="noopener" size="sm">
+              Открыть тарификацию
+            </Hyperlink>
+          </div>
+        </Field>
+      </div>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ PRICE_EXAMPLE }}</pre>
     </section>
   </main>
 </template>

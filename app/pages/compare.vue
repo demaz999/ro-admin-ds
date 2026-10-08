@@ -19,6 +19,11 @@ const appModel = createModel((schemeDemo as unknown as Record<'main', Dataset>).
   s.mobile.phoneName = 'Служба поддержки'
 }
 const appScreens = appModel.demo.value.byId
+/**
+ * Такт 90: страница сценария для автопроверок — витрина демо-данных страницы схемы той же сборкой, что превью на табе «Витрина»
+ * (`buildSitePreview`): метки «Не заполнено» у краткого описания и изображения.
+ */
+const sitePage = appModel.site.value
 
 /**
  * Смещения вариантов внутри мастера сняты через Plugin API как координаты
@@ -2004,6 +2009,29 @@ const textareaVariants = [
             <HelpPreview title="Отказ от осмотра" value="Сейчас: разрешён" />
           </template>
         </SettingRow>
+      </div>
+    </section>
+
+    <!--
+      Такт 90: рамка браузера (`AppPreviewBrowser` — карточка 13) и превью страницы сценария (`ScenarioPreview` и части — карточка 14).
+      Эталона нет: ДС сайта в репо нет, вид сайта условный. Раздел — ради автопроверок шрифтов и оптики иконок; матрицы —
+      `/scheme-edit/states`.
+    -->
+    <section data-theme="rososmotr" class="space-y-3 bg-background font-sans text-foreground" data-compare="scenario-preview">
+      <h2 class="text-lg font-bold">
+        AppPreviewBrowser · ScenarioPreview — без эталона кита, такт 90
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Страница сценария на сайте в рамке браузера — компьютер и телефон; страница собрана из витрины демо-данных страницы схемы.
+        Роли <code>--site-*</code> и <code>--app-*</code> на ролях кита.
+      </p>
+      <div class="flex flex-wrap items-start gap-6">
+        <AppPreviewBrowser url="example.com/scenarios/distantsionnyy-osmotr-avtomobilya-pered-strakhovaniem" class="h-120 max-w-4xl">
+          <ScenarioPreview :page="sitePage" />
+        </AppPreviewBrowser>
+        <AppPreviewBrowser device="phone" url="example.com/scenarios" class="h-160">
+          <ScenarioPreview :page="sitePage" view="card" />
+        </AppPreviewBrowser>
       </div>
     </section>
 

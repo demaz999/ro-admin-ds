@@ -321,3 +321,25 @@ export const SHOWCASE_STATUS = {
 } as const
 /** Изображение карточки на стенде — один демо-файл. */
 export const SHOWCASE_IMAGE = 'showcase-cover.jpg'
+/**
+ * Изображение карточки на сайте — превью страницы сценария (такт 90): файл стенда картинкой не загружается, поэтому превью
+ * показывает демо-картинку стенда по типу схемы — рисунок ракурса из каталога фото-подсказок либо кадр `public/free-shoot/`
+ * (`CREDITS.md`). Демо-данные стенда: в прод и в витрину не переносятся.
+ */
+export const SHOWCASE_IMAGE_SRC: Record<string, string> = {
+  vehicle: '/scheme-edit/hints/car-front-left.svg',
+  house: '/free-shoot/demo-10.jpg',
+  equipment: '/free-shoot/demo-01.jpg',
+}
+
+/**
+ * Источник цены «от» на витрине — такт 90 (`docs/scheme-edit-review.md`, 4.7; решение 3 оркестратора 2026-10-08): «Из тарифа»
+ * (по умолчанию) — нижняя граница цены для не клиента по текущему периоду «Тарификации»: посетитель сайта ещё не клиент;
+ * «Указать вручную» — своя цена; «Не показывать» — цены на сайте нет. `diff` — значение в диффе публикации.
+ */
+export type PriceSource = 'tariff' | 'manual' | 'hidden'
+export const PRICE_SOURCES: { value: PriceSource, label: string, description: string, diff: string }[] = [
+  { value: 'tariff', label: 'Из тарифа', description: 'Нижняя граница цены для не клиента по текущему тарифу', diff: 'из тарифа' },
+  { value: 'manual', label: 'Указать вручную', description: 'Своя цена — тариф её не меняет', diff: 'вручную' },
+  { value: 'hidden', label: 'Не показывать', description: 'Цены нет на странице и в каталоге', diff: 'не показывать' },
+]
