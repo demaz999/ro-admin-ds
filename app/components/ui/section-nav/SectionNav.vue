@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { provide } from 'vue'
+import { computed, provide } from 'vue'
 import { cn } from '@/lib/utils'
 import { SECTION_NAV_KEY } from '.'
 
@@ -11,11 +11,16 @@ import { SECTION_NAV_KEY } from '.'
  */
 const props = defineProps<{
   title?: string
+  /**
+   * Ширина от раскладки — такт 104: навигатор тянется от `--container-section-nav-min` до 266 (основа 266, сжимается вместе с
+   * колонкой), подписи переносятся по словам, уже 266 — поля строк 12 вместо 16. Без пропа — прежние 266 и многоточие.
+   */
+  fluid?: boolean
   class?: string
 }>()
 
 const model = defineModel<string>({ default: '' })
-provide(SECTION_NAV_KEY, { model, select: (value: string) => { model.value = value } })
+provide(SECTION_NAV_KEY, { model, select: (value: string) => { model.value = value }, fluid: computed(() => props.fluid) })
 
 /** Стрелки переводят фокус между строками разделов; якоря — обычным Tab. */
 function onKeydown(event: KeyboardEvent) {
@@ -33,10 +38,11 @@ function onKeydown(event: KeyboardEvent) {
   <nav
     data-slot="section-nav"
     :aria-label="props.title"
-    :class="cn('flex w-section-nav shrink-0 flex-col gap-1 rounded-xl bg-accent p-0.5', props.class)"
+    :data-fluid="props.fluid || undefined"
+    :class="cn('flex flex-col gap-1 rounded-xl bg-accent p-0.5', props.fluid ? '@container min-w-section-nav-min shrink grow-0 basis-section-nav' : 'w-section-nav shrink-0', props.class)"
     @keydown="onKeydown"
   >
-    <p v-if="props.title" data-slot="section-nav-title" class="px-4 pt-2 pb-0.5 text-lg font-bold text-foreground">
+    <p v-if="props.title" data-slot="section-nav-title" class="px-4 pt-2 pb-0.5 text-lg font-bold text-foreground" :class="props.fluid ? '@max-section-nav:px-3' : ''">
       {{ props.title }}
     </p>
     <slot />

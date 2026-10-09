@@ -495,6 +495,15 @@ function kit(page) {
     },
     check: field => page.click(`document.querySelector('[data-field=${field}] [data-slot=choice-control], [data-field=${field}][data-slot=choice] [data-slot=choice-control]')`),
     async tabs(n) { for (let k = 0; k < n; k++) await page.key('Tab') },
+    /** Shift+Tab — такт 104: возврат фокуса с первого элемента немодального сайда. */
+    shiftTab: () => page.key('Tab', 'Tab', { modifiers: 8 }),
+    /** Tab, пока фокус в узле `sel` (не больше 80 нажатий) — такт 104: выход Tab с последнего элемента сайда, без счёта остановок. */
+    async tabOut(sel) {
+      for (let k = 0; k < 80; k++) {
+        await page.key('Tab')
+        if (!(await page.evaluate(`!!document.activeElement?.closest?.(${JSON.stringify(sel)})`))) return
+      }
+    },
     /* ---------- П5 ---------- */
     /** Клавиша «/» реальным вводом — как набор знака: событие клавиши и текст. */
     slash: () => page.slash(),
@@ -883,6 +892,8 @@ function kit(page) {
           sideComments: document.querySelectorAll('[data-side-comments] [data-slot=chip]').length,
           commentDict: t(document.querySelector('[data-act=open-comments]')?.textContent) || null,
           focusAct: document.activeElement?.dataset?.act ?? null,
+          /* Такт 104: размещение открытого сайда — slot или layer; модальный и закрытый — null. */
+          sideDock: document.querySelector('[data-slot=modal-card][data-state=open][data-dock]')?.dataset.dock ?? null,
           /* ---------- П6, такт 69: «Форма» ---------- */
           form: (() => { const el = document.querySelector('[data-form]'); if (!el) return null
             const bar = el.querySelector('[data-fields-bar]')
@@ -2017,8 +2028,12 @@ const SCENARIOS = {
     ['Tab по кругу — фокус остаётся в оверлее', K => K.tabs(30), { surface: 'process-overlay', focusIn: 'overlay' }],
     ['«Добавить шаг» — сайд шага поверх оверлея: стек из двух слоёв, фокус в сайде', K => K.act('overlay-step-add'),
       { surface: 'step', surfaces: ['process-overlay', 'step'], focusIn: 'step', 'stepSide.title': 'Добавление шага', 'stepSide.sub': 'Процесс «Осмотр повреждений»', 'stepSide.host': 'overlay', 'overlay.title': 'Осмотр повреждений' }],
-    /* Такт 101: сайд шага поверх оверлея — немодальный слой, Tab с последнего элемента уходит из сайда; сайд и оверлей открыты. */
-    ['Tab уходит из немодального сайда, сайд и оверлей открыты', K => K.tabs(40), { surface: 'step', surfaces: ['process-overlay', 'step'], focusIn: null }],
+    /*
+     * Такт 101: сайд шага поверх оверлея — немодальный слой, Tab с последнего элемента уходит из сайда; сайд и оверлей открыты. Такт 104: фокус —
+     * на «Добавить шаг» оверлея, открывшей сайд (до такта 104 — к концу документа: `focusIn: null`).
+     */
+    ['Tab с последнего элемента сайда — на «Добавить шаг» оверлея, сайд и оверлей открыты', K => K.tabOut('[data-side=step]'),
+      { surface: 'step', surfaces: ['process-overlay', 'step'], focusIn: 'overlay', focusAct: 'overlay-step-add' }],
     ['название, Esc — закрыт только сайд, оверлей открыт, фокус на «Добавить шаг» оверлея', async (K) => { await K.typeInto('sdTitle', 'Черновик шага'); await K.key('Escape') },
       { surface: 'process-overlay', surfaces: ['process-overlay'], focusIn: 'overlay', focusAct: 'overlay-step-add', 'overlay.steps': [], writes: 0 }],
     ['«Добавить шаг», название — «Добавить шаг»: шаг в черновике оверлея, полотно прежнее', async (K) => { await K.act('overlay-step-add'); await K.typeInto('sdTitle', 'Общий план повреждения'); await K.act('step-save') },
@@ -3101,12 +3116,18 @@ const SCENARIOS = {
     ['«Удалить» — строки нет, уведомление с «Отменить»', async (K) => { await K.clickEl("document.querySelector('[data-menu=row-actions] [data-action=delete]')"); await K.settled() },
       { rowMenu: [], 'form.rows.length': 2 }],
   ]],
-  /* Такт 101 — решение владельца 2026-10-09 (доска scheme-edit-wide-v4, S1, L2): сайд немодальный, навигатор слева от колонки. */
-  'СС-129': ['сайд немодальным слоем: страница под ним работает — навигатор «Настроек» слева нажимается, сайд остаётся открытым; Esc закрывает (такт 101, S1)', [
-    ['«Словарь комментариев» — сайд открыт слоем (окно 1440)', K => K.act('open-comments'), { surface: 'comments', section: 'general' }],
-    ['навигатор под сайдом: «Мобильное приложение» — раздел сменился, сайд открыт', K => K.section('mobile'), { surface: 'comments', section: 'mobile' }],
-    ['Esc — сайд закрыт, раздел прежний', K => K.key('Escape'), { surface: '', section: 'mobile', writes: 0 }],
-  ]],
+  /*
+   * Такт 101 — решение владельца 2026-10-09 (доска scheme-edit-wide-v4, S1): сайд немодальный. Такт 104 (владелец 2026-10-09, живая проверка
+   * такта 101): навигатор справа, сайд слотом, когда рабочая область без сайда вмещает минимум группы (окно 1920: 990 ≥ 910); Tab с краевого
+   * элемента сайда — на элемент, открывший сайд.
+   */
+  'СС-129': ['сайд слотом: рабочая область вмещает минимум группы — страница уступает место, навигатор справа нажимается; Tab и Shift+Tab с краевого элемента сайда — на элемент, открывший сайд; Esc закрывает (такты 101, 104)', [
+    ['«Словарь комментариев» на окне 1920 — сайд слотом, фокус в сайде', K => K.act('open-comments'), { surface: 'comments', section: 'general', sideDock: 'slot', focusInSide: true }],
+    ['Tab — первый элемент сайда; Shift+Tab — на строке словаря, открывшей сайд; сайд открыт', async (K) => { await K.tabs(1); await K.shiftTab() }, { surface: 'comments', focusInSide: false, focusAct: 'open-comments' }],
+    ['клик по заголовку сайда — фокус на карточке; Tab до ручки ширины (пятый) и дальше — на строке словаря', async (K) => { await K.clickEl("document.querySelector('[data-side=comments] [data-slot=modal-card-title]')"); await K.tabs(6) }, { surface: 'comments', focusInSide: false, focusAct: 'open-comments' }],
+    ['навигатор справа: «Мобильное приложение» — раздел сменился, сайд открыт', K => K.section('mobile'), { surface: 'comments', section: 'mobile', sideDock: 'slot' }],
+    ['Esc — сайд закрыт, раздел прежний', K => K.key('Escape'), { surface: '', section: 'mobile', sideDock: null, writes: 0 }],
+  ], { width: 1920, height: 1080 }],
 }
 
 /* ------------------------------ прогон ------------------------------ */

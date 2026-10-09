@@ -45,6 +45,7 @@ const minutes = ref(60)
 const nav = ref('general')
 const navAnchor = ref('behavior')
 const nav2 = ref('access')
+const nav3 = ref('general')
 
 const ROLES = [
   { value: 'admin', label: 'Администратор' },
@@ -202,7 +203,13 @@ const SECTION_NAV_EXAMPLE = `<SectionNav v-model="section" title="Настрой
     <SectionNavAnchor label="Поведение процесса" :active="anchor === 'behavior'" @select="goAnchor('behavior')" />
   </SectionNavItem>
   <SectionNavItem value="pdf" label="PDF" status="off" />
-</SectionNav>`
+</SectionNav>
+
+<!-- такт 104: ширина от раскладки — основа 266, не уже --container-section-nav-min 148; подписи переносятся, уже 266 — поля 12 -->
+<div class="flex items-start gap-settings-gap">
+  <div class="flex min-w-settings-fit basis-settings">…колонка…</div>
+  <SectionNav v-model="section" title="Настройки" fluid class="sticky top-6">…</SectionNav>
+</div>`
 
 const SELECT_MULTIPLE_EXAMPLE = `<Field label="Кто может редактировать дедлайн">
   <Select v-model:values="roles" multiple :items="ROLES" placeholder="Выберите роли" />   <!-- значение — массив строк -->
@@ -655,6 +662,27 @@ const PAGE_ROWS_EXAMPLE = `<Table attached :page-rows="total > pageSize ? pageSi
           </SectionNavItem>
           <SectionNavItem value="ai" label="ИИ-анализ" />
         </SectionNav>
+        <!-- Такт 104: ширина от раскладки (`fluid`) — в строке шириной 200 и шириной минимума 148: подписи переносятся, поля 12. -->
+        <div class="flex w-50" data-case="fluid-200">
+          <SectionNav v-model="nav3" title="Настройки" fluid>
+            <SectionNavItem value="general" label="Общие" status="attention">
+              <SectionNavAnchor label="Дедлайны и доступ к осмотру" active />
+              <SectionNavAnchor label="Экран подтверждения" />
+            </SectionNavItem>
+            <SectionNavItem value="mobile" label="Мобильное приложение" />
+            <SectionNavItem value="anomalies" label="Аномалии" status="on" :count="2" />
+          </SectionNav>
+        </div>
+        <div class="flex w-section-nav-min" data-case="fluid-min">
+          <SectionNav v-model="nav3" title="Настройки" fluid>
+            <SectionNavItem value="general" label="Общие" status="attention">
+              <SectionNavAnchor label="Дедлайны и доступ к осмотру" active />
+              <SectionNavAnchor label="Экран подтверждения" />
+            </SectionNavItem>
+            <SectionNavItem value="mobile" label="Мобильное приложение" />
+            <SectionNavItem value="anomalies" label="Аномалии" status="on" :count="2" />
+          </SectionNav>
+        </div>
       </div>
       <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ SECTION_NAV_EXAMPLE }}</pre>
     </section>

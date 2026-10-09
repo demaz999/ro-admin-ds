@@ -17,7 +17,7 @@ import {
   fillRepeatTexts, knownObjectType, REPEAT_TEXT_FIELDS, textVariants, variantChips, variantGroups,
   buildDemo, type DemoSource, type HelpKey, type HelpPreviewView,
   type BehaviorSettings, type Dataset, type DonorScheme, type FieldDraft, type FillRow, type FormulaSettings, type GroupDraft, type HintCategoryFilter, type HintMatch,
-  type NetworkState, type PdfTemplate, type PdfTemplateDraft, type ProcessDraft, type ProcessStep, type RepeatTextKey, type SaveState, type SectionId, type SectionStatus, type StepDraft,
+  type NetworkState, type PdfTemplate, type PdfTemplateDraft, type ProcessDraft, type ProcessStep, type RepeatTextKey, type SaveState, type SectionId, type StepDraft,
   type StepHint, type TabId,
 } from '~/stands/scheme-edit/model'
 import demo from '~/stands/scheme-edit/demo-data.json'
@@ -27,7 +27,6 @@ import { createCard, createdDataset, createdNotice, defaultBasics, setHandoff, t
 import { RULES_LABEL, type Stage, type StageId } from '~/stands/scheme-edit/readiness'
 import type { ReadinessGroupItem, ReadinessMarkState, ReadinessStageItem } from '~/components/ui/readiness'
 import type { ModalCardDock } from '~/components/ui/modal-card'
-import type { IconName } from '~/components/ui/icon/icons'
 
 /**
  * Страница «Редактирование схемы осмотра» (VA-16377) — стенд, такты 61–65, порции П1–П5 (`docs/scheme-edit.md`,
@@ -185,7 +184,7 @@ import type { IconName } from '~/components/ui/icon/icons'
  * | `?open=readiness` | поповер чипа «Готовность N из 5» либо «Проверка: N» открыт (такт 91) |
  * | `?open=copy` | окно «Новая схема осмотра» копии на шаге «Основа» (такт 91) |
  * | `?rules=1` | этап «Правила» отмечен: «Проверил унаследованное…» (такт 91) |
- * | `?variant=l1-compact` · `l1-rail` | раскладка «Настроек» L1 для живой проверки владельцем: колонка и навигатор справа по центру рабочей зоны; навигатор под сайдом-слоем — выбором раздела списком над колонкой либо рейкой у края сайда (такт 101; временно — до выбора владельца) |
+ * | `?variant=nav-left` | раскладка «Настроек» L2 для сравнения: навигатор слева от колонки, сжимается так же (такт 104; по умолчанию — навигатор справа) |
  */
 /*
  * Такт 91: копия переходит на тот же адрес с другим набором — страница пересобирается по полному адресу.
@@ -217,7 +216,7 @@ onBeforeUnmount(() => phoneQuery?.removeEventListener('change', onPhone))
 /** Чип готовности и меню «⋯» — одна разметка: в шапке рабочего стола, на узком экране — в строке статусов и в нижней полосе. */
 const [DefineChip, ReuseChip] = createReusableTemplate()
 const [DefineMenu, ReuseMenu] = createReusableTemplate()
-/** Навигатор «Настроек» — одна разметка на два места (такт 101): слева от колонки (L2) либо справа (варианты L1 оснастки). */
+/** Навигатор «Настроек» — одна разметка на два места: справа от колонки (такт 104) либо слева (оснастка `?variant=nav-left`). */
 const [DefineSettingsNav, ReuseSettingsNav] = createReusableTemplate()
 /**
  * Строка-карточка шага (решение 5): «Процессы и шаги» и оверлей повторяемого процесса — одна разметка. Карточка — `Card size="sm"`:
@@ -1942,21 +1941,23 @@ onMounted(() => {
   try { if (sessionStorage.getItem(HINT_KEY) === 'closed') m.closeHint() } catch {}
 })
 
-/* ------------------------------ раскладка «Настроек» и сайды — такт 101 ------------------------------ */
+/* ------------------------------ раскладка страницы и сайды — такты 101, 104 ------------------------------ */
 /**
- * Решения владельца 2026-10-09 (доска `scheme-edit-wide-v4`): **L2** — навигатор «Настроек» у левого края рабочей зоны, колонка 846
- * за ним, левый край не двигается; **S1** — сайды страницы немодальные: слотом справа, когда рядом с раскладкой помещаются, иначе
- * слоем у правого края; страница под сайдом работает. Довесок 1: ширина сайда тянется ручкой (480 — половина окна), помнится в
- * сессии вкладки и общая для всех сайдов; слот или слой — по текущей ширине.
+ * Такт 104 — решения владельца 2026-10-09 (живая проверка такта 101): **рабочая область** — окно минус меню каркаса, поля страницы и
+ * сайд-слот с зазором 16 (`pr-modal-slot`); содержимое страницы — **группа** по центру рабочей области не шире 1136
+ * (`--container-settings-group`): «Назад», заголовок, строка статусов и действий, баннер-ухо, поиск, полоса табов и содержимое
+ * табов — от левого до правого края группы. На «Настройках» группа — колонка и навигатор справа (L1); колонка сжимается от 846 до
+ * `--container-settings-min`, навигатор — от 266 до `--container-section-nav-min` (`SectionNav fluid`), зазор 24 → 16 первым.
+ * Оснастка `?variant=nav-left` — навигатор слева (L2), сжимается так же.
  *
- * Слот помещается, когда справа от раскладки «Настроек» (`--container-settings-group` 1136 от левого поля рабочей зоны) остаётся
- * ширина сайда и поле 16: при развёрнутом меню 256 + 16 + 1136 + 16 + 642 = 2066 (сайд 480 — 1904). Порог один на все табы.
- * Узкий экран (уже 768) — сайды как прежде: модальные во всё окно. Сайд поверх полноэкранного слоя (шаг в оверлее процесса) —
- * слой: страница под оверлеем не видна, место ей не уступается.
+ * **S1** (такт 101) — сайды страницы немодальные: **слотом**, когда рабочая область без сайда вмещает минимум группы текущего таба
+ * (`--container-settings-group-min`, `--container-form-min`, `--container-processes-min`, `--container-showcase-min` — замер такта 104),
+ * иначе **слоем** у правого края; страница под сайдом работает. Ширина сайда — ручкой (довесок 1 к такту 101), общая, помнится в
+ * сессии вкладки; слот или слой — по текущей ширине. Узкий экран (уже 768) — сайды модальные во всё окно, как прежде. Сайд поверх
+ * полноэкранного слоя (шаг в оверлее процесса) — слой.
  */
-/** Оснастка приёмки — `?variant=l1-compact` · `l1-rail`: варианты L1 для живой проверки владельцем; по умолчанию — L2. */
-const VARIANT: '' | 'l1-compact' | 'l1-rail' = q('variant') === 'l1-compact' || q('variant') === 'l1-rail' ? q('variant') as 'l1-compact' | 'l1-rail' : ''
-const l1 = VARIANT !== ''
+/** Оснастка приёмки — `?variant=nav-left`: навигатор «Настроек» слева от колонки (L2) для сравнения; по умолчанию — справа. */
+const NAV_LEFT = q('variant') === 'nav-left'
 const SIDE_KEY = 'scheme-edit:side-width'
 /** Ширина сайдов страницы — ручка `ModalCardContent resizable`; не задана — 642. */
 const sideWidth = ref<number | undefined>(undefined)
@@ -1970,8 +1971,15 @@ watch(sideWidth, (v) => {
   if (!v) return
   try { sessionStorage.setItem(SIDE_KEY, String(v)) } catch {}
 })
+/** Минимум группы по табу — токены `tailwind.css` (замер такта 104). */
+const GROUP_MIN: Record<TabId, string> = {
+  settings: '--container-settings-group-min',
+  form: '--container-form-min',
+  processes: '--container-processes-min',
+  showcase: '--container-showcase-min',
+}
 /** Числа раскладки — токены `tailwind.css`; меряются после монтирования, при смене ширины окна и меню. */
-const layout = ref({ room: 0, edge: 642, min: 480, viewport: 0, navRight: 0 })
+const layout = ref({ area: 0, edge: 642, min: 480, viewport: 0, groupMin: {} as Partial<Record<TabId, number>>, search: 1136 })
 function cssPx(name: string, fallback: number) {
   const v = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name))
   return Number.isFinite(v) && v > 0 ? v : fallback
@@ -1980,13 +1988,15 @@ function measureLayout() {
   const main = document.querySelector('main')
   const left = main?.getBoundingClientRect().left ?? 0
   const px = cssPx('--spacing-page-x', 16)
-  const nav = document.querySelector('[data-settings-nav]')?.getBoundingClientRect()
+  const search = document.querySelector('[data-search]')?.getBoundingClientRect().width
   layout.value = {
-    room: window.innerWidth - left - px - cssPx('--container-settings-group', 1136) - px,
+    /* Рабочая область без сайда: окно минус меню и поля страницы слева и справа. */
+    area: window.innerWidth - left - 2 * px,
     edge: cssPx('--container-modal-edge', 642),
     min: cssPx('--container-modal-edge-min', 480),
     viewport: window.innerWidth,
-    navRight: nav?.width ? nav.right : 0,
+    groupMin: Object.fromEntries((Object.keys(GROUP_MIN) as TabId[]).map(t => [t, cssPx(GROUP_MIN[t], 0)])),
+    search: search ? Math.round(search) : layout.value.search,
   }
 }
 /** Ширина сайда на экране — те же пределы, что у ручки: не уже 480, не шире половины окна. */
@@ -1995,31 +2005,15 @@ const sideShown = computed(() => {
   const max = Math.max(min, Math.floor(viewport / 2))
   return Math.round(Math.min(max, Math.max(min, sideWidth.value ?? edge)))
 })
+/** Слот — когда рабочая область без сайда (окно − меню − поля − сайд; зазор до сайда — поле 16) вмещает минимум группы таба. */
 const sideDock = computed<ModalCardDock | undefined>(() => {
   if (phone.value || !layout.value.viewport) return undefined
   if (m.ui.surfaces.some(x => x.kind === 'overlay')) return 'layer'
-  return layout.value.room >= sideShown.value ? 'slot' : 'layer'
+  const need = layout.value.groupMin[m.ui.tab as TabId] ?? 0
+  return layout.value.area - sideShown.value >= need ? 'slot' : 'layer'
 })
 /** Открыт сайд страницы. */
 const sideOpenAny = computed(() => m.ui.surfaces.some(x => x.kind === 'side'))
-/**
- * L1: навигатор справа от колонки уходит под сайд-слой — тогда он сворачивается: `l1-compact` — выбор раздела списком над
- * колонкой (часть узкого экрана, такт 92), `l1-rail` — рейка у левого края сайда. Место навигатора держится (`invisible`):
- * колонка не двигается.
- */
-const navCovered = computed(() => l1 && !phone.value && sideOpenAny.value && sideDock.value === 'layer'
-  && layout.value.navRight > layout.value.viewport - sideShown.value)
-/** Глиф раздела рейки — из лежащих в `icons.ts`; новых не скачивалось. */
-const RAIL_ICON: Record<SectionId, IconName> = {
-  general: 'settings',
-  mobile: 'photo-camera',
-  web: 'monitoring',
-  access: 'lock',
-  ai: 'auto-awesome',
-  anomalies: 'warning',
-  pdf: 'article',
-}
-const RAIL_TONE: Record<SectionStatus, 'success' | 'neutral' | 'warning' | undefined> = { none: undefined, on: 'success', off: 'neutral', attention: 'warning' }
 let layoutObserver: ResizeObserver | null = null
 onMounted(() => {
   measureLayout()
@@ -2028,13 +2022,16 @@ onMounted(() => {
   if (main) {
     layoutObserver = new ResizeObserver(() => measureLayout())
     layoutObserver.observe(main)
+    /* Поле поиска — ширина группы: выдача берёт её же. */
+    const search = document.querySelector('[data-search]')
+    if (search) layoutObserver.observe(search)
   }
 })
 onBeforeUnmount(() => {
   window.removeEventListener('resize', measureLayout)
   layoutObserver?.disconnect()
 })
-/* Навигатор L1 меряется заново, когда открывается сайд и меняется его ширина: слот сдвигает группу к центру оставшейся ширины. */
+/* Слот сужает группу: ширина поля поиска меряется заново. */
 watch([sideOpenAny, sideShown, sideDock, () => m.ui.tab], () => {
   if (import.meta.client) nextTick(() => measureLayout())
 })
@@ -2202,23 +2199,36 @@ if (import.meta.client) {
         каркаса — первой строкой над «Назад», тон мягкого предупреждения (`Callout warning`); уходит с прокруткой. Одноразовая
         ориентация: закрытая не возвращается (аудит, «Смена парадигмы»; строка 167).
       -->
-      <!-- Такт 101: сайд-слот справа — плашка уступает ему место, как вся страница (`pr-modal-slot`). -->
+      <!--
+        Такт 101: сайд-слот справа — плашка уступает ему место, как вся страница (`pr-modal-slot`). Такт 104: плашка — ширины группы
+        по центру рабочей области (`max-w-settings-group`).
+      -->
       <template v-if="!ro && !m.ui.hintClosed" #banner>
         <div class="flex flex-col pr-modal-slot">
-          <Callout tone="warning" icon="info" closable data-autosave-hint @close="closeHint()">
-            Сохранение теперь автоматическое. В боевые осмотры изменения попадают по кнопке «Опубликовать схему»
-          </Callout>
+          <div class="mx-auto flex w-full max-w-settings-group flex-col">
+            <Callout tone="warning" icon="info" closable data-autosave-hint @close="closeHint()">
+              Сохранение теперь автоматическое. В боевые осмотры изменения попадают по кнопке «Опубликовать схему»
+            </Callout>
+          </div>
         </div>
       </template>
-      <!-- «Назад» — слот `back` каркаса (такт 96): до заголовка 12 держит каркас. -->
+      <!-- «Назад» — слот `back` каркаса (такт 96): до заголовка 12 держит каркас. Такт 104: от левого края группы. -->
       <template #back>
-        <ButtonNavigation size="base" direction="left" data-act="back" @click="m.back()">
-          Назад
-        </ButtonNavigation>
+        <div class="flex w-full pr-modal-slot">
+          <div class="mx-auto flex w-full max-w-settings-group" data-back-row>
+            <ButtonNavigation size="base" direction="left" data-act="back" @click="m.back()">
+              Назад
+            </ButtonNavigation>
+          </div>
+        </div>
       </template>
 
-    <!-- Такт 101: сайд-слот справа (S1) — страница уступает ему место, колонка «Настроек» не двигается (L2). -->
-    <div class="flex min-w-0 flex-col gap-6 pr-modal-slot max-md:pb-20">
+    <!--
+      Такт 101: сайд-слот справа (S1) — страница уступает ему место (`pr-modal-slot`). Такт 104: содержимое — группа не шире 1136 по
+      центру рабочей области; шапка, поиск, полоса табов и табы — от её левого до правого края.
+    -->
+    <div class="flex min-w-0 flex-col pr-modal-slot max-md:pb-20">
+    <div class="mx-auto flex w-full max-w-settings-group min-w-0 flex-col gap-6" data-page-group>
 
     <div class="flex flex-col gap-2">
       <!-- Узкий экран (такт 92): имя — ступень 24/28 (макет `33694:3930`), до трёх строк. -->
@@ -2330,8 +2340,8 @@ if (import.meta.client) {
     <!-- ============================ поиск — № 9–11, такт 86: строкой под шапкой, над табами, на всех табах ============================ -->
     <Popover :open="searchOpen">
       <PopoverAnchor as-child>
-        <!-- Такт 101: поле — ширина раскладки «Настроек» L2 (навигатор, зазор, колонка — 1136): края по навигатору и колонке. -->
-        <div :class="l1 ? 'mx-auto w-full max-w-settings-group' : 'max-w-settings-group'" data-search :data-find="finding || undefined">
+        <!-- Такт 104: поле — ширина группы (края по краям группы); такт 101 — ширина раскладки L2. -->
+        <div class="w-full" data-search :data-find="finding || undefined">
           <div data-field="search" @keydown="onSearchKeydown" @input="onSearchInput" @focusin="onSearchFocusIn" @focusout="searchFocused = false">
             <!--
               Подсказка хоткея — внутри поля справа, слотом `end` (такт 67, строка 98): при непустом значении её место занимает крестик.
@@ -2359,14 +2369,14 @@ if (import.meta.client) {
         </div>
       </PopoverAnchor>
       <!--
-        Выдача — ширина поля 1136 (`--container-settings-group`, такт 101; до него — 846): охват, строки со значением справа и подвал клавиш (такт 86, строка 99).
+        Выдача — ширина поля (ширина группы, такт 104; такт 101 — 1136, до него — 846): охват, строки со значением справа и подвал клавиш (такт 86, строка 99).
         Фокус остаётся в поле: выдача его не забирает; клик по выдаче не снимает фокус с поля до перехода.
       -->
       <PopoverContent
         data-search-results
         align="start"
         :side-offset="4"
-        :width="1136"
+        :width="layout.search"
         narrow="full"
         :side-flip="!phone"
         class="max-md:flex max-md:flex-col"
@@ -2462,7 +2472,8 @@ if (import.meta.client) {
     </Popover>
 
     <Tabs v-model="tab">
-      <TabsList>
+      <!-- Такт 104: полоса табов — ширины поиска (ширина группы): ось `stretch` (такт 48). -->
+      <TabsList stretch>
         <template v-for="t in TABS" :key="t.id">
           <!--
             Новая схема (№ 66; аудит, «Двухфазность и табы»): «Форма» и «Процессы и шаги» неактивны до первого сохранения.
@@ -2507,11 +2518,11 @@ if (import.meta.client) {
           <Select v-model="section" :items="sectionItems" placeholder="Раздел настроек" :show-icon="false" :searchable="false" data-field="section-select" />
         </Toolbar>
         <!--
-          Навигатор — № 14: липкий (r2 §3). Узкий экран — выбор раздела списком над колонкой (такт 92). Такт 101: место навигатора
-          держится, когда он под сайдом-слоем в вариантах L1 (`invisible`) — колонка не двигается.
+          Навигатор — № 14: липкий (r2 §3). Узкий экран — выбор раздела списком над колонкой (такт 92). Такт 104: ширина от раскладки
+          (`fluid`) — от 266 до своего минимума, подписи переносятся.
         -->
         <DefineSettingsNav>
-          <SectionNav v-model="section" title="Настройки" :class="navCovered ? 'invisible sticky top-6' : 'sticky top-6'" data-settings-nav>
+          <SectionNav v-model="section" title="Настройки" fluid class="sticky top-6" data-settings-nav>
             <!-- Режим «найдено» (такт 86; 3.2, п. 16): разделы с совпадениями и раздел на экране, у каждого — число совпадений. -->
             <SectionNavItem
               v-for="s in navSections"
@@ -2526,17 +2537,13 @@ if (import.meta.client) {
           </SectionNav>
         </DefineSettingsNav>
         <!--
-          Каркас «Настроек» — такт 101, L2 (владелец 2026-10-09, доска `scheme-edit-wide-v4`): навигатор 266 у левого края рабочей
-          зоны, зазор 24, колонка 846; справа свободно — место сайда-слота. Макет `33346:5470` ставит навигатор справа от колонки —
-          отклонение в `figma-fixes.md`. Варианты L1 оснастки (`?variant=`): колонка и навигатор справа — группой по центру.
+          Каркас «Настроек» — такт 104 (владелец 2026-10-09, живая проверка такта 101): группа «колонка + навигатор справа» во всю ширину
+          группы страницы (макет `33346:5470`, L1); колонка — основа 846, не уже `min-w-settings-fit`; навигатор — основа 266, не уже
+          своего минимума; зазор 24 → 16 (`gap-settings-gap`). Оснастка `?variant=nav-left` — навигатор слева (L2, такт 101).
         -->
-        <div class="flex items-start gap-6 pt-6" :class="l1 ? 'justify-center' : ''" :data-layout="l1 ? VARIANT : 'l2'">
-          <ReuseSettingsNav v-if="!phone && !l1" />
-          <div ref="column" class="flex max-w-settings min-w-0 flex-1 flex-col gap-8" data-settings-column>
-            <!-- Вариант `l1-compact` (такт 101): навигатор под сайдом-слоем — выбор раздела списком над колонкой, липкий; часть узкого экрана (такт 92). -->
-            <Toolbar v-if="navCovered && VARIANT === 'l1-compact'" class="sticky top-0 z-20" data-section-select>
-              <Select v-model="section" :items="sectionItems" placeholder="Раздел настроек" :show-icon="false" :searchable="false" data-field="section-select" />
-            </Toolbar>
+        <div class="flex items-start gap-settings-gap pt-6" :data-layout="NAV_LEFT ? 'nav-left' : 'nav-right'">
+          <ReuseSettingsNav v-if="!phone && NAV_LEFT" />
+          <div ref="column" class="flex min-w-settings-fit shrink grow-0 basis-settings flex-col gap-8" data-settings-column>
             <!-- Просмотр прошлой версии (такт 68): поля — «только чтение» осью `readonly` у `Field` и контролов, значения выделяются; действия разделов закрыты `inert`; навигатор, табы и «Назад / Далее» работают. -->
             <div class="contents" :data-readonly="ro || undefined">
             <template v-if="m.ui.section === 'general'">
@@ -3108,7 +3115,7 @@ if (import.meta.client) {
                     <div class="w-56 shrink-0 max-md:w-auto max-md:min-w-0 max-md:flex-1" data-field="groupFilter">
                       <Select v-model="groupFilter" variant="elevated" :items="GROUP_FILTERS" placeholder="" :show-icon="false" :searchable="false" />
                     </div>
-                    <ToolbarText class="ml-auto" data-groups-count>
+                    <ToolbarText class="ml-auto shrink-0" data-groups-count>
                       Выбрано {{ access.groups.length }}
                     </ToolbarText>
                   </TableToolbar>
@@ -3374,19 +3381,19 @@ if (import.meta.client) {
                   </Heading>
                   <Table v-if="pdf.templates.length">
                     <TableRow>
-                      <TableHead variant="column" class="w-58 px-4">
+                      <TableHead variant="column" class="w-48 px-4">
                         Название
                       </TableHead>
-                      <TableHead variant="column" class="w-40 px-4">
+                      <TableHead variant="column" class="w-36 px-4">
                         Шаблон
                       </TableHead>
-                      <TableHead variant="column" class="w-50 px-4">
+                      <TableHead variant="column" class="w-0 min-w-40 flex-1 px-4">
                         Доступно
                       </TableHead>
                       <TableHead variant="column" aria-label="Действия" :class="['justify-end px-4', TEMPLATE_ACTIONS_COLUMN]" />
                     </TableRow>
                     <TableRow v-for="t in pdf.templates" :key="t.id" :data-template="t.id">
-                      <TableCell variant="slot" class="w-58 gap-2 px-4">
+                      <TableCell variant="slot" class="w-48 gap-2 px-4">
                         <TableCellIdentity>
                           {{ t.title }}
                         </TableCellIdentity>
@@ -3394,10 +3401,10 @@ if (import.meta.client) {
                           Основной
                         </Badge>
                       </TableCell>
-                      <TableCell class="w-40 px-4">
+                      <TableCell class="w-36 px-4">
                         {{ t.template }}
                       </TableCell>
-                      <TableCell class="w-50 px-4">
+                      <TableCell class="w-0 min-w-40 flex-1 px-4">
                         {{ templateAccess(t) }}
                       </TableCell>
                       <TableCell variant="slot" :class="['justify-end px-4', TEMPLATE_ACTIONS_COLUMN]">
@@ -3509,30 +3516,8 @@ if (import.meta.client) {
             </div>
           </div>
 
-          <ReuseSettingsNav v-if="!phone && l1" />
+          <ReuseSettingsNav v-if="!phone && !NAV_LEFT" />
         </div>
-        <!--
-          Вариант `l1-rail` (такт 101): навигатор под сайдом-слоем — рейка 48 вплотную к левому краю сайда (`right-modal-dock`): по строке
-          на раздел — глиф и точка статуса, активный раздел — тональная кнопка, название — подсказкой; нажатие ведёт в раздел. Сборка
-          из кита — `Card`, `IconButton`, `Tooltip`, `Indicator`; рейка — часть страницы, в кит не выносится.
-        -->
-        <Card v-if="navCovered && VARIANT === 'l1-rail'" class="fixed top-1/2 right-modal-dock z-40 flex -translate-y-1/2 flex-col gap-1 p-1" data-section-rail>
-          <TooltipProvider>
-            <div v-for="s in navSections" :key="s.id" class="flex items-center" :data-rail-section="s.id">
-              <Tooltip>
-                <TooltipTrigger as-child>
-                  <IconButton :variant="m.ui.section === s.id ? 'secondary' : 'ghost'" size="md" :label="s.label" :aria-current="m.ui.section === s.id ? 'true' : undefined" @click="section = s.id">
-                    <Icon :name="RAIL_ICON[s.id]" :size="16" />
-                  </IconButton>
-                </TooltipTrigger>
-                <TooltipContent side="left">
-                  {{ s.label }}
-                </TooltipContent>
-              </Tooltip>
-              <Indicator v-if="RAIL_TONE[m.sectionStatus.value[s.id]]" :variant="RAIL_TONE[m.sectionStatus.value[s.id]]" size="sm" />
-            </div>
-          </TooltipProvider>
-        </Card>
       </TabsContent>
 
       <!-- ============================ «Форма» — № 39–42, 62, 70: группы слева, поля выбранной группы справа (r2 §5; макет `32765:5584`) ============================ -->
@@ -4335,6 +4320,7 @@ if (import.meta.client) {
         </div>
       </TabsContent>
     </Tabs>
+    </div>
 
     <!-- ============================ сайд словаря комментариев — № 69 ============================ -->
     <ModalCard v-model:open="sideOpen" :dock="sideDock">

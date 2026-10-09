@@ -50,6 +50,15 @@ export { default as SectionNavItem } from './SectionNavItem.vue'
  * экрана: источник «Другие схемы» окна «Новая схема осмотра» страницы схемы — доступ по роли (ревью 5.3; решение 3 оркестратора
  * 2026-10-08), глиф `admin`. Без пропа строка прежняя.
  *
+ * ## Ширина от раскладки — такт 104
+ *
+ * Проп `fluid` у `SectionNav`: навигатор «Настроек» страницы схемы стоит в группе с колонкой и сжимается вместе с ней (решение
+ * владельца 2026-10-09, живая проверка такта 101: «её можно сделать компактнее и не превращать в рейку»). Основа — 266, сжатие —
+ * до `--container-section-nav-min` 148: замер такта 104 — слово «подтверждения» якоря «Экран подтверждения» в строке с полями 12.
+ * Подписи разделов и якорей переносятся по словам (многоточия нет), строка растёт от 36 с полями 8 сверху и снизу; уже 266 — поля
+ * строк, заголовка и отступ якорей 12 вместо 16 (запрос контейнера по ширине навигатора, `@max-section-nav`). Без пропа — прежние
+ * 266, строка 36 и многоточие. Матрица — `/scheme-edit/states`, `fluid-200` и `fluid-min`.
+ *
  * ## Состояния
  *
  * В макете состояний строки нет. Наведение — `--foreground` у текста (правило «у всего интерактивного системное
@@ -59,6 +68,8 @@ export { default as SectionNavItem } from './SectionNavItem.vue'
 export interface SectionNavContext {
   model: Ref<string>
   select: (value: string) => void
+  /** Ширина от раскладки — такт 104 (`SectionNav fluid`). */
+  fluid: Readonly<Ref<boolean>>
 }
 export const SECTION_NAV_KEY: InjectionKey<SectionNavContext> = Symbol('section-nav')
 export type SectionNavStatus = 'none' | 'on' | 'off' | 'attention'

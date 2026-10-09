@@ -149,16 +149,29 @@ function guardOutside(event: Event) {
 
 /**
  * Tab с последнего элемента сайда (Shift+Tab — с первого) у прикреплённого сайда уходит на страницу: ловушка фокуса Reka у
- * немодального окна не заперта, но по кругу водит (`loop`). Обработчик в фазе перехвата останавливает событие до неё, переход
- * делает браузер.
+ * немодального окна не заперта, но по кругу водит (`loop`). Обработчик в фазе перехвата останавливает событие до неё.
+ * Такт 104: фокус встаёт на элемент страницы, открывший сайд (`opener` — элемент в фокусе в момент открытия); сайд стоит порталом в
+ * конце документа, и переход браузером уводил Tab за конец документа. Открывший элемент пропал или скрыт — первый доступный
+ * элемент `main`.
  */
+let opener: HTMLElement | null = null
+function returnFocus() {
+  const ok = (x: HTMLElement | null): x is HTMLElement => !!x && x.isConnected && x.getClientRects().length > 0 && !x.closest('[inert]')
+  const target = ok(opener)
+    ? opener
+    : [...document.querySelectorAll<HTMLElement>(`main :is(${TABBABLE})`)].find(x => x.tabIndex >= 0 && ok(x))
+  target?.focus()
+  return !!target
+}
 const TABBABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]), [contenteditable="true"]'
 function onTabCapture(event: KeyboardEvent) {
   if (!dock.value || event.key !== 'Tab' || event.altKey || event.ctrlKey || event.metaKey) return
   const card = event.currentTarget as HTMLElement
   const list = [...card.querySelectorAll<HTMLElement>(TABBABLE)].filter(x => x.tabIndex >= 0 && !x.closest('[inert]') && x.getClientRects().length > 0)
   const edge = event.shiftKey ? list[0] : list[list.length - 1]
-  if (edge && document.activeElement === edge) event.stopPropagation()
+  if (!edge || document.activeElement !== edge) return
+  event.stopPropagation()
+  if (returnFocus()) event.preventDefault()
 }
 
 /**
@@ -169,6 +182,10 @@ function onTabCapture(event: KeyboardEvent) {
  * монтирования. Потребитель, отменивший событие сам, решает за окно.
  */
 function focusCard(event: Event) {
+  /* Такт 104: элемент страницы, открывший сайд, — сюда возвращает Tab с краевого элемента прикреплённого сайда. */
+  const prev = document.activeElement
+  const card = event.currentTarget as HTMLElement | null
+  opener = prev instanceof HTMLElement && prev !== document.body && !card?.contains(prev) ? prev : null
   if (event.defaultPrevented) return
   event.preventDefault()
   ;(event.currentTarget as HTMLElement | null)?.focus({ preventScroll: true })

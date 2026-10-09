@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { inject, ref } from 'vue'
+import { SECTION_NAV_KEY } from '.'
 /**
  * Якорь подраздела в навигаторе: у активного — линия 2 слева цветом `--primary`. Разбор — `index.ts`.
  * Переход — событие `select`; прокрутку к месту делает страница.
@@ -15,6 +17,8 @@ const props = withDefaults(defineProps<{
 }>(), { active: false, description: '', tone: 'default' })
 
 const emit = defineEmits<{ select: [] }>()
+/** Навигатор с шириной от раскладки (такт 104): подпись переносится, уже 266 — поля 12. */
+const ctx = inject(SECTION_NAV_KEY, { model: ref(''), select: () => {}, fluid: ref(false) })
 </script>
 
 <template>
@@ -25,12 +29,13 @@ const emit = defineEmits<{ select: [] }>()
     :class="[
       'flex min-h-9 w-full flex-col justify-center border-l-2 px-4 text-left text-sm font-medium outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring',
       props.active ? 'border-primary text-foreground' : 'border-transparent text-foreground-secondary',
-      props.description ? 'py-2' : '',
+      props.description || ctx.fluid.value ? 'py-2' : '',
+      ctx.fluid.value ? '@max-section-nav:px-3' : '',
     ]"
     :style="{ transitionDuration: 'var(--duration-hover)' }"
     @click="emit('select')"
   >
-    <span class="w-full min-w-0 truncate">{{ props.label }}</span>
+    <span class="w-full min-w-0" :class="ctx.fluid.value ? '' : 'truncate'">{{ props.label }}</span>
     <span
       v-if="props.description"
       data-slot="section-nav-anchor-description"

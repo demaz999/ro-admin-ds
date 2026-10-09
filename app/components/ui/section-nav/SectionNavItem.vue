@@ -24,7 +24,7 @@ const props = withDefaults(defineProps<{
   badgeLabel?: string
 }>(), { status: 'none', count: undefined, badge: undefined, badgeLabel: '' })
 
-const ctx = inject(SECTION_NAV_KEY, { model: ref(''), select: () => {} })
+const ctx = inject(SECTION_NAV_KEY, { model: ref(''), select: () => {}, fluid: ref(false) })
 const active = computed(() => ctx.model.value === props.value)
 
 const STATUS_TEXT: Record<SectionNavStatus, string> = { none: '', on: 'включено', off: 'выключено', attention: 'требует внимания' }
@@ -40,12 +40,12 @@ const STATUS_CLASS: Record<SectionNavStatus, string> = { none: '', on: 'bg-succe
       :data-value="props.value"
       :data-status="props.status"
       :aria-current="active ? 'true' : undefined"
-      class="flex h-9 w-full items-center gap-1.5 rounded-xl px-4 text-left text-sm font-medium outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-      :class="active ? 'text-foreground' : 'text-foreground-secondary'"
+      class="flex w-full items-center gap-1.5 rounded-xl px-4 text-left text-sm font-medium outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+      :class="[active ? 'text-foreground' : 'text-foreground-secondary', ctx.fluid.value ? 'min-h-9 py-2 @max-section-nav:px-3' : 'h-9']"
       :style="{ transitionDuration: 'var(--duration-hover)' }"
       @click="ctx.select(props.value)"
     >
-      <span class="min-w-0 truncate">{{ props.label }}</span>
+      <span class="min-w-0" :class="ctx.fluid.value ? '' : 'truncate'">{{ props.label }}</span>
       <span v-if="props.badge" data-slot="section-nav-badge" class="inline-flex shrink-0 items-center text-foreground-secondary">
         <Icon :name="props.badge" :size="14" />
         <span v-if="props.badgeLabel" class="sr-only">{{ props.badgeLabel }}</span>
@@ -60,7 +60,7 @@ const STATUS_CLASS: Record<SectionNavStatus, string> = { none: '', on: 'bg-succe
         class="ml-auto inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-card px-1.5 text-xs font-bold text-foreground-secondary"
       >{{ props.count }}</span>
     </button>
-    <div v-if="active && $slots.default" data-slot="section-nav-anchors" class="flex flex-col pl-4">
+    <div v-if="active && $slots.default" data-slot="section-nav-anchors" class="flex flex-col pl-4" :class="ctx.fluid.value ? '@max-section-nav:pl-3' : ''">
       <slot />
     </div>
   </div>
