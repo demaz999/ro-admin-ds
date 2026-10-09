@@ -1913,7 +1913,7 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   /**
    * Режим создания — схема ни разу не опубликована (`scheme-edit-review.md`, 5.2): модель развёрнута — полоса подготовки, чип
    * «Готовность N из 5», маркеры этапов на вкладках, «Далее» внизу этапа, первая публикация с моделью. После первой публикации —
-   * чип «Проверка: N» при замечаниях и «! N» на вкладках.
+   * чип «Проверка: N» при замечаниях и число на вкладках.
    */
   const creating = computed(() => !current.value)
   /** Незаполненное витрины по черновику — этап «Витрина» после публикации. */
@@ -1935,7 +1935,7 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     if (ui.tab === 'showcase') return 'showcase'
     return ui.section === 'general' && (!ui.anchor || ui.anchor === 'main') ? 'base' : 'rules'
   })
-  /** Маркер вкладки: замок до идентификатора; «! N» — замечания с местом исправления на вкладке; в режиме создания — готово. */
+  /** Маркер вкладки: замок до идентификатора; число — замечания с местом исправления на вкладке; в режиме создания — готово. */
   function tabMark(tab: TabId): { state: 'locked' | 'blocked' | 'warning' | 'done' | '', count: number } {
     if (tabLocked(tab)) return { state: 'locked', count: 0 }
     const r = readiness.value

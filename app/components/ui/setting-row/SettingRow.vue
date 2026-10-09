@@ -64,7 +64,7 @@ onBeforeUnmount(() => clearTimeout(timer))
     <!-- Провайдер подсказок — внутри корня: безрендерный корень съел бы атрибуты страницы (`CLAUDE.md`). -->
     <TooltipProvider>
       <div data-slot="setting-row-main" class="flex min-w-0 items-start gap-2 py-2">
-        <div class="min-w-0">
+        <div class="flex min-w-0 flex-col">
           <slot :disabled="!!props.reason" />
         </div>
         <!--

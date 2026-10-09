@@ -7,7 +7,7 @@ import { readinessMarkLabel, type ReadinessMarkState } from '.'
 /**
  * Маркер состояния этапа или области — семейство «Модель готовности», такт 91. Разбор — `index.ts`.
  *
- * Пример: `<ReadinessMark state="warning" :count="2" />` — пилюля «! 2» тона предупреждения.
+ * Пример: `<ReadinessMark state="warning" :count="2" />` — пилюля с числом «2» тона предупреждения (такт 97: число без восклицательного знака).
  */
 const props = withDefaults(defineProps<{
   state: ReadinessMarkState
@@ -34,9 +34,9 @@ const spoken = computed(() => props.label ?? readinessMarkLabel(props.state, pro
     <span
       v-else
       aria-hidden="true"
-      class="inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-2xs font-bold whitespace-nowrap"
-      :class="props.state === 'blocked' ? 'bg-destructive-surface text-destructive-strong' : 'bg-warning-surface text-warning-strong'"
-    >! {{ props.count }}</span>
+      class="inline-flex h-5 shrink-0 items-center justify-center rounded-full text-2xs font-bold whitespace-nowrap"
+      :class="[props.count < 10 ? 'w-5' : 'min-w-5 px-1.5', props.state === 'blocked' ? 'bg-destructive-surface text-destructive-strong' : 'bg-warning-surface text-warning-strong']"
+    >{{ props.count }}</span>
     <span v-if="spoken" class="sr-only">{{ spoken }}</span>
   </span>
 </template>

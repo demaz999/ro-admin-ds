@@ -134,7 +134,10 @@ const hintClass = computed(() => [
       <label :class="fieldLabelVariants({ orientation: props.orientation, labelWidth: 'content' })">
         <span>{{ props.label }}<span v-if="props.required" class="text-destructive"> *</span></span>
       </label>
-      <slot name="help" />
+      <!-- Такт 97: «?» на 1 ниже — центр глифа на середине строчных подписи (15/20: середина строки на 1 выше). -->
+      <span data-slot="field-help" class="relative top-px flex shrink-0">
+        <slot name="help" />
+      </span>
     </div>
     <label
       v-else-if="props.label"

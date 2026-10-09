@@ -110,9 +110,9 @@ import type { ReadinessGroupItem, ReadinessMarkState, ReadinessStageItem } from 
  * **Такт 91 — создание схемы с мягкой этапностью** (`docs/scheme-edit-review.md`, раздел 5): модель готовности в режиме создания
  * (ни одной публикации) — полоса подготовки под шапкой (`ReadinessBar`: «Подготовка схемы: N из 5 · Далее: … →», этапы кнопками,
  * «Свернуть» — память сессии), чип «Готовность N из 5» у «Опубликовать схему» (`ReadinessChip` с `ReadinessList`: этапы, проверки,
- * «Исправить», ручная отметка «Правил»), маркеры этапов на вкладках (`ReadinessMark`: готово, «! N», замок), «Далее» внизу этапа,
+ * «Исправить», ручная отметка «Правил»), маркеры этапов на вкладках (`ReadinessMark`: готово, число замечаний, замок), «Далее» внизу этапа,
  * первая публикация — та же модель вместо сводки, блокирующее выключает «Опубликовать» с причиной в подвале. После первой
- * публикации — чип «Проверка: N» при замечаниях, «! N» на вкладках, проверки над диффом. «История версий» — после первой публикации
+ * публикации — чип «Проверка: N» при замечаниях, число замечаний на вкладках, проверки над диффом. «История версий» — после первой публикации
  * (С-1); «Удалить схему» в меню «⋯» — тоном опасного действия (К-4); «Сделать копию» — окно «Новая схема осмотра» на шаге «Основа»
  * (`SchemeCreate`, вход — `/scheme-edit/new`).
  *
@@ -1716,7 +1716,7 @@ const afterMount = (fn: () => void) => onMounted(() => { setTimeout(fn, 120) })
  */
 const R = computed(() => m.readiness.value)
 const creatingNow = computed(() => m.creating.value && !ro.value)
-/** Маркер этапа: замок; блокирующие — «! N» по всем замечаниям этапа; предупреждения — «! N»; иначе готово либо не готово. */
+/** Маркер этапа: замок; блокирующие — число по всем замечаниям этапа; предупреждения — число; иначе готово либо не готово. */
 function stageMark(st: Stage): { state: ReadinessMarkState, count: number } {
   if (st.locked) return { state: 'locked', count: 0 }
   /*
@@ -1762,10 +1762,10 @@ const chip = computed(() => {
     const prepared = r.stages.filter(st => !st.after && st.id !== 'publish').every(st => st.done)
     const state: ReadinessMarkState | '' = r.blocks ? 'blocked' : r.warns ? 'warning' : prepared ? 'ready' : ''
     const tail = [r.blocks ? `блокирует публикацию: ${r.blocks}` : 'блокирующих нет', r.warns ? `предупреждений: ${r.warns}` : ''].filter(Boolean).join(' · ')
-    return { label: `Готовность ${r.done} из ${r.total}`, state, count: r.blocks || r.warns, title: 'Готовность к публикации', summary: `${r.done} из ${r.total} этапов · ${tail}` }
+    return { label: `Готовность ${r.done} из ${r.total}`, markAfter: false, state, count: r.blocks || r.warns, title: 'Готовность к публикации', summary: `${r.done} из ${r.total} этапов · ${tail}` }
   }
   if (!issues.value) return null
-  return { label: `Проверка: ${issues.value}`, state: (r.blocks ? 'blocked' : 'warning') as ReadinessMarkState, count: issues.value, title: 'Проверка перед публикацией',
+  return { label: 'Проверка:', markAfter: true, state: (r.blocks ? 'blocked' : 'warning') as ReadinessMarkState, count: issues.value, title: 'Проверка перед публикацией',
     summary: [r.blocks ? `Блокирует публикацию: ${r.blocks}` : 'Блокирующих нет', r.warns ? `предупреждений: ${r.warns}` : ''].filter(Boolean).join(' · ') }
 })
 const readinessOpen = ref(false)
@@ -1986,6 +1986,7 @@ if (import.meta.client) {
         :label="chip.label"
         :state="chip.state"
         :count="chip.count"
+        :mark-after="chip.markAfter"
         :title="chip.title"
         :summary="chip.summary"
         data-act="readiness"
@@ -2352,7 +2353,7 @@ if (import.meta.client) {
             <!-- Звезда «Витрины» — макет `33347:6751`: глиф 12, зазор вкладки 8 (строка 13 реестра покрытия). -->
             <Icon v-if="t.id === 'showcase'" name="star" :size="12" />
             {{ t.label }}
-            <!-- Такт 91 (5.5): маркер этапа — готово (в режиме создания), «! N» — замечания с местом исправления на вкладке. -->
+            <!-- Такт 91 (5.5): маркер этапа — готово (в режиме создания), число — замечания с местом исправления на вкладке. -->
             <template v-if="!ro && m.tabMark(t.id).state" #counter>
               <ReadinessMark :state="m.tabMark(t.id).state || 'todo'" :count="m.tabMark(t.id).count" />
             </template>

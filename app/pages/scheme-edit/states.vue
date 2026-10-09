@@ -416,7 +416,7 @@ const PRICE_EXAMPLE = `<!-- композиция страницы: источн�
 </Field>`
 
 /* ------------------------------ Такт 91: модель готовности ------------------------------ */
-/** Полоса подготовки: все состояния этапа — готово, «! N» предупреждает и блокирует, не готово, замок; текущий — «Съёмка». */
+/** Полоса подготовки: все состояния этапа — готово, число предупреждает и блокирует, не готово, замок; текущий — «Съёмка». */
 const BAR_STAGES: ReadinessStageItem[] = [
   { id: 'base', label: 'Основа', state: 'done' },
   { id: 'form', label: 'Анкета', state: 'done' },
@@ -1636,7 +1636,7 @@ const sourceDemo = ref('other')
 
     <!-- ============================ Такт 91: модель готовности — карточки 15 и 16; тон удаления у SelectItem, значок у SectionNavItem ============================ -->
     <section class="flex flex-col gap-4" data-matrix="readiness-mark">
-      <Heading>ReadinessMark — маркер этапа: готово, готово к публикации, не готово, «! N» предупреждает, «! N» блокирует, замок (карточка 15; такт 92)</Heading>
+      <Heading>ReadinessMark — маркер этапа: готово, готово к публикации, не готово, число предупреждает, число блокирует, замок (карточка 15; такт 92)</Heading>
       <div class="flex flex-wrap items-center gap-8">
         <div class="flex items-center gap-2" data-case="done">
           <ReadinessMark state="done" />
@@ -1725,7 +1725,7 @@ const sourceDemo = ref('other')
         <ReadinessChip label="Готовность 4 из 5" title="Готовность к публикации" summary="4 из 5 этапов · блокирующих нет">
           <ReadinessList :groups="READY_GROUPS.slice(0, 1)" />
         </ReadinessChip>
-        <ReadinessChip label="Проверка: 2" state="warning" :count="2" title="Проверка перед публикацией" summary="Блокирующих нет · предупреждений: 2">
+        <ReadinessChip label="Проверка:" mark-after state="warning" :count="2" title="Проверка перед публикацией" summary="Блокирующих нет · предупреждений: 2">
           <ReadinessList :groups="CHECK_GROUPS" />
         </ReadinessChip>
       </div>

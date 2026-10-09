@@ -29,7 +29,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{ click: [] }>()
 
 const locked = computed(() => props.state === 'locked')
-/** Готово, готово к публикации (такт 92) и замок — маркер перед подписью, «! N» — после: так читается строка чек-листа. */
+/** Готово, готово к публикации (такт 92) и замок — маркер перед подписью, число замечаний — после: так читается строка чек-листа. */
 const before = computed(() => props.state === 'done' || props.state === 'ready' || locked.value)
 const after = computed(() => props.state === 'warning' || props.state === 'blocked')
 </script>

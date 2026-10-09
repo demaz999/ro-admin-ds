@@ -16,16 +16,18 @@ defineOptions({ inheritAttrs: false })
 
 const props = withDefaults(defineProps<{
   label: string
-  /** Маркер чипа перед подписью; пусто — маркера нет. */
+  /** Маркер чипа; пусто — маркера нет. */
   state?: ReadinessMarkState | ''
   count?: number
+  /** Такт 97: маркер стоит после подписи («Проверка: [6]»); по умолчанию — перед ней («[✓] Готовность 2 из 5»). */
+  markAfter?: boolean
   /** Заголовок поповера. */
   title: string
   /** Сводка под заголовком. */
   summary?: string
   open?: boolean
   class?: string
-}>(), { state: '', count: 0, summary: '', open: undefined })
+}>(), { state: '', count: 0, markAfter: false, summary: '', open: undefined })
 
 const emit = defineEmits<{ 'update:open': [value: boolean] }>()
 </script>
@@ -44,9 +46,11 @@ const emit = defineEmits<{ 'update:open': [value: boolean] }>()
         )"
         :style="{ transitionDuration: 'var(--duration-hover)' }"
       >
-        <ReadinessMark v-if="props.state" :state="props.state" :count="props.count" />
+        <ReadinessMark v-if="props.state && !props.markAfter" :state="props.state" :count="props.count" />
         <span data-slot="readiness-chip-label">{{ props.label }}</span>
-        <Icon name="chevron-down" :size="12" class="text-foreground-secondary transition-transform group-data-[state=open]/chip:rotate-180" />
+        <!-- Довесок 1 такта 97: счётчик ближе к подписи (4), от него до шеврона — шире (12): «Проверка: [6]   ▾». -->
+        <ReadinessMark v-if="props.state && props.markAfter" :state="props.state" :count="props.count" class="-ml-1" />
+        <Icon name="chevron-down" :size="12" :class="cn('text-foreground-secondary transition-transform group-data-[state=open]/chip:rotate-180', props.state && props.markAfter ? 'ml-1' : '')" />
       </button>
     </PopoverTrigger>
     <!-- Узкий экран (такт 92): поповер во всю ширину окна — `narrow="full"` у `PopoverContent`. -->
