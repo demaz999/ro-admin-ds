@@ -1,0 +1,921 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Широкий экран v4</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Доска решений: рабочая поверхность. Шапка → карта флоу → разделы (что нужно узлу → карточки → сборка → решение по разделу) → док снизу. */
+:root{
+  --bg:#f1f2f4; --surface:#fff; --sunken:#e9ebef; --line:#dcdfe5;
+  --ink:#15171c; --ink2:#4a505b; --ink3:#7a818d; --accent:#2c56c9;
+  --take:#1d7348; --take-bg:#e1f2e8; --adapt:#8f5b00; --adapt-bg:#f9edd6;
+  --skip:#6f7580; --skip-bg:#e6e8ec; --fix:#b0212b; --fix-bg:#fae3e4;
+  --hatch:rgba(21,23,28,.08); --shadow:0 1px 2px rgba(21,23,28,.06);
+  --f-ui:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --r:12px; --r-s:8px; --gut:clamp(16px,3vw,32px);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#111317; --surface:#1a1d23; --sunken:#22262d; --line:#2f343d;
+  --ink:#eceef2; --ink2:#b3b9c4; --ink3:#868d99; --accent:#86a6ff;
+  --take:#62d29c; --take-bg:#173326; --adapt:#efb652; --adapt-bg:#382a10;
+  --skip:#a0a6b0; --skip-bg:#262a31; --fix:#ff8b91; --fix-bg:#3b1c1f;
+  --hatch:rgba(255,255,255,.06); --shadow:none; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#111317; --surface:#1a1d23; --sunken:#22262d; --line:#2f343d;
+  --ink:#eceef2; --ink2:#b3b9c4; --ink3:#868d99; --accent:#86a6ff;
+  --take:#62d29c; --take-bg:#173326; --adapt:#efb652; --adapt-bg:#382a10;
+  --skip:#a0a6b0; --skip-bg:#262a31; --fix:#ff8b91; --fix-bg:#3b1c1f;
+  --hatch:rgba(255,255,255,.06); --shadow:none; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font:400 14px/1.5 var(--f-ui);margin:0}
+.wrap{max-width:1240px;margin:0 auto;padding-inline:var(--gut);padding-block:28px 140px;display:flex;flex-direction:column;gap:28px}
+a{color:inherit;text-decoration-color:var(--line);text-underline-offset:3px}
+a:hover{text-decoration-color:currentColor}
+button,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mono{font-family:var(--f-mono);font-size:12px;letter-spacing:0}
+.eyebrow{font:500 12px/1.3 var(--f-mono);color:var(--ink3);text-transform:uppercase;letter-spacing:.06em}
+h1{font:600 28px/1.15 var(--f-ui);margin:0;text-wrap:balance;letter-spacing:-.01em}
+h2{font:600 20px/1.2 var(--f-ui);margin:0;text-wrap:balance}
+h3{font:600 14px/1.3 var(--f-ui);margin:0}
+p{margin:0}
+.lead{font-size:16px;color:var(--ink2);max-width:72ch}
+.muted{color:var(--ink2)} .faint{color:var(--ink3)}
+/* шапка */
+.head{display:flex;flex-direction:column;gap:12px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:var(--surface);border:1px solid var(--line);font-size:13px;color:var(--ink2)}
+.chip b{font-weight:500;color:var(--ink)}
+.chip.scope{background:transparent;border-style:dashed}
+.howto{font-size:13px;color:var(--ink3);max-width:90ch}
+.caveat{border:1px dashed var(--line);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:4px;max-width:90ch}
+.caveat ul{margin:0;padding-left:18px;color:var(--ink2)}
+/* карта флоу */
+.flow{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.node{border:1px solid var(--ink);border-radius:var(--r-s);padding:6px 10px;font-size:13px;max-width:28ch}
+.node.sub{border-color:transparent;background:var(--sunken);color:var(--ink2)}
+.arr{color:var(--ink3)}
+/* раздел */
+.sec{display:flex;flex-direction:column;gap:16px;scroll-margin-top:16px}
+.sec-h{display:flex;flex-direction:column;gap:6px}
+.need{display:flex;flex-direction:column;gap:6px}
+.need ul,.synth ul,.diff ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:2px}
+.grid{display:grid;gap:12px;align-items:start}
+.grid.refs{grid-template-columns:repeat(auto-fill,minmax(min(100%,232px),1fr))}
+.grid.phones{grid-template-columns:repeat(auto-fill,minmax(min(100%,250px),1fr))}
+.grid.wide{grid-template-columns:repeat(auto-fit,minmax(min(100%,480px),1fr))}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.card.span{grid-column:1/-1}
+.card.picked{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.card-b{padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.card-t{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px}
+.card-t .mono{color:var(--ink3)}
+.state{font:500 11px/1.2 var(--f-mono);padding:2px 6px;border-radius:4px;background:var(--sunken);color:var(--ink2)}
+.txt{font-size:13px;color:var(--ink2)}
+.txt b{color:var(--ink);font-weight:500}
+.shot{margin:0;aspect-ratio:4/3;max-width:100%;background:var(--sunken);display:flex;align-items:center;justify-content:center;cursor:zoom-in;border-bottom:1px solid var(--line)}
+.shot img{width:100%;height:100%;object-fit:contain;display:block}
+.shot.ph{cursor:default}
+/* вердикты */
+.seg{display:flex;flex-wrap:wrap;gap:4px}
+.opt{border:1px solid var(--line);background:transparent;border-radius:999px;padding:3px 10px;font-size:13px;cursor:pointer;color:var(--ink2);line-height:1.4}
+.opt:hover{border-color:var(--ink3)}
+.opt.sug{border-style:dashed;border-color:var(--ink3);color:var(--ink)}
+.opt[aria-pressed="true"]{border-style:solid;font-weight:500}
+.opt[data-v="take"][aria-pressed="true"],.opt[data-v="keep"][aria-pressed="true"],.opt[data-v="accept"][aria-pressed="true"]{background:var(--take-bg);border-color:var(--take);color:var(--take)}
+.opt[data-v="adapt"][aria-pressed="true"],.opt[data-v="fix"][aria-pressed="true"]{background:var(--adapt-bg);border-color:var(--adapt);color:var(--adapt)}
+.opt[data-v="skip"][aria-pressed="true"]{background:var(--skip-bg);border-color:var(--skip);color:var(--skip)}
+.opt[data-v="drop"][aria-pressed="true"],.opt[data-v="return"][aria-pressed="true"]{background:var(--fix-bg);border-color:var(--fix);color:var(--fix)}
+.opt.auto[aria-pressed="true"]{border-style:dashed;font-weight:400}
+.pick{align-self:flex-start;border:1px solid var(--ink);background:transparent;border-radius:999px;padding:5px 14px;cursor:pointer;font-weight:500}
+.picked .pick{background:var(--ink);color:var(--surface)}
+.note-t{align-self:flex-start;border:0;background:none;padding:0;font-size:12px;color:var(--ink3);cursor:pointer;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+textarea{width:100%;min-height:56px;resize:vertical;border:1px solid var(--line);border-radius:var(--r-s);background:var(--bg);padding:8px 10px;font-size:13px;line-height:1.45}
+textarea::placeholder{color:var(--ink3)}
+.pm{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pm div{background:var(--sunken);border-radius:var(--r-s);padding:8px 10px}
+.pm .faint{font-size:12px;display:block}
+/* сборка и решение по разделу */
+.synth{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.synth ul{color:var(--ink2)}
+.verdict{display:flex;gap:10px;align-items:flex-start}
+.verdict .btns{display:flex;gap:6px;flex-shrink:0}
+.ok{width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--surface);cursor:pointer;font-size:18px;line-height:1;display:grid;place-items:center;color:var(--ink2)}
+.ok:hover{border-color:var(--ink3)}
+.ok[data-ok="1"][aria-pressed="true"]{background:var(--take-bg);border-color:var(--take);color:var(--take)}
+.ok[data-ok="0"][aria-pressed="true"]{background:var(--fix-bg);border-color:var(--fix);color:var(--fix)}
+.verdict textarea{min-height:44px}
+/* вайрфреймы */
+.frame{background:var(--sunken);border-bottom:1px solid var(--line);padding:14px;display:flex;justify-content:center}
+.phone{width:100%;max-width:250px;aspect-ratio:9/18.5;background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:14px 12px;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+.web{width:100%;min-height:300px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-s);display:grid;grid-template-columns:1fr;overflow:hidden}
+.web.has-side{grid-template-columns:minmax(90px,150px) 1fr}
+.web.has-aside{grid-template-columns:1fr minmax(120px,210px)}
+.web.has-side.has-aside{grid-template-columns:minmax(90px,150px) 1fr minmax(120px,210px)}
+.col{padding:10px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.col.side{background:var(--sunken)} .col.aside{border-left:1px solid var(--line)}
+.w-h{font-weight:600;font-size:14px;line-height:1.25}
+.w-p{font-size:12px;color:var(--ink2);line-height:1.4}
+.w-btn{border-radius:999px;border:1px solid var(--ink);padding:6px 10px;font-size:12px;font-weight:500;text-align:center}
+.w-btn.primary{background:var(--ink);color:var(--surface)}
+.w-btn.ghost{border-color:var(--line);color:var(--ink3)}
+.w-ph{border-radius:var(--r-s);background:repeating-linear-gradient(135deg,var(--hatch) 0 8px,transparent 8px 16px),var(--sunken);display:flex;align-items:center;justify-content:center;padding:8px;min-height:48px}
+.w-ph span{background:var(--surface);border-radius:6px;padding:3px 8px;font-size:11px;color:var(--ink2);text-align:center}
+.w-seg,.w-tabs{display:flex;border:1px solid var(--line);border-radius:var(--r-s);overflow:hidden}
+.w-seg span,.w-tabs span{flex:1;text-align:center;font-size:11px;padding:5px 4px;color:var(--ink2)}
+.w-seg span.on{background:var(--ink);color:var(--surface)}
+.w-tabs{border-width:0 0 1px;border-radius:0} .w-tabs span{flex:0 0 auto;padding:5px 8px}
+.w-tabs span.on{color:var(--ink);box-shadow:inset 0 -2px 0 var(--ink)}
+.w-chips{display:flex;flex-wrap:wrap;gap:4px}
+.w-chips span{font-size:11px;padding:3px 8px;border-radius:999px;background:var(--sunken);color:var(--ink2)}
+.w-chips span.on{background:var(--ink);color:var(--surface)}
+.w-kv{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:var(--r-s);overflow:hidden}
+.w-kv div{display:flex;justify-content:space-between;gap:8px;padding:5px 8px;font-size:11px}
+.w-kv div+div{border-top:1px solid var(--line)} .w-kv span:last-child{color:var(--ink3);text-align:right}
+.w-field{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--ink3)}
+.w-field div{border:1px solid var(--line);border-radius:6px;padding:5px 8px;color:var(--ink2)}
+.w-list{margin:0;padding-left:16px;font-size:12px;color:var(--ink2)}
+.w-table{overflow-x:auto} .w-table table{border-collapse:collapse;width:100%;font-size:11px}
+.w-table th{text-align:left;font-weight:500;color:var(--ink3);border-bottom:1px solid var(--line);padding:4px 6px}
+.w-table td{padding:4px 6px;border-bottom:1px solid var(--line);color:var(--ink2)}
+.w-row{display:grid;gap:8px} .w-row>div{display:flex;flex-direction:column;gap:8px;min-width:0}
+.w-nav{display:flex;flex-direction:column;gap:2px} .w-nav span{font-size:12px;padding:4px 6px;border-radius:6px;color:var(--ink2)}
+.w-nav span.on{background:var(--surface);color:var(--ink);font-weight:500}
+.w-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.w-bar b{font-size:13px;font-weight:600} .w-bar .w-chips span{background:transparent;border:1px solid var(--line)}
+.w-note{font-size:11px;line-height:1.4;padding:6px 8px;border-radius:6px;background:var(--adapt-bg);color:var(--adapt)}
+.w-hr{height:1px;background:var(--line)}
+.w-img{width:100%;border-radius:6px;display:block}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border-bottom:1px solid var(--line)}
+.pair figure{margin:0;background:var(--sunken);display:flex;flex-direction:column}
+.pair figcaption{padding:6px 10px}
+.pair .shot{border:0}
+/* док */
+.dock{position:fixed;left:0;right:0;bottom:0;z-index:5;background:var(--surface);border-top:1px solid var(--line);padding:10px var(--gut) calc(10px + env(safe-area-inset-bottom,0px))}
+.dock-in{max-width:1240px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
+.dock-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.dock-info{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1 1 320px}
+.dock-info .faint{font-size:12px}
+.cta{background:var(--ink);color:var(--surface);border:0;border-radius:999px;padding:10px 18px;font-weight:500;cursor:pointer;flex-shrink:0}
+.export{display:flex;flex-direction:column;gap:6px}
+.export textarea{min-height:140px;max-height:40vh;font:12px/1.5 var(--f-mono)}
+.lb{position:fixed;inset:0;z-index:10;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;padding:24px;cursor:zoom-out}
+.lb img{max-width:100%;max-height:100%;border-radius:8px}
+@media (max-width:560px){h1{font-size:23px}.pm{grid-template-columns:1fr}.web.has-side,.web.has-aside,.web.has-side.has-aside{grid-template-columns:1fr}.col.aside{border-left:0;border-top:1px solid var(--line)}}
+@media (prefers-reduced-motion:no-preference){.opt,.ok,.card{transition:background-color .12s,border-color .12s,box-shadow .12s}}
+</style>
+</head>
+<body>
+<main class="wrap" id="app" aria-live="off"></main>
+<div class="dock" id="dock"></div>
+<div class="lb" id="lb" hidden><img alt=""></div>
+
+<script type="application/json" id="board">
+{
+ "id": "scheme-edit-wide-v4",
+ "stage": "Приёмка",
+ "task": "scheme-edit",
+ "title": "«Настройки» на большом экране — итерация 4: колонка по центру или от левого края, сайд слотом",
+ "lead": "Твои мысли 2026-10-09 на доске: 1) основная колонка по центру с навигатором справа — или навигатор слева, фиксирующий левый край; 2) сайд фиксированной ширины встаёт слотом справа, когда место есть, а когда нет — слоем поверх, не блокируя страницу. Вайрфреймы, кода нет. Твои комментарии к v3 — отдельно, эта доска их не заменяет.",
+ "scope": "Раскладка колонки и навигатора, поведение сайда; сводка раздела и общий слот трёх страниц — v3",
+ "sources": [
+  {
+   "label": "Твои мысли",
+   "note": "сообщение 2026-10-09: центр / навигатор слева; сайд слотом или немодальным слоем"
+  },
+  {
+   "label": "Встреча 2026-08-20",
+   "note": "п. 2 — блоки на месте; п. 3–4 — навигация справа островками"
+  },
+  {
+   "label": "Замер",
+   "note": "меню 256, колонка 846, навигатор 266, поля 16, зазор 24 — вместе около 1424; сайд сейчас 642"
+  },
+  {
+   "label": "Итерация 3",
+   "note": "scheme-edit-wide-v3"
+  }
+ ],
+ "caveat": {
+  "title": "Что я не знаю и прошу проверить",
+  "items": [
+   "Порог слота: сайд 642 встаёт рядом с раскладкой только от окна около 2080 (1424 + 16 + 642). На 1920 он будет слоем поверх. Сайд 480 встаёт слотом от окна около 1920 — но тогда каталог и вставка (сейчас 642, сетка в две колонки) перестраиваются в одну колонку.",
+   "У центрированной колонки (L1) при появлении сайда-слота свободная ширина меняется: либо группа «колонка + навигатор» переезжает к центру оставшейся ширины (сдвиг, против п. 2 встречи), либо стоит на месте и сайд ложится в правое поле — тогда слот возможен, только пока правого поля хватает.",
+   "Навигатор слева (L2) расходится с макетом (навигатор справа) и с п. 3–4 встречи (навигация справа как общий паттерн трёх страниц).",
+   "Немодальный слой: страница под ним работает (клики, прокрутка, поиск); закрытие — крестиком и Esc; фокус не заперт. Сейчас сайды модальные: страница под ними выключена."
+  ]
+ },
+ "principles": [
+  "блоки не двигаются (п. 2)",
+  "сайд не блокирует страницу",
+  "фиксированная ширина сайда"
+ ],
+ "sections": [
+  {
+   "id": "now",
+   "tag": "Для сравнения",
+   "title": "Как сейчас",
+   "purpose": "Отмечать не обязательно.",
+   "cards": [
+    {
+     "id": "wide-1920",
+     "kind": "screen",
+     "title": "Как сейчас · 1920",
+     "state": "снимок до такта 97",
+     "frame": "web",
+     "img": "img/wide-1920.jpg",
+     "caption": "Колонка и навигатор от левого края, справа 481 пусто; сайд — модальный слой поверх."
+    }
+   ]
+  },
+  {
+   "id": "layout",
+   "tag": "Твоя мысль 1",
+   "title": "Где стоит основная колонка",
+   "purpose": "Выбери раскладку на окне шире 1440.",
+   "decide": "pick",
+   "synthTitle": "Почему предлагаю L1 со сдвигом только при слоте",
+   "synth": [
+    "L1 держит макет и встречу: навигатор справа (п. 3–4); пустота делится поровну, дыры с одной стороны нет.",
+    "Сдвиг колонки при слоте случается одно мгновение и только когда сайд открылся рядом — блоки внутри колонки не перестраиваются (п. 2 про них).",
+    "L2 даёт «ничего не двигается никогда», но ставит навигатор вплотную к меню — две вертикальные навигации подряд, и против макета.",
+    "Цена: L1 — 0.3 такта, L2 — 0.5."
+   ],
+   "cards": [
+    {
+     "id": "l1",
+     "kind": "variant",
+     "title": "L1 · по центру: колонка, навигатор справа",
+     "frame": "web",
+     "wf": {
+      "main": [
+       {
+        "row": [
+         [
+          {
+           "ph": "поле",
+           "h": 200
+          }
+         ],
+         [
+          {
+           "ph": "колонка 846",
+           "h": 200
+          }
+         ],
+         [
+          {
+           "nav": [
+            "Общие",
+            "Мобильное",
+            "Веб",
+            "Права",
+            "ИИ",
+            "Аномалии",
+            "PDF"
+           ],
+           "on": 0
+          }
+         ],
+         [
+          {
+           "ph": "поле",
+           "h": 200
+          }
+         ]
+        ],
+        "w": [
+         1,
+         3.2,
+         1,
+         1
+        ]
+       }
+      ]
+     },
+     "caption": "Группа «колонка + навигатор» по центру рабочей зоны; поля слева и справа равные.",
+     "plus": "По макету и встрече; на любом широком окне ровно.",
+     "minus": "Левый край колонки зависит от ширины окна; при сайде-слоте группа переезжает.",
+     "suggest": true
+    },
+    {
+     "id": "l2",
+     "kind": "variant",
+     "title": "L2 · навигатор слева, левый край фиксирован",
+     "frame": "web",
+     "wf": {
+      "main": [
+       {
+        "row": [
+         [
+          {
+           "nav": [
+            "Общие",
+            "Мобильное",
+            "Веб",
+            "Права",
+            "ИИ",
+            "Аномалии",
+            "PDF"
+           ],
+           "on": 0
+          }
+         ],
+         [
+          {
+           "ph": "колонка 846",
+           "h": 200
+          }
+         ],
+         [
+          {
+           "ph": "свободно — место под сайд",
+           "h": 200
+          }
+         ]
+        ],
+        "w": [
+         1,
+         3.2,
+         2
+        ]
+       }
+      ]
+     },
+     "caption": "Навигатор у левого края рабочей зоны, колонка за ним; справа свободно.",
+     "plus": "Левый край не двигается никогда; свободное место справа — готовый слот сайда.",
+     "minus": "Против макета и п. 3–4 встречи; меню и навигатор подряд."
+    }
+   ]
+  },
+  {
+   "id": "side",
+   "tag": "Твоя мысль 2",
+   "title": "Как открывается сайд",
+   "purpose": "Сайд поля, шага, группы, каталога.",
+   "decide": "pick",
+   "synthTitle": "Почему предлагаю S1",
+   "synth": [
+    "S1 — твоя мысль целиком: слотом, когда помещается, слоем, когда нет; в обоих случаях страница работает.",
+    "Ширина 642 сохраняет каталог и вставку в две колонки; слот начинается с окна около 2080, на 1920 — немодальный слой.",
+    "S3 даёт слот уже на 1920, но перестраивает каталог и вставку.",
+    "Цена: S1 — около 1.5 такта (размещение слотом и немодальный слой у переданного ModalCard — добавлением); S3 — около 2."
+   ],
+   "cards": [
+    {
+     "id": "s1",
+     "kind": "variant",
+     "title": "S1 · слот 642 справа, иначе немодальный слой",
+     "frame": "web",
+     "wf": {
+      "main": [
+       {
+        "row": [
+         [
+          {
+           "ph": "колонка и навигатор",
+           "h": 200
+          }
+         ],
+         [
+          {
+           "bar": "Поле — VIN",
+           "actions": [
+            "Сохранить"
+           ]
+          },
+          {
+           "field": "Алиас",
+           "value": "vin"
+          },
+          {
+           "field": "Подсказка",
+           "value": "…"
+          }
+         ]
+        ],
+        "w": [
+         3,
+         2
+        ]
+       },
+       {
+        "note": "Окно от ~2080 — слот рядом; уже — тот же сайд слоем поверх, страница под ним кликается и прокручивается."
+       }
+      ]
+     },
+     "plus": "Работать с сайдом и страницей одновременно; каталог без перестройки.",
+     "minus": "На 1920 — почти всегда слой.",
+     "suggest": true
+    },
+    {
+     "id": "s3",
+     "kind": "variant",
+     "title": "S3 · слот 480 справа, иначе немодальный слой",
+     "frame": "web",
+     "wf": {
+      "main": [
+       {
+        "row": [
+         [
+          {
+           "ph": "колонка и навигатор",
+           "h": 200
+          }
+         ],
+         [
+          {
+           "bar": "Поле — VIN",
+           "actions": [
+            "Сохранить"
+           ]
+          },
+          {
+           "field": "Алиас",
+           "value": "vin"
+          },
+          {
+           "field": "Подсказка",
+           "value": "…"
+          }
+         ]
+        ],
+        "w": [
+         3.5,
+         1.6
+        ]
+       },
+       {
+        "note": "Окно от ~1920 — слот рядом."
+       }
+      ]
+     },
+     "plus": "Слот уже на 1920.",
+     "minus": "Каталог и вставка из другой схемы — в одну колонку; около 2 тактов."
+    },
+    {
+     "id": "s2",
+     "kind": "variant",
+     "title": "S2 · как сейчас: модальный слой",
+     "frame": "web",
+     "wf": {
+      "main": [
+       {
+        "row": [
+         [
+          {
+           "ph": "страница выключена",
+           "h": 200
+          }
+         ],
+         [
+          {
+           "bar": "Поле — VIN",
+           "actions": [
+            "Сохранить"
+           ]
+          },
+          {
+           "field": "Алиас",
+           "value": "vin"
+          },
+          {
+           "field": "Подсказка",
+           "value": "…"
+          }
+         ]
+        ],
+        "w": [
+         3,
+         2
+        ]
+       }
+      ]
+     },
+     "plus": "Без правки.",
+     "minus": "Страница под сайдом не работает."
+    }
+   ]
+  },
+  {
+   "id": "combo",
+   "tag": "Сочетания",
+   "title": "Как это выглядит вместе",
+   "purpose": "Проверь, что видишь то, что хотел.",
+   "cards": [
+    {
+     "id": "c-l1-slot",
+     "kind": "screen",
+     "title": "L1 + S1 · окно 2560, сайд слотом",
+     "frame": "web",
+     "wf": {
+      "main": [
+       {
+        "row": [
+         [
+          {
+           "ph": "поле",
+           "h": 160
+          }
+         ],
+         [
+          {
+           "ph": "колонка 846",
+           "h": 160
+          }
+         ],
+         [
+          {
+           "nav": [
+            "Общие",
+            "Мобильное",
+            "Веб",
+            "Права",
+            "ИИ",
+            "Аномалии",
+            "PDF"
+           ],
+           "on": 0
+          }
+         ],
+         [
+          {
+           "bar": "Поле — VIN",
+           "actions": [
+            "Сохранить"
+           ]
+          },
+          {
+           "field": "Алиас",
+           "value": "vin"
+          },
+          {
+           "field": "Подсказка",
+           "value": "…"
+          }
+         ]
+        ],
+        "w": [
+         0.6,
+         3.2,
+         1,
+         2.4
+        ]
+       }
+      ]
+     },
+     "caption": "Группа переехала к центру оставшейся ширины."
+    },
+    {
+     "id": "c-l2-slot",
+     "kind": "screen",
+     "title": "L2 + S1 · окно 2560, сайд слотом",
+     "frame": "web",
+     "wf": {
+      "main": [
+       {
+        "row": [
+         [
+          {
+           "nav": [
+            "Общие",
+            "Мобильное",
+            "Веб",
+            "Права",
+            "ИИ",
+            "Аномалии",
+            "PDF"
+           ],
+           "on": 0
+          }
+         ],
+         [
+          {
+           "ph": "колонка 846",
+           "h": 160
+          }
+         ],
+         [
+          {
+           "ph": "поле",
+           "h": 160
+          }
+         ],
+         [
+          {
+           "bar": "Поле — VIN",
+           "actions": [
+            "Сохранить"
+           ]
+          },
+          {
+           "field": "Алиас",
+           "value": "vin"
+          },
+          {
+           "field": "Подсказка",
+           "value": "…"
+          }
+         ]
+        ],
+        "w": [
+         1,
+         3.2,
+         0.6,
+         2.4
+        ]
+       }
+      ]
+     },
+     "caption": "Колонка и навигатор на месте, сайд занял свободное."
+    },
+    {
+     "id": "c-overlay",
+     "kind": "screen",
+     "title": "Любая раскладка + S1 · окно 1920, слой",
+     "frame": "web",
+     "wf": {
+      "main": [
+       {
+        "row": [
+         [
+          {
+           "ph": "страница работает под слоем",
+           "h": 160
+          }
+         ],
+         [
+          {
+           "bar": "Поле — VIN",
+           "actions": [
+            "Сохранить"
+           ]
+          },
+          {
+           "field": "Алиас",
+           "value": "vin"
+          },
+          {
+           "field": "Подсказка",
+           "value": "…"
+          }
+         ]
+        ],
+        "w": [
+         3,
+         2
+        ]
+       }
+      ]
+     },
+     "caption": "Немодальный слой: клики и прокрутка страницы не заперты."
+    }
+   ]
+  }
+ ]
+}
+</script>
+
+<script>
+(() => {
+  const B = JSON.parse(document.getElementById('board').textContent);
+  const KIND = {
+    ref:    {opts: [['take','берём'],['adapt','адаптируем'],['skip','мимо']], note: ['adapt','skip']},
+    screen: {opts: [['keep','оставить'],['fix','поправить'],['drop','убрать']], note: ['fix','drop']},
+    pair:   {opts: [['accept','принять'],['return','вернуть']], note: ['return']}
+  };
+  const LABEL = Object.fromEntries(Object.values(KIND).flatMap(k => k.opts));
+  let S = {sections: {}, cards: {}, pick: {}};
+  const app = document.getElementById('app'), dock = document.getElementById('dock'), lb = document.getElementById('lb');
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const fmt = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  const safeHref = h => /^https?:\/\//i.test(h || '') ? esc(h) : '';
+  const imgSrc = s => /^(https?:|data:image\/|img\/|\.\/|[\w-]+\/)/i.test(s || '') ? esc(s) : '';
+  const cardById = {}, secOf = {};
+  B.sections.forEach(s => (s.cards || []).forEach(c => { cardById[c.id] = c; secOf[c.id] = s; }));
+
+  /* ---------- вайрфреймы: маленький язык блоков ---------- */
+  function wf(blocks) { return (blocks || []).map(blk).join(''); }
+  function blk(b) {
+    if (b.bar !== undefined) return `<div class="w-bar"><b>${esc(b.bar)}</b>${b.actions ? `<div class="w-chips">${b.actions.map(a => `<span>${esc(a)}</span>`).join('')}</div>` : ''}</div>`;
+    if (b.h !== undefined && b.ph === undefined) return `<div class="w-h">${esc(b.h)}</div>`;
+    if (b.p !== undefined) return `<div class="w-p">${fmt(b.p)}</div>`;
+    if (b.btn !== undefined) return `<div class="w-btn${b.primary ? ' primary' : ''}${b.ghost ? ' ghost' : ''}">${esc(b.btn)}</div>`;
+    if (b.ph !== undefined) return `<div class="w-ph" style="min-height:${Math.max(40, +b.h || 80)}px"><span>${esc(b.ph)}</span></div>`;
+    if (b.seg) return `<div class="w-seg">${b.seg.map((x, i) => `<span class="${i === b.on ? 'on' : ''}">${esc(x)}</span>`).join('')}</div>`;
+    if (b.tabs) return `<div class="w-tabs">${b.tabs.map((x, i) => `<span class="${i === b.on ? 'on' : ''}">${esc(x)}</span>`).join('')}</div>`;
+    if (b.chips) return `<div class="w-chips">${b.chips.map((x, i) => `<span class="${i === b.on ? 'on' : ''}">${esc(x)}</span>`).join('')}</div>`;
+    if (b.kv) return `<div class="w-kv">${b.kv.map(([k, v]) => `<div><span>${esc(k)}</span><span>${esc(v)}</span></div>`).join('')}</div>`;
+    if (b.field !== undefined) return `<div class="w-field">${esc(b.field)}<div>${esc(b.value || ' ')}</div></div>`;
+    if (b.list) return `<ul class="w-list">${b.list.map(x => `<li>${fmt(x)}</li>`).join('')}</ul>`;
+    if (b.table) return `<div class="w-table"><table><thead><tr>${b.table.cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${b.table.rows.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+    if (b.row) { const w = b.w || b.row.map(() => 1); return `<div class="w-row" style="grid-template-columns:${w.map(x => `minmax(0,${+x || 1}fr)`).join(' ')}">${b.row.map(c => `<div>${wf(c)}</div>`).join('')}</div>`; }
+    if (b.nav) return `<div class="w-nav">${b.nav.map((x, i) => `<span class="${i === b.on ? 'on' : ''}">${esc(x)}</span>`).join('')}</div>`;
+    if (b.note !== undefined) return `<div class="w-note">${fmt(b.note)}</div>`;
+    if (b.img !== undefined) return imgSrc(b.img) ? `<img class="w-img" src="${imgSrc(b.img)}" alt="${esc(b.alt || '')}">` : '';
+    if (b.hr) return `<div class="w-hr"></div>`;
+    return '';
+  }
+  function frame(c) {
+    if (c.img) return shot(c.img, c.title);
+    if (!c.wf) return '';
+    if (c.frame === 'web') {
+      const w = Array.isArray(c.wf) ? {main: c.wf} : c.wf;
+      const cls = `web${w.side ? ' has-side' : ''}${w.aside ? ' has-aside' : ''}`;
+      return `<div class="frame"><div class="${cls}">${w.side ? `<div class="col side">${wf(w.side)}</div>` : ''}<div class="col">${wf(w.main)}</div>${w.aside ? `<div class="col aside">${wf(w.aside)}</div>` : ''}</div></div>`;
+    }
+    return `<div class="frame"><div class="phone">${wf(Array.isArray(c.wf) ? c.wf : c.wf.main)}</div></div>`;
+  }
+  function shot(src, alt) {
+    const s = imgSrc(src);
+    return s ? `<figure class="shot" data-zoom="${s}"><img src="${s}" alt="${esc(alt || '')}"></figure>`
+             : `<figure class="shot ph"><div class="w-ph" style="width:100%;height:100%"><span>${esc(src || 'нет картинки')}</span></div></figure>`;
+  }
+
+  /* ---------- разметка доски ---------- */
+  function seg(c) {
+    return `<div class="seg" role="group" aria-label="Решение по карточке">${KIND[c.kind].opts.map(([v, l]) =>
+      `<button type="button" class="opt${c.suggest === v ? ' sug' : ''}" data-card="${esc(c.id)}" data-v="${v}" aria-pressed="false">${l}</button>`).join('')}</div>`;
+  }
+  function noteUI(c) {
+    return `<button type="button" class="note-t" data-note-t="${esc(c.id)}">Заметка</button><textarea id="n-${esc(c.id)}" data-note="${esc(c.id)}" placeholder="Что именно взять или поправить" hidden></textarea>`;
+  }
+  function fromLine(c) {
+    if (!c.from || !c.from.length) return '';
+    const names = c.from.map(id => cardById[id] ? cardById[id].title.split(' · ')[0] : id);
+    return `<p class="txt faint">Из рефов: ${esc(names.join(', '))}</p>`;
+  }
+  function card(c, s) {
+    const head = `<div class="card-t">${c.code ? `<span class="mono">${esc(c.code)}</span>` : ''}<h3>${c.href && safeHref(c.href) ? `<a href="${safeHref(c.href)}" target="_blank" rel="noopener">${esc(c.title)}</a>` : esc(c.title)}</h3>${c.state ? `<span class="state">${esc(c.state)}</span>` : ''}</div>`;
+    const spec = c.spec ? `<p class="txt faint mono">${esc(c.spec)}</p>` : '';
+    if (c.kind === 'ref') return `<article class="card" data-id="${esc(c.id)}">${shot(c.img, c.title)}<div class="card-b">${head}${seg(c)}
+      ${c.take ? `<p class="txt"><b>Берём:</b> ${fmt(c.take)}</p>` : ''}${c.skip ? `<p class="txt"><b>Не переносим:</b> ${fmt(c.skip)}</p>` : ''}${noteUI(c)}</div></article>`;
+    if (c.kind === 'pair') return `<article class="card" data-id="${esc(c.id)}"><div class="pair">
+      <figure><figcaption class="eyebrow">Было</figcaption>${shot(c.before, 'Было')}</figure>
+      <figure><figcaption class="eyebrow">Стало</figcaption>${shot(c.after, 'Стало')}</figure></div>
+      <div class="card-b">${head}${spec}${c.diff ? `<div class="diff txt"><b>Что изменилось</b><ul>${c.diff.map(d => `<li>${fmt(d)}</li>`).join('')}</ul></div>` : ''}${seg(c)}${noteUI(c)}</div></article>`;
+    const pm = (c.plus || c.minus) ? `<div class="pm">${c.plus ? `<div class="txt"><span class="faint">Сильная сторона</span>${fmt(c.plus)}</div>` : ''}${c.minus ? `<div class="txt"><span class="faint">Цена</span>${fmt(c.minus)}</div>` : ''}</div>` : '';
+    const body = `${head}${spec}${c.caption ? `<p class="txt">${fmt(c.caption)}</p>` : ''}${pm}${fromLine(c)}`;
+    if (c.kind === 'variant') return `<article class="card" data-id="${esc(c.id)}">${frame(c)}<div class="card-b">${body}
+      <button type="button" class="pick" data-pick="${esc(c.id)}" data-sec="${esc(s.id)}" aria-pressed="false">${c.suggest ? 'Выбрать · предлагаю' : 'Выбрать'}</button>${noteUI(c)}</div></article>`;
+    return `<article class="card" data-id="${esc(c.id)}">${frame(c)}<div class="card-b">${body}${seg(c)}${noteUI(c)}</div></article>`;
+  }
+  const isWide = c => c.kind === 'pair' || c.frame === 'web';
+  function gridClass(s) {
+    const cs = s.cards || [];
+    if (cs.length && cs.every(isWide)) return 'wide';
+    if (cs.some(c => c.kind === 'screen' || c.kind === 'variant')) return 'phones';
+    return 'refs';
+  }
+  function section(s) {
+    return `<section class="sec" id="s-${esc(s.id)}">
+      <div class="sec-h">${s.tag ? `<span class="eyebrow">${esc(s.tag)}</span>` : ''}<h2>${esc(s.title)}</h2>${s.purpose ? `<p class="muted">${fmt(s.purpose)}</p>` : ''}</div>
+      ${s.need && s.need.length ? `<div class="need"><h3>Что нужно узлу</h3><ul class="muted">${s.need.map(n => `<li>${fmt(n)}</li>`).join('')}</ul></div>` : ''}
+      ${(s.cards || []).length ? `<div class="grid ${gridClass(s)}">${s.cards.map(c => card(c, s).replace('<article class="card"', `<article class="card${gridClass(s) !== 'wide' && isWide(c) ? ' span' : ''}"`)).join('')}</div>` : ''}
+      ${s.synth && s.synth.length ? `<div class="synth"><h3>${esc(s.synthTitle || 'Как собираю из кусков')}</h3><ul>${s.synth.map(x => `<li>${fmt(x)}</li>`).join('')}</ul></div>` : ''}
+      <div class="verdict">
+        <div class="btns"><button type="button" class="ok" data-sec="${esc(s.id)}" data-ok="1" aria-pressed="false" title="Принять раздел" aria-label="Принять раздел">✓</button><button type="button" class="ok" data-sec="${esc(s.id)}" data-ok="0" aria-pressed="false" title="Не то" aria-label="Не то">✕</button></div>
+        <textarea id="f-${esc(s.id)}" data-fix="${esc(s.id)}" placeholder="Что поправить в разделе «${esc(s.title)}»"></textarea>
+      </div></section>`;
+  }
+  function render() {
+    const src = (B.sources || []).map(x => { const h = safeHref(x.href); const inner = `<b>${esc(x.label)}</b>${x.note ? ` ${esc(x.note)}` : ''}`; return h ? `<a class="chip" href="${h}" target="_blank" rel="noopener">${inner}</a>` : `<span class="chip">${inner}</span>`; }).join('');
+    const cav = B.caveat && B.caveat.items && B.caveat.items.length ? `<div class="caveat"><h3>${esc(B.caveat.title || 'Что я не знаю')}</h3><ul>${B.caveat.items.map(x => `<li>${fmt(x)}</li>`).join('')}</ul></div>` : '';
+    const flow = B.flow && B.flow.length ? `<div class="flow" aria-label="Карта флоу">${B.flow.map((n, i) => `${i ? '<span class="arr" aria-hidden="true">→</span>' : ''}<span class="node${n.sub ? ' sub' : ''}">${fmt(n.t)}</span>`).join('')}</div>` : '';
+    app.innerHTML = `<header class="head">
+      <span class="eyebrow">${esc([B.stage, B.task, B.id].filter(Boolean).join(' · '))}</span>
+      <h1>${esc(B.title)}</h1>${B.lead ? `<p class="lead">${fmt(B.lead)}</p>` : ''}
+      <div class="chips">${B.scope ? `<span class="chip scope">${esc(B.scope)}</span>` : ''}${src}</div>
+      ${B.principles && B.principles.length ? `<div class="chips">${B.principles.map(p => `<span class="chip">${esc(p)}</span>`).join('')}</div>` : ''}
+      <p class="howto">Пунктир — предложение агента. ✓ у раздела принимает все предложения в нём, любую карточку можно перещёлкнуть. Свои слова — в «Что поправить» или в заметке к карточке.</p>
+      ${cav}</header>${flow}${B.sections.map(section).join('')}`;
+    dock.innerHTML = `<div class="dock-in"><div class="export" id="export" hidden><textarea id="export-t" readonly aria-label="Решения для агента"></textarea><span class="faint" id="export-s" role="status"></span></div>
+      <div class="dock-row"><div class="dock-info"><span id="prog"></span><span class="faint" id="stat" role="status">Решения живут в этой вкладке. Скопируй их и вставь в чат с агентом.</span></div>
+      <button type="button" class="cta" id="copy">Скопировать решения</button></div></div>`;
+  }
+
+  /* ---------- состояние ---------- */
+  const sec = id => S.sections[id] || (S.sections[id] = {ok: null, fix: ''});
+  const crd = id => S.cards[id] || (S.cards[id] = {v: null, note: ''});
+  function eff(c) {
+    const own = S.cards[c.id] && S.cards[c.id].v;
+    if (own) return {v: own, how: c.suggest && c.suggest !== own ? `изменено, агент предлагал «${LABEL[c.suggest]}»` : 'отмечено'};
+    if (c.suggest && S.sections[secOf[c.id].id] && S.sections[secOf[c.id].id].ok === true) return {v: c.suggest, how: 'принято с разделом'};
+    return null;
+  }
+  function picked(s) {
+    if (S.pick[s.id]) return {id: S.pick[s.id], how: 'выбрано'};
+    const sug = (s.cards || []).find(c => c.suggest === true);
+    if (sug && S.sections[s.id] && S.sections[s.id].ok === true) return {id: sug.id, how: 'принято с разделом'};
+    return null;
+  }
+  function sync() {
+    app.querySelectorAll('.opt').forEach(b => {
+      const c = cardById[b.dataset.card], e = eff(c), own = S.cards[c.id] && S.cards[c.id].v;
+      b.setAttribute('aria-pressed', String(own === b.dataset.v || (!own && e && e.v === b.dataset.v)));
+      b.classList.toggle('auto', !own && !!e && e.v === b.dataset.v);
+    });
+    B.sections.forEach(s => {
+      const st = S.sections[s.id] || {};
+      app.querySelectorAll(`.ok[data-sec="${CSS.escape(s.id)}"]`).forEach(b => b.setAttribute('aria-pressed', String(st.ok === (b.dataset.ok === '1'))));
+      if (s.decide === 'pick') { const p = picked(s); (s.cards || []).forEach(c => { const el = app.querySelector(`.card[data-id="${CSS.escape(c.id)}"]`); const on = !!p && p.id === c.id; el.classList.toggle('picked', on); el.querySelector('.pick').setAttribute('aria-pressed', String(on)); }); }
+    });
+    const secDone = B.sections.filter(s => S.sections[s.id] && S.sections[s.id].ok !== null && S.sections[s.id].ok !== undefined).length;
+    const cards = Object.values(cardById).filter(c => c.kind !== 'variant');
+    const cardDone = cards.filter(eff).length;
+    const pickSecs = B.sections.filter(s => s.decide === 'pick');
+    document.getElementById('prog').textContent = `Разделы: ${secDone} из ${B.sections.length}` + (cards.length ? ` · карточки: ${cardDone} из ${cards.length}` : '') + (pickSecs.length ? ` · выбор варианта: ${pickSecs.filter(picked).length} из ${pickSecs.length}` : '');
+  }
+  function fillInputs() {
+    app.querySelectorAll('textarea[data-fix]').forEach(t => { if (t !== document.activeElement) t.value = (S.sections[t.dataset.fix] || {}).fix || ''; });
+    app.querySelectorAll('textarea[data-note]').forEach(t => { if (t !== document.activeElement) { t.value = (S.cards[t.dataset.note] || {}).note || ''; if (t.value) t.hidden = false; } });
+  }
+  function exportText() {
+    const L = [], q = s => `«${s.replace(/\s+/g, ' ').trim()}»`;
+    const secDone = B.sections.filter(s => S.sections[s.id] && typeof S.sections[s.id].ok === 'boolean').length;
+    L.push(`РЕШЕНИЯ ПО ДОСКЕ · ${B.title} · ${B.id}`);
+    L.push(`Разделов решено: ${secDone} из ${B.sections.length} · ${new Date().toLocaleString('ru-RU', {dateStyle: 'short', timeStyle: 'short'})}`);
+    B.sections.forEach(s => {
+      const st = S.sections[s.id] || {};
+      L.push('', `[${s.id}] ${s.title} — ${st.ok === true ? '✓ принят' : st.ok === false ? '✕ не то' : 'без решения по разделу'}`);
+      if (st.fix && st.fix.trim()) L.push(`  Что поправить: ${q(st.fix)}`);
+      if (s.decide === 'pick') { const p = picked(s); L.push(`  Вариант: ${p ? `${p.id} (${cardById[p.id].title}) — ${p.how}` : 'не выбран'}`); }
+      (s.cards || []).forEach(c => {
+        const note = S.cards[c.id] && S.cards[c.id].note && S.cards[c.id].note.trim();
+        if (c.kind === 'variant') { if (note) L.push(`  ${c.id}: заметка ${q(note)}`); return; }
+        const e = eff(c);
+        L.push(`  ${c.id}: ${e ? `${LABEL[e.v]} (${e.how})` : 'без решения'}${note ? ` — заметка ${q(note)}` : ''}`);
+      });
+    });
+    return L.join('\n');
+  }
+
+  /* ---------- сохранение: db доски, если есть; иначе вкладка ---------- */
+  let ref = null, timer = null, dirty = false, chain = Promise.resolve(), readOnly = false;
+  const stat = t => { document.getElementById('stat').textContent = t; };
+  function scheduleSave() { if (!ref || readOnly) return; dirty = true; clearTimeout(timer); timer = setTimeout(flush, 700); }
+  function flush() {
+    const body = {board: B.id, state: JSON.parse(JSON.stringify(S)), updatedAt: new Date().toISOString()};
+    chain = chain.then(() => ref.set(body)).then(() => {
+      dirty = false; stat(`Сохранено в доске · ${new Date().toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'})}. Агент заберёт решения сам.`);
+    }).catch(e => {
+      dirty = false;
+      if (e && e.code === 'invalid_argument') { readOnly = true; stat('У тебя доступ только на просмотр. Скопируй решения и отправь автору доски.'); }
+      else stat('Не сохранилось в доске. Скопируй решения и вставь в чат с агентом.');
+    });
+  }
+  async function connect() {
+    if (!(window.claude && typeof window.claude.use === 'function')) return;
+    let db = null; try { db = await window.claude.use('db'); } catch (e) { db = null; }
+    if (!db) return;
+    try { ref = db.doc('marks/' + B.id.replace(/[^A-Za-z0-9_\-.~:@+]/g, '_')); } catch (e) { ref = null; return; }
+    stat('Решения сохраняются в доске, агент заберёт их сам.');
+    ref.onSnapshot(snap => {
+      if (dirty || snap.metadata.hasPendingWrites || !snap.exists) return;
+      const d = snap.data(); if (d && d.state) { S = JSON.parse(JSON.stringify(d.state)); S.sections ||= {}; S.cards ||= {}; S.pick ||= {}; fillInputs(); sync(); }
+    }, () => { ref = null; stat('Связь с доской пропала. Скопируй решения и вставь в чат с агентом.'); });
+  }
+
+  /* ---------- события ---------- */
+  render(); sync();
+  app.addEventListener('click', e => {
+    const opt = e.target.closest('.opt');
+    if (opt) {
+      const c = cardById[opt.dataset.card], st = crd(c.id), was = st.v, own = was === opt.dataset.v;
+      st.v = own ? null : opt.dataset.v;
+      if (st.v && KIND[c.kind].note.includes(st.v)) { const t = document.getElementById('n-' + c.id); if (t.hidden) t.hidden = false; }
+      sync(); scheduleSave(); return;
+    }
+    const ok = e.target.closest('.ok');
+    if (ok) { const st = sec(ok.dataset.sec), v = ok.dataset.ok === '1'; st.ok = st.ok === v ? null : v; if (st.ok === false) document.getElementById('f-' + ok.dataset.sec).focus(); sync(); scheduleSave(); return; }
+    const pk = e.target.closest('.pick');
+    if (pk) { S.pick[pk.dataset.sec] = S.pick[pk.dataset.sec] === pk.dataset.pick ? null : pk.dataset.pick; if (!S.pick[pk.dataset.sec]) delete S.pick[pk.dataset.sec]; sync(); scheduleSave(); return; }
+    const nt = e.target.closest('.note-t');
+    if (nt) { const t = document.getElementById('n-' + nt.dataset.noteT); t.hidden = !t.hidden; if (!t.hidden) t.focus(); return; }
+    const z = e.target.closest('[data-zoom]');
+    if (z) { lb.querySelector('img').src = z.dataset.zoom; lb.hidden = false; }
+  });
+  app.addEventListener('input', e => {
+    const t = e.target;
+    if (t.dataset.fix) { sec(t.dataset.fix).fix = t.value; scheduleSave(); }
+    if (t.dataset.note) { crd(t.dataset.note).note = t.value; scheduleSave(); }
+  });
+  lb.addEventListener('click', () => { lb.hidden = true; });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !lb.hidden) lb.hidden = true; });
+  document.getElementById('copy').addEventListener('click', () => {
+    const box = document.getElementById('export'), ta = document.getElementById('export-t'), s = document.getElementById('export-s');
+    ta.value = exportText(); box.hidden = false;
+    const fallback = () => { ta.focus(); ta.select(); s.textContent = 'Текст выделен — скопируй его (Ctrl/Cmd + C) и вставь в чат с агентом.'; };
+    try { navigator.clipboard.writeText(ta.value).then(() => { s.textContent = 'Скопировано. Вставь в чат с агентом.'; }, fallback); } catch (err) { fallback(); }
+  });
+  connect();
+})();
+</script>
+</body>
+</html>
