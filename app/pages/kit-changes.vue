@@ -103,7 +103,11 @@ const ro = ref({ name: 'КАСКО — осмотр', text: 'Осмотр авт
         </div>
         <div data-example class="flex min-w-0 flex-col items-stretch gap-3">
           <!-- Такт 92: оси узкого экрана срабатывают по ширине окна — пример рамкой 375 × 480 со страницей /kit-narrow. -->
-          <template v-if="c.id === 'frame-narrow'">
+          <!-- Такт 96: формат страницы каркаса — поля 16 сверху и по бокам, «Назад» и баннер-ухо слотами; рамка со страницей /kit-narrow?case=page. -->
+          <template v-if="c.id === 'frame-page-format' || c.id === 'frame-page-back' || c.id === 'frame-page-banner'">
+            <iframe src="/kit-narrow?case=page" title="Формат страницы — Каркас admin.vue" class="h-120 w-full rounded-md border border-border-soft" />
+          </template>
+          <template v-else-if="c.id === 'frame-narrow'">
             <iframe src="/kit-narrow?case=frame&drawer=1" title="Узкий экран — Каркас admin.vue" class="h-120 w-93.75 self-start rounded-md border border-border-soft" />
             <span class="text-xs text-muted-foreground">рамка 375 × 480: каркас ниже 1024 — компактная полоса, панель меню открыта (оснастка ?drawer=1)</span>
           </template>

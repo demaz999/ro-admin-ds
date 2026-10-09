@@ -15,6 +15,7 @@ import { computed, ref } from 'vue'
  * | `text` | `Heading lines`, `Callout narrow="stack"`, подсказка `Field` в две строки |
  * | `toaster` | `Toaster narrow="full"` — уведомление во всю ширину с полями 16 |
  * | `frame` | каркас `admin.vue` на узком экране; `&drawer=1` — выезжающая панель меню (`ModalCard side="left" surface="sidebar"`) |
+ * | `page` | формат страницы каркаса (такт 96): поля 16 по бокам и 16 сверху, баннер-ухо (слот `banner`), «Назад» (слот `back`) и заголовок через 12 |
  */
 definePageMeta({ layout: false })
 useHead({ title: 'Узкий экран — примеры изменений кита' })
@@ -25,11 +26,32 @@ const modalOpen = ref(true)
 const popoverOpen = ref(true)
 const toasts = ref([1])
 const mode = ref('steps')
+/** Такт 96: баннер-ухо примера закрывается. */
+const bannerClosed = ref(false)
 </script>
 
 <template>
   <!-- Кадр примера — фон и гарнитура темы на корне; каркас (`frame`) несёт их сам. -->
-  <NuxtLayout v-if="kind === 'frame'" name="admin">
+  <!-- Такт 96: формат страницы — баннер, «Назад», заголовок; поля и зазоры ставит каркас. -->
+  <NuxtLayout v-if="kind === 'page'" name="admin">
+    <template v-if="!bannerClosed" #banner>
+      <Callout tone="warning" closable @close="bannerClosed = true">
+        Баннер-ухо страницы — первой строкой, над «Назад»
+      </Callout>
+    </template>
+    <template #back>
+      <ButtonNavigation size="base" direction="left">
+        Назад
+      </ButtonNavigation>
+    </template>
+    <Heading level="page" as="h1">
+      Заголовок страницы
+    </Heading>
+    <Callout>
+      Поля рабочей зоны — 16 по бокам и сверху; «Назад» → заголовок — 12
+    </Callout>
+  </NuxtLayout>
+  <NuxtLayout v-else-if="kind === 'frame'" name="admin">
     <Heading level="title" as="h1">
       Каркас на узком экране
     </Heading>

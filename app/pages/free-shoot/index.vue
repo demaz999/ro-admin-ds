@@ -1236,7 +1236,8 @@ function onUndo(id: number) {
       <div class="flex min-h-0 min-w-0 flex-1 flex-col">
 
         <!-- ============================ подшапка, §7 — кит, такт 42: Toolbar (№ 11–14) ============================ -->
-        <Toolbar class="gap-y-3 py-3">
+        <!-- Такт 96: поля 16 сверху и по бокам, «Назад» → заголовок 12 — токены формата страницы каркаса (`--spacing-page-*`); верх был 12 — довесок 1 к такту 96. -->
+        <Toolbar class="gap-y-3 px-page-x pt-page-top pb-3">
           <!-- полоса приёмки, §13.2 — кит, такт 39: Callout warning во всю строку, текст — модель (`renderReview`) -->
           <Callout v-if="reviewBar" data-review tone="warning" :title="reviewBar.title" class="basis-full">
             {{ reviewBar.text }}
@@ -1258,7 +1259,7 @@ function onUndo(id: number) {
             btn_back 24442:45220 (ButtonNavigation base), до заголовка 12. Заголовок и сводка — по середине строчных:
             контраст кеглей page против текста (слот meta у Heading).
           -->
-          <div class="flex min-w-0 flex-1 flex-col gap-3">
+          <div class="flex min-w-0 flex-1 flex-col gap-page-back">
             <ButtonNavigation size="base" direction="left">Назад</ButtonNavigation>
             <Heading level="page">
               Свободная съёмка

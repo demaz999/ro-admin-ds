@@ -428,50 +428,52 @@ if (import.meta.client) {
     :data-state="m.loading ? 'loading' : undefined"
   >
     <NuxtLayout name="admin">
+      <!--
+        «Назад» — слот `back` каркаса (такт 96, решение владельца 2026-10-09): каркас ставит его в закреплённую шапку над её
+        содержимым и держит 12 до строки заголовка.
+      -->
+      <template #back>
+        <ButtonNavigation size="base" direction="left" data-act="back" @click="m.back()">
+          Назад
+        </ButtonNavigation>
+      </template>
+
       <!-- Шапка — Figma `30957:7809` в `30980:7926`; закреплена сверху (§11) — слот `header` каркаса. -->
       <template #header>
-        <div class="flex flex-col gap-3">
-          <div class="flex">
-            <ButtonNavigation size="base" direction="left" data-act="back" @click="m.back()">
-              Назад
-            </ButtonNavigation>
+        <div class="flex h-11 items-center justify-between gap-6" data-header-row>
+          <div class="flex min-w-0 items-center gap-3">
+            <Heading level="page" as="h1" data-tariffs-title>
+              Тарификация
+            </Heading>
+            <!-- Переключатель тарифного периода — Figma `30957:7855`, список `31089:12090` (№ 4, 5). -->
+            <!-- Загрузка (№ 54): срок периода ещё неизвестен — скелетон на месте переключателя. -->
+            <Skeleton v-if="m.loading" class="h-7 w-56" data-skeleton="period" />
+            <PeriodSwitcher
+              v-else
+              v-model="periodId"
+              v-model:open="periodsOpen"
+              :periods="m.periodList.value"
+              data-period-switcher
+              data-act="periods"
+              @plan="m.openPlan()"
+            />
           </div>
 
-          <div class="flex h-11 items-center justify-between gap-6" data-header-row>
-            <div class="flex min-w-0 items-center gap-3">
-              <Heading level="page" as="h1" data-tariffs-title>
-                Тарификация
-              </Heading>
-              <!-- Переключатель тарифного периода — Figma `30957:7855`, список `31089:12090` (№ 4, 5). -->
-              <!-- Загрузка (№ 54): срок периода ещё неизвестен — скелетон на месте переключателя. -->
-              <Skeleton v-if="m.loading" class="h-7 w-56" data-skeleton="period" />
-              <PeriodSwitcher
-                v-else
-                v-model="periodId"
-                v-model:open="periodsOpen"
-                :periods="m.periodList.value"
-                data-period-switcher
-                data-act="periods"
-                @plan="m.openPlan()"
-              />
-            </div>
-
-            <!-- Архив — только просмотр (№ 47): статуса сохранения и «Сохранить изменения» нет (стр. 49). -->
-            <div v-if="!ro && !m.loading" class="flex shrink-0 items-center gap-4">
-              <AppBarStatus surface="light" retryable :state="m.save.state" @retry="m.retry()" />
-              <Button
-                show-icon
-                :disabled="!m.canSave.value"
-                :loading="m.apply.state === 'applying'"
-                data-act="apply"
-                @click="m.requestSave()"
-              >
-                <template #icon>
-                  <Icon name="save" :size="20" />
-                </template>
-                Сохранить изменения
-              </Button>
-            </div>
+          <!-- Архив — только просмотр (№ 47): статуса сохранения и «Сохранить изменения» нет (стр. 49). -->
+          <div v-if="!ro && !m.loading" class="flex shrink-0 items-center gap-4">
+            <AppBarStatus surface="light" retryable :state="m.save.state" @retry="m.retry()" />
+            <Button
+              show-icon
+              :disabled="!m.canSave.value"
+              :loading="m.apply.state === 'applying'"
+              data-act="apply"
+              @click="m.requestSave()"
+            >
+              <template #icon>
+                <Icon name="save" :size="20" />
+              </template>
+              Сохранить изменения
+            </Button>
           </div>
         </div>
       </template>

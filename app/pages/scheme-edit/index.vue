@@ -184,8 +184,11 @@ import type { ReadinessGroupItem, ReadinessMarkState, ReadinessStageItem } from 
  * | `?open=copy` | окно «Новая схема осмотра» копии на шаге «Основа» (такт 91) |
  * | `?rules=1` | этап «Правила» отмечен: «Проверил унаследованное…» (такт 91) |
  */
-/* Такт 91: копия переходит на тот же адрес с другим набором — страница пересобирается по полному адресу. */
-definePageMeta({ layout: 'admin', key: route => route.fullPath })
+/*
+ * Такт 91: копия переходит на тот же адрес с другим набором — страница пересобирается по полному адресу.
+ * Такт 96: каркас ставится в странице (`<NuxtLayout name="admin">`) — «Назад» и баннер-ухо идут в его слоты `back` и `banner`.
+ */
+definePageMeta({ layout: false, key: route => route.fullPath })
 useHead({ title: 'Редактирование схемы осмотра — стенд' })
 
 const route = useRoute()
@@ -1967,7 +1970,6 @@ if (import.meta.client) {
     :data-surface="m.topSurface.value?.id ?? ''"
     :data-viewing="m.ui.viewing"
     :data-phone="phone || undefined"
-    class="flex min-w-0 flex-col gap-6 max-md:pb-20"
   >
     <!--
       Такт 92 — узкий экран (ревью 4.10, решение 5 оркестратора 2026-10-08): чип готовности и меню «⋯» — одна разметка на два места.
@@ -2080,11 +2082,25 @@ if (import.meta.client) {
       </Card>
     </DefineStepCard>
 
-    <div class="flex">
-      <ButtonNavigation size="base" direction="left" data-act="back" @click="m.back()">
-        Назад
-      </ButtonNavigation>
-    </div>
+    <NuxtLayout name="admin">
+      <!--
+        Плашка «Сохранение теперь автоматическое» — № 67, баннер-ухо страницы (такт 96, решение владельца 2026-10-09): слот `banner`
+        каркаса — первой строкой над «Назад», тон мягкого предупреждения (`Callout warning`); уходит с прокруткой. Одноразовая
+        ориентация: закрытая не возвращается (аудит, «Смена парадигмы»; строка 167).
+      -->
+      <template v-if="!ro && !m.ui.hintClosed" #banner>
+        <Callout tone="warning" closable data-autosave-hint @close="closeHint()">
+          Сохранение теперь автоматическое. В боевые осмотры изменения попадают по кнопке «Опубликовать схему»
+        </Callout>
+      </template>
+      <!-- «Назад» — слот `back` каркаса (такт 96): до заголовка 12 держит каркас. -->
+      <template #back>
+        <ButtonNavigation size="base" direction="left" data-act="back" @click="m.back()">
+          Назад
+        </ButtonNavigation>
+      </template>
+
+    <div class="flex min-w-0 flex-col gap-6 max-md:pb-20">
 
     <div class="flex flex-col gap-2">
       <!-- Узкий экран (такт 92): имя — ступень 24/28 (макет `33694:3930`), до трёх строк. -->
@@ -2183,11 +2199,6 @@ if (import.meta.client) {
       @next="m.goStage(R.next.id)"
       @collapse="setStrip(true)"
     />
-
-    <!-- Плашка «Сохранение теперь автоматическое» — № 67: одноразовая ориентация, закрытая не возвращается (аудит, «Смена парадигмы»). -->
-    <Callout v-if="!ro && !m.ui.hintClosed" closable data-autosave-hint @close="closeHint()">
-      Сохранение теперь автоматическое. В боевые осмотры изменения попадают по кнопке «Опубликовать схему»
-    </Callout>
 
     <!-- ============================ поиск — № 9–11, такт 86: строкой под шапкой, над табами, на всех табах ============================ -->
     <Popover :open="searchOpen">
@@ -5531,5 +5542,7 @@ if (import.meta.client) {
         </template>
       </Toast>
     </Toaster>
+    </div>
+    </NuxtLayout>
   </div>
 </template>
