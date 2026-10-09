@@ -2233,22 +2233,31 @@ if (import.meta.client) {
         на 28 при каждой смене статуса сохранения — причина промаха клика в списке переменных (`scheme-edit.md`, 19.4).
       -->
       <!-- Узкий экран (такт 92): строка статусов переносится, действия — в нижней полосе. -->
+      <!--
+        Такт 102 (решение владельца 2026-10-09, доска scheme-edit-batch1-v1, вариант C): один кегль 15/20 у всей строки; черновик
+        коротко — «Черновик: И. П., 11:40 · 4 изменения», полное — подсказкой; «История версий» на прежнем месте; статус
+        сохранения — значок последним в группе: «Сохранение…» и ошибка шире значка на 118 и 247, и стоящая за ними «История
+        версий» сдвигалась бы при каждом сохранении (строка реестра 364).
+      -->
       <div class="flex h-11 items-center gap-6 max-md:h-auto max-md:flex-wrap max-md:gap-y-2" data-header-row>
         <div class="flex min-w-0 flex-1 items-center gap-4 max-md:flex-wrap max-md:gap-y-2">
           <PublishStatus
             v-if="!ro"
             :state="m.publishState.value"
             :author="m.draft.author"
+            :author-genitive="m.draftAuthorOf.value"
             :date="m.draftDate.value"
+            :time="m.draftTime.value"
+            :changes="m.draftChanges.value"
             :editing="m.ui.editing"
             @open="m.openPublish()"
           />
           <div class="flex shrink-0 items-center gap-4">
             <!-- С-1 (такт 91): история — после первой публикации; у схемы без публикаций входа в пустоту нет. -->
-            <ButtonAction v-if="m.current.value && !phone" size="sm" :show-icon="false" data-act="history" @click="m.openHistory()">
+            <ButtonAction v-if="m.current.value && !phone" size="15" :show-icon="false" data-act="history" @click="m.openHistory()">
               История версий
             </ButtonAction>
-            <AppBarStatus v-if="!ro" surface="light" retryable :state="m.save.state" @retry="m.retry()" />
+            <AppBarStatus v-if="!ro" surface="light" size="15" compact retryable :state="m.save.state" @retry="m.retry()" />
           </div>
           <ReuseChip v-if="phone && !ro" />
         </div>

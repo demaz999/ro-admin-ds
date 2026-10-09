@@ -133,6 +133,37 @@ const ro = ref({ name: 'КАСКО — осмотр', text: 'Осмотр авт
           <template v-if="c.id === 'frame-page-format' || c.id === 'frame-page-back' || c.id === 'frame-page-banner'">
             <iframe src="/kit-narrow?case=page" title="Формат страницы — Каркас admin.vue" class="h-120 w-full rounded-md border border-border-soft" />
           </template>
+          <!-- Такт 102 (решение владельца 2026-10-09, доска scheme-edit-batch1-v1): строка статусов одним кеглем 15/20, сохранение значком. -->
+          <template v-else-if="c.id === 'app-bar-status-compact'">
+            <div class="flex flex-wrap items-center gap-4">
+              <AppBarStatus surface="light" size="15" compact state="saved" />
+              <AppBarStatus surface="light" size="15" compact state="saving" />
+              <AppBarStatus surface="light" size="15" compact state="error" retryable />
+            </div>
+            <div class="flex flex-wrap items-center gap-4">
+              <AppBarStatus surface="light" state="saved" />
+              <AppBarStatus surface="light" state="saving" />
+              <AppBarStatus surface="light" state="error" retryable />
+            </div>
+            <span class="text-xs text-muted-foreground">верхняя строка — compact и size="15": наведите на галочку — «Все изменения сохранены»; нижняя — без пропов, как было</span>
+          </template>
+          <template v-else-if="c.id === 'button-action-15'">
+            <div class="flex flex-wrap items-center gap-6">
+              <ButtonAction size="sm" :show-icon="false">
+                История версий
+              </ButtonAction>
+              <ButtonAction size="15" :show-icon="false">
+                История версий
+              </ButtonAction>
+              <ButtonAction :show-icon="false">
+                История версий
+              </ButtonAction>
+              <ButtonAction size="15">
+                Повторить
+              </ButtonAction>
+            </div>
+            <span class="text-xs text-muted-foreground">13/16 (sm) · 15/20 (size="15") · 16/20 (md); высота у всех 20</span>
+          </template>
           <!-- Такт 99 (решения владельца 2026-10-09): плашка с иконкой — три роли; таблица держит высоту полной страницы. -->
           <!-- Такт 101 (владелец 2026-10-09, доска scheme-edit-wide-v4 и довесок 1): сайд без подложки — слоем и слотом; ручка ширины. -->
           <template v-else-if="c.id === 'modal-card-dock' || c.id === 'modal-card-resize'">

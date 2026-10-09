@@ -693,7 +693,9 @@ function kit(page) {
           tabs: [...document.querySelectorAll('[data-tab-trigger]')].map(b => { const c = b.cloneNode(true); c.querySelectorAll('[data-slot=readiness-mark]').forEach(x => x.remove()); return t(c.textContent) }),
           section: root.dataset.section,
           save: root.dataset.save,
-          saveText: t(status?.childNodes ? [...status.childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join(' ') : ''),
+          /* Такт 102: текст статуса без «Повторить»; у «сохранено» значком текст — строка для чтения с экрана, saveIcon — значок. */
+          saveText: status ? ((c) => { c.querySelectorAll('[data-slot=app-bar-status-retry]').forEach(b => b.remove()); return t(c.textContent) })(status.cloneNode(true)) : '',
+          saveIcon: !!status?.querySelector('[data-slot=app-bar-status-icon]'),
           saveSurface: status?.dataset.surface ?? 'dark',
           retry: !!${Q.retry},
           saveLog,
@@ -1529,10 +1531,11 @@ const SCENARIOS = {
     ['старт', null, { publish: 'never', status: { state: 'never', text: 'Ни разу не опубликовано', clickable: false, editing: '' }, versions: 0, current: null, headerActs: ['preview', 'readiness', 'publish', 'menu'] }],
     ['«Опубликовать схему» — первая публикация', K => K.publish(), { surface: 'first-publish', modalTitle: 'Первая публикация схемы', diff: null, versions: 0 }],
   ], { query: 'data=new&now=2026-10-03T09:00:00' }],
-  'СС-03': ['правка делает черновик грязным: индикатор «Черновик: правки {автор} от {дата}»; клик по индикатору открывает дифф (r2 §2, состояние 2; аудит, «Индикатор состояния схемы»)', [
-    ['старт: черновик с чужими правками', null, { publish: 'draft', status: { state: 'draft', text: 'Черновик: правки Игорь Петров от 01.10.2026, 11:40', clickable: true, editing: '' } }],
-    ['своя правка — автор и дата последних правок', async (K) => { await K.toggle('skipExpertise'); await K.settled() },
-      { 'status.text': 'Черновик: правки Анна Смирнова от 03.10.2026, 09:00', 'status.clickable': true, writes: 1 }],
+  /* Такт 102 (владелец 2026-10-09, доска scheme-edit-batch1-v1): индикатор коротко — инициалы, время, число правок; полное — подсказкой. */
+  'СС-03': ['правка делает черновик грязным: индикатор «Черновик: {инициалы}, {время} · N изменений», число — счёт диффа публикации; клик по индикатору открывает дифф (r2 §2, состояние 2; аудит, «Индикатор состояния схемы»)', [
+    ['старт: черновик с чужими правками', null, { publish: 'draft', status: { state: 'draft', text: 'Черновик: И. П., 11:40 · 4 изменения', clickable: true, editing: '' }, saveText: 'Все изменения сохранены', saveIcon: true }],
+    ['своя правка — автор, время и число правок', async (K) => { await K.toggle('skipExpertise'); await K.settled() },
+      { 'status.text': 'Черновик: А. С., 09:00 · 5 изменений', 'status.clickable': true, writes: 1 }],
     ['клик по индикатору открывает дифф', K => K.statusOpen(), { surface: 'publish', modalTitle: 'Публикация схемы', 'diff.areas.0': { id: 'settings', count: '2 изменения', tone: 'changed' }, versions: 2 }],
   ], { query: 'now=2026-10-03T09:00:00' }],
   'СС-04': ['«Предпросмотр» открывает демо-осмотр — полноэкранный оверлей по черновику (r2 §3; ревью 4.1, такт 89; до такта 89 — уведомление-заглушка)', [
@@ -1668,7 +1671,7 @@ const SCENARIOS = {
         'form-empty · block · В форме нет полей · Форма', 'approval-none · warn · Согласование включено, поля для согласования не отмечены · Настройки → Поведение процесса'], manual: null }, confirmOff: true }],
   ], { query: 'data=new&now=2026-10-03T09:00:00' }],
   'СС-50': ['presence: «Сейчас редактирует {кто}» (r2 §2, состояние 6)', [
-    ['старт', null, { status: { state: 'draft', text: 'Черновик: правки Игорь Петров от 01.10.2026, 11:40', clickable: true, editing: 'Сейчас редактирует Игорь Петров' }, save: 'saved' }],
+    ['старт', null, { status: { state: 'draft', text: 'Черновик: И. П., 11:40 · 4 изменения', clickable: true, editing: 'Сейчас редактирует Игорь Петров' }, save: 'saved' }],
   ], { query: 'presence=1' }],
   'СС-51': ['«Сбросить черновик к текущей версии»: окно показывает, что сбрасывается; после сброса черновик равен current (r2 §2; аудит, «Конкурентный доступ к черновику»)', [
     ['меню → «Сбросить черновик к текущей версии»', K => K.menu('reset'), { surface: 'reset', modalTitle: 'Сбросить черновик?', modalSub: 'Черновик вернётся к текущей версии от 22.09.2026, 16:05. Будет сброшено:',

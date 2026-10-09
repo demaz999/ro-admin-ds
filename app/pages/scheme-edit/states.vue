@@ -123,15 +123,17 @@ const DIFF_WARNINGS = [
   { text: 'У поля «Пробег» пустой алиас', critical: true },
 ]
 
-const PUBLISH_STATUS_EXAMPLE = `<PublishStatus state="draft" author="Игорь Петров" date="01.10.2026, 11:40" @open="openDiff" />   <!-- кнопка: открывает дифф -->
+const PUBLISH_STATUS_EXAMPLE = `<!-- такт 102: «Черновик: И. П., 11:40 · 4 изменения», подсказка — «Правки Игоря Петрова от 01.10.2026, 11:40 · 4 изменения» -->
+<PublishStatus state="draft" author="Игорь Петров" author-genitive="Игоря Петрова" date="01.10.2026, 11:40" time="11:40" :changes="4" @open="openDiff" />
+<PublishStatus state="draft" author="Игорь Петров" date="01.10.2026, 11:40" @open="openDiff" />   <!-- без времени и счёта: «Черновик: И. П., 01.10.2026, 11:40» -->
 <PublishStatus state="published" />
 <PublishStatus state="never" />
 <PublishStatus state="draft" author="Анна Смирнова" date="03.10.2026, 09:00" editing="Игорь Петров" />   <!-- presence -->
 
 <!-- в узкой строке шапки — ужимается многоточием, полный текст в подсказке (такт 67) -->
 <div class="flex min-w-0 flex-1 items-center gap-4">
-  <PublishStatus state="draft" :author="draft.author" :date="draftDate" :editing="editing" />
-  <div class="flex shrink-0 items-center gap-4">…история, статус сохранения…</div>
+  <PublishStatus state="draft" :author="draft.author" :author-genitive="authorOf" :date="draftDate" :time="draftTime" :changes="diff.count" :editing="editing" />
+  <div class="flex shrink-0 items-center gap-4">…«История версий» (ButtonAction size="15"), AppBarStatus size="15" compact…</div>
 </div>`
 
 const DIFF_EXAMPLE = `<!-- готовый результат сравнения: области, опасное, предупреждения, итог -->
@@ -507,6 +509,16 @@ const PAGE_ROWS_EXAMPLE = `<Table attached :page-rows="total > pageSize ? pageSi
       </div>
     </section>
 
+    <!-- Такт 102 (решение владельца 2026-10-09, доска scheme-edit-batch1-v1): строка статусов одним кеглем 15/20, «сохранено» значком. -->
+    <section class="flex flex-col gap-4" data-matrix="app-bar-status-compact">
+      <Heading>AppBarStatus · size="15" compact — статус значком в строке 15/20</Heading>
+      <div class="flex flex-col items-start gap-3">
+        <AppBarStatus v-for="s in STATES" :key="s" surface="light" size="15" compact :state="s" :data-case="`compact-${s}`" />
+        <AppBarStatus surface="light" size="15" compact state="error" retryable data-case="compact-error-retry" />
+        <AppBarStatus surface="light" size="15" state="saved" data-case="size-15" />
+      </div>
+    </section>
+
     <section class="flex flex-col gap-4" data-matrix="app-bar-status-dark">
       <Heading>AppBarStatus · surface="dark" — полоса приложения, как на «Свободной съёмке»</Heading>
       <AppBar>
@@ -700,15 +712,19 @@ const PAGE_ROWS_EXAMPLE = `<Table attached :page-rows="total > pageSize ? pageSi
       <Heading>PublishStatus — индикатор состояния публикации</Heading>
       <div class="flex flex-col items-start gap-3">
         <PublishStatus state="never" data-case="never" />
-        <PublishStatus state="draft" author="Игорь Петров" date="01.10.2026, 11:40" data-case="draft" @open="statusLog = 'open'" />
+        <PublishStatus state="draft" author="Игорь Петров" author-genitive="Игоря Петрова" date="01.10.2026, 11:40" time="11:40" :changes="4" data-case="draft" @open="statusLog = 'open'" />
+        <PublishStatus state="draft" author="Анна Смирнова" author-genitive="Анны Смирновой" date="03.10.2026, 09:00" time="09:00" :changes="1" data-case="draft-one" />
+        <PublishStatus state="draft" author="Анна Смирнова" author-genitive="Анны Смирновой" date="03.10.2026, 09:00" time="09:00" :changes="2" data-case="draft-two" />
+        <PublishStatus state="draft" author="Анна Смирнова" author-genitive="Анны Смирновой" date="03.10.2026, 09:00" time="09:00" :changes="5" data-case="draft-five" />
+        <PublishStatus state="draft" author="Игорь Петров" date="01.10.2026, 11:40" data-case="draft-plain" />
         <PublishStatus state="draft" data-case="draft-bare" />
         <PublishStatus state="published" data-case="published" />
-        <PublishStatus state="draft" author="Анна Смирнова" date="03.10.2026, 09:00" editing="Игорь Петров" data-case="editing" />
+        <PublishStatus state="draft" author="Анна Смирнова" author-genitive="Анны Смирновой" date="03.10.2026, 09:00" time="09:00" :changes="3" editing="Игорь Петров" data-case="editing" />
         <PublishStatus state="published" editing="Игорь Петров" data-case="published-editing" />
       </div>
       <!-- Узкий контейнер — такт 67: текст ужимается многоточием, полный — в подсказке; у первой строки подсказка открыта оснасткой. -->
       <div class="flex w-60 flex-col items-stretch gap-6 pt-8">
-        <PublishStatus state="draft" author="Игорь Петров" date="01.10.2026, 11:40" tooltip-open data-case="narrow-draft" />
+        <PublishStatus state="draft" author="Игорь Петров" author-genitive="Игоря Петрова" date="01.10.2026, 11:40" time="11:40" :changes="4" tooltip-open data-case="narrow-draft" />
         <PublishStatus state="draft" author="Анна Смирнова" date="03.10.2026, 09:00" editing="Константин Константинопольский-Преображенский" data-case="narrow-editing" />
         <PublishStatus state="never" data-case="narrow-never" />
       </div>

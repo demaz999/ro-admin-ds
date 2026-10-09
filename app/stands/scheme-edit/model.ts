@@ -5,7 +5,7 @@ import {
   type PriceSource, type ShowcaseMetric, type ShowcaseProblem, type StepFlag,
 } from './catalogs'
 import { buildDemo, fieldPreview, helpPreview, type DemoEdit, type DemoSource, type HelpKey } from './demo'
-import { diffConfigs, formatDate, plural } from './diff'
+import { diffConfigs, formatDate, formatTime, genitiveName, plural } from './diff'
 import { DONOR_SCHEMES, type DonorSchemeRaw } from './donors'
 import { catalogHint, categoryAtOpen, proposeHint, stepCategory, type HintProposal, type StepHint } from './hints'
 import { EMPTY_REPEAT_TEXTS, fillRepeatTexts, type RepeatTexts } from './repeat-texts'
@@ -1750,6 +1750,13 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   const warnings = computed(() => readiness.value.checks.filter(c => c.level !== 'todo').map(c => ({ text: c.text, critical: c.level === 'block' })))
   const blocked = computed(() => readiness.value.blocks > 0)
   const draftDate = computed(() => formatDate(draft.editedAt))
+  /**
+   * Индикатор черновика коротко (такт 102, решение владельца 2026-10-09, доска scheme-edit-batch1-v1): время правок, автор
+   * в родительном падеже для подсказки и число правок — тот же счёт, что у диффа публикации («Итого: N изменений»).
+   */
+  const draftTime = computed(() => formatTime(draft.editedAt))
+  const draftAuthorOf = computed(() => genitiveName(draft.author))
+  const draftChanges = computed(() => draftDiff.value?.count)
 
   function openModal(id: string) { ui.surfaces.push({ kind: 'modal', id }) }
   /**
@@ -2003,7 +2010,7 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
     searchIndex, search, searchGroups, setQuery, setScope, cycleScope, expand, setModified, modifiedAvailable, changedKeys, goTo, quick,
     openResult, findHits, findPos, findStep, findCounts, findSummary, leaveFind, exitFind, startFind, toggleFromSearch, runAction,
     recentPlaces, setRecent, remember,
-    shown, draftDiff, warnings, blocked, draftDate, history, versionDiff, versionShown, viewingText,
+    shown, draftDiff, warnings, blocked, draftDate, draftTime, draftAuthorOf, draftChanges, history, versionDiff, versionShown, viewingText,
     openPublish, confirmPublish, openReset, confirmReset, copy, copySource, preview, menu, confirmDelete, openHistory, openVersion, closeVersion, view, leaveView,
     creating, readiness, currentStage, tabMark, goStage, fixCheck, setRulesChecked, setStrip, nextStage,
     demo, demoScreen, demoPos, openDemo, demoGo, demoStep, setDemoMode, demoEdit, helpView, fieldView,

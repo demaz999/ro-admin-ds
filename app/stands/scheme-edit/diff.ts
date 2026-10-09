@@ -337,3 +337,33 @@ export function formatDate(iso: string): string {
   const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/)
   return m ? `${m[3]}.${m[2]}.${m[1]}, ${m[4]}:${m[5]}` : iso
 }
+
+/** Время для строки индикатора черновика: «11:40» (такт 102). */
+export function formatTime(iso: string): string {
+  const m = iso.match(/T(\d{2}):(\d{2})/)
+  return m ? `${m[1]}:${m[2]}` : ''
+}
+
+/**
+ * Имя и фамилия в родительном падеже — подсказка индикатора черновика «Правки Игоря Петрова» (такт 102). Правила — для
+ * русских имён демо-данных: имя на «ь» и «й» — «я», на «а» — «ы» (после г, к, х, ж, ш, щ, ч — «и»), на «я» — «и», на
+ * согласную — «а»; фамилия на «ов», «ев», «ин» — «а», на «ова», «ева», «ина» — «ой», на «ский» — «ского», на «ская» — «ской».
+ * Прочее — как есть.
+ */
+export function genitiveName(name: string): string {
+  const [first = '', ...rest] = name.trim().split(/\s+/)
+  const female = /[ая]$/.test(first)
+  const ofFirst = (w: string) => /[ьй]$/.test(w)
+    ? `${w.slice(0, -1)}я`
+    : /[гкхжшщч]а$/.test(w)
+      ? `${w.slice(0, -1)}и`
+      : /а$/.test(w)
+        ? `${w.slice(0, -1)}ы`
+        : /я$/.test(w)
+          ? `${w.slice(0, -1)}и`
+          : /[бвгджзклмнпрстфхцчшщ]$/.test(w) ? `${w}а` : w
+  const ofLast = (w: string) => female
+    ? (/(?:ов|ев|ёв|ин|ын)а$/.test(w) ? `${w.slice(0, -1)}ой` : /(?:ск|цк)ая$/.test(w) ? `${w.slice(0, -2)}ой` : w)
+    : (/(?:ов|ев|ёв|ин|ын)$/.test(w) ? `${w}а` : /(?:ск|цк)ий$/.test(w) ? `${w.slice(0, -2)}ого` : w)
+  return [ofFirst(first), ...rest.map(ofLast)].filter(Boolean).join(' ')
+}
