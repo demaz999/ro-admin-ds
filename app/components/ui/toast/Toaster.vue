@@ -28,7 +28,12 @@ const props = withDefaults(defineProps<{
   x?: string
   /** Отступ стопки от низа окна — CSS-значение; без него — 24. */
   bottom?: string
-}>(), { duration: 5000, side: 'right', x: undefined, bottom: undefined })
+  /**
+   * Узкий экран (уже 768) — такт 92: `keep` (по умолчанию) — стопка 360 в углу; `full` — стопка во всю ширину окна с полями 16,
+   * отступ снизу — `bottom`; `x` не действует. Рабочий стол прежний.
+   */
+  narrow?: 'keep' | 'full'
+}>(), { duration: 5000, side: 'right', x: undefined, bottom: undefined, narrow: 'keep' })
 </script>
 
 <template>
@@ -39,8 +44,9 @@ const props = withDefaults(defineProps<{
         data-slot="toaster"
         :data-side="props.side"
         class="pointer-events-auto fixed bottom-6 z-100 flex w-90 flex-col gap-3 outline-none transition-[bottom]"
-        :class="props.side === 'left' ? 'left-6' : 'right-6'"
-        :style="{ [props.side]: props.x, bottom: props.bottom, transitionDuration: 'var(--duration-zoom)' }"
+        :data-narrow="props.narrow === 'full' ? 'full' : undefined"
+        :class="[props.side === 'left' ? 'left-6' : 'right-6', props.narrow === 'full' ? 'max-md:inset-x-4 max-md:w-auto' : '']"
+        :style="{ [props.side]: props.narrow === 'full' ? undefined : props.x, bottom: props.bottom, transitionDuration: 'var(--duration-zoom)' }"
       />
     </ToastPortal>
   </ToastProvider>

@@ -41,6 +41,11 @@ const props = withDefaults(defineProps<PopoverContentProps & {
    * которым не от чего вычислять положение. В продукте не используется.
    */
   inline?: boolean
+  /**
+   * Узкий экран (уже 768) — такт 92: `keep` (по умолчанию) — ширина `width`; `full` — плашка во всю ширину окна и во всю
+   * доступную высоту от поля до края окна, без скругления (выдача поиска страницы схемы на телефоне); рабочий стол прежний.
+   */
+  narrow?: 'keep' | 'full'
 }>(), {
   width: 320,
   side: 'bottom',
@@ -49,12 +54,19 @@ const props = withDefaults(defineProps<PopoverContentProps & {
   alignOffset: 0,
   class: undefined,
   inline: false,
+  narrow: 'keep',
 })
 const emits = defineEmits<PopoverContentEmits>()
 
-/** `width`/`class`/`inline` — наши, Reka о них не знает: исключаются из пробрасываемого. */
-const delegated = reactiveOmit(props, 'width', 'class', 'inline')
+/** `width`/`class`/`inline`/`narrow` — наши, Reka о них не знает: исключаются из пробрасываемого. */
+const delegated = reactiveOmit(props, 'width', 'class', 'inline', 'narrow')
 const forwarded = useForwardPropsEmits(delegated, emits)
+
+/**
+ * `narrow="full"` ниже 768: ширина окна поверх ширины `width` (встроенный стиль — поэтому `!`), высота — доступная Reka до края
+ * окна (`--reka-popper-available-height`), без скругления. Сдвиг к краю окна делает Reka (`shift`).
+ */
+const NARROW_FULL = 'max-md:w-screen! max-md:h-(--reka-popper-available-height) max-md:rounded-none'
 </script>
 
 <template>
@@ -71,7 +83,8 @@ const forwarded = useForwardPropsEmits(delegated, emits)
     <PopoverContent
       data-slot="popover"
       v-bind="{ ...forwarded, ...$attrs }"
-      :class="cn('z-50 rounded-lg bg-popover shadow-dropdown', props.class)"
+      :data-narrow="props.narrow === 'full' ? 'full' : undefined"
+      :class="cn('z-50 rounded-lg bg-popover shadow-dropdown', props.narrow === 'full' ? NARROW_FULL : '', props.class)"
       :style="{ width: `${props.width}px` }"
     >
       <slot />

@@ -20,8 +20,13 @@ const props = withDefaults(defineProps<{
    * `33694:3883`: окно 289, телефон `md` с `y = −71` при шапке 31; у кита шапка 32). Масштаб у фрагмента — 1.
    */
   fragment?: boolean
+  /**
+   * Корпус телефона — такт 92: `false` — экран приложения без рамки: без корпуса `--app-device`, поля 6 и скруглений; экран
+   * занимает размер корпуса (демо-осмотр на узком экране — ревью 4.10, решение 5 оркестратора). У фрагмента не действует.
+   */
+  frame?: boolean
   class?: string
-}>(), { title: '', size: 'lg', scale: 1, fragment: false })
+}>(), { title: '', size: 'lg', scale: 1, fragment: false, frame: true })
 </script>
 
 <template>
@@ -29,6 +34,7 @@ const props = withDefaults(defineProps<{
     data-slot="app-preview"
     :data-size="props.size"
     :data-fragment="props.fragment || undefined"
+    :data-frame="props.frame || props.fragment ? undefined : 'none'"
     :class="cn(
       'relative shrink-0',
       props.fragment
@@ -44,13 +50,14 @@ const props = withDefaults(defineProps<{
     <div
       data-slot="app-preview-device"
       :class="[
-        'absolute flex w-app-phone flex-col rounded-2xl bg-app-device p-1.5',
+        'absolute flex w-app-phone flex-col',
+        props.frame || props.fragment ? 'rounded-2xl bg-app-device p-1.5' : '',
         props.size === 'md' || props.fragment ? 'h-app-phone-md' : 'h-app-phone-lg',
         props.fragment ? 'top-[calc(var(--spacing-app-crop)*-1)] left-1/2 -translate-x-1/2' : 'top-0 left-0 origin-top-left scale-(--app-scale)',
       ]"
     >
       <!-- Экран: радиус 18 — концентрический к корпусу (24 − 6). -->
-      <div data-slot="app-preview-screen" class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[calc(var(--radius-2xl)-var(--spacing)*1.5)] bg-app-screen">
+      <div data-slot="app-preview-screen" :class="['flex min-h-0 flex-1 flex-col overflow-hidden bg-app-screen', props.frame || props.fragment ? 'rounded-[calc(var(--radius-2xl)-var(--spacing)*1.5)]' : '']">
         <div data-slot="app-preview-status" class="flex h-6 shrink-0 items-center bg-app-surface px-3 text-3xs font-bold text-app-foreground">
           9:41
         </div>

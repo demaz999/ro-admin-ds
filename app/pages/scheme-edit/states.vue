@@ -1354,6 +1354,11 @@ const sourceDemo = ref('other')
           <ToolbarText>lg 220 × 476 (пропорция 375 × 812), масштаб 1 — экран анкеты</ToolbarText>
           <AppPreviewScreen :screen="appScreens['form:g-car']!" size="lg" />
         </div>
+        <!-- Такт 92: экран без рамки телефона — демо-осмотр на узком экране. -->
+        <div class="flex flex-col gap-2" data-case="frameless">
+          <ToolbarText>без рамки (frame=false) — демо-осмотр на телефоне; масштаб 1</ToolbarText>
+          <AppPreviewScreen :screen="appScreens['form:g-car']!" size="lg" :frame="false" />
+        </div>
         <div class="flex flex-col gap-2" data-case="interactive">
           <ToolbarText>нажимается — кнопки с переходом; масштаб 0.75</ToolbarText>
           <AppPreviewScreen :screen="appScreens.start!" size="lg" :scale="0.75" interactive @go="pressLog = `go: ${$event}`" />
@@ -1631,11 +1636,16 @@ const sourceDemo = ref('other')
 
     <!-- ============================ Такт 91: модель готовности — карточки 15 и 16; тон удаления у SelectItem, значок у SectionNavItem ============================ -->
     <section class="flex flex-col gap-4" data-matrix="readiness-mark">
-      <Heading>ReadinessMark — маркер этапа: готово, не готово, «! N» предупреждает, «! N» блокирует, замок (карточка 15)</Heading>
+      <Heading>ReadinessMark — маркер этапа: готово, готово к публикации, не готово, «! N» предупреждает, «! N» блокирует, замок (карточка 15; такт 92)</Heading>
       <div class="flex flex-wrap items-center gap-8">
         <div class="flex items-center gap-2" data-case="done">
           <ReadinessMark state="done" />
           <ToolbarText>готово</ToolbarText>
+        </div>
+        <!-- Такт 92, решение 1а: «Проверка и публикация» засчитывается публикацией — до неё без галочки выполненного. -->
+        <div class="flex items-center gap-2" data-case="ready">
+          <ReadinessMark state="ready" />
+          <ToolbarText>готово к публикации</ToolbarText>
         </div>
         <div class="flex items-center gap-2" data-case="todo">
           <ReadinessMark state="todo" />
@@ -1687,13 +1697,15 @@ const sourceDemo = ref('other')
         @select="barLog = `select: ${$event}`" @next="barLog = 'next'" @collapse="barLog = 'collapse'" />
       <ReadinessBar title="Подготовка схемы: 1 из 5" :stages="BAR_LOCKED" current="base" next-label="Далее: Анкета →" data-case="bar-locked"
         @select="barLog = `select: ${$event}`" @next="barLog = 'next'" @collapse="barLog = 'collapse'" />
-      <ReadinessBar title="Подготовка схемы: 5 из 5" :stages="BAR_STAGES.map(s => ({ ...s, state: 'done', count: 0 }))" current="rules" next-label="Проверить и опубликовать" data-case="bar-ready"
+      <!-- Такт 92, решение 1а: до публикации счёт — по этапам 1–4, «Проверка и публикация» — готово к публикации. -->
+      <ReadinessBar title="Подготовка схемы: 4 из 5" :stages="BAR_STAGES.map(s => ({ ...s, state: s.id === 'publish' ? 'ready' : 'done', count: 0 }))" current="rules" next-label="Проверить и опубликовать" data-case="bar-ready"
         @select="barLog = `select: ${$event}`" @next="barLog = 'next'" @collapse="barLog = 'collapse'" />
       <div class="flex flex-wrap items-center gap-2" data-case="stages">
         <ReadinessStage label="Основа" state="done" />
         <ReadinessStage label="Анкета" state="warning" :count="3" current />
         <ReadinessStage label="Съёмка" state="blocked" :count="1" />
         <ReadinessStage label="Правила" state="todo" />
+        <ReadinessStage label="Проверка и публикация" state="ready" />
         <ReadinessStage label="Съёмка" state="locked" reason="Станет доступно после первого сохранения схемы" />
       </div>
       <ToolbarText>Событие: {{ barLog }}</ToolbarText>

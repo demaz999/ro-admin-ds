@@ -109,7 +109,8 @@ const schemeType = computed<string>({ get: () => basics.value.schemeType, set: (
 
 <template>
   <ModalCard :open="props.open" @update:open="emit('update:open', $event)">
-    <ModalCardContent :size="props.mode === 'copy' ? 'md' : 'lg'" data-modal="create" :data-step="step" :data-source="source" :data-mode="props.mode">
+    <!-- Узкий экран (такт 92): окно во всё окно, источники над карточками, поля — одной колонкой. -->
+    <ModalCardContent :size="props.mode === 'copy' ? 'md' : 'lg'" narrow="full" data-modal="create" :data-step="step" :data-source="source" :data-mode="props.mode">
       <!-- ============================ шаг 1 «С чего начать» ============================ -->
       <template v-if="step === 'start'">
         <ModalCardHeader title="Новая схема осмотра" subtitle="С чего начать: шаблон, другая схема или пустая схема" />
@@ -122,8 +123,8 @@ const schemeType = computed<string>({ get: () => basics.value.schemeType, set: (
               </template>
             </Input>
           </Field>
-          <div class="flex items-start gap-6">
-            <SectionNav v-model="sourceModel" title="Источник" data-create-sources>
+          <div class="flex items-start gap-6 max-md:flex-col max-md:items-stretch">
+            <SectionNav v-model="sourceModel" title="Источник" class="max-md:w-full" data-create-sources>
               <SectionNavItem
                 v-for="x in CREATE_SOURCES"
                 :key="x.id"
@@ -138,7 +139,7 @@ const schemeType = computed<string>({ get: () => basics.value.schemeType, set: (
               <ToolbarText v-if="access" data-create-access>
                 {{ access }}
               </ToolbarText>
-              <RadioGroup v-model="picked" class="grid grid-cols-2 gap-4" data-radio="createCard" aria-label="Шаблон или схема">
+              <RadioGroup v-model="picked" class="grid grid-cols-2 gap-4 max-md:grid-cols-1" data-radio="createCard" aria-label="Шаблон или схема">
                 <RadioGroupItem v-for="c in cards" :key="c.id" variant="card" :value="c.id" :checked="picked === c.id" :data-card="c.id">
                   {{ c.title }}
                   <template #description>
@@ -182,7 +183,7 @@ const schemeType = computed<string>({ get: () => basics.value.schemeType, set: (
       <template v-else>
         <ModalCardHeader title="Новая схема осмотра" subtitle="Основа — то, что нужно для идентификатора схемы" />
         <ModalCardBody class="flex flex-col gap-6">
-          <Callout :title="origin.title" data-create-origin>
+          <Callout :title="origin.title" narrow="stack" data-create-origin>
             {{ origin.text }}
             <template v-if="props.mode === 'create'" #actions>
               <ButtonAction size="sm" :show-icon="false" data-act="create-change" @click="back()">
@@ -193,7 +194,7 @@ const schemeType = computed<string>({ get: () => basics.value.schemeType, set: (
           <Field label="Наименование" required :invalid="nameInvalid" :hint="nameInvalid ? 'Заполните наименование схемы' : 'Видно в списке схем и в приложении исполнителя'" data-field="create-name">
             <Input v-model="name" placeholder="" :show-icon="false" />
           </Field>
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-cols-2 gap-4 max-md:grid-cols-1">
             <Field label="Компания-владелец" data-field="create-owner">
               <Autocomplete v-model="owner" :items="OWNERS" placeholder="Найти компанию" />
             </Field>
@@ -202,7 +203,7 @@ const schemeType = computed<string>({ get: () => basics.value.schemeType, set: (
             </Field>
           </div>
           <Field label="Тип осмотра" data-field="create-inspection">
-            <RadioGroup v-model="inspectionType" class="grid grid-cols-2 gap-2" data-radio="createInspection">
+            <RadioGroup v-model="inspectionType" class="grid grid-cols-2 gap-2 max-md:grid-cols-1" data-radio="createInspection">
               <RadioGroupItem variant="card" value="regular" :checked="inspectionType === 'regular'">
                 Обычный
                 <template #description>

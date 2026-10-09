@@ -14,18 +14,24 @@ const props = withDefaults(defineProps<{
   title?: string
   /** Крестик «Закрыть» справа — одноразовая плашка; нажатие отдаёт `close`, плашку убирает потребитель. */
   closable?: boolean
+  /**
+   * Узкий экран (уже 768) — такт 92: `keep` (по умолчанию) — действия справа от текста; `stack` — действия строкой под текстом,
+   * от левого края, с переносом (статус витрины страницы схемы на телефоне). Рабочий стол прежний.
+   */
+  narrow?: 'keep' | 'stack'
   class?: string
 }>(), {
   tone: 'neutral',
   title: '',
   closable: false,
+  narrow: 'keep',
 })
 const emit = defineEmits<{ close: [] }>()
 </script>
 
 <template>
-  <div data-slot="callout" :data-tone="props.tone" :class="cn(calloutVariants({ tone: props.tone }), props.class)">
-    <div class="flex min-w-0 flex-1 flex-col gap-1">
+  <div data-slot="callout" :data-tone="props.tone" :data-narrow="props.narrow === 'stack' ? 'stack' : undefined" :class="cn(calloutVariants({ tone: props.tone }), props.narrow === 'stack' ? 'max-md:flex-wrap' : '', props.class)">
+    <div :class="cn('flex min-w-0 flex-1 flex-col gap-1', props.narrow === 'stack' ? 'max-md:basis-full' : '')">
       <p v-if="props.title" data-slot="callout-title" class="m-0 font-bold">
         {{ props.title }}
       </p>
@@ -37,7 +43,7 @@ const emit = defineEmits<{ close: [] }>()
         <slot />
       </div>
     </div>
-    <div v-if="$slots.actions" data-slot="callout-actions" class="flex shrink-0 flex-wrap items-center justify-end gap-4">
+    <div v-if="$slots.actions" data-slot="callout-actions" :class="cn('flex shrink-0 flex-wrap items-center justify-end gap-4', props.narrow === 'stack' ? 'max-md:max-w-full max-md:shrink max-md:justify-start' : '')">
       <slot name="actions" />
     </div>
     <!--

@@ -102,7 +102,44 @@ const ro = ref({ name: 'КАСКО — осмотр', text: 'Осмотр авт
           </p>
         </div>
         <div data-example class="flex min-w-0 flex-col items-stretch gap-3">
-          <template v-if="c.id === 'input-clear-tab'">
+          <!-- Такт 92: оси узкого экрана срабатывают по ширине окна — пример рамкой 375 × 480 со страницей /kit-narrow. -->
+          <template v-if="c.id === 'frame-narrow'">
+            <iframe src="/kit-narrow?case=frame&drawer=1" title="Узкий экран — Каркас admin.vue" class="h-120 w-93.75 self-start rounded-md border border-border-soft" />
+            <span class="text-xs text-muted-foreground">рамка 375 × 480: каркас ниже 1024 — компактная полоса, панель меню открыта (оснастка ?drawer=1)</span>
+          </template>
+          <template v-else-if="c.id === 'modal-card-narrow'">
+            <iframe src="/kit-narrow?case=modal" title="Узкий экран — ModalCard" class="h-120 w-93.75 self-start rounded-md border border-border-soft" />
+            <span class="text-xs text-muted-foreground">рамка 375 × 480: сайд во всё окно, действия шапки под заголовком, текст подвала над кнопками</span>
+          </template>
+          <template v-else-if="c.id === 'modal-card-side'">
+            <iframe src="/kit-narrow?case=frame&drawer=1" title="Узкий экран — ModalCard" class="h-120 w-93.75 self-start rounded-md border border-border-soft" />
+            <span class="text-xs text-muted-foreground">рамка 375 × 480: side="left" и surface="sidebar" — выезжающее меню каркаса</span>
+          </template>
+          <template v-else-if="c.id === 'action-bar-dock'">
+            <iframe src="/kit-narrow?case=dock" title="Узкий экран — ActionBar" class="h-120 w-93.75 self-start rounded-md border border-border-soft" />
+            <span class="text-xs text-muted-foreground">рамка 375 × 480: полоса у низа окна во всю ширину</span>
+          </template>
+          <template v-else-if="c.id === 'popover-narrow'">
+            <iframe src="/kit-narrow?case=popover" title="Узкий экран — Popover" class="h-120 w-93.75 self-start rounded-md border border-border-soft" />
+            <span class="text-xs text-muted-foreground">рамка 375 × 480: плашка во всю ширину и до края окна</span>
+          </template>
+          <template v-else-if="c.id === 'heading-lines'">
+            <iframe src="/kit-narrow?case=text" title="Узкий экран — Heading" class="h-120 w-93.75 self-start rounded-md border border-border-soft" />
+            <span class="text-xs text-muted-foreground">рамка 375 × 480: заголовок 24/28 — три строки с многоточием</span>
+          </template>
+          <template v-else-if="c.id === 'callout-narrow'">
+            <iframe src="/kit-narrow?case=text" title="Узкий экран — Callout" class="h-120 w-93.75 self-start rounded-md border border-border-soft" />
+            <span class="text-xs text-muted-foreground">рамка 375 × 480: действия плашки — строкой под текстом</span>
+          </template>
+          <template v-else-if="c.id === 'toaster-narrow'">
+            <iframe src="/kit-narrow?case=toaster" title="Узкий экран — Toast" class="h-120 w-93.75 self-start rounded-md border border-border-soft" />
+            <span class="text-xs text-muted-foreground">рамка 375 × 480: уведомление во всю ширину с полями 16</span>
+          </template>
+          <template v-else-if="c.id === 'field-hint-wrap'">
+            <iframe src="/kit-narrow?case=text" title="Узкий экран — Field" class="h-120 w-93.75 self-start rounded-md border border-border-soft" />
+            <span class="text-xs text-muted-foreground">рамка 375 × 480: подсказка «Описания» в две строки под полем — строка выросла</span>
+          </template>
+          <template v-else-if="c.id === 'input-clear-tab'">
             <Input v-model="draftClearTab" placeholder="Поиск типа объекта" clearable />
             <Button variant="outline">
               Следующий элемент

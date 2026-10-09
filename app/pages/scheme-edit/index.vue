@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createReusableTemplate } from '@vueuse/core'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { formulaPreview } from '~/components/ui/formula-input'
 import { clearMatches, highlightMatches, queryWords, type HighlightTarget } from '~/components/ui/highlight-text'
@@ -189,6 +190,49 @@ useHead({ title: 'Редактирование схемы осмотра — с�
 
 const route = useRoute()
 const q = (k: string) => String(route.query[k] ?? '')
+
+/* ------------------------------ узкий экран — такт 92 ------------------------------ */
+/**
+ * Раскладка 375 (`docs/scheme-edit-review.md`, 4.10; решение 5 оркестратора 2026-10-08): ниже 768 — шапка с именем до трёх строк,
+ * нижняя полоса «Опубликовать схему» и «⋯», выбор раздела и группы списком, строки-карточки полей и шагов, окна во всё окно,
+ * демо-осмотр без рамки телефона с вкладками. Раскладка без смены состава — классами `max-md:`; смена состава — флагом `phone`.
+ * Флаг ставится после монтирования: серверная разметка — рабочего стола, гидратация без расхождений; рабочий стол прежний.
+ */
+const PHONE = '(max-width: 767.98px)'
+const phone = ref(false)
+let phoneQuery: MediaQueryList | null = null
+const onPhone = (e: MediaQueryListEvent) => { phone.value = e.matches }
+onMounted(() => {
+  phoneQuery = window.matchMedia(PHONE)
+  phone.value = phoneQuery.matches
+  phoneQuery.addEventListener('change', onPhone)
+})
+onBeforeUnmount(() => phoneQuery?.removeEventListener('change', onPhone))
+/** Чип готовности и меню «⋯» — одна разметка: в шапке рабочего стола, на узком экране — в строке статусов и в нижней полосе. */
+const [DefineChip, ReuseChip] = createReusableTemplate()
+const [DefineMenu, ReuseMenu] = createReusableTemplate()
+/**
+ * Строка-карточка шага (решение 5): «Процессы и шаги» и оверлей повторяемого процесса — одна разметка. Карточка — `Card size="sm"`:
+ * номер и название с описанием, тип и признаки, способ и нейросети, фото-подсказки; действия — «⋯» (правка в сайде, удаление).
+ */
+const [DefineStepCard, ReuseStepCard] = createReusableTemplate<{ st: StepDraft, k: number, overlay: boolean, edit: () => void, remove: () => void }>()
+/**
+ * Демо-осмотр на узком экране (решение 5): экран приложения без рамки телефона, оглавление и «Из чего собран экран» — вкладками.
+ * Выбор экрана в оглавлении возвращает на вкладку экрана.
+ */
+const demoPane = ref<'screen' | 'toc' | 'sources'>('screen')
+/* Оснастка приёмки (такт 92): `?pane=toc` · `sources` — вкладка демо-осмотра на узком экране при загрузке. */
+const PANE_AT_LOAD = q('pane') === 'toc' || q('pane') === 'sources' ? q('pane') as 'toc' | 'sources' : null
+function demoPick(id: string) {
+  m.demoGo(id)
+  if (phone.value) demoPane.value = 'screen'
+}
+/** Открытое меню «⋯» строки-карточки: `field:<id>`, `step:<id>`. */
+const cardMenu = ref('')
+function cardAct(fn: () => void) {
+  cardMenu.value = ''
+  fn()
+}
 
 const D = demo as unknown as Record<'main' | 'fresh', Dataset>
 /** Окна и выделение «Формы» открывают таб «Форма» (такт 69); такт 88 — вставка полей из другой схемы. */
@@ -602,7 +646,19 @@ function goQuick(index: number) {
 function onSearchFocusIn() {
   searchFocused.value = true
   listDismissed.value = false
+  if (phone.value) revealSearch()
 }
+/**
+ * Узкий экран (такт 92): выдача — во всю ширину окна от поля до края окна и только вниз; поле встаёт к верху окна, выдаче остаётся
+ * вся высота экрана.
+ */
+function revealSearch() {
+  const el = document.querySelector<HTMLElement>('[data-search]')
+  if (!el) return
+  const top = Math.max(0, el.getBoundingClientRect().top + window.scrollY - 8)
+  if (Math.abs(window.scrollY - top) > 1) window.scrollTo({ top, behavior: 'instant' })
+}
+onMounted(() => { if (phone.value && searchPinned.value) setTimeout(revealSearch, 60) })
 /** Набор в поле в режиме «найдено» — снова выдача: режим снят, запрос прежний (и при наборе того же текста). */
 function onSearchInput() {
   if (finding.value) m.leaveFind()
@@ -698,7 +754,8 @@ function findTarget(target: string): HTMLElement | null {
   if (step) return document.querySelector(`[data-step-row="${step[1]}"]`)
   /* Группа формы и процесс (такт 86): карточка группы в списке, карточка процесса. */
   const group = target.match(/^group-(.+)$/)
-  if (group) return document.querySelector(`[data-form-group="${group[1]}"]`)
+  /* Узкий экран (такт 92): группа — выбором списком; цель — поле выбора группы. */
+  if (group) return document.querySelector(`[data-form-group="${group[1]}"]`) ?? (phone.value ? document.querySelector<HTMLElement>('[data-group-select]') : null)
   const process = target.match(/^process-(.+)$/)
   if (process) return document.querySelector(`[data-process="${process[1]}"]`)
   /* Кнопка по `data-act` (такт 91): «Добавить группу» и «Добавить процесс» пустых состояний — место проверок модели готовности. */
@@ -785,6 +842,15 @@ watch([() => m.findHits.value, () => m.ui.find.current, () => m.ui.tab, () => m.
 
 /** Навигатор в режиме «найдено» — 3.2, п. 16: разделы с совпадениями и раздел на экране, у каждого — число. */
 const navSections = computed(() => (finding.value ? SECTIONS.filter(s => m.findCounts.value.sections[s.id] > 0 || s.id === m.ui.section) : SECTIONS))
+/**
+ * Выбор раздела на узком экране — такт 92 (решение 5): семь разделов «Настроек» списком; в режиме «найдено» у раздела — число
+ * совпадений второй строкой (как число у раздела навигатора, 3.2, п. 16).
+ */
+const sectionItems = computed(() => SECTIONS.map(x => ({
+  value: x.id,
+  label: x.label,
+  subtitle: finding.value ? `Совпадений: ${m.findCounts.value.sections[x.id] ?? 0}` : undefined,
+})))
 
 /* ---------- «Недавние» — сессия вкладки (решение 5 оркестратора 2026-10-08, прецедент строки 167) ---------- */
 const RECENT_KEY = 'scheme-edit:search-recent'
@@ -841,6 +907,12 @@ function pickMenu(key: 'export' | 'dump' | 'copy' | 'reset' | 'delete') {
   menuOpen.value = false
   m.menu(key)
 }
+/** Узкий экран (такт 92): «Предпросмотр» и «История версий» — пунктами «⋯». */
+function pickPhone(key: 'preview' | 'history') {
+  menuOpen.value = false
+  if (key === 'preview') m.preview()
+  else m.openHistory()
+}
 const currentDate = computed(() => m.history.value[0]?.date ?? '')
 if (q('open') === 'publish' || q('open') === 'first-publish') m.openPublish()
 if (q('open') === 'reset') m.openReset()
@@ -867,6 +939,8 @@ const fieldsCount = computed(() => (fg.value ? `${fg.value.fields.length} ${plur
 const selectedCount = computed(() => m.ui.selectedFields.length)
 const selectedText = computed(() => `Выбрано: ${selectedCount.value} ${plural(selectedCount.value, 'поле', 'поля', 'полей')}`)
 const FIELD_ACTIONS: TableRowActionItem[] = [{ key: 'delete', label: 'Удалить', icon: 'delete', destructive: true }]
+/** Выбор группы на узком экране — такт 92 (решение 5): группы списком, алиас второй строкой. */
+const groupItems = computed(() => m.formGroups.value.map(g => ({ value: g.id, label: g.title, subtitle: g.alias || 'Алиас не задан' })))
 const FIELD_ACTIONS_COLUMN = tableRowActionsColumn(FIELD_ACTIONS)
 
 /** Сайд поля — № 42: черновик живёт здесь до «Сохранить» (r2 §7); порядковый номер — место в группе. */
@@ -1363,7 +1437,12 @@ const demoMode = computed<string>({ get: () => m.ui.demo.mode, set: v => m.setDe
 /** Этап открытого экрана — раздел оглавления; выбор этапа ведёт на его первый экран. */
 const demoStage = computed<string>({
   get: () => m.demoScreen.value.stage,
-  set: (v) => { const st = m.demo.value.stages.find(x => x.id === v); if (st && st.id !== m.demoScreen.value.stage) m.demoGo(st.screens[0]!) },
+  set: (v) => {
+    const st = m.demo.value.stages.find(x => x.id === v)
+    if (st && st.id !== m.demoScreen.value.stage) m.demoGo(st.screens[0]!)
+    /* Узкий экран (такт 92): этап без якорей — сразу его экран на вкладке «Экран». */
+    if (st && phone.value && !tocAnchors(st.id).length) demoPane.value = 'screen'
+  },
 })
 /**
  * Обводка элемента телефона и подсветка строки «Из чего собран экран»: переход из «?» (модель, до смены экрана) и наведение —
@@ -1376,7 +1455,12 @@ watch(() => m.ui.demo.screen, () => { demoHover.value = '' })
  * Такт 91: «Изменить» закрывает оверлей под курсором — строка уходит из DOM без `mouseleave`, и наведение пережило бы закрытие:
  * снова открытый демо-осмотр подсвечивал строку без курсора над ней (вскрыл прогон, СС-96). Закрытие оверлея наведение сбрасывает.
  */
-watch(() => demoOpen.value, (v) => { if (!v) demoHover.value = '' })
+watch(() => demoOpen.value, (v) => {
+  if (!v) demoHover.value = ''
+  /* Узкий экран (такт 92): демо-осмотр открывается на вкладке «Экран». */
+  else demoPane.value = 'screen'
+})
+if (PANE_AT_LOAD) onMounted(() => { demoPane.value = PANE_AT_LOAD })
 const demoTitle = computed(() => `Демо-осмотр — ${general.value.name || 'Новая схема осмотра'}`)
 const demoSubtitle = computed(() => (ro.value ? `По версии от ${m.history.value.find(v => v.id === m.ui.viewing)?.date ?? ''} · логика не выполняется` : 'По черновику · логика не выполняется'))
 /** Якоря этапа в оглавлении: у этапа из нескольких экранов и у экрана с пробелом. */
@@ -1632,8 +1716,11 @@ const creatingNow = computed(() => m.creating.value && !ro.value)
 /** Маркер этапа: замок; блокирующие — «! N» по всем замечаниям этапа; предупреждения — «! N»; иначе готово либо не готово. */
 function stageMark(st: Stage): { state: ReadinessMarkState, count: number } {
   if (st.locked) return { state: 'locked', count: 0 }
-  /* «Проверка и публикация» своих проверок не несёт: её маркер — блокирующие всей схемы. */
-  if (st.id === 'publish') return R.value.blocks ? { state: 'blocked', count: R.value.blocks } : { state: 'done', count: 0 }
+  /*
+   * «Проверка и публикация» своих проверок не несёт: её маркер — блокирующие всей схемы. Такт 92 (решение 1а): этап засчитывается
+   * публикацией — до неё без блокирующих «Готово к публикации» (`ready`, без галочки выполненного).
+   */
+  if (st.id === 'publish') return R.value.blocks ? { state: 'blocked', count: R.value.blocks } : { state: st.done ? 'done' : 'ready', count: 0 }
   const blocks = st.checks.filter(c => c.level === 'block').length
   const warns = st.checks.filter(c => c.level === 'warn').length
   if (blocks) return { state: 'blocked', count: blocks + warns }
@@ -1668,7 +1755,9 @@ const issues = computed(() => R.value.blocks + R.value.warns)
 const chip = computed(() => {
   const r = R.value
   if (m.creating.value) {
-    const state: ReadinessMarkState | '' = r.blocks ? 'blocked' : r.warns ? 'warning' : r.done === r.total ? 'done' : ''
+    /* Такт 92 (решение 1а): этапы 1–4 готовы, блокирующих и предупреждений нет — «Готово к публикации», без галочки выполненного. */
+    const prepared = r.stages.filter(st => !st.after && st.id !== 'publish').every(st => st.done)
+    const state: ReadinessMarkState | '' = r.blocks ? 'blocked' : r.warns ? 'warning' : prepared ? 'ready' : ''
     const tail = [r.blocks ? `блокирует публикацию: ${r.blocks}` : 'блокирующих нет', r.warns ? `предупреждений: ${r.warns}` : ''].filter(Boolean).join(' · ')
     return { label: `Готовность ${r.done} из ${r.total}`, state, count: r.blocks || r.warns, title: 'Готовность к публикации', summary: `${r.done} из ${r.total} этапов · ${tail}` }
   }
@@ -1850,9 +1939,14 @@ function placeToasts() {
   const tops = [...document.querySelectorAll('[data-slot=modal-card-actions]')]
     .filter(x => x.closest('[data-slot=modal-card]')?.getAttribute('data-state') !== 'closed').map(x => x.getBoundingClientRect())
     .filter(r => r.width > 0 && r.right > window.innerWidth - TOAST_ZONE).map(r => r.top)
+  /* Узкий экран (такт 92): без открытого окна уведомления — над нижней полосой «Опубликовать схему». */
+  if (!tops.length && phone.value) {
+    const dock = document.querySelector('[data-dock]')?.getBoundingClientRect()
+    if (dock?.width) tops.push(dock.top)
+  }
   toastBottom.value = tops.length ? `${Math.round(window.innerHeight - Math.min(...tops)) + 12}px` : undefined
 }
-watch([() => m.ui.surfaces.length, () => m.notices.length], () => {
+watch([() => m.ui.surfaces.length, () => m.notices.length, phone], () => {
   if (import.meta.client) nextTick(() => setTimeout(placeToasts, 0))
 })
 
@@ -1872,8 +1966,120 @@ if (import.meta.client) {
     :data-publish="m.publishState.value"
     :data-surface="m.topSurface.value?.id ?? ''"
     :data-viewing="m.ui.viewing"
-    class="flex min-w-0 flex-col gap-6"
+    :data-phone="phone || undefined"
+    class="flex min-w-0 flex-col gap-6 max-md:pb-20"
   >
+    <!--
+      Такт 92 — узкий экран (ревью 4.10, решение 5 оркестратора 2026-10-08): чип готовности и меню «⋯» — одна разметка на два места.
+      Рабочий стол — в строке шапки; узкий экран — чип в строке статусов, «⋯» — в нижней полосе рядом с «Опубликовать схему».
+    -->
+    <DefineChip>
+      <!--
+        Чип модели готовности — такт 91 (5.5): в режиме создания «Готовность N из 5» с этапами и проверками; после публикации —
+        «Проверка: N» только при замечаниях. «Исправить» ведёт к месту тем же переходом, что поиск.
+      -->
+      <ReadinessChip
+        v-if="chip"
+        v-model:open="readinessOpen"
+        :label="chip.label"
+        :state="chip.state"
+        :count="chip.count"
+        :title="chip.title"
+        :summary="chip.summary"
+        data-act="readiness"
+      >
+        <ReadinessList :groups="m.creating.value ? stageGroups() : checkGroups" data-readiness-list @go="goStageFrom" @fix="fixFrom" @manual="manualFrom" />
+        <template v-if="m.creating.value && m.ui.stripCollapsed" #footer>
+          <ButtonAction size="sm" :show-icon="false" data-act="strip-expand" @click="setStrip(false); readinessOpen = false">
+            Показать полосу подготовки
+          </ButtonAction>
+        </template>
+      </ReadinessChip>
+    </DefineChip>
+    <DefineMenu>
+      <!-- Меню «⋯» — № 8: список действий в поповере, удаление — отдельной группой. -->
+      <Popover v-model:open="menuOpen">
+        <PopoverTrigger as-child>
+          <IconButton variant="secondary" size="lg" label="Действия со схемой" data-act="menu">
+            <Icon name="more" :size="20" />
+          </IconButton>
+        </PopoverTrigger>
+        <PopoverContent data-menu="scheme" align="end" :side-offset="4" class="p-1">
+          <!-- Такт 92 (решение 5): на узком экране «Предпросмотр» и «История версий» уходят из шапки в «⋯». -->
+          <SelectGroup v-if="phone">
+            <SelectItem data-action="preview" @click="pickPhone('preview')">
+              Предпросмотр
+            </SelectItem>
+            <SelectItem v-if="m.current.value" data-action="history" @click="pickPhone('history')">
+              История версий
+            </SelectItem>
+          </SelectGroup>
+          <SelectGroup>
+            <SelectItem v-for="a in MENU" :key="a.key" :data-action="a.key" @click="pickMenu(a.key)">
+              {{ a.label }}
+            </SelectItem>
+          </SelectGroup>
+          <SelectGroup data-section="danger">
+            <!-- К-4 (такт 91): удаление — тоном опасного действия. -->
+            <SelectItem tone="destructive" data-action="delete" @click="pickMenu('delete')">
+              Удалить схему
+            </SelectItem>
+          </SelectGroup>
+        </PopoverContent>
+      </Popover>
+    </DefineMenu>
+
+    <DefineStepCard v-slot="{ st, k, overlay, edit, remove }">
+      <Card size="sm" class="flex items-start gap-3" :data-step-row="overlay ? undefined : st.id" :data-overlay-step="overlay ? st.id : undefined">
+        <div class="flex min-w-0 flex-1 flex-col gap-2">
+          <TableCellIdentity>
+            {{ k + 1 }}. {{ st.title }}
+            <template v-if="st.description" #description>
+              {{ st.description }}
+            </template>
+          </TableCellIdentity>
+          <div class="flex flex-wrap items-center gap-2">
+            <Chip variant="neutral">
+              {{ kindLabel(st.kind) }}
+            </Chip>
+            <template v-for="x in STEP_FLAGS" :key="x.key">
+              <Badge v-if="st[x.key]" size="sm" :variant="x.key === 'required' ? 'default' : 'neutral'" :data-badge="x.key">
+                {{ x.label }}
+              </Badge>
+            </template>
+          </div>
+          <ToolbarText data-step-meta>
+            {{ st.method }} · {{ st.networks.length ? `нейросети: ${st.networks.join(', ')}` : 'нейросети не выбраны' }}
+          </ToolbarText>
+          <div v-if="!overlay" class="flex flex-wrap items-center gap-2" :data-step-hints="st.hints.length">
+            <Badge size="sm" :variant="st.hints.length ? 'success' : 'warning'" data-hint-status>
+              {{ hintStatus(st.hints.length) }}
+            </Badge>
+            <ThumbStrip v-if="st.hints.length" :items="thumbs(st.hints)" :label="`Фото-подсказки шага «${st.title}»`" :data-hint-thumbs="st.id" @open="viewHints(st.hints, $event)" />
+          </div>
+        </div>
+        <Popover :open="cardMenu === `step:${st.id}`" @update:open="cardMenu = $event ? `step:${st.id}` : ''">
+          <PopoverTrigger as-child>
+            <IconButton :inert="ro" variant="service" size="lg" :label="`Действия с шагом «${st.title}»`" data-act="card-menu">
+              <Icon name="more" :size="20" />
+            </IconButton>
+          </PopoverTrigger>
+          <PopoverContent data-menu="card" align="end" :side-offset="4" class="p-1">
+            <SelectGroup>
+              <SelectItem data-action="edit" @click="cardAct(edit)">
+                Изменить шаг
+              </SelectItem>
+            </SelectGroup>
+            <SelectGroup data-section="danger">
+              <SelectItem tone="destructive" data-action="delete" @click="cardAct(remove)">
+                Удалить шаг
+              </SelectItem>
+            </SelectGroup>
+          </PopoverContent>
+        </Popover>
+      </Card>
+    </DefineStepCard>
+
     <div class="flex">
       <ButtonNavigation size="base" direction="left" data-act="back" @click="m.back()">
         Назад
@@ -1881,7 +2087,8 @@ if (import.meta.client) {
     </div>
 
     <div class="flex flex-col gap-2">
-      <Heading level="page" as="h1" data-scheme-title>
+      <!-- Узкий экран (такт 92): имя — ступень 24/28 (макет `33694:3930`), до трёх строк. -->
+      <Heading :level="phone ? 'title' : 'page'" as="h1" :lines="phone ? 3 : undefined" data-scheme-title>
         {{ general.name }}
       </Heading>
 
@@ -1891,8 +2098,9 @@ if (import.meta.client) {
         полный текст в подсказке; история, статус и кнопки ширину держат. Перенос строки сдвигал страницу под шапкой
         на 28 при каждой смене статуса сохранения — причина промаха клика в списке переменных (`scheme-edit.md`, 19.4).
       -->
-      <div class="flex h-11 items-center gap-6" data-header-row>
-        <div class="flex min-w-0 flex-1 items-center gap-4">
+      <!-- Узкий экран (такт 92): строка статусов переносится, действия — в нижней полосе. -->
+      <div class="flex h-11 items-center gap-6 max-md:h-auto max-md:flex-wrap max-md:gap-y-2" data-header-row>
+        <div class="flex min-w-0 flex-1 items-center gap-4 max-md:flex-wrap max-md:gap-y-2">
           <PublishStatus
             v-if="!ro"
             :state="m.publishState.value"
@@ -1903,81 +2111,65 @@ if (import.meta.client) {
           />
           <div class="flex shrink-0 items-center gap-4">
             <!-- С-1 (такт 91): история — после первой публикации; у схемы без публикаций входа в пустоту нет. -->
-            <ButtonAction v-if="m.current.value" size="sm" :show-icon="false" data-act="history" @click="m.openHistory()">
+            <ButtonAction v-if="m.current.value && !phone" size="sm" :show-icon="false" data-act="history" @click="m.openHistory()">
               История версий
             </ButtonAction>
             <AppBarStatus v-if="!ro" surface="light" retryable :state="m.save.state" @retry="m.retry()" />
           </div>
+          <ReuseChip v-if="phone && !ro" />
         </div>
 
         <!-- Просмотр прошлой версии: индикатора черновика и «Опубликовать схему» нет (r2 §2, состояние 7). -->
-        <div v-if="ro" class="ml-auto flex shrink-0 items-center gap-3">
-          <Button variant="outline" data-act="view-copy" @click="m.copy()">
-            Сделать копию
-          </Button>
-          <Button data-act="view-leave" @click="m.leaveView()">
-            Перейти к текущей версии
-          </Button>
-        </div>
-        <div v-else class="ml-auto flex shrink-0 items-center gap-3">
-          <Button variant="outline" show-icon data-act="preview" @click="m.preview()">
-            <template #icon>
-              <Icon name="visibility" :size="20" />
-            </template>
-            Предпросмотр
-          </Button>
-          <!--
-            Чип модели готовности — такт 91 (5.5): в режиме создания «Готовность N из 5» с этапами и проверками; после публикации —
-            «Проверка: N» только при замечаниях. «Исправить» ведёт к месту тем же переходом, что поиск.
-          -->
-          <ReadinessChip
-            v-if="chip"
-            v-model:open="readinessOpen"
-            :label="chip.label"
-            :state="chip.state"
-            :count="chip.count"
-            :title="chip.title"
-            :summary="chip.summary"
-            data-act="readiness"
-          >
-            <ReadinessList :groups="m.creating.value ? stageGroups() : checkGroups" data-readiness-list @go="goStageFrom" @fix="fixFrom" @manual="manualFrom" />
-            <template v-if="m.creating.value && m.ui.stripCollapsed" #footer>
-              <ButtonAction size="sm" :show-icon="false" data-act="strip-expand" @click="setStrip(false); readinessOpen = false">
-                Показать полосу подготовки
-              </ButtonAction>
-            </template>
-          </ReadinessChip>
-          <Button data-act="publish" @click="m.openPublish()">
-            Опубликовать схему
-          </Button>
-          <!-- Меню «⋯» — № 8: список действий в поповере, удаление — отдельной группой. -->
-          <Popover v-model:open="menuOpen">
-            <PopoverTrigger as-child>
-              <IconButton variant="secondary" size="lg" label="Действия со схемой" data-act="menu">
-                <Icon name="more" :size="20" />
-              </IconButton>
-            </PopoverTrigger>
-            <PopoverContent data-menu="scheme" align="end" :side-offset="4" class="p-1">
-              <SelectGroup>
-                <SelectItem v-for="a in MENU" :key="a.key" :data-action="a.key" @click="pickMenu(a.key)">
-                  {{ a.label }}
-                </SelectItem>
-              </SelectGroup>
-              <SelectGroup data-section="danger">
-                <!-- К-4 (такт 91): удаление — тоном опасного действия. -->
-                <SelectItem tone="destructive" data-action="delete" @click="pickMenu('delete')">
-                  Удалить схему
-                </SelectItem>
-              </SelectGroup>
-            </PopoverContent>
-          </Popover>
-        </div>
+        <template v-if="!phone">
+          <div v-if="ro" class="ml-auto flex shrink-0 items-center gap-3">
+            <Button variant="outline" data-act="view-copy" @click="m.copy()">
+              Сделать копию
+            </Button>
+            <Button data-act="view-leave" @click="m.leaveView()">
+              Перейти к текущей версии
+            </Button>
+          </div>
+          <div v-else class="ml-auto flex shrink-0 items-center gap-3">
+            <Button variant="outline" show-icon data-act="preview" @click="m.preview()">
+              <template #icon>
+                <Icon name="visibility" :size="20" />
+              </template>
+              Предпросмотр
+            </Button>
+            <ReuseChip />
+            <Button data-act="publish" @click="m.openPublish()">
+              Опубликовать схему
+            </Button>
+            <ReuseMenu />
+          </div>
+        </template>
       </div>
 
       <Callout v-if="ro" data-viewing-banner>
         {{ m.viewingText.value }}. Настройки открыты только для чтения
       </Callout>
     </div>
+
+    <!--
+      Нижняя полоса узкого экрана — такт 92 (ревью 4.10, решение 5): «Опубликовать схему» и «⋯» прибиты к низу окна; в просмотре
+      версии — «Перейти к текущей версии» и «Сделать копию». `ActionBar layout="dock"`.
+    -->
+    <ActionBar v-if="phone" layout="dock" :count="ro ? 'Просмотр версии' : 'Публикация схемы'" data-dock>
+      <template v-if="ro">
+        <Button class="min-w-0 flex-1" data-act="view-leave" @click="m.leaveView()">
+          Перейти к текущей версии
+        </Button>
+        <IconButton variant="secondary" size="lg" label="Сделать копию" data-act="view-copy" @click="m.copy()">
+          <Icon name="copy" :size="20" />
+        </IconButton>
+      </template>
+      <template v-else>
+        <Button class="min-w-0 flex-1" data-act="publish" @click="m.openPublish()">
+          Опубликовать схему
+        </Button>
+        <ReuseMenu />
+      </template>
+    </ActionBar>
 
     <!-- Полоса подготовки — такт 91 (5.5): до первой публикации; сворачивается в чип у «Опубликовать схему». -->
     <ReadinessBar
@@ -2018,7 +2210,7 @@ if (import.meta.client) {
                   <Icon name="chevron-down" :size="16" />
                 </IconButton>
               </template>
-              <template v-else #end>
+              <template v-else-if="!phone" #end>
                 <Kbd surface="card" data-search-hotkey>
                   /
                 </Kbd>
@@ -2036,14 +2228,18 @@ if (import.meta.client) {
         align="start"
         :side-offset="4"
         :width="846"
+        narrow="full"
+        :side-flip="!phone"
+        class="max-md:flex max-md:flex-col"
         @open-auto-focus="$event.preventDefault()"
         @close-auto-focus="$event.preventDefault()"
         @mousedown.prevent
       >
         <!-- Охват с числом совпадений (3.2, п. 6) и фильтр «Изменено в черновике» (п. 17). -->
         <Toolbar v-if="listMode === 'results'" data-search-toolbar>
-          <Tabs v-model="scope">
-            <TabsList variant="segmented">
+          <!-- Узкий экран (такт 92): охват прокручивается вбок. -->
+          <Tabs v-model="scope" class="max-md:max-w-full">
+            <TabsList variant="segmented" class="max-md:max-w-full max-md:overflow-x-auto">
               <TabsTrigger v-for="s in SEARCH_SCOPES" :key="s.id" :value="s.id" variant="segmented" :count="m.search.value.counts[s.id]" :data-scope="s.id">
                 {{ s.label }}
               </TabsTrigger>
@@ -2059,7 +2255,8 @@ if (import.meta.client) {
             Показано по «{{ m.search.value.shownFor }}»
           </ToolbarText>
         </div>
-        <div v-if="rows.length" class="max-h-96 overflow-y-auto p-1" role="listbox" aria-label="Выдача поиска">
+        <!-- Узкий экран (такт 92): список занимает высоту выдачи до края окна. -->
+        <div v-if="rows.length" class="max-h-96 overflow-y-auto p-1 max-md:max-h-none max-md:min-h-0 max-md:flex-1" role="listbox" aria-label="Выдача поиска">
           <SelectGroup v-for="sec in sections" :key="sec.header || sec.rows[0]?.id" :header="sec.header">
             <template v-for="row in sec.rows" :key="row.id">
               <SearchResult
@@ -2113,9 +2310,9 @@ if (import.meta.client) {
             </div>
           </template>
         </Empty>
-        <!-- Подвал — 3.2, п. 12: клавиши и общий счёт охвата. -->
-        <div class="flex items-center justify-between gap-4 px-4 pt-1 pb-3" data-search-footer>
-          <ToolbarText>
+        <!-- Подвал — 3.2, п. 12: клавиши и общий счёт охвата. Узкий экран (такт 92): клавиш нет — только счёт. -->
+        <div class="flex items-center justify-between gap-4 px-4 pt-1 pb-3 max-md:mt-auto" data-search-footer>
+          <ToolbarText v-if="!phone">
             <KbdText :text="listMode === 'results' ? '[↑↓] выбрать · [Enter] перейти · [Alt+Enter] переключить · [Tab] область · [Esc] закрыть' : '[↑↓] выбрать · [Enter] перейти · [Esc] закрыть'" />
           </ToolbarText>
           <ToolbarText v-if="listMode === 'results'" data-search-total>
@@ -2153,7 +2350,7 @@ if (import.meta.client) {
       </TabsList>
 
       <!-- Режим «найдено» — 3.2, пп. 16, 18: сводка над содержимым и «Сбросить». -->
-      <Callout v-if="finding" class="mt-6" data-find-bar>
+      <Callout v-if="finding" class="mt-6" narrow="stack" data-find-bar>
         {{ m.findSummary.value }}
         <template #actions>
           <ButtonAction size="sm" :show-icon="false" data-act="find-reset" @click="exitFind()">
@@ -2163,6 +2360,13 @@ if (import.meta.client) {
       </Callout>
 
       <TabsContent value="settings">
+        <!--
+          Узкий экран (такт 92; решение 5 оркестратора 2026-10-08): навигатор — выбор раздела списком, липкий под табами.
+          Отступление от макета `33694:3930` (навигатор раскрыт карточкой) — строка реестра расхождений.
+        -->
+        <Toolbar v-if="phone" class="sticky top-0 z-20 -mx-4" data-section-select>
+          <Select v-model="section" :items="sectionItems" placeholder="Раздел настроек" :show-icon="false" :searchable="false" data-field="section-select" />
+        </Toolbar>
         <!-- Каркас «Настроек»: колонка содержимого 846 и правый навигатор 266, зазор 24 — макет `33346:5470`. -->
         <div class="flex items-start gap-6 pt-6">
           <div ref="column" class="flex max-w-settings min-w-0 flex-1 flex-col gap-8" data-settings-column>
@@ -2195,7 +2399,7 @@ if (import.meta.client) {
                     <Autocomplete v-model="owner" :items="OWNERS" placeholder="Найти компанию" />
                   </Field>
                   <Field :readonly="ro" label="Тип осмотра" hint="Мультиосмотр объединяет несколько объектов в одном осмотре">
-                    <RadioGroup v-model="inspectionType" class="grid grid-cols-3" data-radio="inspectionType">
+                    <RadioGroup v-model="inspectionType" class="grid grid-cols-3 max-md:grid-cols-1" data-radio="inspectionType">
                       <RadioGroupItem variant="card" value="regular" :checked="inspectionType === 'regular'">
                         Обычный
                       </RadioGroupItem>
@@ -2205,7 +2409,7 @@ if (import.meta.client) {
                     </RadioGroup>
                   </Field>
                   <Field :readonly="ro" label="Назначение схемы" hint="От назначения зависит доступность части настроек">
-                    <RadioGroup v-model="purpose" class="grid grid-cols-3" data-radio="purpose">
+                    <RadioGroup v-model="purpose" class="grid grid-cols-3 max-md:grid-cols-1" data-radio="purpose">
                       <RadioGroupItem variant="card" value="standard" :checked="purpose === 'standard'">
                         Стандартная
                       </RadioGroupItem>
@@ -2246,7 +2450,7 @@ if (import.meta.client) {
                         Блокировать осмотр при проверке
                       </Checkbox>
                       <template #children>
-                        <Field :readonly="ro" label="Разблокировать при неактивности через, минут" orientation="left" :control-height="32" data-field="unlockMinutes">
+                        <Field :readonly="ro" label="Разблокировать при неактивности через, минут" :orientation="phone ? 'split' : 'left'" :control-height="32" data-field="unlockMinutes">
                           <InputNumber v-model="unlockMinutes" :min="5" :max="120" :step="5" />
                         </Field>
                       </template>
@@ -2293,7 +2497,7 @@ if (import.meta.client) {
                       </template>
                     </SettingRow>
                     <Field :readonly="ro" label="Видимость комментария к отказу" hint="Кто увидит комментарий исполнителя к отказу">
-                      <RadioGroup v-model="refuseVisibility" class="grid grid-cols-3" data-radio="refuseCommentVisibility">
+                      <RadioGroup v-model="refuseVisibility" class="grid grid-cols-3 max-md:grid-cols-1" data-radio="refuseCommentVisibility">
                         <RadioGroupItem variant="card" value="all" :checked="refuseVisibility === 'all'">
                           Все роли
                         </RadioGroupItem>
@@ -2385,7 +2589,7 @@ if (import.meta.client) {
                 <Heading level="title" description="Привязка справочников статусов и комментариев к схеме">
                   Словари
                 </Heading>
-                <Card class="grid grid-cols-2 items-start gap-6">
+                <Card class="grid grid-cols-2 max-md:grid-cols-1 items-start gap-6">
                   <Field :readonly="ro" label="Словарь статусов" data-field="statusDict">
                     <Select v-model="statusDict" :items="STATUS_DICTIONARIES" placeholder="" :show-icon="false" :searchable="false" />
                   </Field>
@@ -2410,7 +2614,7 @@ if (import.meta.client) {
                     <Heading level="group">
                       Дедлайн проверки
                     </Heading>
-                    <RadioGroup :readonly="ro" v-model="deadlineMode" class="grid grid-cols-3" data-radio="deadlineMode">
+                    <RadioGroup :readonly="ro" v-model="deadlineMode" class="grid grid-cols-3 max-md:grid-cols-1" data-radio="deadlineMode">
                       <RadioGroupItem variant="card" value="none" :checked="deadlineMode === 'none'">
                         Не устанавливать автоматически
                       </RadioGroupItem>
@@ -2422,10 +2626,10 @@ if (import.meta.client) {
                       </RadioGroupItem>
                     </RadioGroup>
                     <div v-if="deadlineMode !== 'none'" class="flex flex-wrap items-start gap-6">
-                      <Field v-if="deadlineMode === 'hours'" :readonly="ro" label="Часов" orientation="left" :control-height="32" data-field="deadlineHours">
+                      <Field v-if="deadlineMode === 'hours'" :readonly="ro" label="Часов" :orientation="phone ? 'split' : 'left'" :control-height="32" data-field="deadlineHours">
                         <InputNumber v-model="deadlineHours" :min="1" :max="240" />
                       </Field>
-                      <Field v-else :readonly="ro" label="Дней" orientation="left" :control-height="32" data-field="deadlineDays">
+                      <Field v-else :readonly="ro" label="Дней" :orientation="phone ? 'split' : 'left'" :control-height="32" data-field="deadlineDays">
                         <InputNumber v-model="deadlineDays" :min="1" :max="90" />
                       </Field>
                     </div>
@@ -2438,7 +2642,7 @@ if (import.meta.client) {
                     <Select v-model:values="deadlineEditors" multiple :items="ROLES" placeholder="Выберите роли" data-field="deadlineEditors" />
                   </Field>
                   <Field :readonly="ro" label="Кто может делиться осмотром">
-                    <RadioGroup v-model="share" class="grid grid-cols-4" data-radio="share">
+                    <RadioGroup v-model="share" class="grid grid-cols-4 max-md:grid-cols-1" data-radio="share">
                       <RadioGroupItem variant="card" value="anyone" :checked="share === 'anyone'">
                         Любой, с кем поделились
                       </RadioGroupItem>
@@ -2464,7 +2668,7 @@ if (import.meta.client) {
                 <Heading level="title" description="Тексты, отображаемые клиенту перед финальным подтверждением осмотра">
                   Экран подтверждения
                 </Heading>
-                <Card class="grid grid-cols-2 items-start gap-6">
+                <Card class="grid grid-cols-2 max-md:grid-cols-1 items-start gap-6">
                   <Field :readonly="ro" label="Подсказка клиенту" hint="Текст подсказки на экране подтверждения">
                     <Input v-model="confirmHint" placeholder="Введите подсказку для экрана подтверждения" :show-icon="false" data-field="confirmHint" />
                     <template #help>
@@ -2504,7 +2708,7 @@ if (import.meta.client) {
                         </template>
                       </HelpPreview>
                     </template>
-                    <RadioGroup v-model="mobileMode" class="grid grid-cols-2" data-radio="mobileMode">
+                    <RadioGroup v-model="mobileMode" class="grid grid-cols-2 max-md:grid-cols-1" data-radio="mobileMode">
                       <RadioGroupItem variant="card" value="regular" :checked="mobileMode === 'regular'">
                         Обычный
                         <template #description>
@@ -2607,7 +2811,7 @@ if (import.meta.client) {
                     </div>
                     <Card v-if="reasonForm && web.feedback" tone="muted" class="flex flex-col gap-4" data-reason-form>
                       <FieldSet legend="Новое обоснование">
-                        <div class="grid grid-cols-2 items-start gap-4">
+                        <div class="grid grid-cols-2 max-md:grid-cols-1 items-start gap-4">
                           <Field :readonly="ro" label="Ключ">
                             <Input v-model="reasonKey" placeholder="Например, geo" variant="elevated" :show-icon="false" data-field="reasonKey" />
                           </Field>
@@ -2673,7 +2877,7 @@ if (import.meta.client) {
                     <Select v-model:values="executors" multiple :items="ACCESS_ROLES" placeholder="Выберите роли" data-field="executors" />
                   </Field>
                   <Field :readonly="ro" label="Кто может управлять выполнением осмотра">
-                    <RadioGroup v-model="accessManage" class="grid grid-cols-3" data-radio="manage">
+                    <RadioGroup v-model="accessManage" class="grid grid-cols-3 max-md:grid-cols-1" data-radio="manage">
                       <RadioGroupItem variant="card" value="all" :checked="accessManage === 'all'">
                         Все роли
                       </RadioGroupItem>
@@ -2727,9 +2931,10 @@ if (import.meta.client) {
                 </Heading>
                 <!-- Канон страницы-таблицы (`naming.md`, «Такт 20»): шапка, таблица, подвал с пагинацией. -->
                 <div class="flex min-w-0 flex-col" data-groups-table>
-                  <TableToolbar :inert="ro" class="items-center gap-3">
-                    <Input v-model="groupQuery" variant="elevated" placeholder="Поиск по названию группы и компании" class="max-w-110 min-w-0" data-field="groupQuery" />
-                    <div class="w-56 shrink-0" data-field="groupFilter">
+                  <!-- Узкий экран (такт 92): поиск — строкой во всю ширину, фильтр и счёт — под ним; подвал переносится. -->
+                  <TableToolbar :inert="ro" class="items-center gap-3 max-md:h-auto max-md:flex-wrap max-md:py-3">
+                    <Input v-model="groupQuery" variant="elevated" placeholder="Поиск по названию группы и компании" class="max-w-110 min-w-0 max-md:max-w-none max-md:basis-full" data-field="groupQuery" />
+                    <div class="w-56 shrink-0 max-md:w-auto max-md:min-w-0 max-md:flex-1" data-field="groupFilter">
                       <Select v-model="groupFilter" variant="elevated" :items="GROUP_FILTERS" placeholder="" :show-icon="false" :searchable="false" />
                     </div>
                     <ToolbarText class="ml-auto" data-groups-count>
@@ -2771,6 +2976,7 @@ if (import.meta.client) {
                   </Table>
                   <TableFooter :inert="ro"
                     v-if="groupTotal"
+                    class="max-md:flex-wrap"
                     v-model:page="groupPage"
                     v-model:page-size="groupPageSize"
                     :pages="groupPages"
@@ -2799,7 +3005,7 @@ if (import.meta.client) {
                   <Heading level="group" description="Привязанные по алиасам поля формы осмотра будут подставлены в расчёт стоимости отделки">
                     Поля для расчётов
                   </Heading>
-                  <div class="grid grid-cols-2 items-start gap-6">
+                  <div class="grid grid-cols-2 max-md:grid-cols-1 items-start gap-6">
                     <Field :readonly="ro" label="Алиас для «Общая площадь объекта»" hint="Системное имя поля. Формат: namespace:fieldname" :disabled="finishOff">
                       <Input v-model="aliasTotal" placeholder="" :show-icon="false" :disabled="finishOff" data-field="aliasTotal" />
                     </Field>
@@ -3123,8 +3329,8 @@ if (import.meta.client) {
             </div>
           </div>
 
-          <!-- Правый навигатор — № 14: липкий в колонке (r2 §3). -->
-          <SectionNav v-model="section" title="Настройки" class="sticky top-6">
+          <!-- Правый навигатор — № 14: липкий в колонке (r2 §3). Узкий экран — выбор раздела списком над колонкой (такт 92). -->
+          <SectionNav v-if="!phone" v-model="section" title="Настройки" class="sticky top-6">
             <!-- Режим «найдено» (такт 86; 3.2, п. 16): разделы с совпадениями и раздел на экране, у каждого — число совпадений. -->
             <SectionNavItem
               v-for="s in navSections"
@@ -3143,9 +3349,10 @@ if (import.meta.client) {
       <!-- ============================ «Форма» — № 39–42, 62, 70: группы слева, поля выбранной группы справа (r2 §5; макет `32765:5584`) ============================ -->
       <TabsContent value="form">
         <!-- Просмотр прошлой версии (такт 68, решение 3 такта 69): поля — «только чтение», действия — под `inert`; выбор группы работает. -->
-        <div class="flex items-start gap-2 pt-6" data-form :data-readonly="ro || undefined">
+        <!-- Узкий экран (такт 92): группы — над полями, выбор группы списком; поля — строками-карточками. -->
+        <div class="flex items-start gap-2 pt-6 max-md:flex-col max-md:items-stretch max-md:gap-4" data-form :data-readonly="ro || undefined">
           <!-- Список групп — № 39: панель 192 (`32765:5586`), карандаш открывает сайд группы — № 68. -->
-          <div class="flex w-group-list shrink-0 flex-col gap-2">
+          <div class="flex w-group-list shrink-0 flex-col gap-2 max-md:w-full">
             <Card class="flex flex-col gap-1 p-1" data-groups>
               <div class="flex h-12 items-center justify-between gap-2 pr-2 pl-4">
                 <Heading level="group">Группы</Heading>
@@ -3158,7 +3365,7 @@ if (import.meta.client) {
                   </IconButton>
                 </div>
               </div>
-              <RadioGroup v-if="m.formGroups.value.length" v-model="groupValue" class="flex flex-col gap-0.5" data-radio="formGroup">
+              <RadioGroup v-if="m.formGroups.value.length && !phone" v-model="groupValue" class="flex flex-col gap-0.5" data-radio="formGroup">
                 <RadioGroupItem v-for="g in m.formGroups.value" :key="g.id" variant="card" :value="g.id" :checked="groupValue === g.id" :data-form-group="g.id">
                   {{ g.title }}
                   <template #description>
@@ -3166,6 +3373,9 @@ if (import.meta.client) {
                   </template>
                 </RadioGroupItem>
               </RadioGroup>
+              <div v-else-if="m.formGroups.value.length" class="px-3 pb-2" data-group-select>
+                <Select v-model="groupValue" :items="groupItems" placeholder="Группа формы" :show-icon="false" :searchable="false" data-field="group-select" />
+              </div>
               <!--
                 Настройки группы — блок `33179:4467`: пары «подпись — значение» текстом — `FrameMeta layout="stack"` (ступень 1,
                 решение оркестратора, довесок 1 к такту 69); правка — в сайде группы.
@@ -3243,7 +3453,7 @@ if (import.meta.client) {
                 </Button>
               </ActionBar>
 
-              <Table v-if="fg.fields.length" data-fields-table :data-reorder-list="`fields:${fg.id}`">
+              <Table v-if="fg.fields.length && !phone" data-fields-table :data-reorder-list="`fields:${fg.id}`">
                 <TableRow>
                   <TableHead variant="column" class="w-10 pl-4" aria-label="Порядок полей" />
                   <TableHead variant="column" class="w-10 justify-center px-2" aria-label="Выбор полей группы">
@@ -3337,6 +3547,62 @@ if (import.meta.client) {
                   </TableCell>
                 </TableRow>
               </Table>
+              <!--
+                Узкий экран (такт 92; решение 5): поля — строками-карточками `Card size="sm"`: номер и название, алиас и тип, признаки;
+                «⋯» — правка в сайде на весь экран и удаление. Перестановки и выбора нескольких на телефоне нет — правка структуры редкая.
+              -->
+              <div v-else-if="fg.fields.length" class="flex flex-col gap-2" data-fields-cards>
+                <Card v-for="(f, k) in fieldRows" :key="f.id" size="sm" class="flex items-start gap-3" :data-form-row="f.id">
+                  <div class="flex min-w-0 flex-1 flex-col gap-2">
+                    <div class="flex min-w-0 items-start gap-2">
+                      <TableCellIdentity>
+                        {{ k + 1 }}. {{ f.title }}
+                        <template #description>
+                          {{ f.alias || 'алиас не задан' }} · {{ typeLabel(f.type) }}
+                        </template>
+                      </TableCellIdentity>
+                      <HelpPreview v-bind="fieldBind(f.id)" @update:open="setHelp(`field:${f.id}`, $event)" @action="demoFromHelp(fieldHelp(f.id))">
+                        <template v-if="fieldHelp(f.id)?.screen" #default>
+                          <AppPreviewScreen fragment size="md" :screen="fieldHelp(f.id)?.screen" :marked="fieldHelp(f.id)?.mark" />
+                        </template>
+                      </HelpPreview>
+                    </div>
+                    <div v-if="f.required || f.webOnly || f.approval || f.dependent" class="flex flex-wrap items-center gap-2">
+                      <Badge v-if="f.required" size="sm" data-badge="required">
+                        Обязательное
+                      </Badge>
+                      <Badge v-if="f.webOnly" size="sm" variant="neutral" data-badge="web">
+                        Только web
+                      </Badge>
+                      <Badge v-if="f.approval" size="sm" variant="neutral" data-badge="approval">
+                        Согласование
+                      </Badge>
+                      <Badge v-if="f.dependent" size="sm" variant="neutral" data-badge="dependent">
+                        Зависимое
+                      </Badge>
+                    </div>
+                  </div>
+                  <Popover :open="cardMenu === `field:${f.id}`" @update:open="cardMenu = $event ? `field:${f.id}` : ''">
+                    <PopoverTrigger as-child>
+                      <IconButton :inert="ro" variant="service" size="lg" :label="`Действия с полем «${f.title}»`" data-act="card-menu">
+                        <Icon name="more" :size="20" />
+                      </IconButton>
+                    </PopoverTrigger>
+                    <PopoverContent data-menu="card" align="end" :side-offset="4" class="p-1">
+                      <SelectGroup>
+                        <SelectItem data-action="edit" @click="cardAct(() => openField(f.id))">
+                          Изменить поле
+                        </SelectItem>
+                      </SelectGroup>
+                      <SelectGroup data-section="danger">
+                        <SelectItem tone="destructive" data-action="delete" @click="cardAct(() => m.removeField(fg!.id, f.id))">
+                          Удалить поле
+                        </SelectItem>
+                      </SelectGroup>
+                    </PopoverContent>
+                  </Popover>
+                </Card>
+              </div>
               <!-- Пустые состояния — № 65 (аудит, «Пустые состояния»): «В группе нет полей» + «Добавить поле». -->
               <Empty v-else title="В группе нет полей" description="Добавьте первое поле группы" data-fields-empty>
                 <template #action>
@@ -3390,7 +3656,7 @@ if (import.meta.client) {
               </template>
               Вставить шаг из другой схемы
             </Button>
-            <Button variant="outline" show-icon class="ml-auto" data-act="fill-images" @click="openFill()">
+            <Button variant="outline" show-icon class="ml-auto max-md:ml-0" data-act="fill-images" @click="openFill()">
               <template #icon>
                 <Icon name="auto-fix" :size="16" />
               </template>
@@ -3405,7 +3671,7 @@ if (import.meta.client) {
           -->
           <ActionBar layout="panel" :open="stepsCount > 0" :count="stepsText" :inert="ro" data-steps-bar>
             <div class="flex w-full min-w-0 flex-col gap-3">
-              <Field label="Флаги" orientation="left" :control-height="20" data-steps-flags>
+              <Field label="Флаги" :orientation="phone ? 'top' : 'left'" :control-height="20" data-steps-flags>
                 <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
                   <Checkbox
                     v-for="f in STEP_FLAGS"
@@ -3420,7 +3686,7 @@ if (import.meta.client) {
                 </div>
               </Field>
               <div class="flex flex-wrap items-center gap-2">
-                <Field label="Фото" orientation="left" :control-height="40" data-field="bulkMethod">
+                <Field label="Фото" :orientation="phone ? 'top' : 'left'" :control-height="40" data-field="bulkMethod">
                   <div class="w-50">
                     <Select :model-value="''" :items="STEP_METHODS" placeholder="Способ съёмки" :show-icon="false" :searchable="false" @update:model-value="m.bulkMethod(String($event))" />
                   </div>
@@ -3477,7 +3743,8 @@ if (import.meta.client) {
                   Скрытый
                 </Badge>
               </div>
-              <div class="flex shrink-0 items-center gap-3">
+              <!-- Узкий экран (такт 92): действия процесса переносятся строкой под заголовком. -->
+              <div class="flex shrink-0 items-center gap-3 max-md:shrink max-md:flex-wrap">
                 <!-- «Открыть процесс» — полноэкранный оверлей повторяемого (№ 64, такт 71); чтение, поэтому и в просмотре версии. -->
                 <Button v-if="p.repeatable" variant="outline" show-icon data-act="process-open" @click="openOverlay(p.id)">
                   <template #icon>
@@ -3485,7 +3752,7 @@ if (import.meta.client) {
                   </template>
                   Открыть процесс
                 </Button>
-                <div :inert="ro" class="flex items-center gap-3">
+                <div :inert="ro" class="flex items-center gap-3 max-md:flex-wrap">
                   <!-- «Добавить шаг» у обычного процесса — сайд нового шага (такт 71, строка 150); у повторяемого шаги правит оверлей. -->
                   <Button v-if="!p.repeatable" variant="outline" show-icon data-act="step-add" @click="openStep(p.id, '')">
                     <template #icon>
@@ -3510,7 +3777,7 @@ if (import.meta.client) {
               Таблица шагов — № 46 (`32765:6642`, `32765:6652`): ручка, выбор, номер, название с описанием и типом шага, способ,
               нейросети, фото-подсказка, действия. Строку растит ячейка названия; соседние стоят у первой линии (ось `start`).
             -->
-            <Table v-if="p.steps.length" :data-steps-table="p.id" :data-reorder-list="`steps:${p.id}`">
+            <Table v-if="p.steps.length && !phone" :data-steps-table="p.id" :data-reorder-list="`steps:${p.id}`">
               <TableRow>
                 <TableHead variant="column" class="w-10 pl-4" aria-label="Порядок шагов" />
                 <TableHead variant="column" class="w-10 justify-center px-2" aria-label="Выбор шагов процесса">
@@ -3655,6 +3922,18 @@ if (import.meta.client) {
                 </TableCell>
               </TableRow>
             </Table>
+            <!-- Узкий экран (такт 92; решение 5): шаги — строками-карточками; правка — в сайде шага на весь экран. -->
+            <div v-else-if="p.steps.length" class="flex flex-col gap-2" :data-steps-cards="p.id">
+              <ReuseStepCard
+                v-for="(st, k) in p.steps"
+                :key="st.id"
+                :st="st"
+                :k="k"
+                :overlay="false"
+                :edit="() => openStep(p.id, st.id)"
+                :remove="() => m.removeStep(p.id, st.id)"
+              />
+            </div>
           </Card>
         </div>
         <!-- Такт 91 (5.5): «Далее» внизу этапа «Съёмка». -->
@@ -3677,7 +3956,8 @@ if (import.meta.client) {
             Такт 90 (решение 5): «Предпросмотр страницы» — у статуса витрины, всегда и в просмотре версии (страница по снимку);
             «Опубликовать на витрину» — до публикации карточки, в просмотре версии под `inert`.
           -->
-          <Callout :tone="CARD_TONE[sc.status]" :title="`Статус витрины: ${SHOWCASE_STATUS[sc.status]}`" data-showcase-status>
+          <!-- Узкий экран (такт 92): действия статуса — строкой под текстом (`narrow="stack"`). -->
+          <Callout :tone="CARD_TONE[sc.status]" :title="`Статус витрины: ${SHOWCASE_STATUS[sc.status]}`" narrow="stack" data-showcase-status>
             {{ cardText }}
             <template #actions>
               <div class="flex flex-wrap gap-3">
@@ -3701,13 +3981,13 @@ if (import.meta.client) {
             <Heading level="group" description="Публичное представление схемы для клиентов и менеджеров продаж">
               Витринная карточка
             </Heading>
-            <Field :readonly="ro" label="Продающее название" orientation="left" label-width="form" hint="Отличается от технического наименования схемы" data-field="scTitle">
+            <Field :readonly="ro" label="Продающее название" :orientation="phone ? 'top' : 'left'" label-width="form" hint="Отличается от технического наименования схемы" data-field="scTitle">
               <Input :model-value="sc.title" placeholder="" :show-icon="false" @update:model-value="m.setShowcase('title', String($event ?? ''))" />
             </Field>
-            <Field :readonly="ro" label="Краткое описание" orientation="left" label-width="form" data-field="scSummary">
+            <Field :readonly="ro" label="Краткое описание" :orientation="phone ? 'top' : 'left'" label-width="form" data-field="scSummary">
               <Textarea :model-value="sc.summary" placeholder="1–2 предложения для карточки на витрине" @update:model-value="m.setShowcase('summary', String($event ?? ''))" />
             </Field>
-            <Field :readonly="ro" label="Изображение" orientation="left" label-width="form" hint="Релевантное фото объекта. JPEG или PNG, до 5 МБ" data-field="scImage">
+            <Field :readonly="ro" label="Изображение" :orientation="phone ? 'top' : 'left'" label-width="form" hint="Релевантное фото объекта. JPEG или PNG, до 5 МБ" data-field="scImage">
               <button type="button" class="w-full" :inert="ro" data-act="showcase-image" @click="m.setShowcase('image', SHOWCASE_IMAGE)">
                 <FileUpload>
                   {{ sc.image ? `Изображение загружено · ${sc.image}` : 'Загрузить изображение' }}
@@ -3721,9 +4001,9 @@ if (import.meta.client) {
               Цена «от» — № 106 (такт 90, ревью 4.7; решение 3): источник — радио-карточки, как «Дедлайн проверки» (№ 23); под ними —
               цена из тарифа (`PriceRange` и «Открыть тарификацию») либо ручная цена с предупреждением ниже тарифа.
             -->
-            <Field :readonly="ro" label="Цена «от»" orientation="left" label-width="form" data-field="scPrice">
+            <Field :readonly="ro" label="Цена «от»" :orientation="phone ? 'top' : 'left'" label-width="form" data-field="scPrice">
               <div class="flex flex-col gap-3">
-                <RadioGroup v-model="priceSource" :readonly="ro" class="grid grid-cols-3 gap-2" data-radio="priceSource">
+                <RadioGroup v-model="priceSource" :readonly="ro" class="grid grid-cols-3 max-md:grid-cols-1 gap-2" data-radio="priceSource">
                   <RadioGroupItem v-for="x in PRICE_SOURCES" :key="x.value" variant="card" :value="x.value" :checked="priceSource === x.value" :data-price-source="x.value">
                     {{ x.label }}
                     <template #description>
@@ -3750,8 +4030,8 @@ if (import.meta.client) {
                 </Field>
               </div>
             </Field>
-            <Field :readonly="ro" label="Теги" orientation="left" label-width="form">
-              <div class="grid grid-cols-3 gap-3">
+            <Field :readonly="ro" label="Теги" :orientation="phone ? 'top' : 'left'" label-width="form">
+              <div class="grid grid-cols-3 max-md:grid-cols-1 gap-3">
                 <Field :readonly="ro" label="Индустрия" data-field="scIndustry">
                   <Select :model-value="sc.industry" :items="INDUSTRIES" :placeholder="sc.industry ? '' : 'Выберите индустрию'" :show-icon="false" :searchable="false" @update:model-value="m.setIndustry(String($event))" />
                 </Field>
@@ -3785,7 +4065,7 @@ if (import.meta.client) {
             </Field>
             <div class="flex flex-col gap-3">
               <Heading>Проблемы и решения</Heading>
-              <div class="grid grid-cols-2 gap-3">
+              <div class="grid grid-cols-2 max-md:grid-cols-1 gap-3">
                 <Card v-for="(p, k) in sc.problems" :key="k" tone="muted" class="flex flex-col gap-3 p-4" :data-problem="k">
                   <Field :readonly="ro" label="Проблема" :data-field="`scProblem${k}`">
                     <Input :model-value="p.problem" placeholder="" :show-icon="false" @update:model-value="m.setProblem(k, 'problem', String($event ?? ''))" />
@@ -3865,7 +4145,7 @@ if (import.meta.client) {
 
     <!-- ============================ сайд словаря комментариев — № 69 ============================ -->
     <ModalCard v-model:open="sideOpen">
-      <ModalCardContent placement="edge" data-side="comments">
+      <ModalCardContent narrow="full" placement="edge" data-side="comments">
         <ModalCardHeader title="Словарь комментариев" subtitle="Привязка словаря к схеме" />
         <ModalCardBody class="flex flex-col gap-6">
           <Field label="Словарь" data-field="sideDict">
@@ -3892,7 +4172,7 @@ if (import.meta.client) {
 
     <!-- ============================ сайд шаблона PDF — № 38 ============================ -->
     <ModalCard v-model:open="templateOpen">
-      <ModalCardContent placement="edge" data-side="template">
+      <ModalCardContent narrow="full" placement="edge" data-side="template">
         <ModalCardHeader :title="tpl.id ? `Редактирование шаблона — ${tplTitle}` : 'Добавление шаблона'" />
         <ModalCardBody class="flex flex-col gap-4">
           <Field label="Отображаемое название" required :invalid="tplInvalid" :hint="tplInvalid ? 'Заполните отображаемое название' : ''">
@@ -3928,7 +4208,7 @@ if (import.meta.client) {
 
     <!-- ============================ сайд поля — № 42: четыре секции (аудит, «Сайд „Редактирование поля“ — эталон»; макет `32936:16381`) ============================ -->
     <ModalCard v-model:open="fieldOpen">
-      <ModalCardContent placement="edge" data-side="field">
+      <ModalCardContent narrow="full" placement="edge" data-side="field">
         <ModalCardHeader :title="fd.id ? `Редактирование поля — ${fdTitle}` : 'Добавление поля'" />
         <ModalCardBody class="flex flex-col gap-6">
           <FieldSet legend="Основное">
@@ -4033,7 +4313,7 @@ if (import.meta.client) {
 
     <!-- ============================ сайд процесса — № 48, 49: три секции макетов `33245:5722`, `33245:6032` ============================ -->
     <ModalCard v-model:open="processOpen">
-      <ModalCardContent placement="edge" data-side="process">
+      <ModalCardContent narrow="full" placement="edge" data-side="process">
         <ModalCardHeader :title="pd.id ? `Редактирование процесса — ${pdTitle}` : 'Добавление процесса'" />
         <ModalCardBody class="flex flex-col gap-6">
           <FieldSet legend="Основное">
@@ -4122,10 +4402,11 @@ if (import.meta.client) {
       версии — чтение: поля «только для чтения», действия под `inert`, в подвале — «Закрыть».
     -->
     <ModalCard v-model:open="overlayOpen">
-      <ModalCardContent placement="full" data-overlay="process" :data-readonly="ro || undefined">
+      <ModalCardContent narrow="full" placement="full" data-overlay="process" :data-readonly="ro || undefined">
         <ModalCardHeader :title="od.title" :subtitle="overlaySubtitle" />
-        <ModalCardBody class="flex items-start gap-6">
-          <div class="flex w-modal-narrow shrink-0 flex-col gap-6" data-overlay-form>
+        <!-- Узкий экран (такт 92): форма процесса над шагами, шаги — строками-карточками. -->
+        <ModalCardBody class="flex items-start gap-6 max-md:flex-col max-md:items-stretch">
+          <div class="flex w-modal-narrow shrink-0 flex-col gap-6 max-md:w-full" data-overlay-form>
             <FieldSet legend="Основное">
               <Field :readonly="ro" label="Название" required :invalid="odError?.key === 'title'" :hint="odError?.key === 'title' ? odError.text : ''">
                 <Input v-model="od.title" placeholder="Например, Осмотр повреждений" :show-icon="false" :invalid="odError?.key === 'title'" data-field="odTitle" />
@@ -4274,7 +4555,7 @@ if (import.meta.client) {
                 </Button>
               </div>
             </div>
-            <Table v-if="od.steps.length" data-overlay-table>
+            <Table v-if="od.steps.length && !phone" data-overlay-table>
               <TableRow>
                 <TableHead variant="column" class="w-10 pl-4">
                   №
@@ -4328,6 +4609,17 @@ if (import.meta.client) {
                 </TableCell>
               </TableRow>
             </Table>
+            <div v-else-if="od.steps.length" class="flex flex-col gap-2" data-overlay-cards>
+              <ReuseStepCard
+                v-for="(st, k) in od.steps"
+                :key="st.id"
+                :st="st"
+                :k="k"
+                :overlay="true"
+                :edit="() => openStep(od.id, st.id, true)"
+                :remove="() => removeOverlayStep(st.id)"
+              />
+            </div>
             <Card v-else tone="muted">
               <Empty title="В процессе нет шагов" description="Шаги повторяемого процесса снимаются при каждом повторении — добавьте первый" data-overlay-empty />
             </Card>
@@ -4358,7 +4650,7 @@ if (import.meta.client) {
       собран экран» со ссылками «Изменить». Esc закрывает.
     -->
     <ModalCard v-model:open="demoOpen">
-      <ModalCardContent placement="full" data-overlay="demo" :data-mode="m.ui.demo.mode" :data-screen="m.demoScreen.value.id" @keydown="onDemoKey">
+      <ModalCardContent narrow="full" placement="full" data-overlay="demo" :data-mode="m.ui.demo.mode" :data-screen="m.demoScreen.value.id" @keydown="onDemoKey">
         <ModalCardHeader :title="demoTitle" :subtitle="demoSubtitle">
           <template #actions>
             <Tabs v-model="demoMode">
@@ -4376,9 +4668,26 @@ if (import.meta.client) {
             </Button>
           </template>
         </ModalCardHeader>
-        <ModalCardBody class="flex items-start gap-6">
+        <ModalCardBody class="flex items-start gap-6 max-md:flex-col max-md:items-stretch max-md:gap-4">
+          <!--
+            Узкий экран (такт 92; решение 5): экран, оглавление и «Из чего собран экран» — вкладками; экран приложения — без рамки
+            телефона. Рабочий стол — три колонки (такт 89).
+          -->
+          <Tabs v-if="phone" v-model="demoPane" data-demo-panes>
+            <TabsList stretch>
+              <TabsTrigger value="screen" data-demo-pane="screen">
+                Экран
+              </TabsTrigger>
+              <TabsTrigger value="toc" data-demo-pane="toc">
+                Оглавление
+              </TabsTrigger>
+              <TabsTrigger value="sources" data-demo-pane="sources">
+                Из чего собран экран
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
           <!-- Оглавление экранов по этапам — № 100: `SectionNav`, у экрана с пробелом — метка тоном предупреждения. -->
-          <SectionNav v-model="demoStage" title="Экраны" class="sticky top-0" data-demo-toc>
+          <SectionNav v-if="!phone || demoPane === 'toc'" v-model="demoStage" title="Экраны" class="sticky top-0 max-md:static max-md:w-full" data-demo-toc>
             <SectionNavItem
               v-for="st in m.demo.value.stages"
               :key="st.id"
@@ -4395,17 +4704,18 @@ if (import.meta.client) {
                 tone="warning"
                 :active="s.id === m.demoScreen.value.id"
                 :data-screen="s.id"
-                @select="m.demoGo(s.id)"
+                @select="demoPick(s.id)"
               />
             </SectionNavItem>
           </SectionNav>
 
           <!-- Центр — № 99, 101: телефон «По шагам» либо карта экранов. -->
-          <div v-if="m.ui.demo.mode === 'steps'" class="sticky top-0 flex min-w-0 flex-1 flex-col items-center gap-4" data-demo-center>
+          <div v-if="m.ui.demo.mode === 'steps' && (!phone || demoPane === 'screen')" class="sticky top-0 flex min-w-0 flex-1 flex-col items-center gap-4 max-md:static" data-demo-center>
             <AppPreviewScreen
               :screen="m.demoScreen.value"
               size="lg"
               :scale="1.4"
+              :frame="!phone"
               interactive
               :marked="demoMarked"
               data-demo-phone
@@ -4425,7 +4735,7 @@ if (import.meta.client) {
               </IconButton>
             </div>
           </div>
-          <div v-else class="flex min-w-0 flex-1 flex-col gap-8" data-demo-map>
+          <div v-else-if="m.ui.demo.mode === 'map' && (!phone || demoPane === 'screen')" class="flex min-w-0 flex-1 flex-col gap-8" data-demo-map>
             <section v-for="st in m.demo.value.stages" :key="st.id" class="flex flex-col gap-3" :data-map-stage="st.id">
               <Heading>
                 {{ st.label }}
@@ -4458,7 +4768,7 @@ if (import.meta.client) {
           </div>
 
           <!-- «Из чего собран экран» — № 102: наведение на строку обводит элемент телефона, «Изменить» ведёт к месту. -->
-          <div class="flex w-80 shrink-0 flex-col gap-3" data-demo-sources>
+          <div v-if="!phone || demoPane === 'sources'" class="flex w-80 shrink-0 flex-col gap-3 max-md:w-full" data-demo-sources>
             <Heading>
               Из чего собран экран
             </Heading>
@@ -4497,7 +4807,7 @@ if (import.meta.client) {
       странице закрывает оверлей и ставит фокус в поле таба. Esc закрывает.
     -->
     <ModalCard v-model:open="siteOpen">
-      <ModalCardContent placement="full" data-overlay="site" :data-device="m.ui.site.device" :data-view="m.ui.site.view">
+      <ModalCardContent narrow="full" placement="full" data-overlay="site" :data-device="m.ui.site.device" :data-view="m.ui.site.view">
         <ModalCardHeader title="Предпросмотр страницы сценария" :subtitle="siteSubtitle">
           <template #actions>
             <Tabs v-model="siteDevice">
@@ -4552,7 +4862,7 @@ if (import.meta.client) {
       Подсказки · Связи. Образец — сайд поля (№ 42). Поверх оверлея пишет в черновик оверлея.
     -->
     <ModalCard v-model:open="stepOpen">
-      <ModalCardContent placement="edge" data-side="step" :data-host="sdHost.overlay ? 'overlay' : 'page'">
+      <ModalCardContent narrow="full" placement="edge" data-side="step" :data-host="sdHost.overlay ? 'overlay' : 'page'">
         <ModalCardHeader :title="sd.id ? `Редактирование шага — ${sdTitle}` : 'Добавление шага'" :subtitle="`Процесс «${hostTitle}»`" />
         <ModalCardBody class="flex flex-col gap-6">
           <FieldSet legend="Основное" data-step-section="main">
@@ -4678,7 +4988,7 @@ if (import.meta.client) {
 
     <!-- ============================ сайд «Нейросети выбранных шагов» — «Настроить нейросети» панели (№ 44) ============================ -->
     <ModalCard v-model:open="networksOpen">
-      <ModalCardContent placement="edge" data-side="networks">
+      <ModalCardContent narrow="full" placement="edge" data-side="networks">
         <ModalCardHeader title="Нейросети выбранных шагов" :subtitle="stepsText" />
         <ModalCardBody class="flex flex-col gap-6">
           <ModalCardText>
@@ -4716,14 +5026,15 @@ if (import.meta.client) {
       с «←», как дифф версии в истории. Категории — `SectionNav` колонкой слева, сетка — `MediaGallery` (решение 4).
     -->
     <ModalCard v-model:open="hintsOpen">
-      <ModalCardContent placement="edge" :data-side="catalogShown ? 'catalog' : 'fill'" :data-target="catalogShown ? cat.target : undefined" @escape-key-down="onHintsEscape">
+      <ModalCardContent narrow="full" placement="edge" :data-side="catalogShown ? 'catalog' : 'fill'" :data-target="catalogShown ? cat.target : undefined" @escape-key-down="onHintsEscape">
         <template v-if="catalogShown">
           <ModalCardHeader v-if="cat.target === 'fill'" back :title="catalogTitle" :subtitle="catalogSubtitle" @back="closeFillCatalog()" />
           <ModalCardHeader v-else :title="catalogTitle" :subtitle="catalogSubtitle" />
           <ModalCardBody class="flex flex-col gap-4">
             <Input v-model="catalogQuery" placeholder="Поиск по части и ракурсу" data-field="catalog-search" />
-            <div class="flex items-start gap-6">
-              <SectionNav v-model="catalogCategory" aria-label="Категории каталога" class="sticky top-0 max-w-44" data-catalog-categories>
+            <!-- Узкий экран (такт 92): категории над сеткой, плитки по две в ряд. -->
+            <div class="flex items-start gap-6 max-md:flex-col max-md:items-stretch max-md:gap-4">
+              <SectionNav v-model="catalogCategory" aria-label="Категории каталога" class="sticky top-0 max-w-44 max-md:static max-md:w-full max-md:max-w-none" data-catalog-categories>
                 <SectionNavItem value="all" label="Все" :count="catalogNumbers.all" />
                 <SectionNavItem v-for="c in HINT_CATEGORIES" :key="c.id" :value="c.id" :label="c.label" :count="catalogNumbers[c.id]" />
               </SectionNav>
@@ -4733,7 +5044,7 @@ if (import.meta.client) {
                     v-for="c in catalogItems"
                     :key="c.id"
                     size="md"
-                    class="w-44"
+                    class="w-44 max-md:w-36"
                     :src="c.src"
                     :alt="catalogLabel(c)"
                     selectable
@@ -4817,7 +5128,8 @@ if (import.meta.client) {
                       {{ v.manual ? 'Выбрано вручную' : HINT_MATCH_LABEL[v.row.proposal.match] }}
                     </Badge>
                   </div>
-                  <div class="flex items-center gap-4">
+                  <!-- Узкий экран (такт 92): действия строки — строкой под предложением. -->
+                  <div class="flex items-center gap-4 max-md:flex-wrap">
                     <MediaGalleryItem size="sm" :src="catalogHint(v.hint)?.src ?? ''" :alt="catalogName(v.hint)" class="w-24 shrink-0" />
                     <TableCellIdentity>
                       {{ catalogName(v.hint) || 'Нет предложения' }}
@@ -4825,7 +5137,7 @@ if (import.meta.client) {
                         {{ v.manual ? 'выбрано в каталоге' : v.row.proposal.reason }}
                       </template>
                     </TableCellIdentity>
-                    <div class="flex shrink-0 flex-col items-end gap-1">
+                    <div class="flex shrink-0 flex-col items-end gap-1 max-md:basis-full max-md:flex-row max-md:items-center max-md:gap-6">
                       <ButtonAction size="sm" :show-icon="false" data-act="fill-replace" @click="openCatalog('fill', v.row.processId, v.row.stepId)">
                         {{ v.hint ? 'Заменить' : 'Выбрать из каталога' }}
                       </ButtonAction>
@@ -4862,7 +5174,7 @@ if (import.meta.client) {
       назад. Схемы и группы — строки-переходы `ListRow` (как список версий истории, № 56); поля и шаги — `Table` с флажками.
     -->
     <ModalCard v-model:open="pasteOpen">
-      <ModalCardContent placement="edge" data-side="paste" :data-kind="paste.kind" :data-level="pasteLevel" @escape-key-down="onPasteEscape">
+      <ModalCardContent narrow="full" placement="edge" data-side="paste" :data-kind="paste.kind" :data-level="pasteLevel" @escape-key-down="onPasteEscape">
         <ModalCardHeader v-if="pasteLevel === 'schemes'" :title="pasteTitle" :subtitle="pasteSubtitle" />
         <ModalCardHeader v-else back :title="pasteTitle" :subtitle="pasteSubtitle" @back="pasteBack()" />
         <ModalCardBody class="flex flex-col gap-4">
@@ -4898,12 +5210,13 @@ if (import.meta.client) {
           </div>
 
           <!-- Третий уровень — поля группы: тип, алиас, конфликт алиаса до вставки. -->
+          <!-- Узкий экран (такт 92): колонка названия не уже 176 — таблица прокручивается вбок. -->
           <Table v-else-if="paste.kind === 'fields'" data-paste-table>
             <TableRow>
               <TableHead variant="column" class="w-10 justify-center px-2" aria-label="Выбор полей группы">
                 <Checkbox :model-value="pasteAll === 'all'" :indeterminate="pasteAll === 'some'" data-paste-all @update:model-value="pasteToggleAll()" />
               </TableHead>
-              <TableHead variant="column" class="min-w-0 flex-1 px-4">
+              <TableHead variant="column" class="min-w-0 flex-1 px-4 max-md:min-w-44">
                 Поле
               </TableHead>
               <TableHead variant="column" class="w-40 px-4">
@@ -4923,7 +5236,7 @@ if (import.meta.client) {
               <TableCell variant="slot" align="start" class="w-10 justify-center px-2">
                 <Checkbox :model-value="paste.picked.includes(r.field.id)" :aria-label="r.field.title" @update:model-value="pasteToggle(r.field.id)" />
               </TableCell>
-              <TableCell variant="slot" class="h-auto min-w-0 flex-1 flex-col items-start px-4 pt-4.5 pb-3 contain-inline-size">
+              <TableCell variant="slot" class="h-auto min-w-0 flex-1 flex-col items-start px-4 pt-4.5 pb-3 contain-inline-size max-md:min-w-44">
                 <TableCellIdentity class="w-full flex-none">
                   {{ r.field.title }}
                   <template v-if="r.conflict" #description>
@@ -4944,7 +5257,7 @@ if (import.meta.client) {
 
           <!-- Третий уровень — шаги процесса: процесс-цель, тип и способ съёмки; подсказки и нейросети переносятся с шагом. -->
           <template v-else>
-            <Field label="Вставить в процесс" orientation="left" :control-height="40" data-field="paste-target">
+            <Field label="Вставить в процесс" :orientation="phone ? 'top' : 'left'" :control-height="40" data-field="paste-target">
               <div class="w-72">
                 <Select v-model="pasteTarget" :items="pasteTargetItems" placeholder="" :show-icon="false" :searchable="false" />
               </div>
@@ -4954,7 +5267,7 @@ if (import.meta.client) {
                 <TableHead variant="column" class="w-10 justify-center px-2" aria-label="Выбор шагов процесса">
                   <Checkbox :model-value="pasteAll === 'all'" :indeterminate="pasteAll === 'some'" data-paste-all @update:model-value="pasteToggleAll()" />
                 </TableHead>
-                <TableHead variant="column" class="min-w-0 flex-1 px-4">
+                <TableHead variant="column" class="min-w-0 flex-1 px-4 max-md:min-w-44">
                   Шаг
                 </TableHead>
                 <TableHead variant="column" class="w-40 px-4">
@@ -4968,7 +5281,7 @@ if (import.meta.client) {
                 <TableCell variant="slot" align="start" class="w-10 justify-center px-2">
                   <Checkbox :model-value="paste.picked.includes(st.id)" :aria-label="st.title" @update:model-value="pasteToggle(st.id)" />
                 </TableCell>
-                <TableCell variant="slot" class="h-auto min-w-0 flex-1 flex-col items-start px-4 pt-4.5 pb-3 contain-inline-size">
+                <TableCell variant="slot" class="h-auto min-w-0 flex-1 flex-col items-start px-4 pt-4.5 pb-3 contain-inline-size max-md:min-w-44">
                   <TableCellIdentity class="w-full flex-none">
                     {{ st.title }}
                     <template #description>
@@ -5027,7 +5340,7 @@ if (import.meta.client) {
 
     <!-- ============================ сайд группы — № 68: поля по блоку «Настройки группы» `33179:4467` ============================ -->
     <ModalCard v-model:open="groupOpen">
-      <ModalCardContent placement="edge" data-side="group">
+      <ModalCardContent narrow="full" placement="edge" data-side="group">
         <ModalCardHeader :title="gd.id ? `Редактирование группы — ${gdTitle}` : 'Добавление группы'" />
         <ModalCardBody class="flex flex-col gap-4">
           <Field label="Название" required :invalid="gdInvalid" :hint="gdInvalid ? 'Заполните название группы' : ''">
@@ -5064,7 +5377,7 @@ if (import.meta.client) {
 
     <!-- ============================ публикация: модалка-гейт с диффом — № 54, 58 ============================ -->
     <ModalCard v-model:open="publishOpen">
-      <ModalCardContent data-modal="publish">
+      <ModalCardContent narrow="full" data-modal="publish">
         <ModalCardHeader title="Публикация схемы" subtitle="Эти изменения войдут в новую версию и будут применяться к новым осмотрам" />
         <ModalCardBody class="flex flex-col gap-4">
           <!-- Такт 91 (5.5): проверки модели готовности над диффом — та же правда, что у чипа; «Исправить» ведёт к месту. -->
@@ -5093,7 +5406,7 @@ if (import.meta.client) {
 
     <!-- ============================ первая публикация — № 55 ============================ -->
     <ModalCard v-model:open="firstPublishOpen">
-      <ModalCardContent data-modal="first-publish">
+      <ModalCardContent narrow="full" data-modal="first-publish">
         <ModalCardHeader title="Первая публикация схемы" />
         <ModalCardBody class="flex flex-col gap-4">
           <ModalCardText>
@@ -5118,7 +5431,7 @@ if (import.meta.client) {
 
     <!-- ============================ «Сбросить черновик?» — № 60 ============================ -->
     <ModalCard v-model:open="resetOpen">
-      <ModalCardContent data-modal="reset">
+      <ModalCardContent narrow="full" data-modal="reset">
         <ModalCardHeader title="Сбросить черновик?" :subtitle="`Черновик вернётся к текущей версии от ${currentDate}. Будет сброшено:`" />
         <ModalCardBody>
           <Diff v-if="m.draftDiff.value" :areas="m.draftDiff.value.areas" :attention="m.draftDiff.value.attention" :total="m.draftDiff.value.total" />
@@ -5136,7 +5449,7 @@ if (import.meta.client) {
 
     <!-- ============================ «Удалить схему?» — № 8 ============================ -->
     <ModalCard v-model:open="deleteOpen">
-      <ModalCardContent size="sm" data-modal="delete">
+      <ModalCardContent narrow="full" size="sm" data-modal="delete">
         <ModalCardHeader title="Удалить схему?" />
         <ModalCardBody>
           <ModalCardText>
@@ -5156,7 +5469,7 @@ if (import.meta.client) {
 
     <!-- ============================ история версий: сайд и дифф версии — № 56 ============================ -->
     <ModalCard v-model:open="historyOpen">
-      <ModalCardContent placement="edge" data-side="history">
+      <ModalCardContent narrow="full" placement="edge" data-side="history">
         <template v-if="!m.versionShown.value">
           <ModalCardHeader title="История версий" subtitle="Публикации схемы: текущая версия сверху" />
           <ModalCardBody class="flex flex-col gap-2">
@@ -5201,7 +5514,8 @@ if (import.meta.client) {
     <!-- ============================ «Сделать копию» — окно «Новая схема осмотра» на шаге «Основа» (такт 91) ============================ -->
     <SchemeCreate v-model:open="copyOpen" mode="copy" :copy="m.copySource.value" @create="createCopy" @notify="m.notify($event)" />
 
-    <Toaster :bottom="toastBottom">
+    <!-- Узкий экран (такт 92): стопка во всю ширину окна с полями 16 (`narrow="full"`). -->
+    <Toaster :bottom="toastBottom" narrow="full">
       <Toast
         v-for="n in m.notices"
         :key="n.id"

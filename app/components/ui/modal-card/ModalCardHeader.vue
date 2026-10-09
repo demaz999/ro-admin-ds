@@ -28,11 +28,13 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{ back: [] }>()
 
 const ctx = inject(MODAL_CARD_KEY, { closable: computed(() => true) })
+/** Окно во всё окно на узком экране (`narrow="full"`, такт 92): действия шапки — строкой под заголовком ниже 768. */
+const narrow = computed(() => ctx.narrow?.value ?? false)
 </script>
 
 <template>
   <!-- Паддинги мастера: `close` — 0 / 12 / 0 / 16, `back` — 0 / 12 / 0 / 12; зазор стрелки и заголовка 16. -->
-  <div data-slot="modal-card-header" :data-type="props.back ? 'back' : 'close'" :class="cn('flex shrink-0 items-start gap-4 pr-3', props.back ? 'pl-3' : 'pl-4', props.class)">
+  <div data-slot="modal-card-header" :data-type="props.back ? 'back' : 'close'" :class="cn('flex shrink-0 items-start gap-4 pr-3', props.back ? 'pl-3' : 'pl-4', narrow ? 'max-md:flex-wrap max-md:gap-y-3' : '', props.class)">
     <!-- Стрелка — бокс 24 по центру строки 28, видимый глиф 17.58 по ширине: `ic_keyboard_backspace24` `1944:1184`. -->
     <IconButton v-if="props.back" data-modal-back variant="ghost" size="sm" label="Назад" class="mt-0.5" @click="emit('back')">
       <Icon name="arrow-back" :size="17.6" class="text-foreground" />
@@ -61,7 +63,12 @@ const ctx = inject(MODAL_CARD_KEY, { closable: computed(() => true) })
       Действия шапки — такт 89: переключатель вида и кнопки полноэкранного слоя (демо-осмотр страницы схемы) справа от
       заголовка через 16, до крестика; по центру блока заголовка и подзаголовка. Без слота шапка прежняя.
     -->
-    <div v-if="$slots.actions" data-slot="modal-card-header-actions" class="flex shrink-0 items-center gap-4 self-center">
+    <!-- Узкий экран (`narrow="full"`, такт 92): действия — последней строкой во всю ширину, с переносом, через 12 под заголовком. -->
+    <div
+      v-if="$slots.actions"
+      data-slot="modal-card-header-actions"
+      :class="cn('flex shrink-0 items-center gap-4 self-center', narrow ? 'max-md:order-last max-md:basis-full max-md:flex-wrap max-md:gap-3 max-md:self-start' : '')"
+    >
       <slot name="actions" />
     </div>
     <!-- Строка 28, бокс крестика 24 — по центру строки. Глиф 13: видимый размер `24_close`. -->

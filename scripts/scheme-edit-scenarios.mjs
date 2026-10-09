@@ -25,6 +25,8 @@
  * Адрес стенда — `KIT_URL` (по умолчанию http://localhost:3000/scheme-edit/). Такт 91: опция сценария `path` — страница стенда от
  * адреса: `new` — окно «Новая схема осмотра» на фоне списка схем (`/scheme-edit/new`); «Создать схему» уводит на страницу схемы в
  * том же документе — адаптер `created` ждёт модель и снова вешает наблюдатель статуса сохранения.
+ * Такт 92: опции сценария `width` и `height` — окно браузера (узкий экран — 375 × 812, раскладка телефона страницы и каркаса); без
+ * них — 1440 × 900. Слепок узкого экрана — поле `phone`, каркаса — `frame`.
  */
 import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
@@ -62,7 +64,7 @@ async function ensureChrome() {
   throw new Error(`Chrome не поднялся на порту ${PORT}`)
 }
 
-async function openPage(width = 1440) {
+async function openPage(width = 1440, height = 900) {
   const t = await (await fetch(`http://127.0.0.1:${PORT}/json/new?about:blank`, { method: 'PUT' })).json()
   const ws = new WebSocket(t.webSocketDebuggerUrl)
   await new Promise(r => { ws.onopen = r })
@@ -77,7 +79,7 @@ async function openPage(width = 1440) {
   }
   await send('Page.enable')
   await send('Emulation.setFocusEmulationEnabled', { enabled: true })
-  await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false })
+  await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false })
   const page = {
     /** Клики, не попавшие в цель, — см. `point`. */
     blind: [],
@@ -91,7 +93,12 @@ async function openPage(width = 1440) {
      */
     async point(sel) {
       await send('Page.bringToFront')
-      const at = scroll => evaluate(`(() => { const el = ${sel}; if (!el) return null; ${scroll ? "{ const v = el.getBoundingClientRect(); if (v.top < 0 || v.bottom > innerHeight) el.scrollIntoView({ block: 'center', behavior: 'instant' }); else el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' }) }" : ''} const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()`)
+      /*
+       * Такт 92: на узком экране низ окна закрывает нижняя полоса, верх — прилипший выбор раздела: цель под ними тоже «за краем окна».
+       * Цель внутри самой полосы или выбора раздела — в окне.
+       */
+      const edges = "const dock = document.querySelector('[data-dock]'); const stick = document.querySelector('[data-section-select]'); const own = x => x && x.contains(el); const lo = dock && !own(dock) ? dock.getBoundingClientRect().top : innerHeight; const sr = stick && !own(stick) ? stick.getBoundingClientRect() : null; const hi = sr && sr.top <= 0.5 ? sr.bottom : 0;"
+      const at = scroll => evaluate(`(() => { const el = ${sel}; if (!el) return null; ${scroll ? `{ ${edges} const v = el.getBoundingClientRect(); if (v.top < hi || v.bottom > lo) el.scrollIntoView({ block: 'center', behavior: 'instant' }); else el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' }) }` : ''} const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()`)
       let p = await at(true)
       if (!p) throw new Error(`нет элемента для клика: ${sel}`)
       for (let k = 0; k < 30; k++) { await sleep(100); const q = await at(false); if (q && q.x === p.x && q.y === p.y) break; p = q }
@@ -196,10 +203,10 @@ async function openPage(width = 1440) {
       await send('Input.dispatchKeyEvent', { type: 'keyUp', key: '/', code: 'Slash', windowsVirtualKeyCode: 191, nativeVirtualKeyCode: 191 })
       await sleep(150)
     },
-    /** Прокрутка окна колесом — реальным вводом. */
+    /** Прокрутка окна колесом — реальным вводом; точка колеса — середина окна (такт 92: окно 375 × 812). */
     async wheel(dy) {
       await send('Page.bringToFront')
-      await send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: 700, y: 450, deltaX: 0, deltaY: dy })
+      await send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: Math.round(width / 2), y: Math.round(height / 2), deltaX: 0, deltaY: dy })
       await sleep(300)
     },
     close() { ws.close(); return fetch(`http://127.0.0.1:${PORT}/json/close/${t.id}`) },
@@ -595,6 +602,27 @@ function kit(page) {
       await this.act('field-save')
       await this.settled()
     },
+    /* ---------- такт 92: каркас и узкий экран ---------- */
+    /** Бургер верхней полосы; на узком экране — выезжающая панель меню. */
+    burger: () => page.click(`document.querySelector('[data-menu-burger]')`),
+    /** Пункт выезжающей панели со страницей стенда — по `data-menu-link`. */
+    drawerLink: id => page.click(`document.querySelector('[data-menu-drawer] [data-menu-link=${id}]')`),
+    drawerClose: () => page.click(`document.querySelector('[data-menu-close]')`),
+    /** Кнопка нижней полосы узкого экрана по `data-act`. */
+    dock: act => page.click(`document.querySelector('[data-dock] [data-act=${act}]')`),
+    /** «⋯» нижней полосы и пункт меню. */
+    async dockMenu(action) {
+      await page.click(`document.querySelector('[data-dock] [data-act=menu]')`)
+      if (action) await page.click(`document.querySelector('[data-menu=scheme] [data-action=${action}]')`)
+    },
+    /** «⋯» строки-карточки поля либо шага и пункт меню: `edit` либо `delete`. */
+    async cardMenu(kind, id, action) {
+      const card = kind === 'field' ? `[data-fields-cards] [data-form-row="${id}"]` : kind === 'overlay' ? `[data-overlay-cards] [data-overlay-step="${id}"]` : `[data-steps-cards] [data-step-row="${id}"]`
+      await page.click(`document.querySelector('${card} [data-act=card-menu]')`)
+      if (action) await page.click(`document.querySelector('[data-menu=card] [data-action=${action}]')`)
+    },
+    /** Вкладка демо-осмотра на узком экране: `screen`, `toc`, `sources`. */
+    demoPane: id => page.click(`document.querySelector('[data-demo-pane=${id}]')`),
     dump: () => page.evaluate(`window.__scheme.dump()`),
     async snapshot() {
       const s = await page.evaluate(`(() => {
@@ -639,8 +667,24 @@ function kit(page) {
             acts: [...el.querySelectorAll('[data-act]')].map(b => b.dataset.act + (b.disabled ? ' выкл' : '')),
           } })(document.querySelector('[data-modal=create]'))
         const url = location.pathname + location.search
-        /* Фон окна создания — список схем вне стенда: модели страницы схемы на нём нет. */
-        if (!root || !M) return JSON.stringify({ page: 'list', url, notices, createWin, rows: document.querySelectorAll('[data-scheme-row]').length })
+        /*
+         * Такт 92 — каркас: меню в потоке, кнопки полосы (без панели меню), выезжающая панель (край, ширина, высота, пунктов, фокус внутри),
+         * подпись кнопки в фокусе.
+         */
+        const frame = (() => {
+          const vis = el => !!el && el.getBoundingClientRect().width > 0
+          const drawer = document.querySelector('[data-menu-drawer]')
+          const flow = [...document.querySelectorAll('[data-slot=menu]')].find(x => !x.closest('[data-menu-drawer]'))
+          const bar = [...document.querySelectorAll('[data-slot=app-bar]')].find(x => !x.closest('[data-menu-drawer]'))
+          return {
+            menuInFlow: vis(flow),
+            bar: bar ? [...bar.querySelectorAll('button')].filter(vis).map(b => b.getAttribute('aria-label') || t(b.textContent)) : [],
+            drawer: drawer ? (r => ({ x: Math.round(r.left), w: Math.round(r.width), h: Math.round(r.height), items: drawer.querySelectorAll('[data-slot=menu-item]').length,
+              focusIn: drawer.contains(document.activeElement), expanded: document.querySelector('[data-menu-burger]')?.getAttribute('aria-expanded') ?? null }))(drawer.getBoundingClientRect()) : null,
+            focus: document.activeElement?.getAttribute('aria-label') ?? null,
+          } })()
+        /* Фон окна создания — список схем вне стенда: модели страницы схемы на нём нет. Такт 92: и страницы стенда, куда ведёт меню каркаса. */
+        if (!root || !M) return JSON.stringify({ page: 'list', url, notices, createWin, rows: document.querySelectorAll('[data-scheme-row]').length, frame })
         return JSON.stringify({
           title: t(document.querySelector('[data-scheme-title]')?.textContent),
           tab: root.dataset.tab,
@@ -844,8 +888,8 @@ function kit(page) {
               /* Такт 74, карточка Б: счёт — слотом meta; слепок — «заголовок · счёт». */
               title: (() => { const h = el.querySelector('[data-fields-title]'); if (!h) return null; const head = h.matches('[data-slot=heading]') ? h : h.querySelector('[data-slot=heading]')
                 return [t(head?.textContent), t(h.querySelector('[data-slot=heading-meta]')?.textContent)].filter(Boolean).join(' · ') || null })(),
-              rows: [...el.querySelectorAll('[data-form-row]')].map(r => [t(r.querySelector('[data-row-number]').textContent), t(r.querySelector('[data-slot=table-cell-identity]').textContent),
-                t(r.querySelector('[data-field-alias]').textContent), t(r.querySelector('[data-slot=chip]').textContent),
+              rows: [...el.querySelectorAll('[data-form-row]')].map(r => [t(r.querySelector('[data-row-number]')?.textContent), t(r.querySelector('[data-slot=table-cell-identity]').textContent),
+                t(r.querySelector('[data-field-alias]')?.textContent), t(r.querySelector('[data-slot=chip]')?.textContent),
                 [...r.querySelectorAll('[data-badge]')].map(b => t(b.textContent)).join(', ')].filter(Boolean).join(' · ')),
               selected: el.querySelectorAll('[data-form-row][data-state=selected]').length,
               all: el.querySelector('[data-fields-all] [data-slot=choice-control], [data-fields-all][data-slot=choice-control]')?.getAttribute('aria-checked') ?? null,
@@ -888,10 +932,10 @@ function kit(page) {
                 c.querySelector('[data-act=process-open]') ? 'открыть' : ''].filter(Boolean).join(' · ')),
               /* Строка шага: № · название · тип · способ · нейросети · фото-подсказка · флаги. */
               rows: Object.fromEntries([...el.querySelectorAll('[data-process]')].map(c => [c.dataset.process, [...c.querySelectorAll('[data-step-row]')].map(r => [
-                t(r.querySelector('[data-row-number]').textContent), t(r.querySelector('[data-slot=table-cell-identity] [data-slot=table-cell-text]')?.textContent ?? r.querySelector('[data-slot=table-cell-identity]').textContent),
-                t(r.querySelector('[data-step-kind] [data-slot=chip-label]')?.textContent), t(r.querySelector('[data-step-method]').textContent),
+                t(r.querySelector('[data-row-number]')?.textContent), t(r.querySelector('[data-slot=table-cell-identity] [data-slot=table-cell-text]')?.textContent ?? r.querySelector('[data-slot=table-cell-identity]').textContent),
+                t(r.querySelector('[data-step-kind] [data-slot=chip-label]')?.textContent), t(r.querySelector('[data-step-method]')?.textContent),
                 [...r.querySelectorAll('[data-step-networks] [data-slot=table-cell-text], [data-step-networks] [data-networks-empty]')].map(x => t(x.textContent)).join(', '),
-                t(r.querySelector('[data-hint-status]').textContent),
+                t(r.querySelector('[data-hint-status]')?.textContent),
                 [...r.querySelectorAll('[data-badge]')].map(b => t(b.textContent)).join(', ')].filter(Boolean).join(' · '))])),
               selected: el.querySelectorAll('[data-step-row][data-state=selected]').length,
               all: Object.fromEntries([...el.querySelectorAll('[data-process]')].filter(c => c.querySelector('[data-steps-all]')).map(c => [c.dataset.process,
@@ -1002,7 +1046,7 @@ function kit(page) {
               placement: el.dataset.placement,
               name: el.querySelector('[data-field=odTitle] input, input[data-field=odTitle]')?.value ?? null,
               alias: el.querySelector('[data-field=odAlias] input, input[data-field=odAlias]')?.value ?? null,
-              steps: [...el.querySelectorAll('[data-overlay-step]')].map(r => [t(r.querySelector('[data-row-number]').textContent), t(r.querySelector('[data-slot=table-cell-identity] [data-slot=table-cell-text]')?.textContent ?? r.querySelector('[data-slot=table-cell-identity]').textContent)].join(' · ')),
+              steps: [...el.querySelectorAll('[data-overlay-step]')].map(r => [t(r.querySelector('[data-row-number]')?.textContent), t(r.querySelector('[data-slot=table-cell-identity] [data-slot=table-cell-text]')?.textContent ?? r.querySelector('[data-slot=table-cell-identity]').textContent)].join(' · ')),
               empty: t(el.querySelector('[data-overlay-empty] [data-slot=empty-title]')?.textContent) || null,
               acts: [...el.querySelectorAll('[data-act]')].filter(live).map(b => b.dataset.act),
               ro: !!el.dataset.readonly,
@@ -1209,6 +1253,47 @@ function kit(page) {
           gate: listOf(document.querySelector('[data-publish-checks]')),
           note: t([...document.querySelectorAll('[data-slot=modal-card-note]')].pop()?.textContent) || null,
           menuTone: [...document.querySelectorAll('[data-menu=scheme] [data-slot=list-item]')].map(x => t(x.textContent) + (x.dataset.tone ? ' · ' + x.dataset.tone : '')),
+          /* Такт 92, поправка 1б: пункты меню действий строки таблицы с тоном. */
+          rowMenu: [...document.querySelectorAll('[data-menu=row-actions] [data-slot=list-item]')].map(x => t(x.textContent) + (x.dataset.tone ? ' · ' + x.dataset.tone : '')),
+          /*
+           * ---------- такт 92: узкий экран ----------
+           * Ширина документа; имя схемы — строк и кегль; действия в строке шапки; нижняя полоса — кнопки и у низа ли окна; выбор раздела —
+           * значение и верх; навигатор; выбор группы; строки-карточки полей и шагов; таблиц на странице; верхнее окно — край и во всё ли
+           * окно; выдача поиска — край, ширина, низ; верх поля поиска; уведомления над полосой; меню «⋯» строки-карточки; вкладка и рамка
+           * демо-осмотра.
+           */
+          frame,
+          phone: (() => { if (!root.dataset.phone) return null
+            const vis = el => !!el && el.getBoundingClientRect().width > 0
+            const dock = document.querySelector('[data-dock]')
+            const title = document.querySelector('[data-scheme-title] [data-slot=heading], [data-scheme-title][data-slot=heading]')
+            const sel = document.querySelector('[data-section-select]')
+            const top = [...document.querySelectorAll('[data-slot=modal-card]')].filter(x => x.dataset.state !== 'closed').pop()
+            const res = document.querySelector('[data-search-results]')
+            const toasts = [...document.querySelectorAll('[data-slot=toast]')].map(x => x.getBoundingClientRect())
+            const demo = document.querySelector('[data-overlay=demo]')
+            return {
+              docWidth: document.documentElement.scrollWidth,
+              titleLines: title ? Math.round(title.getBoundingClientRect().height / parseFloat(getComputedStyle(title).lineHeight)) : null,
+              titleSize: title ? getComputedStyle(title).fontSize + '/' + getComputedStyle(title).lineHeight : null,
+              headerActs: [...document.querySelectorAll('[data-header-row] [data-act]')].filter(vis).map(b => b.dataset.act),
+              dock: dock ? [...dock.querySelectorAll('[data-act]')].map(b => b.dataset.act) : null,
+              dockAtBottom: dock ? Math.round(innerHeight - dock.getBoundingClientRect().bottom) === 0 && Math.round(dock.getBoundingClientRect().width) === innerWidth : null,
+              section: sel ? t(sel.querySelector('[data-slot=field-input]')?.textContent) : null,
+              sectionTop: sel ? Math.round(sel.getBoundingClientRect().top) : null,
+              nav: !!document.querySelector('[data-settings-column]') && [...document.querySelectorAll('[data-slot=section-nav]')].some(x => !x.closest('[data-slot=modal-card]')),
+              group: t(document.querySelector('[data-group-select] [data-slot=field-input]')?.textContent) || null,
+              fieldCards: [...document.querySelectorAll('[data-fields-cards] [data-form-row]')].map(c => t(c.querySelector('[data-slot=table-cell-text]')?.textContent)),
+              stepCards: Object.fromEntries([...document.querySelectorAll('[data-steps-cards]')].map(l => [l.dataset.stepsCards, [...l.querySelectorAll('[data-step-row]')].map(c => t(c.querySelector('[data-slot=table-cell-text]')?.textContent))])),
+              tables: document.querySelectorAll('[data-fields-table], [data-steps-table], [data-overlay-table]').length,
+              surface: top ? (r => ({ x: Math.round(r.left), w: Math.round(r.width), full: Math.round(r.left) === 0 && Math.round(r.top) === 0 && Math.round(r.width) === innerWidth && Math.round(r.height) === innerHeight }))(top.getBoundingClientRect()) : null,
+              results: res ? (r => ({ x: Math.round(r.left), w: Math.round(r.width), toBottom: Math.round(innerHeight - r.bottom) <= 1 }))(res.getBoundingClientRect()) : null,
+              searchTop: Math.round(document.querySelector('[data-search]')?.getBoundingClientRect().top ?? -1),
+              toastAboveDock: toasts.length && dock ? toasts.every(r => r.bottom <= dock.getBoundingClientRect().top && r.left >= 0 && r.right <= innerWidth) : null,
+              cardMenu: [...document.querySelectorAll('[data-menu=card] [data-slot=list-item]')].map(x => t(x.textContent) + (x.dataset.tone ? ' · ' + x.dataset.tone : '')),
+              demoPane: demo ? demo.querySelector('[data-demo-pane][data-state=active]')?.dataset.demoPane ?? null : null,
+              demoFrame: demo ? (demo.querySelector('[data-demo-phone] [data-slot=app-preview]')?.dataset.frame ?? (demo.querySelector('[data-demo-phone]') ? 'phone' : null)) : null,
+            } })(),
         })
       })()`)
       return JSON.parse(s)
@@ -1222,6 +1307,8 @@ function kit(page) {
  * Ожидание — подмножество слепка; источник — в названии сценария.
  */
 const NAME = 'КАСКО — осмотр легкового автомобиля'
+/** Такт 92: длинное имя — на узком экране три строки с многоточием. */
+const LONG_NAME = 'КАСКО — комплексный осмотр легкового автомобиля перед оформлением полиса добровольного страхования с выездом'
 const SCENARIOS = {
   'СС-01': ['«Назад» ведёт к списку схем; на стенде — уведомление-заглушка (r2 §3)', [
     ['старт', null, { title: NAME, tab: 'settings', save: 'saved', saveText: 'Все изменения сохранены', publishButton: 'Опубликовать схему', notices: [] }],
@@ -1471,7 +1558,7 @@ const SCENARIOS = {
         { head: 'form done · Анкета · 8 полей в 2 группах', checks: [], manual: null },
         { head: 'shooting warning ! 1 · Съёмка · 9 шагов в 2 процессах', checks: ['step-hint:ts-car-interior · warn · У шага «Салон» нет фото-подсказки · Процессы → Осмотр автомобиля'], manual: null },
         { head: 'rules todo · Правила · Проверьте права доступа и шаблоны PDF', checks: [], manual: 'false' },
-        { head: 'publish done · Проверка и публикация · Блокирующих проверок нет — можно публиковать', checks: [], manual: null },
+        { head: 'publish ready · Проверка и публикация · Готово к публикации', checks: [], manual: null },
         { head: 'showcase locked · Витрина — после публикации · Доступно после публикации схемы', checks: [], manual: null }] }],
     ['«Отмена»', K => K.act('first-cancel'), { surface: '', versions: 0, publish: 'never' }],
     ['«Опубликовать» — первая версия; полоса подготовки ушла, «История версий» в шапке, чип «Проверка: 1»', async (K) => { await K.publish(); await K.act('first-confirm') },
@@ -2783,8 +2870,8 @@ const SCENARIOS = {
       async (K) => { await K.createName('Осмотр скутеров курьерской службы'); await K.createAct('create-confirm'); await K.created() },
       { page: 'scheme', title: 'Осмотр скутеров курьерской службы', publish: 'never', versions: 0, writes: 1, 'tabLock.off': [],
         notices: ['Схема «Осмотр скутеров курьерской службы» создана из шаблона «Осмотр мототехники»'], headerActs: ['preview', 'readiness', 'publish', 'menu'],
-        strip: { title: 'Подготовка схемы: 4 из 5', next: 'Далее: Правила →', stages: ['base done *', 'form done', 'shooting done', 'rules todo', 'publish done'] },
-        chip: { label: 'Готовность 4 из 5', mark: null, open: false }, tabMarks: { settings: null, form: 'done', processes: 'done', showcase: null },
+        strip: { title: 'Подготовка схемы: 3 из 5', next: 'Далее: Правила →', stages: ['base done *', 'form done', 'shooting done', 'rules todo', 'publish ready'] },
+        chip: { label: 'Готовность 3 из 5', mark: null, open: false }, tabMarks: { settings: null, form: 'done', processes: 'done', showcase: null },
         stageNext: ['base · Далее: Анкета →', 'rules · Проверить и опубликовать'] }],
     ['таб «Форма» — группы и поля шаблона; текущий этап — «Анкета»', K => K.tab('form'),
       { tab: 'form', 'form.groups': ['Заявка', 'Мототехника'], 'form.title': 'Заявка · 2 поля', 'strip.stages.1': 'form done *', stageNext: ['form · Далее: Съёмка →'] }],
@@ -2817,47 +2904,47 @@ const SCENARIOS = {
       { tab: 'form', 'strip.stages.1': 'form blocked ! 1 *', focusAct: 'group-add-empty' }],
     ['группа «Объект» — в группе нет полей: предупреждение, «В форме нет полей» блокирует', async (K) => { await K.act('group-add-empty'); await K.typeInto('gdTitle', 'Объект'); await K.act('group-save'); await K.settled() },
       { 'form.groups': ['Объект'], 'strip.stages.1': 'form blocked ! 2 *', 'tabMarks.form': 'blocked ! 2' }],
-    ['поле «Адрес» с алиасом — «Анкета» готова; блокирующих нет: 3 из 5', async (K) => {
+    ['поле «Адрес» с алиасом — «Анкета» готова; блокирующих нет: 2 из 5', async (K) => {
       await K.act('field-add-empty'); await K.typeInto('fdTitle', 'Адрес'); await K.typeInto('fdAlias', 'address'); await K.act('field-save'); await K.settled() },
-      { 'form.rows': ['1 · Адрес · address · Текст'], strip: { title: 'Подготовка схемы: 3 из 5', next: 'Далее: Съёмка →', stages: ['base done', 'form done *', 'shooting warning ! 1', 'rules todo', 'publish done'] },
+      { 'form.rows': ['1 · Адрес · address · Текст'], strip: { title: 'Подготовка схемы: 2 из 5', next: 'Далее: Съёмка →', stages: ['base done', 'form done *', 'shooting warning ! 1', 'rules todo', 'publish ready'] },
         'tabMarks.form': 'done', stageNext: ['form · Далее: Съёмка →'] }],
     ['«Далее: Съёмка →» внизу «Анкеты» — «Процессы и шаги»', K => K.act('stage-next-form'), { tab: 'processes', 'strip.stages.2': 'shooting warning ! 1 *', focusAct: 'process-add-empty' }],
     ['процесс «Осмотр склада» без шагов — блокирует публикацию: 2 из 5', async (K) => { await K.act('process-add-empty'); await K.typeInto('pdTitle', 'Осмотр склада'); await K.act('process-save'); await K.settled() },
       { 'proc.cards.length': 1, 'strip.title': 'Подготовка схемы: 2 из 5', 'strip.stages.2': 'shooting blocked ! 1 *', 'strip.stages.4': 'publish blocked ! 1', 'tabMarks.processes': 'blocked ! 1' }],
-    ['шаг «Стеллажи» — «Съёмка» готова, без описания и фото-подсказки — два предупреждения: 4 из 5', async (K) => {
+    ['шаг «Стеллажи» — «Съёмка» готова, без описания и фото-подсказки — два предупреждения: 3 из 5', async (K) => {
       await K.clickEl(`document.querySelector('[data-process] [data-act=step-add]')`); await K.typeInto('sdTitle', 'Стеллажи'); await K.act('step-save'); await K.settled() },
-      { strip: { title: 'Подготовка схемы: 4 из 5', next: 'Далее: Правила →', stages: ['base done', 'form done', 'shooting warning ! 2 *', 'rules todo', 'publish done'] }, 'tabMarks.processes': 'warning ! 2' }],
+      { strip: { title: 'Подготовка схемы: 3 из 5', next: 'Далее: Правила →', stages: ['base done', 'form done', 'shooting warning ! 2 *', 'rules todo', 'publish ready'] }, 'tabMarks.processes': 'warning ! 2' }],
     ['«Далее: Правила →» внизу «Съёмки» — «Настройки», «Поведение процесса»', K => K.act('stage-next-shooting'),
       { tab: 'settings', section: 'general', anchor: 'behavior', 'strip.stages.3': 'rules todo *', rulesBox: 'false' }],
-    ['отметка «Проверил унаследованное…» внизу «Настроек» — 5 из 5, «Проверить и опубликовать»; запись автосохранением', async (K) => { await K.rulesCheck(); await K.settled() },
-      { rulesChecked: true, rulesBox: 'true', strip: { title: 'Подготовка схемы: 5 из 5', next: 'Проверить и опубликовать', stages: ['base done', 'form done', 'shooting warning ! 2', 'rules done *', 'publish done'] },
-        'chip.label': 'Готовность 5 из 5', 'tabMarks.settings': 'done', saveLog: ['saving', 'saved'] }],
+    ['отметка «Проверил унаследованное…» внизу «Настроек» — 4 из 5, «Проверить и опубликовать»; запись автосохранением', async (K) => { await K.rulesCheck(); await K.settled() },
+      { rulesChecked: true, rulesBox: 'true', strip: { title: 'Подготовка схемы: 4 из 5', next: 'Проверить и опубликовать', stages: ['base done', 'form done', 'shooting warning ! 2', 'rules done *', 'publish ready'] },
+        'chip.label': 'Готовность 4 из 5', 'tabMarks.settings': 'done', saveLog: ['saving', 'saved'] }],
     ['«Проверить и опубликовать» в полосе — первая публикация', K => K.stripNext(), { surface: 'first-publish', confirmOff: false }],
   ], { query: 'data=created&from=empty&now=2026-10-03T09:00:00' }],
   'СС-113': ['чип «Готовность N из 5»: поповер — этапы и проверки; «Исправить» ведёт к месту; ручная отметка «Правил»; «Перейти» (ревью 5.5; решения 4, 5)', [
     ['чип — поповер: этапы, «! 1» у «Съёмки», флажок «Правил», «Витрина» после публикации', K => K.chipOpen(),
-      { 'chip.open': true, ready: { title: 'Готовность к публикации', summary: '4 из 5 этапов · блокирующих нет · предупреждений: 1', footer: [], groups: [
+      { 'chip.open': true, ready: { title: 'Готовность к публикации', summary: '3 из 5 этапов · блокирующих нет · предупреждений: 1', footer: [], groups: [
         { head: 'base done · Основа · Осмотр транспорта · Демо Страхование', checks: [], manual: null },
         { head: 'form done · Анкета · 8 полей в 2 группах', checks: [], manual: null },
         { head: 'shooting warning ! 1 · Съёмка · 9 шагов в 2 процессах', checks: ['step-hint:ts-car-interior · warn · У шага «Салон» нет фото-подсказки · Процессы → Осмотр автомобиля'], manual: null },
         { head: 'rules todo · Правила · Проверьте права доступа и шаблоны PDF', checks: [], manual: 'false' },
-        { head: 'publish done · Проверка и публикация · Блокирующих проверок нет — можно публиковать', checks: [], manual: null },
+        { head: 'publish ready · Проверка и публикация · Готово к публикации', checks: [], manual: null },
         { head: 'showcase locked · Витрина — после публикации · Доступно после публикации схемы', checks: [], manual: null }] } }],
     ['«Исправить» у «Салон» — поповер закрыт, «Процессы и шаги», фокус на строке шага', K => K.fix('step-hint:ts-car-interior'),
       { ready: null, tab: 'processes', focusStep: 'ts-car-interior', 'strip.stages.2': 'shooting warning ! 1 *' }],
     ['загрузка фото-подсказки у «Салон» — «Съёмка» без замечаний, маркер вкладки — готово', async (K) => { await K.stepAct('ts-car-interior', 'hint-upload'); await K.uploadZone('ts-car-interior'); await K.settled() },
       { 'strip.stages.2': 'shooting done *', 'tabMarks.processes': 'done', 'chip.mark': null }],
-    ['поповер: флажок «Правил» — 5 из 5; запись автосохранением', async (K) => { await K.chipOpen(); await K.manual(); await K.settled() },
-      { rulesChecked: true, 'chip.label': 'Готовность 5 из 5', 'ready.groups.3': { head: 'rules done · Правила · Унаследованное проверено', checks: [], manual: 'true' }, saveLog: ['saving', 'saved'] }],
+    ['поповер: флажок «Правил» — 4 из 5; запись автосохранением', async (K) => { await K.chipOpen(); await K.manual(); await K.settled() },
+      { rulesChecked: true, 'chip.label': 'Готовность 4 из 5', 'ready.groups.3': { head: 'rules done · Правила · Унаследованное проверено', checks: [], manual: 'true' }, saveLog: ['saving', 'saved'] }],
     ['«Перейти» у «Анкеты» — поповер закрыт, таб «Форма»', K => K.groupGo('form'), { ready: null, tab: 'form', 'strip.stages.1': 'form done *' }],
   ], { query: 'data=created&from=t-car&now=2026-10-03T09:00:00' }],
   'СС-114': ['маркеры вкладок и полоса: «Свернуть» — чип остаётся, память сессии; «Показать полосу»; этап полосы ведёт к месту; «Далее» внизу «Правил» (ревью 5.5; решение 5)', [
     ['старт: маркеры — «Форма» готова, «Процессы» «! 1» (у шага нет фото-подсказки)', null,
-      { tabMarks: { settings: null, form: 'done', processes: 'warning ! 1', showcase: null }, 'strip.title': 'Подготовка схемы: 4 из 5' }],
-    ['«Свернуть» — полосы нет, чип у «Опубликовать схему» остаётся', K => K.stripCollapse(), { strip: null, 'chip.label': 'Готовность 4 из 5' }],
-    ['перезагрузка — полоса свёрнута: память сессии вкладки', K => K.start('data=created&from=d-machine&now=2026-10-03T09:00:00'), { strip: null, 'chip.label': 'Готовность 4 из 5' }],
+      { tabMarks: { settings: null, form: 'done', processes: 'warning ! 1', showcase: null }, 'strip.title': 'Подготовка схемы: 3 из 5' }],
+    ['«Свернуть» — полосы нет, чип у «Опубликовать схему» остаётся', K => K.stripCollapse(), { strip: null, 'chip.label': 'Готовность 3 из 5' }],
+    ['перезагрузка — полоса свёрнута: память сессии вкладки', K => K.start('data=created&from=d-machine&now=2026-10-03T09:00:00'), { strip: null, 'chip.label': 'Готовность 3 из 5' }],
     ['поповер чипа — «Показать полосу подготовки»', async (K) => { await K.chipOpen() }, { 'ready.footer': ['strip-expand'] }],
-    ['«Показать полосу подготовки» — полоса снова, поповер закрыт', K => K.act('strip-expand'), { ready: null, 'strip.title': 'Подготовка схемы: 4 из 5' }],
+    ['«Показать полосу подготовки» — полоса снова, поповер закрыт', K => K.act('strip-expand'), { ready: null, 'strip.title': 'Подготовка схемы: 3 из 5' }],
     ['этап «Правила» в полосе — «Настройки», «Поведение процесса»', K => K.stage('rules'),
       { tab: 'settings', section: 'general', anchor: 'behavior', 'strip.stages.3': 'rules todo *' }],
     ['«Проверить и опубликовать» внизу «Правил» — первая публикация', K => K.act('stage-publish'), { surface: 'first-publish', modalTitle: 'Первая публикация схемы', 'firstList.length': 6 }],
@@ -2869,9 +2956,9 @@ const SCENARIOS = {
         'firstList.4.head': 'publish blocked ! 1 · Проверка и публикация · Блокирует публикацию: 1' }],
     ['нажатие по выключенной «Опубликовать» — снимка нет', K => K.act('first-confirm'), { surface: 'first-publish', versions: 0 }, { blind: true }],
     ['«Исправить» у «В форме нет полей» — окно закрыто, «Форма», фокус на «Добавить группу»', K => K.fix('form-empty'), { surface: '', tab: 'form', focusAct: 'group-add-empty' }],
-    ['группа и поле с алиасом — блокирующих нет', K => K.groupWithField('Склад', 'Адрес склада', 'address'), { 'rd.blocks': 0, 'strip.title': 'Подготовка схемы: 3 из 5' }],
+    ['группа и поле с алиасом — блокирующих нет', K => K.groupWithField('Склад', 'Адрес склада', 'address'), { 'rd.blocks': 0, 'strip.title': 'Подготовка схемы: 2 из 5' }],
     ['снова «Опубликовать схему» — «Опубликовать» доступна', K => K.publish(),
-      { surface: 'first-publish', confirmOff: false, note: 'После публикации создаётся неизменяемый снимок версии', 'firstList.4.head': 'publish done · Проверка и публикация · Блокирующих проверок нет — можно публиковать' }],
+      { surface: 'first-publish', confirmOff: false, note: 'После публикации создаётся неизменяемый снимок версии', 'firstList.4.head': 'publish ready · Проверка и публикация · Готово к публикации' }],
     ['«Опубликовать» — первая версия: полосы и «Далее» нет, «История версий» в шапке, чип «Проверка: 1», «! 1» у «Процессов»', K => K.act('first-confirm'),
       { surface: '', versions: 1, publish: 'published', strip: null, stageNext: [], headerActs: ['history', 'preview', 'readiness', 'publish', 'menu'],
         chip: { label: 'Проверка: 1', mark: 'warning ! 1', open: false }, tabMarks: { settings: null, form: null, processes: 'warning ! 1', showcase: null },
@@ -2902,7 +2989,7 @@ const SCENARIOS = {
     ['снова; «Создать схему» — копия: публикаций нет, «Форма» и «Процессы» открыты, полоса подготовки, истории нет', async (K) => { await K.menu('copy'); await K.createAct('create-confirm'); await K.created() },
       { page: 'scheme', title: 'Копия — КАСКО — осмотр легкового автомобиля', versions: 0, publish: 'never', writes: 1, 'tabLock.off': [],
         notices: ['Схема «Копия — КАСКО — осмотр легкового автомобиля» создана копией «КАСКО — осмотр легкового автомобиля»'],
-        headerActs: ['preview', 'readiness', 'publish', 'menu'], 'strip.title': 'Подготовка схемы: 3 из 5', 'strip.next': 'Далее: Съёмка →',
+        headerActs: ['preview', 'readiness', 'publish', 'menu'], 'strip.title': 'Подготовка схемы: 2 из 5', 'strip.next': 'Далее: Съёмка →',
         'g.description': 'Комплексный осмотр автомобиля перед оформлением полиса добровольного страхования' }],
   ], { query: 'now=2026-10-03T09:00:00' }],
   'СС-118': ['прямой адрес новой схемы без идентификатора: «Анкета» и «Съёмка» под замком с причиной, замки на вкладках; истории и копии нет (ревью 5, решение 7)', [
@@ -2916,6 +3003,94 @@ const SCENARIOS = {
     ['первая правка — идентификатор есть: замки сняты, «Анкета» блокирует — форма без полей', async (K) => { await K.rename('Осмотр склада'); await K.settled() },
       { 'tabLock.off': [], writes: 1, 'strip.stages': ['base done *', 'form blocked ! 1', 'shooting warning ! 1', 'rules todo', 'publish blocked ! 1'], tabMarks: { settings: null, form: 'blocked ! 1', processes: 'warning ! 1', showcase: null } }],
   ], { query: 'data=new' }],
+  /*
+   * ============================ такт 92: узкий экран 375 × 812 ============================
+   * Ревью 4.10, сценарий С6 («найти настройку, переключить, посмотреть изменения, опубликовать; посмотреть демо-осмотр»); решения 4 и 5
+   * оркестратора 2026-10-08. Поправки 1а и 1б — СС-127, СС-128 (окно рабочего стола).
+   */
+  'СС-119': ['каркас на 375: меню не в потоке, полоса компактная; бургер — выезжающая панель меню слева; Esc и переход по пункту закрывают её (решение 4)', [
+    ['старт: на полосе — бургер и аватар профиля, меню в потоке нет', null,
+      { 'frame.menuInFlow': false, 'frame.bar': ['Открыть меню', 'Профиль'], 'frame.drawer': null, 'phone.docWidth': 375 }],
+    ['бургер — панель слева во всю высоту, фокус в ней', K => K.burger(),
+      { 'frame.drawer.x': 0, 'frame.drawer.h': 812, 'frame.drawer.focusIn': true, 'frame.drawer.expanded': 'true' }],
+    ['Esc — панель закрыта, фокус на бургере', K => K.key('Escape'), { 'frame.drawer': null, 'frame.focus': 'Открыть меню' }],
+    ['бургер и «Типы схем осмотра» — страница стенда, панель закрыта', async (K) => { await K.burger(); await K.drawerLink('insure-types') },
+      { page: 'list', url: '/insure-types', 'frame.drawer': null, 'frame.menuInFlow': false }],
+  ], { width: 375, height: 812 }],
+  'СС-120': ['шапка на 375: имя 24/28 до трёх строк, строка статусов переносится; «Опубликовать схему» и «⋯» — в нижней полосе, «Предпросмотр» и «История версий» — в «⋯» (решение 5)', [
+    ['старт: в шапке — чип «Проверка: 6», в полосе у низа окна — «Опубликовать схему» и «⋯»', null,
+      { 'phone.titleLines': 2, 'phone.titleSize': '24px/28px', 'phone.headerActs': ['readiness'], 'phone.dock': ['publish', 'menu'], 'phone.dockAtBottom': true, 'phone.docWidth': 375 }],
+    ['«⋯» полосы: «Предпросмотр» и «История версий» первыми, удаление — тоном опасного действия', K => K.dockMenu(),
+      { menuTone: ['Предпросмотр', 'История версий', 'Экспортировать схему', 'Скачать дамп', 'Сделать копию', 'Сбросить черновик к текущей версии', 'Удалить схему · destructive'] }],
+    ['«История версий» — сайд во всё окно', K => K.clickEl("document.querySelector('[data-menu=scheme] [data-action=history]')"),
+      { surface: 'history', 'phone.surface.full': true }],
+    ['Esc — сайд закрыт', K => K.key('Escape'), { surface: '' }],
+    ['длинное имя — три строки с многоточием', async (K) => { await K.rename(LONG_NAME); await K.settled() }, { title: LONG_NAME, 'phone.titleLines': 3 }],
+  ], { width: 375, height: 812 }],
+  'СС-121': ['«Настройки» на 375: навигатор — выбор раздела списком, липкий под табами; колонка во всю ширину (решение 5)', [
+    ['старт: «Общие» в списке, навигатора нет', null, { section: 'general', 'phone.section': 'Общие', 'phone.nav': false, 'phone.docWidth': 375 }],
+    ['список: «Аномалии» — раздел на экране', K => K.select('section-select', 'Аномалии'), { section: 'anomalies', 'phone.section': 'Аномалии', 'phone.docWidth': 375 }],
+    ['прокрутка на 600 — выбор раздела у верха окна', K => K.scrollBy(600), { 'phone.sectionTop': 0 }],
+    ['список: «Права доступа» — таблица групп в ширину страницы', K => K.select('section-select', 'Права доступа'), { section: 'access', 'phone.section': 'Права доступа', 'phone.docWidth': 375 }],
+  ], { width: 375, height: 812 }],
+  'СС-122': ['поиск на 375: поле к верху окна, выдача во всю ширину до края окна; переключатель в строке выдачи, уведомление над нижней полосой (решение 5)', [
+    ['фокус в поле — поле у верха окна', K => K.searchClick(), { searchFocus: true, 'phone.searchTop': 8 }],
+    ['«размыт» — выдача под полем во всю ширину до края окна', K => K.type('размыт'),
+      { searchOpen: true, 'phone.results': { x: 0, w: 375, toBottom: true }, rowsX: ['setting · Детектор «Размытые изображения» ·  · true ·  · Размыт'] }],
+    ['переключатель в строке — детектор выключен, уведомление над нижней полосой', async (K) => { await K.resultToggle('anomalies.detectors.blur.on'); await K.settled() },
+      { 's.anomalies.detectors.blur.on': false, notices: ['Настройка «Детектор „Размытые изображения“» выключена'], 'phone.toastAboveDock': true, searchOpen: true, writes: 1 }],
+  ], { width: 375, height: 812 }],
+  'СС-123': ['«Форма» на 375: группа — выбором списком, поля — строками-карточками; «⋯ → Изменить поле» — сайд во всё окно (решение 5)', [
+    ['таб «Форма»: «Заявка» в списке, три карточки полей, таблицы нет', K => K.tab('form'),
+      { tab: 'form', 'phone.group': 'Заявка', 'phone.fieldCards': ['1. Номер полиса', '2. Страхователь', '3. Дата начала полиса'], 'phone.tables': 0, 'phone.docWidth': 375 }],
+    ['список: «Кузов и комплектация» — четыре карточки', K => K.select('group-select', 'Кузов и комплектация'),
+      { 'phone.group': 'Кузов и комплектация', 'phone.fieldCards': ['1. Тип кузова', '2. Комплектация', '3. Повреждения кузова', '4. Год выпуска'] }],
+    ['«⋯» карточки «Комплектация»: «Изменить поле», «Удалить поле» — тоном опасного действия', K => K.cardMenu('field', 'f-trim'),
+      { 'phone.cardMenu': ['Изменить поле', 'Удалить поле · destructive'] }],
+    ['«Изменить поле» — сайд поля во всё окно', K => K.clickEl("document.querySelector('[data-menu=card] [data-action=edit]')"),
+      { surface: 'field', 'fieldSide.title': 'Комплектация', 'phone.surface.full': true }],
+    ['Esc — сайд закрыт', K => K.key('Escape'), { surface: '' }],
+  ], { width: 375, height: 812 }],
+  'СС-124': ['«Процессы» на 375: шаги — строками-карточками; «⋯ → Изменить шаг» — сайд шага во всё окно, сохранение (решение 5)', [
+    ['таб «Процессы и шаги»: карточки шагов, таблиц нет', K => K.tab('processes'),
+      { tab: 'processes', 'phone.stepCards': { 'p-auto': ['1. VIN под стеклом', '2. VIN на металле', '3. Передняя часть', '4. Вид справа'], 'p-docs': ['1. Паспорт ТС (ПТС)'] }, 'phone.tables': 0, 'phone.docWidth': 375 }],
+    ['«⋯ → Изменить шаг» у «Передней части» — сайд шага во всё окно', K => K.cardMenu('step', 's-front', 'edit'),
+      { surface: 'step', 'stepSide.name': 'Передняя часть', 'phone.surface.full': true }],
+    ['новое название и «Сохранить» — карточка с новым названием', async (K) => { await K.fill('[data-field=sdTitle]', 'Передняя часть авто'); await K.act('step-save'); await K.settled() },
+      { surface: '', 'phone.stepCards.p-auto.2': '3. Передняя часть авто', saveLog: ['saving', 'saved'] }],
+  ], { width: 375, height: 812 }],
+  'СС-125': ['«Опубликовать схему» из нижней полосы — окно публикации во всё окно (решение 5)', [
+    ['«Опубликовать схему» в полосе — окно публикации', K => K.dock('publish'), { surface: 'publish', 'phone.surface.full': true, confirmOff: false }],
+    ['«Отмена» — окно закрыто, полоса на месте', K => K.act('publish-cancel'), { surface: '', 'phone.dock': ['publish', 'menu'] }],
+  ], { width: 375, height: 812 }],
+  'СС-126': ['демо-осмотр на телефоне: экран приложения без рамки, оглавление и «Из чего собран экран» — вкладками (решение 5)', [
+    ['«⋯ → Предпросмотр» — демо-осмотр во всё окно, вкладка «Экран», рамки телефона нет', K => K.dockMenu('preview'),
+      { surface: 'demo', 'phone.surface.full': true, 'phone.demoPane': 'screen', 'phone.demoFrame': 'none', 'demo.screen': 'start' }],
+    ['вкладка «Оглавление»', K => K.demoPane('toc'), { 'phone.demoPane': 'toc', 'demo.stage': 'start' }],
+    ['этап «Анкета» — экраны групп в оглавлении, вкладка прежняя', K => K.demoStage('form'), { 'phone.demoPane': 'toc', 'demo.stage': 'form', 'demo.screen': 'form:g-lead' }],
+    ['экран «Автомобиль» — вкладка «Экран» с ним', K => K.demoAnchor('form:g-car'), { 'phone.demoPane': 'screen', 'demo.screen': 'form:g-car', 'phone.demoFrame': 'none' }],
+    ['вкладка «Из чего собран экран»', K => K.demoPane('sources'), { 'phone.demoPane': 'sources' }],
+    ['«Изменить» у поля VIN — оверлей закрыт, «Форма», сайд поля во всё окно', K => K.demoEdit('field:f-vin'),
+      { demo: null, tab: 'form', surface: 'field', 'fieldSide.title': 'VIN', 'phone.surface.full': true }],
+  ], { width: 375, height: 812 }],
+  'СС-127': ['поправка 1а: «Проверка и публикация» засчитывается публикацией — до неё «Готово к публикации» без галочки, счёт по этапам 1–4 (решение 1а оркестратора 2026-10-08)', [
+    ['схема из шаблона: «Проверка и публикация» — готово к публикации, 3 из 5', null,
+      { strip: { title: 'Подготовка схемы: 3 из 5', next: 'Далее: Правила →', stages: ['base done *', 'form done', 'shooting warning ! 1', 'rules todo', 'publish ready'] }, 'rd.done': 3, 'rd.total': 5 }],
+    ['отметка «Правил» — 4 из 5, «Проверить и опубликовать»; галочки у публикации нет', async (K) => { await K.rulesCheck(); await K.settled() },
+      { 'strip.title': 'Подготовка схемы: 4 из 5', 'strip.next': 'Проверить и опубликовать', 'strip.stages.4': 'publish ready', 'chip.label': 'Готовность 4 из 5', 'rd.next': 'publish' }],
+    ['поповер чипа: «Проверка и публикация» — «Готово к публикации»', K => K.chipOpen(),
+      { 'ready.groups.4': { head: 'publish ready · Проверка и публикация · Готово к публикации', checks: [], manual: null }, 'ready.summary': '4 из 5 этапов · блокирующих нет · предупреждений: 1' }],
+    ['Esc, «Проверить и опубликовать» — первая публикация с тем же статусом', async (K) => { await K.key('Escape'); await K.stripNext() },
+      { surface: 'first-publish', 'firstList.4.head': 'publish ready · Проверка и публикация · Готово к публикации', confirmOff: false }],
+    ['«Опубликовать» — этап засчитан публикацией: полосы нет', async (K) => { await K.act('first-confirm'); await K.settled() },
+      { surface: '', strip: null, versions: 1, 'rd.done': 5 }],
+  ], { query: 'data=created&from=t-car' }],
+  'СС-128': ['поправка 1б: удаление в меню строки таблицы — тоном опасного действия, как «Удалить схему» (решение 1б оркестратора 2026-10-08)', [
+    ['таб «Форма», меню строки «Страхователь» — «Удалить» тоном опасного действия', async (K) => { await K.tab('form'); await K.clickEl("document.querySelector('[data-form-row=f-insurer] [data-slot=table-row-actions-secondary] button')") },
+      { rowMenu: ['Удалить · destructive'] }],
+    ['«Удалить» — строки нет, уведомление с «Отменить»', async (K) => { await K.clickEl("document.querySelector('[data-menu=row-actions] [data-action=delete]')"); await K.settled() },
+      { rowMenu: [], 'form.rows.length': 2 }],
+  ]],
 }
 
 /* ------------------------------ прогон ------------------------------ */
@@ -2937,7 +3112,7 @@ const NOTICED = []
 
 async function run(id) {
   const [title, steps, opts = {}] = SCENARIOS[id]
-  const kp = await openPage()
+  const kp = await openPage(opts.width, opts.height)
   const K = kit(kp)
   const fails = []
   const snaps = []

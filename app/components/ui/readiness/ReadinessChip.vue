@@ -49,7 +49,8 @@ const emit = defineEmits<{ 'update:open': [value: boolean] }>()
         <Icon name="chevron-down" :size="12" class="text-foreground-secondary transition-transform group-data-[state=open]/chip:rotate-180" />
       </button>
     </PopoverTrigger>
-    <PopoverContent data-readiness-popover align="end" :side-offset="8" :width="400" class="flex max-h-[70vh] flex-col">
+    <!-- Узкий экран (такт 92): поповер во всю ширину окна — `narrow="full"` у `PopoverContent`. -->
+    <PopoverContent data-readiness-popover align="end" :side-offset="8" :width="400" narrow="full" class="flex max-h-[70vh] flex-col">
       <div class="flex flex-col gap-1 px-4 pt-4 pb-3">
         <p data-slot="readiness-popover-title" class="m-0 text-lg font-bold text-foreground">
           {{ props.title }}

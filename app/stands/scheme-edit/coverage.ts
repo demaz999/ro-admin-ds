@@ -76,3 +76,20 @@ export const SCHEME_COVERAGE_STATES = [
   'data=created&from=t-car&strip=collapsed', 'data=created&from=empty', 'data=created&from=empty&open=first-publish', 'data=created&from=t-car&open=first-publish',
   'open=copy', 'open=readiness', 'data=new&open=readiness',
 ] as const
+
+/**
+ * Такт 92 — узкий экран 375 × 812 (`docs/scheme-edit-review.md`, 4.10): отдельный проход покрытия по раскладке телефона. Шапка с нижней
+ * полосой, выбор раздела списком на семи разделах, «Форма» и «Процессы» строками-карточками, выдача поиска во всё окно, режим
+ * «найдено», меню «⋯» из нижней полосы, сайды, окна и оверлеи во всё окно, демо-осмотр без рамки телефона — три вкладки, превью
+ * страницы, режим создания с полосой и чипом, просмотр версии, выезжающее меню каркаса.
+ */
+export const SCHEME_PHONE_STATES = [
+  '', 'section=mobile', 'section=web', 'section=access', 'section=ai', 'section=anomalies', 'section=pdf',
+  'tab=form', 'tab=form&group=g-body', 'tab=processes', 'tab=showcase', 'data=new', 'data=new&saved=1&tab=form',
+  'q=фото', 'q=фаыфа', 'find=фото', 'open=menu', 'drawer=1', 'help=refuse',
+  'open=demo', 'open=demo&pane=toc', 'open=demo&pane=sources', 'open=demo&demo=map', 'open=demo&app=full&screen=step:p-auto:s-front',
+  'open=site', 'open=site&device=phone', 'open=step', 'open=field', 'open=group', 'open=process', 'open=networks', 'open=comments', 'open=template',
+  'open=publish', 'data=new&open=first-publish', 'open=reset', 'open=delete', 'open=history', 'open=history&version=v2',
+  'open=overlay-filled', 'open=overlay-texts', 'open=catalog', 'open=fill', 'open=paste-fields&donor=d-osago&part=dg-lead', 'open=copy',
+  'view=v1', 'view=v1&tab=processes', 'data=created&from=t-car', 'data=created&from=t-car&open=readiness', 'open=readiness',
+] as const

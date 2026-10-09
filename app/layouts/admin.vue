@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { createReusableTemplate } from '@vueuse/core'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 
 /**
  * Каркас админки — одна рамка в ките (такт 48, решение чата по правилу 21, ворота 1 «одна шапка в ките»):
@@ -25,6 +26,16 @@ import { computed, reactive, ref } from 'vue'
  *
  * «Мои осмотры» на этот каркас не переведены — у страницы свой рельс, решение такта 8.
  *
+ * ## Узкий экран — уже 1024 (такт 92)
+ *
+ * Решение 4 оркестратора 2026-10-08 (промпт такта 92; ревью `docs/scheme-edit-review.md`, 4.10): ниже 1024 левое меню
+ * скрыто, бургер верхней полосы открывает его выезжающей панелью — `ModalCard` с краем `side="left"` и поверхностью
+ * `surface="sidebar"` (внутри — `sidebar`-токены, правило порталов сайдбара). Панель: строка 56 с «Закрыть меню» и логотипом,
+ * меню целиком в развёрнутом виде с прокруткой, внизу — язык и выход. Верхняя полоса компактная: бургер, логотип и
+ * аватар профиля; язык, имя профиля, выход и пункты страницы (слот `bar`) уходят с полосы. Поля рабочей зоны — 16 по бокам.
+ * Пункт меню со страницей стенда в выезжающей панели ведёт на неё и закрывает панель; панель закрывают крестик, Esc, клик мимо,
+ * переход и выход окна на ширину рабочего стола. Рабочий стол (1024 и шире) прежний — меню, полоса и поведение пунктов.
+ *
  * ## Состав меню — `left_menu` `33970:14833`
  *
  * Пять групп: Главная, Charts, Billing, Построить отчёт | Все доступные осмотры | Все осмотры, Очередь на проверку,
@@ -33,6 +44,22 @@ import { computed, reactive, ref } from 'vue'
  *
  * Внутри тёмной полосы и меню действует правило порталов сайдбара: только `sidebar-*`-токены. Бургер и выход —
  * `IconButton variant="sidebar"`, язык и профиль — `Button variant="sidebar"`.
+ *
+ * ## Изменения после передачи
+ *
+ * Правило 23 `docs/chat-protocol.md`: каркас передан фронтам версией `handover-2026-10-01` (пакет составных компонентов
+ * `free-shoot.md`, раздел 32); каждое изменение маркируется здесь, в `CHANGELOG.md` и в «Передано фронтам».
+ *
+ * ### Черновик следующей версии — относительно `handover-2026-10-02`
+ *
+ * - **Добавлено.** Слот `header` — закреплённая шапка страницы: липнет к верху окна при прокрутке, подложка — фон рабочей зоны,
+ *   поля 24 сверху и 12 снизу; в покое место шапки прежнее. Без слота каркас прежний. Такт 78.
+ * - **Добавлено.** Узкий экран — уже 1024: левое меню скрыто; бургер открывает выезжающую панель меню слева во всю высоту
+ *   (`--sidebar`, ширина меню 256, скругление 48 справа сверху, подложка окна): строка 56 — «Закрыть меню» и логотип, меню
+ *   развёрнутым с прокруткой, внизу — язык и выход; пункт со страницей ведёт на неё и закрывает панель; крестик, Esc,
+ *   клик мимо и переход закрывают панель, фокус возвращается на бургер. Верхняя полоса компактная: бургер, логотип и аватар
+ *   профиля без имени; язык, выход и пункты страницы — в панели и на странице. Поля рабочей зоны — 16 по бокам (было 32).
+ *   Рабочий стол (1024 и шире) прежний. Такт 92.
  */
 const props = withDefaults(defineProps<{
   /** Меню при загрузке: развёрнутое 256 или свёрнутое 84. */
@@ -67,6 +94,48 @@ function toggleMenu() {
     for (const key of Object.keys(open)) open[key] = false
   }
 }
+
+/* ------------------------------ узкий экран — такт 92 ------------------------------ */
+/** Граница рабочего стола: ниже 1024 меню скрыто, бургер открывает выезжающую панель. */
+const NARROW = '(max-width: 1023.98px)'
+/** Выезжающая панель меню. */
+const drawer = ref(false)
+/** Окно уже рабочего стола — подпись бургера; ставится после монтирования: серверная разметка — рабочего стола. */
+const narrow = ref(false)
+/** Бургер: на узком экране — выезжающая панель, на рабочем столе — свернуть или развернуть меню (прежнее поведение). */
+function onBurger() {
+  if (import.meta.client && window.matchMedia(NARROW).matches) {
+    drawer.value = true
+    return
+  }
+  toggleMenu()
+}
+/** Пункт со страницей стенда — из выезжающей панели: переход и закрытие панели. */
+function go(path: string) {
+  drawer.value = false
+  if (route.path !== path) navigateTo(path)
+}
+watch(() => route.fullPath, () => { drawer.value = false })
+/** Окно стало шире рабочего стола — панель не нужна: меню снова в потоке. */
+let wide: MediaQueryList | null = null
+const onWide = (e: MediaQueryListEvent) => {
+  narrow.value = e.matches
+  if (!e.matches) drawer.value = false
+}
+onMounted(() => {
+  wide = window.matchMedia(NARROW)
+  narrow.value = wide.matches
+  wide.addEventListener('change', onWide)
+  /* Оснастка приёмки (такт 92): `?drawer=1` — выезжающая панель открыта при загрузке на узком экране; в продукт не идёт. */
+  if (route.query.drawer === '1' && wide.matches) drawer.value = true
+})
+onBeforeUnmount(() => wide?.removeEventListener('change', onWide))
+
+/**
+ * Меню — одна разметка на два места (такт 92): в потоке слева на рабочем столе и в выезжающей панели на узком экране.
+ * `drawer` — копия в панели: развёрнута всегда, пункт со страницей стенда ведёт на неё.
+ */
+const [DefineMenu, ReuseMenu] = createReusableTemplate<{ compact: boolean, drawer: boolean }>()
 </script>
 
 <template>
@@ -74,52 +143,19 @@ function toggleMenu() {
     class="flex min-h-screen flex-col"
     :class="props.fill ? 'h-screen overflow-hidden' : ''"
   >
-    <!-- Верхняя полоса top_menu 33970:14832: левый блок 256 — бургер 24 и логотип 182×32; справа — язык, профиль, выход. -->
-    <AppBar>
-      <template #start>
-        <IconButton variant="sidebar" size="lg" :label="compact ? 'Развернуть меню' : 'Свернуть меню'" @click="toggleMenu">
-          <Icon name="menu" :size="24" />
-        </IconButton>
-        <AppBarBrand logo="/brand/rososmotr-logo.svg">Рососмотр</AppBarBrand>
-      </template>
-
-      <template #end>
-        <!-- Пункты страницы: статус сохранения, действия экрана. -->
-        <slot name="bar" />
-
-        <Button variant="sidebar">
-          RU
-          <Icon name="chevron-down" :size="8" />
-        </Button>
-
-        <Button variant="sidebar" show-icon>
-          <template #icon>
-            <Avatar type="letter" letter="Ш" :size="32" />
-          </template>
-          Шипилов Михаил
-          <Icon name="chevron-down" :size="8" />
-        </Button>
-
-        <IconButton variant="sidebar" size="lg" label="Выйти">
-          <Icon name="logout" :size="24" />
-        </IconButton>
-      </template>
-    </AppBar>
-
-    <div class="flex min-h-0 flex-1">
+    <!-- Разметка меню — один раз; в потоке и в выезжающей панели — её копии (такт 92). -->
+    <DefineMenu v-slot="{ compact: c, drawer: d }">
       <!--
         variant="kit1": меню по мастеру left_menu кита 1 (такт 9). Свёрнутое — left_menu 33970:14833: пункт 84×48,
         иконка 20, подпись 13/16, группы через линию.
       -->
-      <!-- Развёрнутое меню двигает содержимое и на экране во всё окно (такт 55). -->
-      <div class="relative flex shrink-0">
       <Menu
         variant="kit1"
-        :compact="compact"
+        :compact="c"
         class="shrink-0"
       >
         <MenuSection first>
-          <MenuItem :selected="current === '/'">
+          <MenuItem :selected="current === '/'" @click="d && go('/')">
             <template #icon>
               <Icon name="home" :size="20" />
             </template>
@@ -131,7 +167,8 @@ function toggleMenu() {
             </template>
             Charts
           </MenuItem>
-          <MenuItem>
+          <!-- Такт 92: «Тарификация» (Биллинг 2.0, `docs/tariffs.md`) — страница стенда пункта. -->
+          <MenuItem @click="d && go('/tariffs')">
             <template #icon>
               <Icon name="payments" :size="20" />
             </template>
@@ -146,7 +183,7 @@ function toggleMenu() {
         </MenuSection>
 
         <MenuSection>
-          <MenuItem :selected="current === '/my-inspections'">
+          <MenuItem :selected="current === '/my-inspections'" @click="d && go('/my-inspections')">
             <template #icon>
               <Icon name="article" :size="20" />
             </template>
@@ -156,7 +193,7 @@ function toggleMenu() {
 
         <MenuSection title="Осмотры">
           <!-- Экран распределения открыт из осмотра: активен «Все осмотры», как в макете 33970:14833. -->
-          <MenuItem :selected="current.startsWith('/free-shoot')">
+          <MenuItem :selected="current.startsWith('/free-shoot')" @click="d && go('/free-shoot')">
             <template #icon>
               <Icon name="draft" :size="20" />
             </template>
@@ -173,7 +210,7 @@ function toggleMenu() {
             Подпункты без иконок подтверждено мастером: строки dropdown_menu
             956:4737 у кита 1 тоже без иконочного слота — такт 8 угадал верно.
           -->
-          <MenuSub :open="open.projects" :compact="compact" @toggle="open.projects = !open.projects">
+          <MenuSub :open="open.projects" :compact="c" @toggle="open.projects = !open.projects">
             <template #icon>
               <Icon name="account-tree" :size="20" />
             </template>
@@ -202,7 +239,7 @@ function toggleMenu() {
 
         <MenuSection title="Инструменты">
           <!-- В свёрнутом меню раздел с открытой страницей подсвечен сам: его подпункты спрятаны во флаут. -->
-          <MenuSub :open="open.admin" :compact="compact" :selected="compact && inAdmin" @toggle="open.admin = !open.admin">
+          <MenuSub :open="open.admin" :compact="c" :selected="c && inAdmin" @toggle="open.admin = !open.admin">
             <template #icon>
               <Icon name="admin" :size="20" />
             </template>
@@ -220,19 +257,19 @@ function toggleMenu() {
               <MenuItem :show-icon="false">
                 Привязать пользователя к с…
               </MenuItem>
-              <MenuItem :show-icon="false" :selected="current === '/insure-types'">
+              <MenuItem :show-icon="false" :selected="current === '/insure-types'" data-menu-link="insure-types" @click="d && go('/insure-types')">
                 Типы схем осмотра
               </MenuItem>
               <MenuItem :show-icon="false">
                 Типы объектов съёмки
               </MenuItem>
-              <MenuItem :show-icon="false" :selected="current === '/statuses'">
+              <MenuItem :show-icon="false" :selected="current === '/statuses'" @click="d && go('/statuses')">
                 Статусы
               </MenuItem>
             </template>
           </MenuSub>
 
-          <MenuSub :open="open.system" :compact="compact" @toggle="open.system = !open.system">
+          <MenuSub :open="open.system" :compact="c" @toggle="open.system = !open.system">
             <template #icon>
               <Icon name="settings" :size="20" />
             </template>
@@ -258,11 +295,65 @@ function toggleMenu() {
           </MenuItem>
         </MenuSection>
       </Menu>
+    </DefineMenu>
+
+    <!-- Верхняя полоса top_menu 33970:14832: левый блок 256 — бургер 24 и логотип 182×32; справа — язык, профиль, выход. -->
+    <AppBar>
+      <template #start>
+        <!-- Такт 92: ниже 1024 бургер открывает выезжающую панель меню, на рабочем столе — сворачивает меню, как прежде. -->
+        <IconButton
+          variant="sidebar"
+          size="lg"
+          :label="narrow ? 'Открыть меню' : compact ? 'Развернуть меню' : 'Свернуть меню'"
+          :aria-expanded="narrow ? drawer : undefined"
+          data-menu-burger
+          @click="onBurger"
+        >
+          <Icon name="menu" :size="24" />
+        </IconButton>
+        <AppBarBrand logo="/brand/rososmotr-logo.svg">Рососмотр</AppBarBrand>
+      </template>
+
+      <template #end>
+        <!-- Пункты страницы: статус сохранения, действия экрана. Узкий экран (такт 92) — полоса компактная, пунктов страницы нет. -->
+        <div class="contents max-lg:hidden">
+          <slot name="bar" />
+        </div>
+
+        <Button variant="sidebar" class="max-lg:hidden">
+          RU
+          <Icon name="chevron-down" :size="8" />
+        </Button>
+
+        <Button variant="sidebar" show-icon class="max-lg:hidden">
+          <template #icon>
+            <Avatar type="letter" letter="Ш" :size="32" />
+          </template>
+          Шипилов Михаил
+          <Icon name="chevron-down" :size="8" />
+        </Button>
+        <!-- Узкий экран: профиль — аватар без имени, подпись для чтения с экрана — «Профиль»; язык и выход — внизу выезжающей панели. -->
+        <Button variant="sidebar" show-icon class="lg:hidden" aria-label="Профиль">
+          <template #icon>
+            <Avatar type="letter" letter="Ш" :size="32" />
+          </template>
+        </Button>
+
+        <IconButton variant="sidebar" size="lg" label="Выйти" class="max-lg:hidden">
+          <Icon name="logout" :size="24" />
+        </IconButton>
+      </template>
+    </AppBar>
+
+    <div class="flex min-h-0 flex-1">
+      <!-- Развёрнутое меню двигает содержимое и на экране во всё окно (такт 55). Ниже 1024 — в выезжающей панели (такт 92). -->
+      <div class="relative flex shrink-0 max-lg:hidden">
+        <ReuseMenu :compact="compact" :drawer="false" />
       </div>
 
       <main
         class="flex min-w-0 flex-1 flex-col"
-        :class="props.fill ? 'min-h-0' : 'gap-6 px-8 py-6'"
+        :class="props.fill ? 'min-h-0' : 'gap-6 px-8 py-6 max-lg:px-4'"
       >
         <!--
           Слот `header` — закреплённая шапка страницы (такт 78, сводка тарификации §11: «Сохранить изменения» закреплена
@@ -273,12 +364,42 @@ function toggleMenu() {
         <div
           v-if="$slots.header && !props.fill"
           data-slot="page-header"
-          class="sticky top-0 z-20 -mx-8 -mt-6 -mb-3 bg-background px-8 pt-6 pb-3"
+          class="sticky top-0 z-20 -mx-8 -mt-6 -mb-3 bg-background px-8 pt-6 pb-3 max-lg:-mx-4 max-lg:px-4"
         >
           <slot name="header" />
         </div>
         <slot />
       </main>
     </div>
+
+    <!--
+      Выезжающая панель меню — такт 92, узкий экран (решение 4 оркестратора 2026-10-08): `ModalCard` слева на поверхности меню.
+      Модальная: Esc, клик мимо и крестик закрывают её, фокус возвращается на бургер.
+    -->
+    <ModalCard v-model:open="drawer">
+      <ModalCardContent placement="edge" side="left" surface="sidebar" label="Меню" data-menu-drawer>
+        <AppBar>
+          <template #start>
+            <IconButton variant="sidebar" size="lg" label="Закрыть меню" data-menu-close @click="drawer = false">
+              <Icon name="close" :size="16" />
+            </IconButton>
+            <AppBarBrand logo="/brand/rososmotr-logo.svg">Рососмотр</AppBarBrand>
+          </template>
+        </AppBar>
+        <div class="min-h-0 flex-1 overflow-y-auto [scrollbar-color:var(--sidebar-scroll-thumb)_var(--sidebar-scroll-track)] [scrollbar-width:thin]">
+          <ReuseMenu :compact="false" :drawer="true" />
+        </div>
+        <!-- Низ панели — то, что ушло с компактной полосы: язык и выход; профиль — пункт меню «Профиль» и аватар на полосе. -->
+        <div class="flex shrink-0 items-center justify-between gap-2 px-1 py-2" data-menu-account>
+          <Button variant="sidebar">
+            RU
+            <Icon name="chevron-down" :size="8" />
+          </Button>
+          <IconButton variant="sidebar" size="lg" label="Выйти">
+            <Icon name="logout" :size="24" />
+          </IconButton>
+        </div>
+      </ModalCardContent>
+    </ModalCard>
   </div>
 </template>

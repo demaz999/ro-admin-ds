@@ -23,8 +23,12 @@ const props = withDefaults(defineProps<{
    * Раскладка (такт 69): `float` — плавающая полоса в одну строку (прежняя, по умолчанию); `panel` — панель в потоке
    * страницы во всю ширину контейнера: строка счёта сверху, действия ниже с переносом строк (Figma `32765:6576`).
    * У панели `x` и `y` не действуют.
+   *
+   * Такт 92: `dock` — полоса главного действия, прибитая к низу окна во всю ширину (узкий экран страницы схемы: «Опубликовать
+   * схему» и «⋯»): действия слотом в строку, `count` — имя полосы для чтения с экрана, на полосе не рисуется; `x` и `y` не
+   * действуют.
    */
-  layout?: 'float' | 'panel'
+  layout?: 'float' | 'panel' | 'dock'
   class?: string
 }>(), {
   sub: '',
@@ -53,6 +57,22 @@ const props = withDefaults(defineProps<{
     <div data-slot="action-bar-actions" class="flex min-w-0 flex-wrap items-center gap-2">
       <slot />
     </div>
+  </div>
+  <!--
+    Полоса у низа окна — такт 92: во всю ширину, поверхность `--card`, линия 1 `--border` сверху, поля 12 / 16 (снизу — ещё
+    отступ безопасной зоны экрана), действия через 8. Закрытая не рисуется.
+  -->
+  <div
+    v-else-if="props.layout === 'dock'"
+    v-show="props.open"
+    data-slot="action-bar"
+    data-layout="dock"
+    :data-state="props.open ? 'open' : 'closed'"
+    role="toolbar"
+    :aria-label="props.count"
+    :class="cn('fixed inset-x-0 bottom-0 z-40 flex min-w-0 items-center gap-2 border-t border-border bg-card px-4 pt-3 pb-[calc(var(--spacing)*3+env(safe-area-inset-bottom))] text-card-foreground', props.class)"
+  >
+    <slot />
   </div>
   <div
     v-else

@@ -20,7 +20,7 @@ export { default as ReadinessStage } from './ReadinessStage.vue'
  *
  * | часть | роль |
  * |---|---|
- * | `ReadinessMark` | маркер состояния: готово, «! N» (предупреждает либо блокирует), замок, не готово |
+ * | `ReadinessMark` | маркер состояния: готово, готово к публикации (такт 92), «! N» (предупреждает либо блокирует), замок, не готово |
  * | `ReadinessStage` | этап полосы — кнопка-пилюля с маркером; текущий этап — рамка и текст `--primary` |
  * | `ReadinessBar` | полоса «Подготовка схемы: N из 5 · Далее: … →», этапы кнопками, «Свернуть» |
  * | `ReadinessChip` | чип «Готовность N из 5» либо «Проверка: N» с поповером: заголовок, сводка, содержимое — слотом |
@@ -32,6 +32,7 @@ export { default as ReadinessStage } from './ReadinessStage.vue'
  * | часть | кит | провенанс |
  * |---|---|---|
  * | готово | глиф `check` 16 `--success-strong` (8.2:1 к белому) | роль успеха кита; `--success` на белом — 2.7:1, ниже 3:1 для графики |
+ * | готово к публикации (`ready`, такт 92) | глиф `arrow-forward` 16 `--primary` (6.3:1 к белому) — этап засчитывается публикацией: «Проверка и публикация» до первой публикации без блокирующих | решение 1а оркестратора 2026-10-08: «без галочки выполненного»; стрелка — следующее действие, как «Далее: … →» полосы |
  * | «! N» предупреждает | пилюля 20, поля 6, 12/16 bold: `--warning-surface`, текст `--warning-strong` (5.2:1) | тон предупреждения кита; метка «Не заполнено» (такт 90) |
  * | «! N» блокирует | та же пилюля: `--destructive-surface`, текст `--destructive-strong` (6.8:1) | тон ошибки кита (`Callout destructive`) |
  * | замок | глиф `lock` 14 `--foreground-secondary` | причина — у вкладки и у этапа подсказкой |
@@ -50,7 +51,7 @@ export { default as ReadinessStage } from './ReadinessStage.vue'
  *
  * Семейство не считает готовность: этапы, проверки и переходы отдаёт потребитель (страница схемы — `app/stands/scheme-edit/readiness.ts`).
  */
-export type ReadinessMarkState = 'done' | 'todo' | 'warning' | 'blocked' | 'locked'
+export type ReadinessMarkState = 'done' | 'ready' | 'todo' | 'warning' | 'blocked' | 'locked'
 export type ReadinessLevel = 'block' | 'warn' | 'todo'
 
 /** Этап полосы. */
@@ -97,6 +98,7 @@ export function readinessMarkLabel(state: ReadinessMarkState, count = 0): string
   const word = n === 1 && h !== 11 ? 'замечание' : n >= 2 && n <= 4 && (h < 12 || h > 14) ? 'замечания' : 'замечаний'
   switch (state) {
     case 'done': return 'готово'
+    case 'ready': return 'готово к публикации'
     case 'todo': return 'не готово'
     case 'locked': return 'закрыто'
     case 'blocked': return `${count} ${word}, блокирует публикацию`

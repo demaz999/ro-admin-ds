@@ -149,8 +149,12 @@ const hintClass = computed(() => [
     <div class="flex min-w-0 flex-1 flex-col gap-1">
       <slot />
 
-      <!-- Подсказка тянется, счётчик прижат вправо. Высота строки 16. -->
-      <div v-if="hasHintRow" class="flex h-4 items-center gap-2">
+      <!--
+        Подсказка тянется, счётчик прижат вправо. Высота строки 16. Узкий экран (уже 768, такт 92): длинная подсказка переносится и
+        растит строку — при высоте ровно 16 вторая строка ложилась на контрол. Рабочий стол прежний: перенос подсказки в узкой колонке
+        рабочего стола (окно 1024 с открытым меню) — на решение, вид переданного компонента (`scheme-edit.md`, 33.4).
+      -->
+      <div v-if="hasHintRow" class="flex h-4 items-center gap-2 max-md:h-auto max-md:min-h-4">
         <span
           v-if="props.hint"
           data-slot="field-hint"

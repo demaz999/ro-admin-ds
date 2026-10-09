@@ -21,11 +21,13 @@ const props = withDefaults(defineProps<{
   size?: 'md' | 'lg'
   scale?: number
   fragment?: boolean
+  /** Корпус телефона; `false` — экран приложения без рамки (демо-осмотр на узком экране, такт 92). */
+  frame?: boolean
   /** Источники обведённых частей: часть с `source` из списка обводится (поповер «?», наведение демо-осмотра). */
   marked?: readonly string[]
   /** Кнопки и строки с переходом нажимаются: событие `go` с экраном перехода. */
   interactive?: boolean
-}>(), { size: 'lg', scale: 1, fragment: false, marked: () => [], interactive: false })
+}>(), { size: 'lg', scale: 1, fragment: false, frame: true, marked: () => [], interactive: false })
 
 const emit = defineEmits<{
   go: [to: string]
@@ -67,7 +69,7 @@ watch(() => [props.marked.join('|'), props.screen], reveal)
 
 <template>
   <div ref="root" data-slot="app-preview-screen-root" class="contents">
-    <AppPreview :title="props.screen.title" :size="props.size" :scale="props.scale" :fragment="props.fragment">
+    <AppPreview :title="props.screen.title" :size="props.size" :scale="props.scale" :fragment="props.fragment" :frame="props.frame">
       <template v-for="p in body" :key="p.id">
         <AppPreviewProgress
           v-if="p.kind === 'progress'"

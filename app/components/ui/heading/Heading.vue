@@ -16,14 +16,22 @@ const props = withDefaults(defineProps<{
   as?: string
   /** Подпись под заголовком: 13/16 `--foreground-secondary`, зазор 4 — макет `32876:4136` (такт 62). */
   description?: string
+  /**
+   * Не больше строк — такт 92: длинный заголовок обрывается многоточием на последней строке (имя схемы на узком экране — до
+   * трёх строк). Без пропа заголовок переносится целиком.
+   */
+  lines?: 2 | 3
   class?: string
 }>(), {
   level: 'section',
   as: undefined,
   description: '',
+  lines: undefined,
 })
 
 const tag = computed(() => props.as ?? ({ page: 'h1', title: 'h2', group: 'h3', section: 'h2' } as const)[props.level])
+/** Обрыв по числу строк — такт 92; длинное слово переносится внутри, чтобы не раздвигать узкую колонку. */
+const clamp = computed(() => (props.lines === 2 ? 'line-clamp-2 break-words' : props.lines === 3 ? 'line-clamp-3 break-words' : ''))
 </script>
 
 <template>
@@ -50,7 +58,7 @@ const tag = computed(() => props.as ?? ({ page: 'h1', title: 'h2', group: 'h3', 
       {{ props.description }}
     </p>
   </div>
-  <component :is="tag" v-else data-slot="heading" :data-level="props.level" :class="cn(headingVariants({ level: props.level }), props.class)">
+  <component :is="tag" v-else data-slot="heading" :data-level="props.level" :data-lines="props.lines" :class="cn(headingVariants({ level: props.level }), clamp, props.class)">
     <slot />
   </component>
 </template>

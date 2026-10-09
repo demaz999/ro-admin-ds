@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { DialogContentEmits, DialogContentProps } from 'reka-ui'
 import { reactiveOmit } from '@vueuse/core'
-import { DialogContent, DialogOverlay, DialogPortal, useForwardPropsEmits } from 'reka-ui'
+import { DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogTitle, useForwardPropsEmits, VisuallyHidden } from 'reka-ui'
 import { computed, provide } from 'vue'
 import { cn } from '@/lib/utils'
 import { MODAL_CARD_KEY, type ModalCardPlacement } from '.'
@@ -21,6 +21,24 @@ const props = withDefaults(defineProps<DialogContentProps & {
    * («Новая схема осмотра» страницы схемы). У `edge` ширина одна — 642; `full` — во всё окно.
    */
   size?: 'md' | 'sm' | 'lg'
+  /**
+   * Край окна у `edge` — такт 92: `right` (по умолчанию) — сайд справа, скругление 48 слева сверху; `left` — слева, скругление
+   * 48 справа сверху (выезжающее меню каркаса на узком экране).
+   */
+  side?: 'right' | 'left'
+  /**
+   * Поверхность — такт 92: `card` (по умолчанию) — карточка кита с полями 32 / 16 и зазором блоков 24; `sidebar` — поверхность
+   * меню `--sidebar` без полей и зазоров, ширина — по содержимому: выезжающее меню каркаса (правило порталов сайдбара `CLAUDE.md`:
+   * внутри — `sidebar`-токены).
+   */
+  surface?: 'card' | 'sidebar'
+  /**
+   * Узкий экран (уже 768) — такт 92: `keep` (по умолчанию) — размещение прежнее; `full` — окно и сайд во всё окно без
+   * скругления, действия шапки — строкой под заголовком, текст подвала — строкой над кнопками. Рабочий стол не меняется.
+   */
+  narrow?: 'keep' | 'full'
+  /** Имя окна без шапки `ModalCardHeader` — для чтения с экрана (выезжающее меню). Такт 92. */
+  label?: string
   /** `false` — закрыть можно только кнопками окна: без крестика, Esc и клика мимо (§12.5). */
   closable?: boolean
   /**
@@ -32,15 +50,19 @@ const props = withDefaults(defineProps<DialogContentProps & {
 }>(), {
   placement: 'center',
   size: 'md',
+  side: 'right',
+  surface: 'card',
+  narrow: 'keep',
+  label: '',
   closable: true,
   inline: false,
 })
 const emits = defineEmits<DialogContentEmits>()
 
-const delegated = reactiveOmit(props, 'placement', 'size', 'closable', 'inline', 'class')
+const delegated = reactiveOmit(props, 'placement', 'size', 'side', 'surface', 'narrow', 'label', 'closable', 'inline', 'class')
 const forwarded = useForwardPropsEmits(delegated, emits)
 
-provide(MODAL_CARD_KEY, { closable: computed(() => props.closable) })
+provide(MODAL_CARD_KEY, { closable: computed(() => props.closable), narrow: computed(() => props.narrow === 'full') })
 
 /** Заблокированное окно не закрывается ни Esc, ни кликом мимо — только своими кнопками. */
 function guard(event: Event) {
@@ -61,6 +83,22 @@ function focusCard(event: Event) {
 }
 
 const position = computed(() => (props.inline ? 'absolute' : 'fixed'))
+const sidebar = computed(() => props.surface === 'sidebar')
+
+/**
+ * Узкий экран, `narrow="full"` — такт 92: сайд и окно по центру — во всё окно, без скругления; полноэкранный слой и так во всё
+ * окно. Классы с вариантом `max-md:` — рабочий стол (768 и шире) прежний.
+ */
+const NARROW_FULL: Record<ModalCardPlacement, string> = {
+  edge: 'max-md:inset-x-0 max-md:w-auto max-md:rounded-none',
+  center: 'max-md:inset-0 max-md:w-auto max-md:max-h-none max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-none',
+  full: '',
+}
+
+/** Край `edge`: справа — прежний сайд 642; слева — зеркально; у поверхности меню ширина по содержимому. */
+const edgeClass = computed(() => (props.side === 'left'
+  ? cn('inset-y-0 left-0 rounded-tr-4xl', sidebar.value ? '' : 'w-modal-edge')
+  : 'inset-y-0 right-0 w-modal-edge rounded-tl-4xl'))
 </script>
 
 <template>
@@ -74,17 +112,22 @@ const position = computed(() => (props.inline ? 'absolute' : 'fixed'))
     <DialogContent
       data-slot="modal-card"
       :data-placement="props.placement"
+      :data-side="props.placement === 'edge' && props.side === 'left' ? 'left' : undefined"
+      :data-surface="sidebar ? 'sidebar' : undefined"
+      :data-narrow="props.narrow === 'full' ? 'full' : undefined"
       :data-closable="props.closable || undefined"
       v-bind="{ ...forwarded, ...$attrs }"
       :class="cn(
-        'z-50 flex flex-col gap-6 bg-card px-4 py-8 text-foreground shadow-modal outline-none',
+        'z-50 flex flex-col shadow-modal outline-none',
+        sidebar ? 'overflow-hidden bg-sidebar text-sidebar-foreground' : 'gap-6 bg-card px-4 py-8 text-foreground',
         position,
         props.placement === 'edge'
-          ? 'inset-y-0 right-0 w-modal-edge rounded-tl-4xl'
+          ? edgeClass
           : props.placement === 'full'
             /* Полноэкранный слой (такт 71): во всё окно, без скругления; паддинги и зазоры — прежние. */
             ? 'inset-0'
             : cn('top-1/2 left-1/2 max-h-[88vh] rounded-md -translate-x-1/2 -translate-y-1/2', props.size === 'sm' ? 'w-modal-narrow' : props.size === 'lg' ? 'w-modal-wide' : 'w-modal'),
+        props.narrow === 'full' ? NARROW_FULL[props.placement] : '',
         props.class,
       )"
       tabindex="-1"
@@ -93,6 +136,13 @@ const position = computed(() => (props.inline ? 'absolute' : 'fixed'))
       @interact-outside="guard"
       @open-auto-focus="focusCard"
     >
+      <!-- Окно без шапки (выезжающее меню) — имя и описание для чтения с экрана, иначе Reka предупреждает (такт 28). -->
+      <VisuallyHidden v-if="props.label" as-child>
+        <div>
+          <DialogTitle>{{ props.label }}</DialogTitle>
+          <DialogDescription>{{ props.label }}</DialogDescription>
+        </div>
+      </VisuallyHidden>
       <slot />
     </DialogContent>
   </DialogPortal>

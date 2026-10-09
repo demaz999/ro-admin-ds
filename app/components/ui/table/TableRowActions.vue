@@ -44,6 +44,9 @@ import { TABLE_ROW_ACTION_ORDER, type TableRowActionItem } from '.'
  * > Такт 22 исправил порядок: в такте 21 вторичный слот стоял левее карандаша — ошибка
  * > передачи решения владельца.
  *
+ * Такт 92: пункты последней группы кебаба (удаление, `destructive`) — тоном опасного действия `SelectItem tone="destructive"`:
+ * подпись `--destructive-strong`, наведение `--destructive-surface` — как «Удалить схему» в меню «⋯» страницы схемы (такт 91).
+ *
  * ## Клик по действию не уходит в строку
  *
  * Строка — цель клика (открыть на редактирование), поэтому клики внутри колонки
@@ -138,10 +141,12 @@ const menuDanger = computed(() => ordered.value.filter(a => a.destructive))
                 {{ a.label }}
               </SelectItem>
             </SelectGroup>
+            <!-- Такт 92 (решение 1б оркестратора 2026-10-08): удаление — тоном опасного действия, как «Удалить схему» (К-4, такт 91). -->
             <SelectGroup v-if="menuDanger.length" data-section="danger">
               <SelectItem
                 v-for="a in menuDanger"
                 :key="a.key"
+                tone="destructive"
                 :disabled="a.disabled"
                 :data-action="a.key"
                 @click="pick(a.key)"

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { SCHEME_COVERAGE_STATES } from '~/stands/scheme-edit/coverage'
+import { SCHEME_COVERAGE_STATES, SCHEME_PHONE_STATES } from '~/stands/scheme-edit/coverage'
 import { createModel, type Dataset } from '~/stands/scheme-edit/model'
 import schemeDemo from '~/stands/scheme-edit/demo-data.json'
 import { TARIFFS_COVERAGE_STATES } from '~/stands/tariffs/coverage'
@@ -2156,6 +2156,17 @@ const READY_GROUPS: ReadinessGroupItem[] = [
         кита. Состояния оснастки — <code>app/stands/scheme-edit/coverage.ts</code>. Такт 61.
       </p>
       <CompareCoverageAudit path="/scheme-edit" :states="SCHEME_COVERAGE_STATES" />
+    </section>
+
+    <section class="space-y-3">
+      <h2 class="text-lg font-bold">
+        Автопроверка покрытия страницы схемы — узкий экран 375
+      </h2>
+      <p class="max-w-3xl text-sm text-muted-foreground">
+        Тот же обход в окне 375 × 812: раскладка телефона — нижняя полоса, выбор раздела и группы списком, строки-карточки, окна во всё
+        окно, демо-осмотр без рамки телефона. Состояния — <code>SCHEME_PHONE_STATES</code>. Такт 92.
+      </p>
+      <CompareCoverageAudit path="/scheme-edit" :states="SCHEME_PHONE_STATES" :width="375" :height="812" />
     </section>
 
     <section class="space-y-3">

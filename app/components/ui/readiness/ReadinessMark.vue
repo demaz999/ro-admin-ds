@@ -27,6 +27,8 @@ const spoken = computed(() => props.label ?? readinessMarkLabel(props.state, pro
 <template>
   <span data-slot="readiness-mark" :data-state="props.state" :class="cn('inline-flex shrink-0 items-center', props.class)">
     <Icon v-if="props.state === 'done'" name="check" :size="16" class="text-success-strong" />
+    <!-- Такт 92 (решение 1а): «Готово к публикации» — этап засчитывается публикацией, галочки выполненного до неё нет. -->
+    <Icon v-else-if="props.state === 'ready'" name="arrow-forward" :size="16" class="text-primary" />
     <Icon v-else-if="props.state === 'locked'" name="lock" :size="14" class="text-foreground-secondary" />
     <span v-else-if="props.state === 'todo'" class="size-3.5 rounded-full border-2 border-border-secondary" />
     <span

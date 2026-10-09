@@ -18,7 +18,13 @@ interface Row { state: string, checked: number, findings: CoverageFinding[] }
  * Экран и его состояния оснастки: по умолчанию `/free-shoot`; `/scheme-edit` — такт 61, `/tariffs` — такт 77. Состояние, которое
  * начинается с «/», — свой адрес той же страницы (такт 91: `/scheme-edit/new` — окно «Новая схема осмотра»).
  */
-const props = withDefaults(defineProps<{ path?: string, states?: readonly string[] }>(), { path: '/free-shoot', states: () => COVERAGE_STATES })
+/**
+ * Окно экрана — такт 92: `width` × `height` iframe; по умолчанию 1440 × 900, отдельный проход узкого экрана — 375 × 812 (страница
+ * схемы на телефоне, `docs/scheme-edit.md`, раздел 33).
+ */
+const props = withDefaults(defineProps<{ path?: string, states?: readonly string[], width?: number, height?: number }>(), {
+  path: '/free-shoot', states: () => COVERAGE_STATES, width: 1440, height: 900,
+})
 
 const rows = ref<Row[]>([])
 const running = ref(false)
@@ -54,7 +60,7 @@ const offenders = () => rows.value.reduce((a, r) => a + r.findings.length, 0)
 </script>
 
 <template>
-  <div data-coverage-audit :data-path="props.path" class="space-y-3 text-sm">
+  <div data-coverage-audit :data-path="props.path" :data-viewport="`${props.width}x${props.height}`" class="space-y-3 text-sm">
     <div class="flex items-center gap-4">
       <Button variant="secondary" :disabled="running" data-coverage-run @click="run">
         {{ running ? 'Проверяется…' : 'Запустить проверку покрытия' }}
@@ -89,6 +95,6 @@ const offenders = () => rows.value.reduce((a, r) => a + r.findings.length, 0)
         </li>
       </template>
     </ul>
-    <iframe ref="frame" title="Экран для проверки покрытия" class="pointer-events-none absolute -left-[10000px] h-225 w-360" aria-hidden="true" />
+    <iframe ref="frame" title="Экран для проверки покрытия" class="pointer-events-none absolute -left-[10000px]" :style="{ width: `${props.width}px`, height: `${props.height}px` }" aria-hidden="true" />
   </div>
 </template>

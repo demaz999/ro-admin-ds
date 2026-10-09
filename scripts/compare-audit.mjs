@@ -7,13 +7,15 @@
  * открыта в headless Chrome 1440×900 и выведена вперёд: счёт сопоставим между тактами.
  *
  * Печатает: шрифты и иконки (счёт и провалы), разметку трёх экранов (`/free-shoot`, `/scheme-edit`, с такта 77 —
- * `/tariffs`), покрытие по DOM — по состояниям.
+ * `/tariffs`), покрытие по DOM — по состояниям. С такта 92 у страницы схемы два прохода покрытия: окно 1440 × 900 и узкий экран
+ * 375 × 812 (`@375x812` в строке итога).
  *
  * Запуск (dev-сервер на 3000 уже поднят):
  *   node scripts/compare-audit.mjs                 — всё
  *   node scripts/compare-audit.mjs --no-coverage   — без покрытия (секунды)
  *   node scripts/compare-audit.mjs --only=/scheme-edit — покрытие одного экрана
  *   node scripts/compare-audit.mjs --states        — покрытие с таблицей по состояниям
+ *   node scripts/compare-audit.mjs --only=/scheme-edit --viewport=375x812 — покрытие узкого экрана страницы схемы (такт 92)
  *
  * Счёт шрифтов и иконок берётся, когда два замера подряд дали одно и то же ненулевое число (такт 67): ноль до обхода
  * итогом не считается; не устоялся за 120 с — выход с кодом 2 и строкой «СЧЁТ НЕ УСТОЯЛСЯ».
@@ -30,6 +32,8 @@ const PORT = Number(process.env.CDP_PORT ?? 9335)
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 const args = process.argv.slice(2)
 const only = args.find(a => a.startsWith('--only='))?.slice(7)
+/* Такт 92: `--viewport=375x812` — только проходы покрытия в этом окне. */
+const viewportOnly = args.find(a => a.startsWith('--viewport='))?.slice(11)
 
 async function ensureChrome() {
   try { await (await fetch(`http://127.0.0.1:${PORT}/json/version`)).json(); return } catch {}
@@ -108,9 +112,10 @@ for (const m of H.markup) console.log(`разметка /${m.screen}: ${m.total}
 let bad = drift || !H.iconsOk || !H.fontsOk || H.markup.some(m => !/Нарушений: 0\./.test(m.total) || !/не слепая/.test(m.control))
 
 if (!args.includes('--no-coverage')) {
-  const paths = JSON.parse(await evaluate(`JSON.stringify([...document.querySelectorAll('[data-coverage-audit]')].map(a => a.dataset.path))`)).filter(p => !only || p === only)
-  for (const path of paths) {
-    const root = `document.querySelector('[data-coverage-audit][data-path="${path}"]')`
+  /* Проходы покрытия — по порядку на странице: путь и окно (такт 92 — второй проход страницы схемы в окне 375 × 812). */
+  const audits = JSON.parse(await evaluate(`JSON.stringify([...document.querySelectorAll('[data-coverage-audit]')].map((a, k) => ({ k, path: a.dataset.path, viewport: a.dataset.viewport })))`)).filter(a => (!only || a.path === only) && (!viewportOnly || a.viewport === viewportOnly))
+  for (const { k, path, viewport } of audits) {
+    const root = `document.querySelectorAll('[data-coverage-audit]')[${k}]`
     await send('Page.bringToFront')
     await evaluate(`(${root}.querySelector('[data-coverage-run]').click(), 1)`)
     for (let k = 0; k < 900; k++) {
@@ -120,7 +125,7 @@ if (!args.includes('--no-coverage')) {
     const r = JSON.parse(await evaluate(`(() => { const t = ${T}; const a = ${root}
       return JSON.stringify({ total: t(a.querySelector('[data-coverage-total]')?.textContent), rows: [...a.querySelectorAll('tbody tr')].map(r => [...r.children].map(c => t(c.textContent))),
         offenders: [...a.querySelectorAll('ul li')].map(li => t(li.textContent)) }) })()`))
-    console.log(`покрытие ${path}: ${r.total}`)
+    console.log(`покрытие ${path}${viewport && viewport !== '1440x900' ? ` @${viewport}` : ''}: ${r.total}`)
     if (args.includes('--states')) for (const row of r.rows) console.log(`   ${row[0]}: ${row[1]} / ${row[2]}`)
     for (const o of r.offenders) console.log(`   ✗ ${o}`)
     if (!/Непомеченных: 0\./.test(r.total)) bad = true
