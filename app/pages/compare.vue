@@ -1071,7 +1071,8 @@ const READY_GROUPS: ReadinessGroupItem[] = [
       </p>
       <p class="max-w-3xl rounded-md border border-border p-3 text-sm">
         <strong>Цвет разойдётся, и это ожидаемо.</strong> Мастер красит тело <code>#f6f6f8</code>, чип — синим коллекции
-        <code>theme(primitives)</code> кита 1: это легаси. Тело стоит на ролях поля кита, чип — на <code>--primary</code>.
+        <code>theme(primitives)</code> кита 1: это легаси. Тело стоит на ролях поля кита. Чип с такта 100 — малый чип внутри поля: белая плашка <code>--card</code> с рамкой
+        <code>--border</code> и текстом <code>--foreground</code> (решение владельца 2026-10-09, доска scheme-edit-batch2-v1).
         Шеврон — глиф кита 16 в кнопке 24 против контура 11.2×6.6 мастера.
       </p>
 

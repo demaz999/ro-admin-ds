@@ -7,6 +7,7 @@ import type { FormulaVariable } from '.'
 import { computed, h, onBeforeUnmount, onMounted, ref, render, watch } from 'vue'
 import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui'
 import { cn } from '@/lib/utils'
+import { CHIP_SMALL_REMOVE_GLYPH, chipSmallRemoveVariants, chipSmallVariants } from '../chip'
 import { READONLY_SURFACE, useReadonly } from '../field'
 import { Icon } from '../icon'
 import { SelectContent, SelectGroup, SelectItem } from '../select'
@@ -55,10 +56,15 @@ const groups = computed(() => {
 })
 
 /* ------------------------------ узлы области ------------------------------ */
-const CHIP = 'mx-px inline-flex h-6 items-center gap-1 rounded-full bg-secondary pr-1.5 pl-3 align-middle text-2xs font-bold text-primary select-none'
-const CHIP_INVALID = 'mx-px inline-flex h-6 items-center gap-1 rounded-full bg-destructive-surface pr-1.5 pl-3 align-middle text-2xs font-bold text-destructive-strong select-none'
+/*
+ * Такт 100 (решение владельца 2026-10-09, доска `scheme-edit-batch2-v1`): чип переменной — малый чип внутри поля, общая часть
+ * `ui/chip` с выбранными значениями `SelectMultiple`: белая плашка с рамкой, текст 12/16 regular. Ошибка — прежние роли ошибки.
+ * Здесь — только место чипа в строке текста: поле 1 по бокам и выравнивание по середине строки.
+ */
+const CHIP = cn(chipSmallVariants({ tone: 'default' }), 'mx-px align-middle')
+const CHIP_INVALID = cn(chipSmallVariants({ tone: 'invalid' }), 'mx-px align-middle')
 /* Крестик чипа в «только чтении» не рисуется: чипы строятся в обход шаблона, поэтому прячет их атрибут корня. */
-const CHIP_REMOVE = 'flex size-3 shrink-0 cursor-pointer items-center justify-center rounded-full outline-none hover:opacity-[var(--opacity-icon-muted)] group-data-[readonly]/formula:hidden'
+const CHIP_REMOVE_TAIL = 'cursor-pointer group-data-[readonly]/formula:hidden'
 
 const isChip = (n: Node | null | undefined): n is HTMLElement => !!n && n.nodeType === 1 && (n as HTMLElement).dataset.slot === 'formula-chip'
 
@@ -68,6 +74,7 @@ function makeChip(key: string): HTMLElement {
   chip.contentEditable = 'false'
   chip.dataset.slot = 'formula-chip'
   chip.dataset.var = key
+  chip.dataset.chipSize = 'sm'
   if (!known) chip.dataset.invalid = ''
   chip.className = known ? CHIP : CHIP_INVALID
   chip.title = known ? `{${key}}` : `Неизвестная переменная {${key}}`
@@ -78,9 +85,9 @@ function makeChip(key: string): HTMLElement {
   remove.type = 'button'
   remove.tabIndex = -1
   remove.dataset.slot = 'formula-chip-remove'
-  remove.className = CHIP_REMOVE
+  remove.className = cn(chipSmallRemoveVariants({ tone: known ? 'default' : 'invalid' }), CHIP_REMOVE_TAIL)
   remove.setAttribute('aria-label', `Убрать переменную: ${known?.label ?? key}`)
-  render(h(Icon, { name: 'close', size: 8 }), remove)
+  render(h(Icon, { name: 'close', size: CHIP_SMALL_REMOVE_GLYPH }), remove)
   chip.append(text, remove)
   return chip
 }

@@ -76,6 +76,13 @@ const t99Hint = ref(true)
 const T99_ROWS = ['Эксперты Москва', 'Эксперты Казань', 'Агенты Север', 'Агенты Юг', 'Операторы']
 const t99Page = ref(2)
 const t99Size = ref(3)
+/* Такт 100: малый чип внутри поля — набор значений и формула; чип на странице — для сравнения размеров. */
+const t100Roles = ref(['Администратор', 'Эксперт', 'Агент'])
+const t100Formula = ref('Осмотр {Inspection:number} — {Car:vin} {Car:color}')
+const T100_VARS = [
+  { value: 'Inspection:number', label: 'Номер осмотра', group: 'Осмотр' },
+  { value: 'Car:vin', label: 'VIN', group: 'Автомобиль' },
+]
 /* Ось readonly — такт 68: обычное, только чтение, выключено рядом. */
 const RO_CASES = [
   { id: 'normal', label: 'обычное' },
@@ -154,6 +161,26 @@ const ro = ref({ name: 'КАСКО — осмотр', text: 'Осмотр авт
               <TableFooter v-model:page="t99Page" v-model:page-size="t99Size" :pages="Math.ceil(T99_ROWS.length / t99Size)" :total="T99_ROWS.length" :page-sizes="[3, 4]" />
             </div>
             <span class="text-xs text-muted-foreground">переключайте страницы 1 и 2 и «строк на странице»: подвал на месте, пустое место — под последней строкой</span>
+          </template>
+          <!-- Такт 100 (решения владельца 2026-10-09, доска scheme-edit-batch2-v1): малый чип внутри поля — белая плашка с рамкой; правило размеров. -->
+          <template v-else-if="c.id === 'chip-small'">
+            <Field label="Внутри поля — малый чип 24: набор значений">
+              <Select v-model:values="t100Roles" multiple :items="DRAFT_ROLES" placeholder="Выберите роли" />
+            </Field>
+            <Field label="Внутри поля — малый чип 24: переменные формулы (последняя — вне списка)">
+              <FormulaInput v-model="t100Formula" :variables="T100_VARS" label="Формула" />
+            </Field>
+            <div class="flex flex-wrap items-center gap-2">
+              <Chip>Администратор</Chip>
+              <Chip>Эксперт</Chip>
+            </div>
+            <span class="text-xs text-muted-foreground">на странице — Chip 32; внутри поля — малый чип 24 одной частью у обоих полей (data-chip-size="sm"); наведите на крестик — плашка --accent</span>
+          </template>
+          <template v-else-if="c.id === 'select-multiple-chips'">
+            <Field label="Кто может выполнять осмотр">
+              <Select v-model:values="t100Roles" multiple :items="DRAFT_ROLES" placeholder="Выберите роли" />
+            </Field>
+            <span class="text-xs text-muted-foreground">было: сплошной --primary с белым текстом; стало: --card, рамка 1 --border, текст и крестик --foreground</span>
           </template>
           <!-- Такт 98 (решения владельца 2026-10-09): плашка по полю, фокус пункта, подсказка под внешней подписью, пояснение, минус. -->
           <template v-else-if="c.id === 'select-plaque-width'">

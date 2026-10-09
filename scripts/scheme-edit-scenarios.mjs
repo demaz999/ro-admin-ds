@@ -718,6 +718,10 @@ function kit(page) {
           dots: Object.fromEntries([...document.querySelectorAll('[data-slot=section-nav-item]')].filter(b => b.dataset.status !== 'none').map(b => [b.dataset.value, b.dataset.status])),
           prevDisabled: document.querySelector('[data-act=section-prev]')?.disabled ?? null,
           nextDisabled: document.querySelector('[data-act=section-next]')?.disabled ?? null,
+          /* Такт 100: подписи «← раздел» и «раздел →»; крайней кнопки нет — null. */
+          prevText: t(document.querySelector('[data-act=section-prev]')?.textContent) || null,
+          nextText: t(document.querySelector('[data-act=section-next]')?.textContent) || null,
+          reasonActs: [...document.querySelectorAll('[data-form-actions] [data-act]')].map(b => b.dataset.act),
           g: M.draft.config.settings.general,
           rows: Object.fromEntries([...document.querySelectorAll('[data-setting]')].map(r => {
             const own = sel => [...r.querySelectorAll(sel)].find(x => x.closest('[data-setting]') === r)
@@ -1339,10 +1343,10 @@ const SCENARIOS = {
     ['согласование включено, поля отмечены — точки у «Общих» нет', async (K) => { await K.toggle('approval'); await K.settled() },
       { dots: { web: 'on', anomalies: 'on', pdf: 'on' }, 'g.behavior.approval': true }],
   ]],
-  'СС-16': ['«Назад / Далее»: соседний раздел; на первом выключена «Назад», на последнем — «Далее» (r2 §3)', [
-    ['старт: первый раздел', null, { section: 'general', prevDisabled: true, nextDisabled: false }],
-    ['«Далее»', K => K.act('section-next'), { section: 'mobile', navActive: ['mobile'], prevDisabled: false, nextDisabled: false, anchor: 'shooting', navAnchors: ['Параметры съёмки', 'Поведение в мобильном приложении'] }],
-    ['«Далее» до последнего', async (K) => { for (let k = 0; k < 5; k++) await K.act('section-next') }, { section: 'pdf', navActive: ['pdf'], prevDisabled: false, nextDisabled: true }],
+  'СС-16': ['«Назад / Далее»: соседний раздел с названием; на первом разделе «Назад» нет, на последнем — «Далее» (r2 §3; такт 100)', [
+    ['старт: первый раздел', null, { section: 'general', prevDisabled: null, nextDisabled: false, prevText: null, nextText: 'Мобильное приложение →' }],
+    ['«Далее»', K => K.act('section-next'), { section: 'mobile', navActive: ['mobile'], prevDisabled: false, nextDisabled: false, prevText: '← Общие', nextText: 'Веб-приложение →', anchor: 'shooting', navAnchors: ['Параметры съёмки', 'Поведение в мобильном приложении'] }],
+    ['«Далее» до последнего', async (K) => { for (let k = 0; k < 5; k++) await K.act('section-next') }, { section: 'pdf', navActive: ['pdf'], prevDisabled: false, nextDisabled: null, prevText: '← Аномалии', nextText: null }],
     ['«Назад»', K => K.act('section-prev'), { section: 'anomalies', prevDisabled: false, nextDisabled: false, writes: 0 }],
   ]],
   'СС-17': ['дерево решений: параметры родителя доступны при включённом родителе (аудит, «Механизм разбора стены чекбоксов»)', [
@@ -1688,7 +1692,7 @@ const SCENARIOS = {
   ], { query: 'section=mobile' }],
   'СС-26': ['веб-приложение: рубильник блока гасит варианты и запреты; добавление обоснования «ключ — название», удаление с отменой (r2 §4)', [
     ['старт', null, { section: 'web', reasons: ['Координаты — geo', 'Фото с экрана — screen-photo'], reasonsRemovable: 2, reasonForm: false, reasonAddOff: false, 'rows.blockRepeat.off': false, callouts: {}, 'dots.web': 'on' }],
-    ['«Добавить вариант» — форма с пустыми полями', K => K.act('reason-add'), { reasonForm: true, writes: 0 }],
+    ['«Добавить вариант» — форма с пустыми полями; кнопки справа: «Отмена», затем главная (такт 100)', K => K.act('reason-add'), { reasonForm: true, reasonActs: ['reason-cancel', 'reason-create'], writes: 0 }],
     ['«Создать обоснование» с пустыми полями — отказ', K => K.act('reason-create'), { notices: ['Заполните ключ и название обоснования'], reasonForm: true, reasons: ['Координаты — geo', 'Фото с экрана — screen-photo'], writes: 0 }],
     ['ключ «blur», название «Размытое фото» — создано', async (K) => { await K.typeInto('reasonKey', 'blur'); await K.typeInto('reasonTitle', 'Размытое фото'); await K.act('reason-create'); await K.settled() },
       { reasons: ['Координаты — geo', 'Фото с экрана — screen-photo', 'Размытое фото — blur'], reasonForm: false, saveLog: ['saving', 'saved'], writes: 1 }],

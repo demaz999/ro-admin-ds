@@ -15,11 +15,12 @@ import {
   ComboboxViewport,
 } from 'reka-ui'
 import { useReadonly } from '../field'
+import { CHIP_SMALL_REMOVE_GLYPH, chipSmallRemoveVariants, chipSmallVariants } from '../chip'
 import { Icon } from '../icon'
 import SelectContent from './SelectContent.vue'
 import SelectItem from './SelectItem.vue'
 import { LIST_ITEM_RING, useListKeyboard } from './keyboard'
-import { selectChipVariants, selectMultiBodyVariants, type SelectTriggerVariants } from '.'
+import { selectMultiBodyVariants, type SelectTriggerVariants } from '.'
 
 /**
  * Селект с набором значений — ось `multiple` у `Select`: мастер кита 1 `multiselect` `251:16816`
@@ -85,19 +86,20 @@ function onBodyClick(event: MouseEvent) {
         <!-- `badge_list` мастера: чипы с переносом, зазор 8 в обе стороны. -->
         <!-- Только чтение: чипы принимают указатель — текст значений выделяется мышью. -->
         <div v-if="chips.length" data-slot="select-chips" class="flex min-w-0 flex-1 flex-wrap gap-2" :class="ro ? '' : 'pointer-events-none'">
-          <span v-for="c in chips" :key="c.value" data-slot="select-chip" :data-value="c.value" :role="ro ? 'option' : undefined" :aria-selected="ro ? 'true' : undefined" :class="selectChipVariants({ disabled: props.disabled })">
+          <!-- Такт 100: малый чип внутри поля — общая часть `ui/chip` (белая плашка с рамкой), решение владельца 2026-10-09. -->
+          <span v-for="c in chips" :key="c.value" data-slot="select-chip" data-chip-size="sm" :data-value="c.value" :role="ro ? 'option' : undefined" :aria-selected="ro ? 'true' : undefined" :class="chipSmallVariants({ disabled: props.disabled })">
             <span class="min-w-0 truncate">{{ c.label }}</span>
-            <!-- Крестик — коробка 16, глиф 9.2: мастер `Badge` `250:15548`. -->
+            <!-- Крестик — коробка 16, глиф 9.2: мастер `Badge` `250:15548`; тоном текста, фокус — кольцо `--ring`. -->
             <button
               v-if="!ro"
               type="button"
               data-slot="select-chip-remove"
-              class="pointer-events-auto flex size-4 shrink-0 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground"
+              :class="['pointer-events-auto', chipSmallRemoveVariants()]"
               :aria-label="`Убрать: ${c.label}`"
               :disabled="props.disabled"
               @click.stop="remove(c.value)"
             >
-              <Icon name="close" :size="9.2" />
+              <Icon name="close" :size="CHIP_SMALL_REMOVE_GLYPH" />
             </button>
           </span>
         </div>

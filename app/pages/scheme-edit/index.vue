@@ -503,6 +503,9 @@ function step(dir: -1 | 1) {
   const next = m.neighbourSection(dir)
   if (next) section.value = next
 }
+/** Соседние разделы для «← раздел» и «раздел →» — такт 100. */
+const prevSection = computed(() => SECTIONS.find(x => x.id === m.neighbourSection(-1)) ?? null)
+const nextSection = computed(() => SECTIONS.find(x => x.id === m.neighbourSection(1)) ?? null)
 /** Активный якорь следует за прокруткой: последний подраздел, начало которого прошло верх окна. */
 function spy() {
   const anchors = SECTION_ANCHORS[m.ui.section]
@@ -2835,12 +2838,13 @@ if (import.meta.client) {
                           </Field>
                         </div>
                       </FieldSet>
-                      <div class="flex items-center gap-2">
-                        <Button :inert="ro" data-act="reason-create" @click="createReason()">
-                          Создать обоснование
-                        </Button>
+                      <!-- Такт 100 (владелец, 2026-10-09, доска scheme-edit-batch2-v1): кнопки встроенной формы — как подвал окна: справа, «Отмена», затем главная, 16. -->
+                      <div class="flex items-center justify-end gap-4" data-form-actions>
                         <Button :inert="ro" variant="secondary" data-act="reason-cancel" @click="closeReasonForm()">
                           Отмена
+                        </Button>
+                        <Button :inert="ro" data-act="reason-create" @click="createReason()">
+                          Создать обоснование
                         </Button>
                       </div>
                     </Card>
@@ -3327,13 +3331,16 @@ if (import.meta.client) {
 
             </div>
 
-            <!-- «Назад / Далее» — № 15: соседний раздел; на первом выключена «Назад», на последнем — «Далее». -->
-            <div class="flex items-center gap-4">
-              <Button variant="secondary" :disabled="!m.neighbourSection(-1)" data-act="section-prev" @click="step(-1)">
-                Назад
+            <!--
+              «Назад / Далее» — № 15. Такт 100 (владелец, 2026-10-09, доска scheme-edit-batch2-v1; ревью Н-2, Т-3): по краям строки, с
+              названиями соседних разделов — «← раздел» слева, «раздел →» справа; на первом разделе левой кнопки нет, на последнем — правой.
+            -->
+            <div class="flex items-center gap-4" data-section-steps>
+              <Button v-if="prevSection" variant="secondary" :aria-label="`Предыдущий раздел: ${prevSection.label}`" data-act="section-prev" @click="step(-1)">
+                ← {{ prevSection.label }}
               </Button>
-              <Button :disabled="!m.neighbourSection(1)" data-act="section-next" @click="step(1)">
-                Далее
+              <Button v-if="nextSection" class="ml-auto" :aria-label="`Следующий раздел: ${nextSection.label}`" data-act="section-next" @click="step(1)">
+                {{ nextSection.label }} →
               </Button>
             </div>
             <!--

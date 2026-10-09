@@ -4,6 +4,30 @@ import { cva } from 'class-variance-authority'
 export { default as Chip } from './Chip.vue'
 
 /**
+ * ## Изменения после передачи
+ *
+ * Правило 23 `docs/chat-protocol.md`: изменение маркируется здесь, в `CHANGELOG.md` и в «Передано фронтам»; живые примеры —
+ * стенд `/kit-changes`. В список передачи 2026-09-30 `Chip` не входил; изменения копятся в черновике следующей версии с
+ * такта 88 (чип-вариант), раздел ведётся с такта 100.
+ *
+ * ### Черновик следующей версии — относительно `handover-2026-10-02`
+ *
+ * - **Добавлено.** Малый чип внутри поля — часть для значений, которые стоят внутри тела поля: высота 24, поля 0 / 8, зазор 4,
+ *   радиус 16, подпись 12/16 regular; плашка — заливка `--card`, рамка 1 `--border`, текст `--foreground` (16.77:1 к
+ *   белому); крестик — коробка 16, глиф 9.2 тоном текста; наведение крестика — плашка `--accent`, фокус — кольцо 2
+ *   `--ring`. Ошибка (значение вне списка) — заливка `--destructive-surface`, текст `--destructive-strong` (6.8:1),
+ *   рамка прозрачная, наведение гасит крестик до `--opacity-icon-muted`. Правило размеров: на странице — `Chip` 32
+ *   (мастер `badge` `747:2464`), внутри поля — малый чип 24, одна часть у набора значений `Select` и у поля формулы.
+ *   Источник — «Кто может выполнять осмотр» и формулы страницы схемы осмотра; геометрия — мастер `Badge`
+ *   `250:15548`; решение владельца 2026-10-09, доска scheme-edit-batch2-v1. API: классы `chipSmallVariants` (ось
+ *   `tone`: `default`, `invalid`) и `chipSmallRemoveVariants` в `ui/chip`, метка части `data-chip-size="sm"`. Такт
+ *   100.
+ * - **Добавлено.** Чип-вариант: пилюля целиком — кнопка без хвоста; нажатие подставляет вариант значения. API: проп `pressable`.
+ *   Такт 88 (строка `CHANGELOG.md`, «Кирпичики»).
+ * - **Исправлено.** Раскрывающий чип (с шевроном) в фокусе с клавиатуры — кольцо 2 `--ring`. Такт 88.
+ */
+
+/**
  * Фильтр-чип — **фаза обогащения, очередь 2**.
  *
  * ## Источник двойной, и обе половины названы
@@ -183,3 +207,65 @@ export const chipCounterVariants = cva(
 )
 
 export type ChipVariants = VariantProps<typeof chipVariants>
+
+/**
+ * ## Малый чип внутри поля — такт 100
+ *
+ * Решения владельца 2026-10-09, доска `scheme-edit-batch2-v1`, пункты 3 и 4. **Правило размеров чипа:** на странице — `Chip`
+ * 32 (мастер `badge` `747:2464`); внутри поля — малый чип 24, одна часть на два поля: выбранные значения `SelectMultiple`
+ * (`Select multiple`) и переменные `FormulaInput`. Часть — классы ниже: `Chip` с осью `size` поле не закрывает — чип формулы
+ * строится узлом внутри редактируемой области в обход шаблона Vue, у чипа набора значений свои цели и подписи для прогона
+ * (`select-chip`, `formula-chip`). Оба поля берут вид отсюда и несут метку части `data-chip-size="sm"`.
+ *
+ * | что | значение | источник |
+ * |---|---|---|
+ * | высота 24, поля 0 / 8, зазор 4, радиус 16 | `h-6 px-2 gap-1 rounded-xl` | мастер `Badge` `250:15548` (`multiselect` `251:16816`) |
+ * | подпись 12/16 regular | `text-2xs` | `250:15549` — Regular 12/16 |
+ * | плашка: заливка `--card`, рамка 1 `--border`, текст `--foreground` | | владелец 2026-10-09, доска, вариант A; мастер — сплошной `#3b82f6` (`figma-fixes.md`) |
+ * | крестик: коробка 16, глиф `close` 9.2, тоном текста | `size-4`, `currentColor` | `16ic_close` `250:15550` |
+ * | наведение крестика — плашка `--accent` | `has-[button:hover]:bg-accent` | как этап `ReadinessStage` (`--card`, рамка, наведение `--accent`) |
+ * | фокус крестика — кольцо 2 `--ring` | | кольцо кита |
+ * | ошибка (переменная вне списка формулы) — `--destructive-surface`, текст `--destructive-strong`, рамка прозрачная | | прежний вид чипа ошибки `FormulaInput`; наведение — крестик гаснет до `--opacity-icon-muted` |
+ *
+ * Было: у `SelectMultiple` — заливка `--primary`, текст `--primary-foreground`, наведение `--primary-hover`; у `FormulaInput` —
+ * `--secondary`, текст `--primary` 12/16 bold, поля 0 / 6 / 0 / 12, крестик 12 с глифом 8 (макет `33230:4140`).
+ */
+export const chipSmallVariants = cva(
+  'inline-flex h-6 max-w-full shrink-0 items-center gap-1 rounded-xl border px-2 text-2xs font-normal whitespace-nowrap transition-colors select-none',
+  {
+    variants: {
+      tone: {
+        default: 'border-border bg-card text-foreground',
+        invalid: 'border-transparent bg-destructive-surface text-destructive-strong',
+      },
+      /** Выключенное поле: наведения нет, прозрачность даёт тело поля. */
+      disabled: {
+        true: '',
+        false: '',
+      },
+    },
+    compoundVariants: [
+      { tone: 'default', disabled: false, class: 'has-[button:hover]:bg-accent' },
+    ],
+    defaultVariants: { tone: 'default', disabled: false },
+  },
+)
+
+/** Крестик малого чипа: коробка 16, глиф `close` 9.2 тоном текста; у ошибки наведение гасит глиф. */
+export const chipSmallRemoveVariants = cva(
+  'flex size-4 shrink-0 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring',
+  {
+    variants: {
+      tone: {
+        default: '',
+        invalid: 'hover:opacity-[var(--opacity-icon-muted)]',
+      },
+    },
+    defaultVariants: { tone: 'default' },
+  },
+)
+
+/** Видимый глиф крестика малого чипа — с мастера `16ic_close` `250:15550`. */
+export const CHIP_SMALL_REMOVE_GLYPH = 9.2
+
+export type ChipSmallVariants = VariantProps<typeof chipSmallVariants>
