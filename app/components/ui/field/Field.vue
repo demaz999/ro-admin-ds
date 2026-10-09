@@ -5,7 +5,7 @@
 <script setup lang="ts">
 import type { FieldLabelVariants, FieldVariants } from '.'
 import { computed } from 'vue'
-import { fieldLabelVariants, fieldVariants, provideReadonly } from '.'
+import { fieldLabelVariants, fieldVariants, provideFieldLabeled, provideReadonly } from '.'
 
 /**
  * Полевая обвязка — мастер `input` `720:11753` кита 1.
@@ -60,6 +60,9 @@ const props = withDefaults(defineProps<{
 /** Контекст оси `readonly` для контрола внутри: `useReadonly` в каждом из десяти контролов. */
 const readonly = provideReadonly(() => props.readonly)
 
+/** Такт 98: подпись снаружи — подсказка вложенного поля внутрь не переносится (`index.ts`, «Подпись снаружи»). */
+provideFieldLabeled(() => !!props.label)
+
 /**
  * Состояние вывешивается на корень: ошибка и выключенность красят подпись,
  * подсказку и счётчик — узлы за пределами контрола, до которых его собственные
@@ -74,10 +77,14 @@ const state = computed(() => {
 /** Строка подсказки рисуется, только если есть хотя бы одна из двух её частей. */
 const hasHintRow = computed(() => Boolean(props.hint || props.counter))
 
-/** Тон подсказки — такт 78; ошибка и выключенность перекрашивают её через `group-data` поверх тона. */
+/**
+ * Тон подсказки — такт 78; ошибка и выключенность перекрашивают её через `group-data` поверх тона. Такт 98 (решение владельца
+ * 2026-10-09): подсказка — пояснение кита, 13/16 regular `--foreground-secondary` (было `--muted-foreground`, 4.48:1 → 4.82:1
+ * к белому); через 4 под полем — у раскладок `top`, `left` и `split` (`ui/checkbox/index.ts`, «Пояснение»).
+ */
 const hintClass = computed(() => [
-  'min-w-0 flex-1 text-xs group-data-[state=error]/field:text-destructive group-data-[state=disabled]/field:text-foreground-disabled',
-  props.hintTone === 'warning' ? 'text-warning-strong' : 'text-muted-foreground',
+  'min-w-0 flex-1 text-xs font-normal group-data-[state=error]/field:text-destructive group-data-[state=disabled]/field:text-foreground-disabled',
+  props.hintTone === 'warning' ? 'text-warning-strong' : 'text-foreground-secondary',
 ])
 </script>
 

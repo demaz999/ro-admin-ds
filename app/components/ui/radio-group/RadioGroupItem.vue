@@ -7,7 +7,7 @@ import { createReusableTemplate } from '@vueuse/core'
 import { computed, useSlots } from 'vue'
 import { RadioGroupItem, useForwardProps } from 'reka-ui'
 import { cn } from '@/lib/utils'
-import { choiceReadonlyGuard, choiceRowVariants, choiceTitleVariants } from '../checkbox'
+import { CAPTION, CAPTION_ON_TONE, choiceReadonlyGuard, choiceRowVariants, choiceTitleVariants } from '../checkbox'
 import { useReadonly } from '../field'
 import { choiceCardVariants } from '.'
 
@@ -56,6 +56,11 @@ const props = withDefaults(defineProps<{
   tone: 'default',
 })
 const danger = computed(() => props.tone === 'destructive' && !ro.value)
+/**
+ * Пояснение (такт 98): у выбранной карточки поверхность тонирована (`--surface-selected`, у тона `destructive` —
+ * `--destructive-surface`) — правило тона; в «только чтении» выбранная карточка белая — обычный вид. Зазор даёт колонка (4).
+ */
+const captionClass = computed(() => cn(props.variant === 'card' && props.checked && !ro.value ? CAPTION_ON_TONE : CAPTION, 'mt-0'))
 
 const ro = useReadonly(() => props.readonly, () => props.disabled)
 const guard = choiceReadonlyGuard(ro)
@@ -98,18 +103,20 @@ const [DefineChoice, ReuseChoice] = createReusableTemplate()
       </RadioGroupItem>
     </span>
 
-    <span :class="cn('flex min-w-0 flex-col', props.variant === 'card' ? 'flex-1 gap-0.5' : '')">
+    <!-- Такт 98: части подписи через 4 — у строки и у карточки (было 0 и 2): пояснение отстоит от подписи на 4. -->
+    <span :class="cn('flex min-w-0 flex-col gap-1', props.variant === 'card' ? 'flex-1' : '')">
       <span data-slot="choice-title" :class="choiceTitleVariants({ checked: props.checked })">
         <slot />
       </span>
+      <!-- Пояснение — такт 98, решение владельца 2026-10-09: через 4 под подписью, 13/16 regular `--foreground-secondary` — один вид у всего кита (`ui/checkbox/index.ts`, «Пояснение»). -->
       <span
         v-if="props.subtitle"
         data-slot="choice-subtitle"
-        class="text-xs font-medium text-field-placeholder"
+        :class="captionClass"
       >
         {{ props.subtitle }}
       </span>
-      <span v-if="$slots.description" data-slot="choice-description" class="text-xs text-foreground-secondary">
+      <span v-if="$slots.description" data-slot="choice-description" :class="captionClass">
         <slot name="description" />
       </span>
       <span v-if="$slots.meta" data-slot="choice-meta" class="text-xs font-medium text-primary">

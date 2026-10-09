@@ -39,6 +39,16 @@ const checkBare = ref(false)
 const checkMixed = ref(false)
 const fieldValue = ref('2014')
 const mutedClicks = ref(0)
+/* Такт 98: плашка по полю, фокус пункта, подсказка под внешней подписью, пояснение, минус и плюс. */
+const t98Type = ref('Рабочее')
+const t98Narrow = ref('Рабочее')
+const t98Owner = ref('Демо Страхование')
+const t98Phone = ref('+7 913 555 12 34')
+const t98Search = ref('фото')
+const t98Check = ref(true)
+const t98Switch = ref(true)
+const t98Mode = ref('regular')
+const t98Minutes = ref(60)
 /* Черновик следующей версии — такт 62. */
 const DRAFT_ROLES = ['Администратор', 'Эксперт', 'Оператор', 'Агент'].map(x => ({ value: x, label: x }))
 const draftRoles = ref(['Администратор', 'Эксперт'])
@@ -106,6 +116,75 @@ const ro = ref({ name: 'КАСКО — осмотр', text: 'Осмотр авт
           <!-- Такт 96: формат страницы каркаса — поля 16 сверху и по бокам, «Назад» и баннер-ухо слотами; рамка со страницей /kit-narrow?case=page. -->
           <template v-if="c.id === 'frame-page-format' || c.id === 'frame-page-back' || c.id === 'frame-page-banner'">
             <iframe src="/kit-narrow?case=page" title="Формат страницы — Каркас admin.vue" class="h-120 w-full rounded-md border border-border-soft" />
+          </template>
+          <!-- Такт 98 (решения владельца 2026-10-09): плашка по полю, фокус пункта, подсказка под внешней подписью, пояснение, минус. -->
+          <template v-else-if="c.id === 'select-plaque-width'">
+            <Field label="Состояние — поле во всю ширину">
+              <Select v-model="t98Type" :items="ITEMS" placeholder="" :show-icon="false" :searchable="false" />
+            </Field>
+            <div class="w-56">
+              <Field label="Поле уже 320">
+                <Select v-model="t98Narrow" :items="ITEMS" placeholder="" :show-icon="false" />
+              </Field>
+            </div>
+            <span class="text-xs text-muted-foreground">откройте оба: плашка от левого края поля шириной поля; у узкого — 320 с поиском 312</span>
+          </template>
+          <template v-else-if="c.id === 'select-item-focus'">
+            <Select v-model="t98Type" :items="ITEMS" placeholder="" :show-icon="false" :searchable="false" />
+            <Autocomplete v-model="t98Owner" :items="[{ value: 'demo', label: 'Демо Страхование' }, { value: 'alpha', label: 'Альфа Лизинг' }]" placeholder="Найти компанию" />
+            <span class="text-xs text-muted-foreground">Tab к полю, пробел (у выбора) либо фокус (у поиска), стрелка вниз — кольцо 2 у пункта; движение мыши его гасит</span>
+          </template>
+          <template v-else-if="c.id === 'field-labeled-hint'">
+            <Field label="Телефон для звонка">
+              <Input v-model="t98Phone" placeholder="+7 900 000 00 00" :show-icon="false" />
+            </Field>
+            <Field label="Компания-владелец">
+              <Autocomplete v-model="t98Owner" :items="[{ value: 'demo', label: 'Демо Страхование' }]" placeholder="Найти компанию" />
+            </Field>
+            <Input v-model="t98Search" placeholder="Поиск по настройкам схемы" />
+            <span class="text-xs text-muted-foreground">сверху — под подписью: подсказки внутри нет, высота 40; снизу — поле без подписи: подсказка встаёт подписью, как прежде</span>
+          </template>
+          <template v-else-if="c.id === 'field-hint-caption'">
+            <Field label="Тип схемы осмотра" hint="Определяет структуру и набор полей формы осмотра">
+              <Select v-model="t98Type" :items="ITEMS" placeholder="" :show-icon="false" :searchable="false" />
+            </Field>
+            <span class="text-xs text-muted-foreground">подсказка через 4 под полем, 13/16 regular --foreground-secondary</span>
+          </template>
+          <template v-else-if="c.id === 'checkbox-caption'">
+            <Checkbox v-model="t98Check" subtitle="Осмотр не будет принят, пока не пройдёт согласование">
+              Обязательное согласование осмотра после экспертизы
+            </Checkbox>
+            <Checkbox disabled subtitle="Проверяющий сможет утвердить осмотр одной кнопкой" reason="Недоступно компании — подключается через менеджера">
+              Разрешить принимать осмотр одной кнопкой
+            </Checkbox>
+            <Switch v-model="t98Switch" subtitle="Детекторы подозрительной активности при проведении осмотра">
+              Аномалии
+            </Switch>
+            <span class="text-xs text-muted-foreground">пояснение и причина через 4 под подписью, 13/16 regular --foreground-secondary</span>
+          </template>
+          <template v-else-if="c.id === 'radio-card-caption'">
+            <RadioGroup v-model="t98Mode" class="grid grid-cols-2">
+              <RadioGroupItem variant="card" value="regular" :checked="t98Mode === 'regular'">
+                Обычный
+                <template #description>
+                  Свободное заполнение полей формы в произвольном порядке
+                </template>
+              </RadioGroupItem>
+              <RadioGroupItem variant="card" value="checklist" :checked="t98Mode === 'checklist'">
+                Чек-лист
+                <template #description>
+                  Пошаговое выполнение с отметкой о завершении каждого пункта
+                </template>
+              </RadioGroupItem>
+            </RadioGroup>
+            <span class="text-xs text-muted-foreground">пояснение через 4; у выбранной карточки — правило тона (--foreground на 64 %)</span>
+          </template>
+          <template v-else-if="c.id === 'icon-remove-box'">
+            <InputNumber v-model="t98Minutes" :min="5" :max="120" :step="5" />
+            <Checkbox :model-value="false" indeterminate>
+              Выбрано 2
+            </Checkbox>
+            <span class="text-xs text-muted-foreground">«−» и «+» одной толщины; минус флажка по центру квадрата</span>
           </template>
           <template v-else-if="c.id === 'frame-narrow'">
             <iframe src="/kit-narrow?case=frame&drawer=1" title="Узкий экран — Каркас admin.vue" class="h-120 w-93.75 self-start rounded-md border border-border-soft" />

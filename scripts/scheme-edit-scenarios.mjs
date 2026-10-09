@@ -1871,7 +1871,8 @@ const SCENARIOS = {
       { surface: 'field', sideTitle: 'Редактирование поля — Год выпуска', 'fieldSide.legends': ['Основное', 'Поведение и видимость', 'Валидация и подсказки'],
         'fieldSide.title': 'Год выпуска', 'fieldSide.alias': 'year', 'fieldSide.type': 'Число', 'steppers.fdOrder': 4,
         'fieldSide.checks.fdApproval': { checked: false, off: true, sub: '', why: 'Сначала включите согласование в разделе Настройки', whyLit: true }, 'fieldSide.help': ['fdNoConfidential'],
-        'fieldSide.step': [32, 32, 32, 48, 32] }],
+        /* Такт 98: причина выключения — пояснение через 4 под подписью: флажок с причиной выше на 4 (48 → 52). */
+        'fieldSide.step': [32, 32, 32, 52, 32] }],
     ['тип «Выбор» — четыре секции', K => K.select('fdType', 'Выбор'), { 'fieldSide.legends': ['Основное', 'Поведение и видимость', 'Варианты выбора', 'Валидация и подсказки'], 'fieldSide.choices': true }],
     ['тип «Число», «Отмена» — полотно прежнее', async (K) => { await K.select('fdType', 'Число'); await K.act('field-cancel') },
       { surface: '', fieldSide: null, 'form.rows.3': '4 · Год выпуска · year · Число', writes: 0 }],

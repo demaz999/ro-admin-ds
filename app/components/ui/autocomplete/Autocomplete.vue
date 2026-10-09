@@ -13,9 +13,10 @@ import {
   ComboboxRoot,
   ComboboxViewport,
 } from 'reka-ui'
-import { useReadonly } from '../field'
+import { useFieldLabeled, useReadonly } from '../field'
 import { Icon } from '../icon'
 import { SelectContent, SelectItem } from '../select'
+import { LIST_ITEM_RING, useListKeyboard } from '../select/keyboard'
 import { autocompleteVariants, type AutocompleteVariants } from '.'
 
 /**
@@ -87,8 +88,14 @@ const model = defineModel<string>({ default: '' })
 const picked = ref<string>('')
 
 const focused = ref(false)
-/** Подпись всплывает при фокусе или при значении — как у поля ввода. */
-const isFloating = computed(() => focused.value || model.value.length > 0)
+const labeled = useFieldLabeled()
+/**
+ * Подпись всплывает при фокусе или при значении — как у поля ввода. Такт 98: у поля с подписью снаружи (`Field label`)
+ * подсказка в подпись не переносится — при вводе исчезает, высота поля прежняя (`ui/field/index.ts`, «Подпись снаружи»).
+ */
+const isFloating = computed(() => (focused.value || model.value.length > 0) && !labeled.value)
+/** Крестик очистки — у активного поля, как прежде: в фокусе или со значением. */
+const isActive = computed(() => focused.value || model.value.length > 0)
 
 /** Подсказки фильтруются по набранному — это и есть смысл компонента. */
 const matches = computed(() => {
@@ -100,6 +107,9 @@ const matches = computed(() => {
 function pick(label: string) {
   model.value = label
 }
+
+/** Фокус пункта под клавиатурой — кольцо кита (такт 98, `select/keyboard.ts`): фокус в поле, пункт выделен стрелками. */
+const { keyboard, onKeydown, onPointer } = useListKeyboard()
 </script>
 
 <template>
@@ -114,6 +124,8 @@ function pick(label: string) {
     :reset-search-term-on-select="false"
     class="w-full"
     @update:open="setOpen"
+    @keydown="onKeydown"
+    @pointerdown="onPointer"
   >
     <ComboboxAnchor as-child>
       <div
@@ -158,7 +170,7 @@ function pick(label: string) {
           Очистка — нажатием, с клавиатуры — стиранием текста; вид прежний. Строка 225 реестра расхождений `docs/scheme-edit.md`.
         -->
         <button
-          v-if="props.clearable && isFloating && !ro"
+          v-if="props.clearable && isActive && !ro"
           data-slot="field-clear"
           type="button"
           tabindex="-1"
@@ -175,9 +187,10 @@ function pick(label: string) {
     </ComboboxAnchor>
 
     <ComboboxPortal>
-      <ComboboxContent position="popper" :side-offset="4" as-child>
+      <!-- Такт 98: плашка шириной поля (не уже 320) от его левого края — решение владельца 2026-10-09. -->
+      <ComboboxContent position="popper" align="start" :side-offset="4" as-child>
         <!-- Поиска внутри плашки нет: полем поиска работает само поле. -->
-        <SelectContent>
+        <SelectContent fit-anchor @pointermove="onPointer">
           <ComboboxViewport>
             <ComboboxItem
               v-for="item in matches"
@@ -188,6 +201,7 @@ function pick(label: string) {
               @select="pick(item.label)"
             >
               <SelectItem
+                :class="['outline-none', keyboard ? LIST_ITEM_RING : '']"
                 :subtitle="item.subtitle"
                 :show-icon="Boolean($slots['item-icon'])"
                 :disabled="item.disabled"

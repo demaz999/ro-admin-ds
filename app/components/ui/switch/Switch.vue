@@ -4,7 +4,7 @@
 -->
 <script setup lang="ts">
 import { SwitchRoot, SwitchThumb } from 'reka-ui'
-import { choiceReadonlyGuard, choiceRowVariants, choiceTitleVariants } from '../checkbox'
+import { CAPTION, choiceReadonlyGuard, choiceRowVariants, choiceTitleVariants } from '../checkbox'
 import { useReadonly } from '../field'
 
 /**
@@ -66,10 +66,11 @@ const model = defineModel<boolean>({ default: false })
       <span data-slot="choice-title" :class="choiceTitleVariants({ checked: model })">
         <slot />
       </span>
+      <!-- Пояснение — такт 98, решение владельца 2026-10-09: через 4 под подписью, 13/16 regular `--foreground-secondary` — один вид у всего кита (`ui/checkbox/index.ts`, «Пояснение»). -->
       <span
         v-if="props.subtitle"
         data-slot="choice-subtitle"
-        class="text-xs font-medium text-field-placeholder"
+        :class="CAPTION"
       >
         {{ props.subtitle }}
       </span>

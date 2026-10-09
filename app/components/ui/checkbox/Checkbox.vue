@@ -7,7 +7,7 @@ import { computed, useId } from 'vue'
 import { CheckboxIndicator, CheckboxRoot } from 'reka-ui'
 import { useReadonly } from '../field'
 import { Icon } from '../icon'
-import { choiceReadonlyGuard, choiceRowVariants, choiceTitleVariants } from '.'
+import { CAPTION, choiceReadonlyGuard, choiceRowVariants, choiceTitleVariants } from '.'
 
 /**
  * Флажок — мастер `Checkbox` `486:4733`, спека `486:4305`,
@@ -125,15 +125,15 @@ const state = computed<boolean | 'indeterminate'>({
       <span data-slot="choice-title" :class="[choiceTitleVariants({ checked: filled }), dim]">
         <slot />
       </span>
+      <!-- Пояснение — такт 98, решение владельца 2026-10-09: через 4 под подписью, 13/16 regular `--foreground-secondary` — один вид у всего кита (`ui/checkbox/index.ts`, «Пояснение»). -->
       <span
         v-if="props.subtitle"
         data-slot="choice-subtitle"
-        class="text-xs font-medium text-field-placeholder"
-        :class="dim"
+        :class="[CAPTION, dim]"
       >
         {{ props.subtitle }}
       </span>
-      <span v-if="locked" :id="reasonId" data-slot="choice-reason" class="text-xs text-muted-foreground">
+      <span v-if="locked" :id="reasonId" data-slot="choice-reason" :class="CAPTION">
         {{ props.reason }}
       </span>
     </span>

@@ -318,7 +318,11 @@ onBeforeUnmount(() => { editor.value?.querySelectorAll('[data-slot=formula-chip-
           class="inline-flex h-6 shrink-0 items-center gap-1 rounded-full border border-foreground-secondary pr-3 pl-1.5 text-2xs font-bold text-foreground-secondary outline-none transition-colors hover:border-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
           :style="{ transitionDuration: 'var(--duration-hover)' }"
         >
-          <Icon name="add" :size="12" />
+          <!--
+            Такт 98, решение владельца 2026-10-09: плюс тоньше — глиф 10.5 в прежнем боксе 12 (`scale` 0.875), штрих 1.5 против
+            1.71: ближе к основному штриху букв подписи 12/16 bold. Раскладка кнопки прежняя. Строка реестра `scheme-edit.md`, раздел 11.
+          -->
+          <Icon name="add" :size="12" :scale="0.875" />
           {{ props.addLabel }}
         </button>
       </PopoverTrigger>

@@ -4,7 +4,7 @@
 -->
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useReadonly } from '../field'
+import { useFieldLabeled, useReadonly } from '../field'
 import { textareaVariants } from '.'
 
 const props = withDefaults(defineProps<{
@@ -29,8 +29,12 @@ const ro = useReadonly(() => props.readonly, () => props.disabled)
 const model = defineModel<string>({ default: '' })
 
 const focused = ref(false)
-/** Подпись всплывает при фокусе ИЛИ при наличии значения — как у Input. */
-const isFloating = computed(() => focused.value || model.value.length > 0)
+const labeled = useFieldLabeled()
+/**
+ * Подпись всплывает при фокусе ИЛИ при наличии значения — как у Input. Такт 98: у поля с подписью снаружи (`Field label`)
+ * подсказка в подпись не переносится — при вводе исчезает, высота поля прежняя (`ui/field/index.ts`, «Подпись снаружи»).
+ */
+const isFloating = computed(() => (focused.value || model.value.length > 0) && !labeled.value)
 </script>
 
 <template>

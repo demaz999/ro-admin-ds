@@ -4,7 +4,7 @@
 -->
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useReadonly } from '../field'
+import { useFieldLabeled, useReadonly } from '../field'
 import { Icon } from '../icon'
 import { selectTriggerVariants, type SelectTriggerVariants } from '.'
 
@@ -58,7 +58,9 @@ const isFilled = computed(() => props.label.length > 0)
  * `input` `720:11753`; отклонение от матрицы Атома — решение чата 2026-09-30 в режиме владельца
  * от 2026-09-30 (довесок 2 к такту 36). С непустым плейсхолдером поведение прежнее.
  */
-const isFloating = computed(() => isFilled.value && props.placeholder !== '')
+const labeled = useFieldLabeled()
+/** Такт 98: у выбора с подписью снаружи (`Field label`) подсказка в подпись не переносится (`ui/field/index.ts`, «Подпись снаружи»). */
+const isFloating = computed(() => isFilled.value && props.placeholder !== '' && !labeled.value)
 </script>
 
 <template>

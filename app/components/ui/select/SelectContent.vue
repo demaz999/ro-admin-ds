@@ -28,7 +28,15 @@ withDefaults(defineProps<{
    * высоту задаёт окно — `62vh`, как у прототипа VA-9265 (`.pop`).
    */
   maxHeight?: number | string
-}>(), { width: 320, maxHeight: 304 })
+  /**
+   * Ширина по полю — такт 98, решение владельца 2026-10-09: плашка не уже поля, к которому привязана, и не уже `width`
+   * (`max(width, ширина якоря)`). Ширину якоря отдаёт позиционирование Reka — переменная `--reka-popper-anchor-width`.
+   * Ставят `Select`, `SelectMultiple` и `Autocomplete` вместе с `align="start"`: плашка встаёт от левого края поля.
+   * Без пропа ширина — `width`: плашки, которым ширину задаёт место (`AssignList`, `PeriodSwitcher`, список
+   * переменных `FormulaInput`), прежние.
+   */
+  fitAnchor?: boolean
+}>(), { width: 320, maxHeight: 304, fitAnchor: false })
 </script>
 
 <template>
@@ -40,13 +48,14 @@ withDefaults(defineProps<{
   <div
     data-slot="popover"
     class="z-50 flex flex-col gap-1 rounded-lg bg-popover py-1 pl-1 shadow-dropdown"
-    :style="{ width: `${width}px`, maxHeight: typeof maxHeight === 'number' ? `${maxHeight}px` : maxHeight }"
+    :style="{ width: fitAnchor ? `max(${width}px, var(--reka-popper-anchor-width))` : `${width}px`, maxHeight: typeof maxHeight === 'number' ? `${maxHeight}px` : maxHeight }"
   >
     <!--
       shrink-0 обязателен: плашка ограничена по высоте, и без него флекс ужимает
       поиск и слоты, отнимая у поиска три пикселя от мастерских сорока.
     -->
-    <div v-if="$slots.search" class="shrink-0">
+    <!-- Поле поиска — во всю ширину плашки с полем 4 справа: в плашке 320 оно 312, как у мастера; в плашке по полю — шире (такт 98). -->
+    <div v-if="$slots.search" class="shrink-0 pr-1">
       <slot name="search" />
     </div>
     <div v-if="$slots.top" class="shrink-0">

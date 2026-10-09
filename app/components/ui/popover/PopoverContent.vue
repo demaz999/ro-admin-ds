@@ -3,6 +3,7 @@ import type { PopoverContentEmits, PopoverContentProps } from 'reka-ui'
 import { reactiveOmit } from '@vueuse/core'
 import { PopoverContent, PopoverPortal, useForwardPropsEmits } from 'reka-ui'
 import { cn } from '@/lib/utils'
+import { provideFieldLabeled } from '../field'
 
 /**
  * Тело плашки — такт 28, разбор целиком в `index.ts`.
@@ -66,6 +67,12 @@ const forwarded = useForwardPropsEmits(delegated, emits)
  * `narrow="full"` ниже 768: ширина окна поверх ширины `width` (встроенный стиль — поэтому `!`), высота — доступная Reka до края
  * окна (`--reka-popper-available-height`), без скругления. Сдвиг к краю окна делает Reka (`shift`).
  */
+/**
+ * Такт 98: плашка уходит из обвязки поля — поле внутри неё (поиск по вариантам) подписи `Field` снаружи не наследует и ведёт
+ * себя по мастеру: подсказка встаёт подписью внутри поля (`ui/field/index.ts`, «Подпись снаружи»).
+ */
+provideFieldLabeled(() => false)
+
 const NARROW_FULL = 'max-md:w-screen! max-md:h-(--reka-popper-available-height) max-md:rounded-none'
 </script>
 

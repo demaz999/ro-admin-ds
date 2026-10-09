@@ -4,7 +4,7 @@
 -->
 <script setup lang="ts">
 import { computed, ref, useSlots } from 'vue'
-import { READONLY_SURFACE, useReadonly } from '../field'
+import { READONLY_SURFACE, useFieldLabeled, useReadonly } from '../field'
 import { Icon } from '../icon'
 import { inputVariants, type InputVariants } from '.'
 
@@ -111,7 +111,12 @@ const isActive = computed(() => focused.value || model.value.length > 0)
  * отклонение от матрицы Атома `249:2768` — решение чата 2026-09-30 в режиме владельца от
  * 2026-09-30 (довесок 2 к такту 36). С непустым плейсхолдером поведение прежнее.
  */
-const isFloating = computed(() => isActive.value && props.placeholder !== '')
+const labeled = useFieldLabeled()
+/**
+ * Такт 98, решение владельца 2026-10-09: у поля с подписью снаружи (`Field label`) подсказка в подпись не переносится —
+ * при вводе она исчезает, высота поля прежняя (`ui/field/index.ts`, «Подпись снаружи»).
+ */
+const isFloating = computed(() => isActive.value && props.placeholder !== '' && !labeled.value)
 
 /**
  * Слот `end` — содержимое справа внутри поля, по центру по вертикали (подсказка хоткея, единица). Рисуется только у

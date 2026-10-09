@@ -19,6 +19,7 @@ import SelectContent from './SelectContent.vue'
 import SelectItem from './SelectItem.vue'
 import SelectMultiple from './SelectMultiple.vue'
 import SelectTrigger from './SelectTrigger.vue'
+import { LIST_ITEM_RING, useListKeyboard } from './keyboard'
 import type { SelectTriggerVariants } from '.'
 
 /**
@@ -91,6 +92,9 @@ const values = defineModel<string[]>('values', { default: () => [] })
 const searchable = computed(() => props.searchable ?? !props.multiple)
 
 const selected = computed(() => props.items.find(i => i.value === model.value))
+
+/** Фокус пункта под клавиатурой — кольцо кита (такт 98, `keyboard.ts`). */
+const { keyboard, onKeydown, onPointer } = useListKeyboard()
 </script>
 
 <template>
@@ -118,7 +122,7 @@ const selected = computed(() => props.items.find(i => i.value === model.value))
       <slot name="icon" />
     </template>
   </SelectTrigger>
-  <ComboboxRoot v-else v-model="model" :disabled="props.disabled" class="w-full">
+  <ComboboxRoot v-else v-model="model" :disabled="props.disabled" class="w-full" @keydown="onKeydown" @pointerdown="onPointer">
     <ComboboxAnchor as-child>
       <!--
         Такт 36: ComboboxTrigger Reka ставит кнопке tabindex="-1" — фокус у комбобокса несёт поле
@@ -142,8 +146,9 @@ const selected = computed(() => props.items.find(i => i.value === model.value))
     </ComboboxAnchor>
 
     <ComboboxPortal>
-      <ComboboxContent position="popper" :side-offset="4" as-child>
-        <SelectContent>
+      <!-- Такт 98: плашка шириной поля (не уже 320) от его левого края — решение владельца 2026-10-09. -->
+      <ComboboxContent position="popper" align="start" :side-offset="4" as-child>
+        <SelectContent fit-anchor @keydown="onKeydown" @pointermove="onPointer">
           <!--
             Поиск внутри плашки — то самое, из-за чего взят Combobox.
             Геометрия поля берётся у Input: 40 высотой, 312 шириной.
@@ -152,7 +157,7 @@ const selected = computed(() => props.items.find(i => i.value === model.value))
             <ComboboxInput as-child>
               <input
                 data-slot="field-input"
-                class="h-10 w-78 rounded-md bg-field px-4 text-sm font-medium outline-none text-field-foreground placeholder:text-field-placeholder"
+                class="h-10 w-full rounded-md bg-field px-4 text-sm font-medium outline-none text-field-foreground placeholder:text-field-placeholder"
                 placeholder="Search"
               >
             </ComboboxInput>
@@ -167,6 +172,7 @@ const selected = computed(() => props.items.find(i => i.value === model.value))
               as-child
             >
               <SelectItem
+                :class="['outline-none', keyboard ? LIST_ITEM_RING : '']"
                 :subtitle="item.subtitle"
                 :selected="item.value === model"
                 :disabled="item.disabled"

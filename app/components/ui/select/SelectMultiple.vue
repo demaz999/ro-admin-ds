@@ -18,6 +18,7 @@ import { useReadonly } from '../field'
 import { Icon } from '../icon'
 import SelectContent from './SelectContent.vue'
 import SelectItem from './SelectItem.vue'
+import { LIST_ITEM_RING, useListKeyboard } from './keyboard'
 import { selectChipVariants, selectMultiBodyVariants, type SelectTriggerVariants } from '.'
 
 /**
@@ -48,6 +49,8 @@ const ro = useReadonly(() => props.readonly, () => props.disabled)
 
 const model = defineModel<string[]>({ default: () => [] })
 const open = ref(false)
+/** Фокус пункта под клавиатурой — кольцо кита (такт 98, `keyboard.ts`). */
+const { keyboard, onKeydown, onPointer } = useListKeyboard()
 
 /** Чипы — в порядке выбора; значение вне списка показывается своим ключом. */
 const chips = computed(() => model.value.map(v => props.items.find(i => i.value === v) ?? { value: v, label: v }))
@@ -64,7 +67,7 @@ function onBodyClick(event: MouseEvent) {
 </script>
 
 <template>
-  <ComboboxRoot v-model="model" :open="ro ? false : open" multiple :disabled="props.disabled" class="w-full" @update:open="open = ro ? false : $event">
+  <ComboboxRoot v-model="model" :open="ro ? false : open" multiple :disabled="props.disabled" class="w-full" @update:open="open = ro ? false : $event" @keydown="onKeydown" @pointerdown="onPointer">
     <ComboboxAnchor as-child>
       <div
         data-slot="field"
@@ -117,13 +120,14 @@ function onBodyClick(event: MouseEvent) {
     </ComboboxAnchor>
 
     <ComboboxPortal>
-      <ComboboxContent position="popper" :side-offset="4" as-child>
-        <SelectContent>
+      <!-- Такт 98: плашка шириной поля (не уже 320) от его левого края — решение владельца 2026-10-09. -->
+      <ComboboxContent position="popper" align="start" :side-offset="4" as-child>
+        <SelectContent fit-anchor @keydown="onKeydown" @pointermove="onPointer">
           <template v-if="props.searchable" #search>
             <ComboboxInput as-child>
               <input
                 data-slot="field-input"
-                class="h-10 w-78 rounded-md bg-field px-4 text-sm font-medium outline-none text-field-foreground placeholder:text-field-placeholder"
+                class="h-10 w-full rounded-md bg-field px-4 text-sm font-medium outline-none text-field-foreground placeholder:text-field-placeholder"
                 placeholder="Search"
               >
             </ComboboxInput>
@@ -138,7 +142,7 @@ function onBodyClick(event: MouseEvent) {
               as-child
             >
               <!-- Строка мастера `items3`, `multiselect=on`: слева место галочки 16, у выбранной она видна. -->
-              <SelectItem :subtitle="item.subtitle" :selected="model.includes(item.value)" :disabled="item.disabled" show-icon>
+              <SelectItem :subtitle="item.subtitle" :selected="model.includes(item.value)" :disabled="item.disabled" show-icon :class="['outline-none', keyboard ? LIST_ITEM_RING : '']">
                 <template #icon>
                   <Icon v-if="model.includes(item.value)" name="check" :size="16" />
                 </template>

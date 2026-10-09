@@ -86,18 +86,25 @@ onBeforeUnmount(() => clearTimeout(timer))
       </div>
     </TooltipProvider>
 
-    <p v-if="props.reason" data-slot="setting-row-reason" class="-mt-1 pb-2 pl-6 text-xs text-muted-foreground">
+    <!--
+      Причина и строка счётчика — пояснение кита (такт 98, решение владельца 2026-10-09): через 4 под контролом (поле строки 8
+      минус 4), 13/16 regular `--foreground-secondary`. Действие в строке счётчика — на её базовой линии; строка высотой 16
+      (кнопка-ссылка 20 выступает на 2 вверх и вниз; поле в строке — выбор роли — стоит от её края, через 4 под контролом), до следующей строки — поле 10 и поле её контрола 8: 18, как прежде.
+    -->
+    <p v-if="props.reason" data-slot="setting-row-reason" class="-mt-1 pb-2 pl-6 text-xs font-normal text-foreground-secondary">
       {{ props.reason }}
     </p>
 
-    <div v-if="props.meta || $slots.action" data-slot="setting-row-meta" class="flex min-h-9 flex-wrap items-center gap-x-3 gap-y-1 pl-6">
+    <div v-if="props.meta || $slots.action" data-slot="setting-row-meta" class="-mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1 pb-2.5 pl-6">
       <span
         v-if="props.meta"
         data-slot="setting-row-meta-text"
         :data-tone="props.metaTone"
-        :class="cn('text-xs', props.metaTone === 'warning' ? 'text-warning-strong' : 'text-muted-foreground')"
+        :class="cn('text-xs font-normal', props.metaTone === 'warning' ? 'text-warning-strong' : 'text-foreground-secondary')"
       >{{ props.meta }}</span>
-      <slot name="action" />
+      <span v-if="$slots.action" data-slot="setting-row-action" class="-my-0.5 inline-flex flex-wrap items-baseline gap-x-3 gap-y-1 has-[[data-slot=field]]:my-0">
+        <slot name="action" />
+      </span>
     </div>
 
     <div v-if="$slots.children && !props.collapsed" data-slot="setting-row-children" class="flex flex-col pl-6">
