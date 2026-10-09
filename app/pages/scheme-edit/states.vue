@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import { formulaPreview } from '~/components/ui/formula-input'
 import { clearMatches, highlightMatches, queryWords } from '~/components/ui/highlight-text'
 import { variantChips, variantGroups } from '~/stands/scheme-edit/repeat-texts'
@@ -468,6 +468,29 @@ const READINESS_EXAMPLE = `<!-- полоса подготовки: этапы с
 <!-- маркер этапа у вкладки — слот counter -->
 <TabsTrigger value="form">Форма<template #counter><ReadinessMark state="warning" :count="2" /></template></TabsTrigger>`
 const sourceDemo = ref('other')
+
+/* Такт 99: плашка с иконкой — три роли (доска scheme-edit-callout-v1). */
+const CALLOUT_ICON_ROLES = [
+  { tone: 'plain', role: 'информация раздела — plain', title: 'Доступные ИИ-модули зависят от типа объекта схемы', text: 'Текущий тип: Осмотр недвижимости' },
+  { tone: 'neutral', role: 'причина выключенного — neutral', title: 'Блок выключен', text: 'Анализ стоимости доступен только для схем недвижимости. Тип схемы задаётся в разделе «Общие → Основное»' },
+  { tone: 'warning', role: 'баннер-ухо — warning', title: 'Сохранение теперь автоматическое', text: 'В боевые осмотры изменения попадают по кнопке «Опубликовать схему»' },
+] as const
+const CALLOUT_ICON_EXAMPLE = `<Callout tone="plain" icon="info" title="Доступные ИИ-модули зависят от типа объекта схемы">
+  Текущий тип: Осмотр недвижимости
+</Callout>
+<Callout icon="info">Анализ стоимости доступен только для схем недвижимости</Callout>
+<Callout tone="warning" icon="info" closable @close="hide()">Сохранение теперь автоматическое</Callout>`
+
+/* Такт 99: таблица с пагинацией держит высоту полной страницы. */
+const PAGE_ROWS = ['Эксперты Москва', 'Эксперты Казань', 'Агенты Север', 'Агенты Юг', 'Операторы', 'Партнёры']
+const pageRowsSize = ref(4)
+const pageRowsPages = computed(() => Math.ceil(PAGE_ROWS.length / pageRowsSize.value))
+const pageRowsSlice = (pg: number) => PAGE_ROWS.slice((pg - 1) * pageRowsSize.value, pg * pageRowsSize.value)
+const PAGE_ROWS_EXAMPLE = `<Table attached :page-rows="total > pageSize ? pageSize : undefined">
+  <TableRow>…шапка…</TableRow>
+  <TableRow v-for="r in rows">…</TableRow>
+</Table>
+<TableFooter v-model:page="page" v-model:page-size="pageSize" :pages :total />`
 </script>
 
 <template>
@@ -1770,6 +1793,53 @@ const sourceDemo = ref('other')
         <SectionNavItem value="other" label="Другие схемы" :count="2" badge="admin" badge-label="Схемы вашей компании — доступ по роли «Администратор»" />
         <SectionNavItem value="recent" label="Недавние" :count="2" />
       </SectionNav>
+    </section>
+
+    <!-- Такт 99 (владелец, 2026-10-09; доска scheme-edit-callout-v1): плашка с иконкой — три роли. -->
+    <section class="flex flex-col gap-4" data-matrix="callout-icon">
+      <Heading>Callout icon — плашка с иконкой по макету 33351:8881: информация раздела, причина, баннер-ухо</Heading>
+      <div class="grid max-w-6xl grid-cols-[10rem_repeat(3,minmax(0,1fr))] items-start gap-4">
+        <ToolbarText>роль</ToolbarText>
+        <ToolbarText>заголовок и текст</ToolbarText>
+        <ToolbarText>только текст</ToolbarText>
+        <ToolbarText>закрываемая</ToolbarText>
+        <template v-for="c in CALLOUT_ICON_ROLES" :key="c.tone">
+          <ToolbarText>{{ c.role }}</ToolbarText>
+          <Callout :tone="c.tone" icon="info" :title="c.title" :data-case="`${c.tone}-title`">
+            {{ c.text }}
+          </Callout>
+          <Callout :tone="c.tone" icon="info" :data-case="`${c.tone}-text`">
+            {{ c.text }}
+          </Callout>
+          <Callout :tone="c.tone" icon="info" closable :data-case="`${c.tone}-closable`">
+            {{ c.text }}
+          </Callout>
+        </template>
+      </div>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ CALLOUT_ICON_EXAMPLE }}</pre>
+    </section>
+
+    <!-- Такт 99 (владелец, 2026-10-09): таблица с пагинацией держит высоту полной страницы. -->
+    <section class="flex flex-col gap-4" data-matrix="table-page-rows">
+      <Heading>Table page-rows — высота полной страницы: страница 1 (4 строки) и последняя (2 строки), подвал на одной высоте</Heading>
+      <div class="grid max-w-6xl grid-cols-2 items-start gap-6">
+        <div v-for="pg in [1, 2]" :key="pg" class="flex min-w-0 flex-col" :data-case="`page-${pg}`">
+          <Table attached :page-rows="pageRowsSize">
+            <TableRow>
+              <TableHead variant="column" class="min-w-0 flex-1 px-4">
+                Группа
+              </TableHead>
+            </TableRow>
+            <TableRow v-for="r in pageRowsSlice(pg)" :key="r">
+              <TableCell class="min-w-0 flex-1 px-4">
+                {{ r }}
+              </TableCell>
+            </TableRow>
+          </Table>
+          <TableFooter :page="pg" :pages="pageRowsPages" :page-size="pageRowsSize" :total="PAGE_ROWS.length" :page-sizes="[4, 6]" @update:page-size="pageRowsSize = $event" />
+        </div>
+      </div>
+      <pre class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-2xs">{{ PAGE_ROWS_EXAMPLE }}</pre>
     </section>
   </main>
 </template>

@@ -71,6 +71,11 @@ let toastSeq = 0
 const toastUndone = ref(0)
 /** Такт 72: пример закрываемой плашки — закрытие помнит страница. */
 const calloutClosed = ref(false)
+/* Такт 99: плашка с иконкой, таблица с высотой полной страницы. */
+const t99Hint = ref(true)
+const T99_ROWS = ['Эксперты Москва', 'Эксперты Казань', 'Агенты Север', 'Агенты Юг', 'Операторы']
+const t99Page = ref(2)
+const t99Size = ref(3)
 /* Ось readonly — такт 68: обычное, только чтение, выключено рядом. */
 const RO_CASES = [
   { id: 'normal', label: 'обычное' },
@@ -116,6 +121,39 @@ const ro = ref({ name: 'КАСКО — осмотр', text: 'Осмотр авт
           <!-- Такт 96: формат страницы каркаса — поля 16 сверху и по бокам, «Назад» и баннер-ухо слотами; рамка со страницей /kit-narrow?case=page. -->
           <template v-if="c.id === 'frame-page-format' || c.id === 'frame-page-back' || c.id === 'frame-page-banner'">
             <iframe src="/kit-narrow?case=page" title="Формат страницы — Каркас admin.vue" class="h-120 w-full rounded-md border border-border-soft" />
+          </template>
+          <!-- Такт 99 (решения владельца 2026-10-09): плашка с иконкой — три роли; таблица держит высоту полной страницы. -->
+          <template v-else-if="c.id === 'callout-icon'">
+            <Callout tone="plain" icon="info" title="Доступные ИИ-модули зависят от типа объекта схемы">
+              Текущий тип: Осмотр недвижимости
+            </Callout>
+            <Callout icon="info">
+              Анализ стоимости доступен только для схем недвижимости
+            </Callout>
+            <Callout v-if="t99Hint" tone="warning" icon="info" closable @close="t99Hint = false">
+              Сохранение теперь автоматическое
+            </Callout>
+            <Button v-else variant="outline" size="sm" class="self-start" @click="t99Hint = true">
+              Вернуть плашку
+            </Button>
+          </template>
+          <template v-else-if="c.id === 'table-page-rows'">
+            <div class="flex flex-col">
+              <Table attached :page-rows="t99Size">
+                <TableRow>
+                  <TableHead variant="column" class="min-w-0 flex-1 px-4">
+                    Группа
+                  </TableHead>
+                </TableRow>
+                <TableRow v-for="r in T99_ROWS.slice((t99Page - 1) * t99Size, t99Page * t99Size)" :key="r">
+                  <TableCell class="min-w-0 flex-1 px-4">
+                    {{ r }}
+                  </TableCell>
+                </TableRow>
+              </Table>
+              <TableFooter v-model:page="t99Page" v-model:page-size="t99Size" :pages="Math.ceil(T99_ROWS.length / t99Size)" :total="T99_ROWS.length" :page-sizes="[3, 4]" />
+            </div>
+            <span class="text-xs text-muted-foreground">переключайте страницы 1 и 2 и «строк на странице»: подвал на месте, пустое место — под последней строкой</span>
           </template>
           <!-- Такт 98 (решения владельца 2026-10-09): плашка по полю, фокус пункта, подсказка под внешней подписью, пояснение, минус. -->
           <template v-else-if="c.id === 'select-plaque-width'">

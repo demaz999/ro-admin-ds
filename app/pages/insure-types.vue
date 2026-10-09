@@ -249,7 +249,7 @@ if (route.query.q) search.value = String(route.query.q)
 
     <!-- Закрепления колонок нет: таблица помещается в ширину без прокрутки. -->
     <!-- Без подвала (пустой результат) низ несёт сама таблица — `:attached="total > 0"`. -->
-    <Table attached-top :attached="total > 0" data-slot="types-table">
+    <Table attached-top :attached="total > 0" :page-rows="total > pageSize ? pageSize : undefined" data-slot="types-table">
       <TableRow>
         <TableHead
           v-for="col in columns"

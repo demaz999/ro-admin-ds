@@ -741,7 +741,7 @@ function selectAll(list: readonly string[]) {
           Первые две колонки зафиксированы, остальные уезжают под горизонтальный
           скролл: сумма ширин 1776 при видимой области 1372 — так и в макете.
         -->
-        <Table v-else attached data-slot="table-view">
+        <Table v-else attached :page-rows="TOTAL > pageSize ? pageSize : undefined" data-slot="table-view">
             <TableRow>
               <!-- В шапке на месте чекбокса — кнопка настройки колонок, как в макете. -->
               <!--

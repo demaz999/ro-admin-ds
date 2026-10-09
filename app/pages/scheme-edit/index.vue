@@ -2090,7 +2090,7 @@ if (import.meta.client) {
         ориентация: закрытая не возвращается (аудит, «Смена парадигмы»; строка 167).
       -->
       <template v-if="!ro && !m.ui.hintClosed" #banner>
-        <Callout tone="warning" closable data-autosave-hint @close="closeHint()">
+        <Callout tone="warning" icon="info" closable data-autosave-hint @close="closeHint()">
           Сохранение теперь автоматическое. В боевые осмотры изменения попадают по кнопке «Опубликовать схему»
         </Callout>
       </template>
@@ -2808,18 +2808,21 @@ if (import.meta.client) {
                       </Checkbox>
                     </SettingRow>
                   </div>
-                  <div class="flex flex-col gap-3" data-reasons>
-                    <Heading level="group" description="Типы обоснований, которые эксперт может выбрать при проверке">
-                      Варианты обоснований
-                    </Heading>
-                    <Callout v-if="m.rule('feedbackBlock').reason" data-reason-callout="feedback">
-                      {{ m.rule('feedbackBlock').reason }}
-                    </Callout>
-                    <!-- Вариант — «название — ключ»; крестик снимает вариант, уведомление предлагает отмену. -->
-                    <div v-if="web.reasons.length" class="flex flex-wrap gap-2">
-                      <Chip v-for="r in web.reasons" :key="r.key" :trailing="web.feedback && !ro ? 'remove' : 'none'" :data-reason="r.key" @remove="m.removeReason(r.key)">
-                        {{ r.title }} — {{ r.key }}
-                      </Chip>
+                  <!-- Такт 99 (владелец, 2026-10-09): заголовок → чипы 12; список (чипы, плашка причины) → «Добавить вариант» и форма — 16. -->
+                  <div class="flex flex-col gap-4" data-reasons>
+                    <div class="flex flex-col gap-3">
+                      <Heading level="group" description="Типы обоснований, которые эксперт может выбрать при проверке">
+                        Варианты обоснований
+                      </Heading>
+                      <Callout v-if="m.rule('feedbackBlock').reason" icon="info" data-reason-callout="feedback">
+                        {{ m.rule('feedbackBlock').reason }}
+                      </Callout>
+                      <!-- Вариант — «название — ключ»; крестик снимает вариант, уведомление предлагает отмену. -->
+                      <div v-if="web.reasons.length" class="flex flex-wrap gap-2">
+                        <Chip v-for="r in web.reasons" :key="r.key" :trailing="web.feedback && !ro ? 'remove' : 'none'" :data-reason="r.key" @remove="m.removeReason(r.key)">
+                          {{ r.title }} — {{ r.key }}
+                        </Chip>
+                      </div>
                     </div>
                     <Card v-if="reasonForm && web.feedback" tone="muted" class="flex flex-col gap-4" data-reason-form>
                       <FieldSet legend="Новое обоснование">
@@ -2856,7 +2859,7 @@ if (import.meta.client) {
                     Если не заполнен блок обратной связи
                   </Heading>
                   <!-- Сверка дублей, такт 73: группу гасит тот же рубильник — причина стоит и здесь (строка 65). -->
-                  <Callout v-if="m.rule('feedbackBlock').reason" data-reason-callout="feedback-block">
+                  <Callout v-if="m.rule('feedbackBlock').reason" icon="info" data-reason-callout="feedback-block">
                     {{ m.rule('feedbackBlock').reason }}
                   </Callout>
                   <SettingRow data-setting="blockRepeat" :highlighted="hl('blockRepeat')">
@@ -2953,7 +2956,7 @@ if (import.meta.client) {
                       Выбрано {{ access.groups.length }}
                     </ToolbarText>
                   </TableToolbar>
-                  <Table attached-top :attached="groupTotal > 0">
+                  <Table attached-top :attached="groupTotal > 0" :page-rows="groupTotal > groupPageSize ? groupPageSize : undefined">
                     <TableRow>
                       <TableHead variant="column" class="w-16 justify-center px-6" aria-label="Выбор групп на странице">
                         <Checkbox :readonly="ro"
@@ -3002,30 +3005,36 @@ if (import.meta.client) {
 
             <!-- ============================ ИИ-анализ — № 29–33 ============================ -->
             <template v-else-if="m.ui.section === 'ai'">
-              <Callout title="Доступные ИИ-модули зависят от типа объекта схемы" data-ai-banner>
-                Текущий тип: {{ schemeTypeLabel }}
-              </Callout>
-
-              <section id="anchor-finish" data-anchor-section="finish" class="flex flex-col gap-4">
-                <Heading level="title" description="Автоматический расчёт стоимости ремонта по классам отделки для недвижимости">
-                  Анализ стоимости отделки
-                </Heading>
-                <Callout v-if="finishOff" data-reason-callout="finish">
-                  {{ m.rule('finishCost').reason }}. Тип схемы задаётся в разделе «Общие → Основное»
+              <!--
+                Такт 99 (владелец, 2026-10-09): плашка раздела — первой в первом подразделе: переход из навигатора к «Анализу стоимости
+                отделки» ставит в окно и её; табы → плашка и плашка → заголовок — 24 и 24. Вид — плашка с иконкой без заливки (доска
+                scheme-edit-callout-v1, макет `33351:8881`).
+              -->
+              <section id="anchor-finish" data-anchor-section="finish" class="flex flex-col gap-6">
+                <Callout tone="plain" icon="info" title="Доступные ИИ-модули зависят от типа объекта схемы" data-ai-banner>
+                  Текущий тип: {{ schemeTypeLabel }}
                 </Callout>
-                <Card class="flex flex-col gap-4">
-                  <Heading level="group" description="Привязанные по алиасам поля формы осмотра будут подставлены в расчёт стоимости отделки">
-                    Поля для расчётов
+                <div class="flex flex-col gap-4">
+                  <Heading level="title" description="Автоматический расчёт стоимости ремонта по классам отделки для недвижимости">
+                    Анализ стоимости отделки
                   </Heading>
-                  <div class="grid grid-cols-2 max-md:grid-cols-1 items-start gap-6">
-                    <Field :readonly="ro" label="Алиас для «Общая площадь объекта»" hint="Системное имя поля. Формат: namespace:fieldname" :disabled="finishOff">
-                      <Input v-model="aliasTotal" placeholder="" :show-icon="false" :disabled="finishOff" data-field="aliasTotal" />
-                    </Field>
-                    <Field :readonly="ro" label="Алиас для «Площадь отдельного помещения»" hint="Системное имя поля. Формат: namespace:fieldname" :disabled="finishOff">
-                      <Input v-model="aliasRoom" placeholder="" :show-icon="false" :disabled="finishOff" data-field="aliasRoom" />
-                    </Field>
-                  </div>
-                </Card>
+                  <Callout v-if="finishOff" icon="info" data-reason-callout="finish">
+                    {{ m.rule('finishCost').reason }}. Тип схемы задаётся в разделе «Общие → Основное»
+                  </Callout>
+                  <Card class="flex flex-col gap-4">
+                    <Heading level="group" description="Привязанные по алиасам поля формы осмотра будут подставлены в расчёт стоимости отделки">
+                      Поля для расчётов
+                    </Heading>
+                    <div class="grid grid-cols-2 max-md:grid-cols-1 items-start gap-6">
+                      <Field :readonly="ro" label="Алиас для «Общая площадь объекта»" hint="Системное имя поля. Формат: namespace:fieldname" :disabled="finishOff">
+                        <Input v-model="aliasTotal" placeholder="" :show-icon="false" :disabled="finishOff" data-field="aliasTotal" />
+                      </Field>
+                      <Field :readonly="ro" label="Алиас для «Площадь отдельного помещения»" hint="Системное имя поля. Формат: namespace:fieldname" :disabled="finishOff">
+                        <Input v-model="aliasRoom" placeholder="" :show-icon="false" :disabled="finishOff" data-field="aliasRoom" />
+                      </Field>
+                    </div>
+                  </Card>
+                </div>
               </section>
 
               <section id="anchor-costs" data-anchor-section="costs" class="flex flex-col gap-4">
@@ -3096,7 +3105,7 @@ if (import.meta.client) {
                   <Heading level="group" description="Распознавание повреждений, распознавание VIN и оценка ущерба — для схем с типом «Осмотр транспорта»">
                     Модули для авто
                   </Heading>
-                  <Callout v-if="autoOff" data-reason-callout="auto">
+                  <Callout v-if="autoOff" icon="info" data-reason-callout="auto">
                     {{ m.rule('autoModules').reason }}. Тип схемы задаётся в разделе «Общие → Основное»
                   </Callout>
                   <SettingRow data-setting="damage" :highlighted="hl('damage')">
@@ -3129,7 +3138,7 @@ if (import.meta.client) {
                   </SettingRow>
                 </Card>
                 <Card class="flex flex-col gap-6">
-                  <Callout v-if="anomaliesOff" data-reason-callout="anomalies">
+                  <Callout v-if="anomaliesOff" icon="info" data-reason-callout="anomalies">
                     {{ m.rule('anomalies').reason }}
                   </Callout>
                   <div class="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
@@ -3364,7 +3373,8 @@ if (import.meta.client) {
         <!-- Узкий экран (такт 92): группы — над полями, выбор группы списком; поля — строками-карточками. -->
         <div class="flex items-start gap-2 pt-6 max-md:flex-col max-md:items-stretch max-md:gap-4" data-form :data-readonly="ro || undefined">
           <!-- Список групп — № 39: панель 192 (`32765:5586`), карандаш открывает сайд группы — № 68. -->
-          <div class="flex w-group-list shrink-0 flex-col gap-2 max-md:w-full">
+          <!-- Такт 99 (владелец, 2026-10-09, п. 2): список групп → «Добавить группу» — 16 (макет `32765:5586` — 8). -->
+          <div class="flex w-group-list shrink-0 flex-col gap-4 max-md:w-full">
             <Card class="flex flex-col gap-1 p-1" data-groups>
               <div class="flex h-12 items-center justify-between gap-2 pr-2 pl-4">
                 <Heading level="group">Группы</Heading>
@@ -4091,18 +4101,21 @@ if (import.meta.client) {
                 </Card>
               </div>
             </div>
-            <div class="flex flex-col gap-3" data-metrics>
-              <Heading>Метрики</Heading>
-              <div v-for="(x, k) in sc.metrics" :key="k" class="flex items-end gap-3" :data-metric="k">
-                <Field :readonly="ro" :label="k === 0 ? 'Метрика' : ''" class="min-w-0 flex-1" :data-field="`scMetric${k}`">
-                  <Input :model-value="x.label" placeholder="" :show-icon="false" @update:model-value="m.setMetric(k, 'label', String($event ?? ''))" />
-                </Field>
-                <Field :readonly="ro" :label="k === 0 ? 'Значение' : ''" class="w-40 shrink-0" :data-field="`scMetricValue${k}`">
-                  <Input :model-value="x.value" placeholder="" :show-icon="false" @update:model-value="m.setMetric(k, 'value', String($event ?? ''))" />
-                </Field>
-                <IconButton :inert="ro" variant="ghost" size="lg" :label="`Удалить метрику «${x.label}»`" data-act="metric-delete" @click="m.removeMetric(k)">
-                  <Icon name="delete" :size="20" />
-                </IconButton>
+            <!-- Такт 99 (владелец, 2026-10-09, п. 2): заголовок и строки метрик — через 12; список → «Добавить метрику» — 16. -->
+            <div class="flex flex-col gap-4" data-metrics>
+              <div class="flex flex-col gap-3">
+                <Heading>Метрики</Heading>
+                <div v-for="(x, k) in sc.metrics" :key="k" class="flex items-end gap-3" :data-metric="k">
+                  <Field :readonly="ro" :label="k === 0 ? 'Метрика' : ''" class="min-w-0 flex-1" :data-field="`scMetric${k}`">
+                    <Input :model-value="x.label" placeholder="" :show-icon="false" @update:model-value="m.setMetric(k, 'label', String($event ?? ''))" />
+                  </Field>
+                  <Field :readonly="ro" :label="k === 0 ? 'Значение' : ''" class="w-40 shrink-0" :data-field="`scMetricValue${k}`">
+                    <Input :model-value="x.value" placeholder="" :show-icon="false" @update:model-value="m.setMetric(k, 'value', String($event ?? ''))" />
+                  </Field>
+                  <IconButton :inert="ro" variant="ghost" size="lg" :label="`Удалить метрику «${x.label}»`" data-act="metric-delete" @click="m.removeMetric(k)">
+                    <Icon name="delete" :size="20" />
+                  </IconButton>
+                </div>
               </div>
               <div :inert="ro" class="flex">
                 <Button variant="outline" show-icon data-act="metric-add" @click="m.addMetric()">
@@ -4943,23 +4956,26 @@ if (import.meta.client) {
             своего файла. «Из каталога» — каталог поверх сайда; «Загрузить» — свой файл. Всё — в черновик сайда до «Сохранить».
           -->
           <FieldSet :legend="`Фото-подсказки · ${sd.hints.length}`" data-step-section="photo-hints">
-            <div class="flex flex-col items-start gap-3">
-              <Badge :variant="sd.hints.length ? 'success' : 'warning'" data-step-hint-status>
-                {{ hintStatus(sd.hints.length) }}
-              </Badge>
-              <div v-if="sd.hints.length" class="flex flex-wrap gap-2" data-step-hint-list>
-                <TooltipProvider>
-                  <StepThumb
-                    v-for="(h, k) in sd.hints"
-                    :key="h.id"
-                    :src="hintSrc(h)"
-                    :alt="hintLabel(h)"
-                    :reason="hintLabel(h)"
-                    :data-hint="h.id"
-                    @open="viewHints(sd.hints, k)"
-                    @remove="removeSideHint(h.id)"
-                  />
-                </TooltipProvider>
+            <!-- Такт 99 (владелец, 2026-10-09, п. 2): статус и миниатюры — через 12; список → кнопки добавления — 16. -->
+            <div class="flex flex-col items-start gap-4">
+              <div class="flex flex-col items-start gap-3">
+                <Badge :variant="sd.hints.length ? 'success' : 'warning'" data-step-hint-status>
+                  {{ hintStatus(sd.hints.length) }}
+                </Badge>
+                <div v-if="sd.hints.length" class="flex flex-wrap gap-2" data-step-hint-list>
+                  <TooltipProvider>
+                    <StepThumb
+                      v-for="(h, k) in sd.hints"
+                      :key="h.id"
+                      :src="hintSrc(h)"
+                      :alt="hintLabel(h)"
+                      :reason="hintLabel(h)"
+                      :data-hint="h.id"
+                      @open="viewHints(sd.hints, k)"
+                      @remove="removeSideHint(h.id)"
+                    />
+                  </TooltipProvider>
+                </div>
               </div>
               <div class="flex flex-wrap items-center gap-3">
                 <Button variant="outline" show-icon data-act="step-hint-catalog" @click="openCatalog('side')">

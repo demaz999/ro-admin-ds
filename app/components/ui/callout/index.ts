@@ -29,18 +29,25 @@ export { default as Callout } from './Callout.vue'
  * `FrameBindBar`. Действия — `Button` sm, `Checkbox` — ставит потребитель.
  */
 export const calloutVariants = cva(
-  'flex items-center gap-3 rounded-md px-4 py-3 text-sm',
+  'flex items-center gap-3 text-sm',
   {
     variants: {
+      /* Такт 99: `icon` — устройство плашки с иконкой, макет `33351:8881` (поля 12 / 12 / 12 / 20, радиус 16). */
+      layout: {
+        text: 'rounded-md px-4 py-3',
+        icon: 'rounded-xl py-3 pr-3 pl-5',
+      },
       tone: {
         success: 'bg-success-surface text-success-strong',
         warning: 'bg-warning-surface text-warning-strong',
         destructive: 'bg-destructive-surface text-destructive-strong',
         // Такт 50: второстепенный текст на тонированной поверхности — `--foreground` на ступени `--opacity-on-tone`.
         neutral: 'bg-muted text-foreground/[var(--opacity-on-tone)]',
+        // Такт 99: информация раздела — без заливки; заголовок `--foreground`, иконка `--primary` ставит компонент.
+        plain: 'text-foreground-secondary',
       },
     },
-    defaultVariants: { tone: 'neutral' },
+    defaultVariants: { tone: 'neutral', layout: 'text' },
   },
 )
 
@@ -60,6 +67,36 @@ export const calloutVariants = cva(
  *
  * Матрица — `/free-shoot/states`, раздел Callout (`data-subsection="callout-closable"`); пример — `/kit-changes`.
  *
+ * ## Плашка с иконкой — проп `icon` и тон `plain`, такт 99
+ *
+ * Решение владельца 2026-10-09, доска `scheme-edit-callout-v1`: вид — по макету плашки раздела «ИИ-анализ» страницы схемы
+ * (`TariffContextBanner` `33351:8881`, раздел `32765:3886`), три вида по ролям на одном устройстве. Снято read-only скриптом
+ * Plugin API (`use_figma`) 2026-10-09.
+ *
+ * | часть | кит | макет `33351:8881` |
+ * |---|---|---|
+ * | раскладка | строка, по центру по вертикали, зазор 12 | `HORIZONTAL`, `counterAxisAlignItems: CENTER`, `itemSpacing` 12 |
+ * | поля | 12 / 12 / 12 / 20 (`py-3 pr-3 pl-5`) | padding 12, 12, 12, 20 |
+ * | радиус | 16 `--radius-xl` | 16 |
+ * | иконка | бокс 24, глиф `info` 20 × 20 (`Icon size=20`) | `24_info` 24 × 24, контур `Union` 20 × 20 со смещением 2 |
+ * | цвет иконки | `plain` — `--primary` | `#0059cf` (`accent/default`) |
+ * | заголовок | 15/20 bold `text-sm` | `Txt/bold15-20`, `fg/primary` |
+ * | заголовок → текст | 0 | 0 (строки 20 и 16 вплотную) |
+ * | текст под заголовком | 12/16 regular `text-2xs` | `Txt/regular12-16`, `fg/primary` |
+ * | заливка | `plain` — нет | `bg/page` (`#ffffff`) на странице `#eef1f5`; у страницы схемы фон белый — заливка не видна |
+ *
+ * Цвета по ролям — решение владельца 2026-10-09 (промпт такта 99, пункт 5):
+ *
+ * | роль | тон | заливка | иконка | заголовок | текст | контраст текста |
+ * |---|---|---|---|---|---|---|
+ * | информация раздела | `plain` | нет | `--primary` (6.31:1) | `--foreground` (16.77:1) | `--foreground-secondary` | 4.82:1 к белому |
+ * | причина «почему выключено» | `neutral` | `--muted` | `--foreground` 64 % | `--foreground` | `--foreground` 64 % | 4.72:1 к `--muted` |
+ * | баннер-ухо страницы | `warning` | `--warning-surface` | `--warning-strong` | `--warning-strong` | `--warning-strong` | 5.16:1 |
+ *
+ * Расхождение с макетом: текст под заголовком в макете — `fg/primary`; у `plain` — `--foreground-secondary` по решению владельца.
+ * Текст без заголовка — единственная строка плашки: 15/20 regular, как заголовок по кеглю (строка 336 реестра `scheme-edit.md`).
+ * Матрица — `/scheme-edit/states`, `data-matrix="callout-icon"`; пример — `/kit-changes`.
+ *
  * ## Изменения после передачи
  *
  * Компонент передан фронтам версией `handover-2026-10-01` (составные компоненты экрана). Правило 23 `docs/chat-protocol.md`:
@@ -72,6 +109,14 @@ export const calloutVariants = cva(
  * - **Добавлено.** Узкий экран — проп `narrow="stack"`: ниже 768 действия (слот `actions`) — строкой под текстом во всю ширину,
  *   от левого края, с переносом. Рабочий стол прежний — действия справа от текста; без пропа (`keep`) прежний и на узком экране.
  *   Пример — статус витрины страницы схемы на телефоне: «Предпросмотр страницы» и «Опубликовать на витрину» (ревью 4.10). Такт 92.
+ * - **Добавлено.** Плашка с иконкой — одно устройство на три роли: иконка 24 слева (глиф 20 в боксе 24), по центру высоты текста, через 12 — заголовок 15/20 bold и под ним вплотную текст 12/16 regular; поля 12 сверху, справа и снизу, 20 слева; радиус 16.
+ *   Без заголовка текст — единственная строка, 15/20 regular.
+ *   Три вида по ролям: информация раздела — без заливки, иконка `--primary` (6.31:1 к белому), заголовок `--foreground`, текст `--foreground-secondary` (4.82:1); причина «почему выключено» — заливка `--muted`, иконка и текст `--foreground` на ступени `--opacity-on-tone` (4.72:1), заголовок `--foreground`; баннер страницы — заливка `--warning-surface`, иконка, заголовок и текст `--warning-strong` (5.16:1).
+ *   Крестик `closable` прежний — у первой строки справа.
+ *   Без пропа плашка прежняя.
+ *   Источник — макет плашки раздела «ИИ-анализ» `33351:8881` страницы схемы осмотра; решение владельца 2026-10-09, доска scheme-edit-callout-v1.
+ *   API: проп `icon` (имя глифа `Icon`), тон `plain` — без заливки.
+ *   Такт 99.
  */
 export type CalloutVariants = VariantProps<typeof calloutVariants>
 export type CalloutTone = NonNullable<CalloutVariants['tone']>

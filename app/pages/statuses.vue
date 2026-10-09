@@ -182,7 +182,7 @@ if (route.query.q) search.value = String(route.query.q)
     </TableToolbar>
 
     <!-- Без подвала (пустой результат) низ несёт сама таблица — `:attached="total > 0"`. -->
-    <Table attached-top :attached="total > 0" data-slot="statuses-table">
+    <Table attached-top :attached="total > 0" :page-rows="total > pageSize ? pageSize : undefined" data-slot="statuses-table">
       <TableRow>
         <TableHead
           v-for="col in columns"
