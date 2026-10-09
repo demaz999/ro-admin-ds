@@ -894,6 +894,15 @@ function kit(page) {
           focusAct: document.activeElement?.dataset?.act ?? null,
           /* Такт 104: размещение открытого сайда — slot или layer; модальный и закрытый — null. */
           sideDock: document.querySelector('[data-slot=modal-card][data-state=open][data-dock]')?.dataset.dock ?? null,
+          /*
+           * Такт 105: вид страницы при сайде сохраняется — сайд перекрывает группу на минимуме (атрибут data-cover); ширина группы, группа у левого
+           * края рабочей области (main + поле 16), навигатор «Настроек» справа вплотную к левому краю сайда.
+           */
+          sideCover: !!document.querySelector('[data-page-group][data-cover]'),
+          groupW: (g => (g ? Math.round(g.getBoundingClientRect().width) : null))(document.querySelector('[data-page-group]')),
+          groupAtLeft: (g => (g ? Math.abs(g.getBoundingClientRect().left - document.querySelector('main').getBoundingClientRect().left - 16) <= 0.5 : null))(document.querySelector('[data-page-group]')),
+          navAtSide: (() => { const nav = document.querySelector('[data-settings-nav]'); const side = document.querySelector('[data-slot=modal-card][data-state=open][data-dock]'); if (!nav || !side) return null
+            return Math.abs(nav.getBoundingClientRect().right - side.getBoundingClientRect().left) <= 0.5 })(),
           /* ---------- П6, такт 69: «Форма» ---------- */
           form: (() => { const el = document.querySelector('[data-form]'); if (!el) return null
             const bar = el.querySelector('[data-fields-bar]')
@@ -3127,6 +3136,25 @@ const SCENARIOS = {
     ['клик по заголовку сайда — фокус на карточке; Tab до ручки ширины (пятый) и дальше — на строке словаря', async (K) => { await K.clickEl("document.querySelector('[data-side=comments] [data-slot=modal-card-title]')"); await K.tabs(6) }, { surface: 'comments', focusInSide: false, focusAct: 'open-comments' }],
     ['навигатор справа: «Мобильное приложение» — раздел сменился, сайд открыт', K => K.section('mobile'), { surface: 'comments', section: 'mobile', sideDock: 'slot' }],
     ['Esc — сайд закрыт, раздел прежний', K => K.key('Escape'), { surface: '', section: 'mobile', sideDock: null, writes: 0 }],
+  ], { width: 1920, height: 1080 }],
+  /*
+   * Такт 105 — решение владельца 2026-10-09 (живая проверка такта 104): вид страницы при сайде сохраняется. Сайд всегда слотом: страница
+   * уступает место до минимума группы таба, дальше группа стоит на минимуме у левого края рабочей области, сайд перекрывает правую часть;
+   * навигатор «Настроек» справа — вплотную к левому краю сайда, поверх колонки (решение агента, строка 383 реестра).
+   */
+  'СС-130': ['вид страницы при сайде сохраняется: группа сжимается до минимума и стоит, сайд перекрывает; навигатор справа у края сайда нажимается; ручка ширины — без скачка (такт 105)', [
+    ['окно 1920, «Словарь комментариев» — сайд слотом, группа сжата до 990, не на минимуме', K => K.act('open-comments'),
+      { surface: 'comments', sideDock: 'slot', sideCover: false, groupW: 990, groupAtLeft: true, navAtSide: false }],
+    ['ручка ширины с клавиатуры: двенадцать шагов влево (сайд 642 → 834) — группа на минимуме 878 у левого края, сайд перекрывает, навигатор у края сайда',
+      async (K) => { await K.focus("document.querySelector('[data-side=comments] [data-slot=modal-card-resize]')"); for (let i = 0; i < 12; i++) await K.key('ArrowLeft') },
+      { surface: 'comments', sideDock: 'slot', sideCover: true, groupW: 878, groupAtLeft: true, navAtSide: true }],
+    ['навигатор у края сайда: «PDF» — раздел сменился, сайд открыт', K => K.section('pdf'), { surface: 'comments', section: 'pdf', sideCover: true, navAtSide: true }],
+    ['ручка вправо на двенадцать шагов (сайд 834 → 642) — перекрытия нет, группа 990', async (K) => { await K.focus("document.querySelector('[data-side=comments] [data-slot=modal-card-resize]')"); for (let i = 0; i < 12; i++) await K.key('ArrowRight') },
+      { surface: 'comments', sideCover: false, groupW: 990, groupAtLeft: true }],
+    ['Esc — сайд закрыт, группа по центру во всю ширину 1136', K => K.key('Escape'), { surface: '', sideDock: null, sideCover: false, groupW: 1136, groupAtLeft: false, writes: 0 }],
+    ['таб «Процессы и шаги», «Изменить» у шага «VIN на металле», сайд 770 — группа на минимуме 982, сайд перекрывает',
+      async (K) => { await K.tab('processes'); await K.stepEdit('s-vin-metal'); await K.focus("document.querySelector('[data-side=step] [data-slot=modal-card-resize]')"); for (let i = 0; i < 8; i++) await K.key('ArrowLeft') },
+      { surface: 'step', sideDock: 'slot', sideCover: true, groupW: 982, groupAtLeft: true }],
   ], { width: 1920, height: 1080 }],
 }
 

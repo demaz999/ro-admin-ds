@@ -1955,6 +1955,9 @@ onMounted(() => {
  * иначе **слоем** у правого края; страница под сайдом работает. Ширина сайда — ручкой (довесок 1 к такту 101), общая, помнится в
  * сессии вкладки; слот или слой — по текущей ширине. Узкий экран (уже 768) — сайды модальные во всё окно, как прежде. Сайд поверх
  * полноэкранного слоя (шаг в оверлее процесса) — слой.
+ *
+ * Такт 105 (владелец 2026-10-09, живая проверка такта 104): выбор «слот или слой» по ширине снят — вид страницы сохраняется, сайд всегда
+ * слотом; страница уступает место до минимума группы таба, дальше сайд перекрывает её правую часть (разбор — у `sideDock` ниже).
  */
 /** Оснастка приёмки — `?variant=nav-left`: навигатор «Настроек» слева от колонки (L2) для сравнения; по умолчанию — справа. */
 const NAV_LEFT = q('variant') === 'nav-left'
@@ -1999,21 +2002,39 @@ function measureLayout() {
     search: search ? Math.round(search) : layout.value.search,
   }
 }
+/** Открыт сайд страницы. */
+const sideOpenAny = computed(() => m.ui.surfaces.some(x => x.kind === 'side'))
 /** Ширина сайда на экране — те же пределы, что у ручки: не уже 480, не шире половины окна. */
 const sideShown = computed(() => {
   const { edge, min, viewport } = layout.value
   const max = Math.max(min, Math.floor(viewport / 2))
   return Math.round(Math.min(max, Math.max(min, sideWidth.value ?? edge)))
 })
-/** Слот — когда рабочая область без сайда (окно − меню − поля − сайд; зазор до сайда — поле 16) вмещает минимум группы таба. */
+/**
+ * Такт 105 (решение владельца 2026-10-09, живая проверка такта 104): вид страницы при сайде сохраняется — сайд всегда слотом, страница
+ * уступает ему место до минимума группы таба (`pr-modal-slot-<таб>`: отступ = clamp(0, рабочая область − минимум, сайд)); дальше группа
+ * стоит на минимуме у левого края рабочей области, сайд перекрывает её правую часть. Перехода «слот → слой» с перестройкой страницы нет:
+ * при протяжке ручки и смене ширины окна левый край и ширина группы меняются монотонно. Сайд поверх полноэкранного слоя — слой.
+ */
 const sideDock = computed<ModalCardDock | undefined>(() => {
   if (phone.value || !layout.value.viewport) return undefined
   if (m.ui.surfaces.some(x => x.kind === 'overlay')) return 'layer'
-  const need = layout.value.groupMin[m.ui.tab as TabId] ?? 0
-  return layout.value.area - sideShown.value >= need ? 'slot' : 'layer'
+  return 'slot'
 })
-/** Открыт сайд страницы. */
-const sideOpenAny = computed(() => m.ui.surfaces.some(x => x.kind === 'side'))
+/** Отступ под сайд-слот по табу — токены `tailwind.css` (классы статичные: собранную строку Tailwind не увидит). */
+const SLOT_FIT_BY_TAB: Record<TabId, string> = {
+  settings: 'pr-modal-slot-settings',
+  form: 'pr-modal-slot-form',
+  processes: 'pr-modal-slot-processes',
+  showcase: 'pr-modal-slot-showcase',
+}
+const SLOT_FIT = computed(() => SLOT_FIT_BY_TAB[m.ui.tab as TabId] ?? 'pr-modal-slot-settings')
+/** Сайд перекрывает группу: рабочая область без сайда уже минимума группы таба (`data-cover` у группы — слепку прогона). */
+const sideCover = computed(() => {
+  if (sideDock.value !== 'slot' || !sideOpenAny.value) return false
+  const need = layout.value.groupMin[m.ui.tab as TabId] ?? 0
+  return layout.value.area - sideShown.value < need
+})
 let layoutObserver: ResizeObserver | null = null
 onMounted(() => {
   measureLayout()
@@ -2200,11 +2221,11 @@ if (import.meta.client) {
         ориентация: закрытая не возвращается (аудит, «Смена парадигмы»; строка 167).
       -->
       <!--
-        Такт 101: сайд-слот справа — плашка уступает ему место, как вся страница (`pr-modal-slot`). Такт 104: плашка — ширины группы
-        по центру рабочей области (`max-w-settings-group`).
+        Такт 101: сайд-слот справа — плашка уступает ему место, как вся страница. Такт 104: плашка — ширины группы
+        по центру рабочей области (`max-w-settings-group`). Такт 105: уступает до минимума группы таба (`SLOT_FIT`).
       -->
       <template v-if="!ro && !m.ui.hintClosed" #banner>
-        <div class="flex flex-col pr-modal-slot">
+        <div class="flex flex-col" :class="SLOT_FIT">
           <div class="mx-auto flex w-full max-w-settings-group flex-col">
             <Callout tone="warning" icon="info" closable data-autosave-hint @close="closeHint()">
               Сохранение теперь автоматическое. В боевые осмотры изменения попадают по кнопке «Опубликовать схему»
@@ -2214,7 +2235,7 @@ if (import.meta.client) {
       </template>
       <!-- «Назад» — слот `back` каркаса (такт 96): до заголовка 12 держит каркас. Такт 104: от левого края группы. -->
       <template #back>
-        <div class="flex w-full pr-modal-slot">
+        <div class="flex w-full" :class="SLOT_FIT">
           <div class="mx-auto flex w-full max-w-settings-group" data-back-row>
             <ButtonNavigation size="base" direction="left" data-act="back" @click="m.back()">
               Назад
@@ -2224,11 +2245,12 @@ if (import.meta.client) {
       </template>
 
     <!--
-      Такт 101: сайд-слот справа (S1) — страница уступает ему место (`pr-modal-slot`). Такт 104: содержимое — группа не шире 1136 по
-      центру рабочей области; шапка, поиск, полоса табов и табы — от её левого до правого края.
+      Такт 101: сайд-слот справа (S1) — страница уступает ему место. Такт 104: содержимое — группа не шире 1136 по
+      центру рабочей области; шапка, поиск, полоса табов и табы — от её левого до правого края. Такт 105: место уступается до минимума
+      группы таба (`SLOT_FIT` — `pr-modal-slot-<таб>`), дальше группа стоит на минимуме у левого края, сайд перекрывает её правую часть.
     -->
-    <div class="flex min-w-0 flex-col pr-modal-slot max-md:pb-20">
-    <div class="mx-auto flex w-full max-w-settings-group min-w-0 flex-col gap-6" data-page-group>
+    <div class="flex min-w-0 flex-col max-md:pb-20" :class="SLOT_FIT">
+    <div class="mx-auto flex w-full max-w-settings-group min-w-0 flex-col gap-6" data-page-group :data-cover="sideCover || undefined">
 
     <div class="flex flex-col gap-2">
       <!-- Узкий экран (такт 92): имя — ступень 24/28 (макет `33694:3930`), до трёх строк. -->
@@ -2519,10 +2541,11 @@ if (import.meta.client) {
         </Toolbar>
         <!--
           Навигатор — № 14: липкий (r2 §3). Узкий экран — выбор раздела списком над колонкой (такт 92). Такт 104: ширина от раскладки
-          (`fluid`) — от 266 до своего минимума, подписи переносятся.
+          (`fluid`) — от 266 до своего минимума, подписи переносятся. Такт 105 (решение агента, строка 383 реестра): навигатор справа под
+          сайд не уходит — липнет к левому краю сайда (`right-modal-dock`) и ложится на правую часть колонки, когда сайд перекрывает группу.
         -->
         <DefineSettingsNav>
-          <SectionNav v-model="section" title="Настройки" fluid class="sticky top-6" data-settings-nav>
+          <SectionNav v-model="section" title="Настройки" fluid :class="NAV_LEFT ? 'sticky top-6' : 'sticky top-6 right-modal-dock'" data-settings-nav>
             <!-- Режим «найдено» (такт 86; 3.2, п. 16): разделы с совпадениями и раздел на экране, у каждого — число совпадений. -->
             <SectionNavItem
               v-for="s in navSections"
@@ -3381,7 +3404,7 @@ if (import.meta.client) {
                   </Heading>
                   <Table v-if="pdf.templates.length">
                     <TableRow>
-                      <TableHead variant="column" class="w-48 px-4">
+                      <TableHead variant="column" class="min-w-40 shrink basis-48 px-4">
                         Название
                       </TableHead>
                       <TableHead variant="column" class="w-36 px-4">
@@ -3393,21 +3416,22 @@ if (import.meta.client) {
                       <TableHead variant="column" aria-label="Действия" :class="['justify-end px-4', TEMPLATE_ACTIONS_COLUMN]" />
                     </TableRow>
                     <TableRow v-for="t in pdf.templates" :key="t.id" :data-template="t.id">
-                      <TableCell variant="slot" class="w-48 gap-2 px-4">
-                        <TableCellIdentity>
+                      <!-- Такт 105: колонка 192 сжимается до 160 — название многоточием с подсказкой, «Основной» переносится строкой ниже (`values`). -->
+                      <TableCell variant="values" class="min-w-40 shrink basis-48 px-4 py-4">
+                        <TableCellIdentity class="flex-initial">
                           {{ t.title }}
                         </TableCellIdentity>
                         <Badge v-if="t.main" size="sm" data-template-main>
                           Основной
                         </Badge>
                       </TableCell>
-                      <TableCell class="w-36 px-4">
+                      <TableCell align="start" class="w-36 px-4">
                         {{ t.template }}
                       </TableCell>
-                      <TableCell class="w-0 min-w-40 flex-1 px-4">
+                      <TableCell align="start" class="w-0 min-w-40 flex-1 px-4">
                         {{ templateAccess(t) }}
                       </TableCell>
-                      <TableCell variant="slot" :class="['justify-end px-4', TEMPLATE_ACTIONS_COLUMN]">
+                      <TableCell variant="slot" align="start" :class="['justify-end px-4', TEMPLATE_ACTIONS_COLUMN]">
                         <TableRowActions :inert="ro" :actions="TEMPLATE_ACTIONS" @edit="openTemplate(t.id)" @action="m.removeTemplate(t.id)" />
                       </TableCell>
                     </TableRow>
@@ -3643,7 +3667,7 @@ if (import.meta.client) {
                   <TableHead variant="column" class="w-10 px-2">
                     №
                   </TableHead>
-                  <TableHead variant="column" class="min-w-0 flex-1 px-4">
+                  <TableHead variant="column" class="w-0 min-w-40 flex-1 px-4">
                     Поле
                   </TableHead>
                   <TableHead variant="column" class="w-36 px-4">
@@ -3663,7 +3687,7 @@ if (import.meta.client) {
                   :data-dragging="reorder.drag.value?.id === f.id || undefined"
                 >
                   <!-- Ручка перестановки — такт 70 (макет `32765:5659`): протяжка мышью, Alt+↑ и Alt+↓ с клавиатуры. -->
-                  <TableCell variant="slot" class="w-10 pl-4">
+                  <TableCell variant="slot" align="start" class="w-10 pl-4">
                     <IconButton
                       :inert="ro"
                       variant="service"
@@ -3676,26 +3700,31 @@ if (import.meta.client) {
                       <Icon name="drag" :size="12" />
                     </IconButton>
                   </TableCell>
-                  <TableCell variant="slot" class="w-10 justify-center px-2">
+                  <TableCell variant="slot" align="start" class="w-10 justify-center px-2">
                     <Checkbox :readonly="ro" :model-value="m.ui.selectedFields.includes(f.id)" :aria-label="f.title" @update:model-value="m.toggleField(f.id)" />
                   </TableCell>
-                  <TableCell class="w-10 px-2" data-row-number>
+                  <TableCell align="start" class="w-10 px-2" data-row-number>
                     {{ k + 1 }}
                   </TableCell>
                   <!--
                     Метаданные строки — метками у названия: обязательность, «только web», согласование; признак «зависимое»
                     возвращён в строку поля (r2 §1, строка 17 реестра).
+                    Такт 105 (владелец 2026-10-09): колонка гибкая — не уже 160; название с «?» — многоточием с подсказкой полного
+                    текста, метки переносятся строкой ниже — многозначная ячейка кита (`values`, такт 24); соседние ячейки — у первой
+                    линии (`align="start"`, такт 26).
                   -->
-                  <TableCell variant="slot" class="min-w-0 flex-1 gap-2 px-4">
-                    <TableCellIdentity class="flex-initial">
-                      {{ f.title }}
-                    </TableCellIdentity>
-                    <!-- «Где увидит исполнитель» — такт 89 (решение 7): «?» с превью — экран анкеты с обведённым полем. -->
-                    <HelpPreview v-bind="fieldBind(f.id)" @update:open="setHelp(`field:${f.id}`, $event)" @action="demoFromHelp(fieldHelp(f.id))">
-                      <template v-if="fieldHelp(f.id)?.screen" #default>
-                        <AppPreviewScreen fragment size="md" :screen="fieldHelp(f.id)?.screen" :marked="fieldHelp(f.id)?.mark" />
-                      </template>
-                    </HelpPreview>
+                  <TableCell variant="values" class="w-0 min-w-40 flex-1 px-4 py-4">
+                    <span class="flex min-w-0 items-center gap-2">
+                      <TableCellIdentity class="flex-initial">
+                        {{ f.title }}
+                      </TableCellIdentity>
+                      <!-- «Где увидит исполнитель» — такт 89 (решение 7): «?» с превью — экран анкеты с обведённым полем. -->
+                      <HelpPreview v-bind="fieldBind(f.id)" @update:open="setHelp(`field:${f.id}`, $event)" @action="demoFromHelp(fieldHelp(f.id))">
+                        <template v-if="fieldHelp(f.id)?.screen" #default>
+                          <AppPreviewScreen fragment size="md" :screen="fieldHelp(f.id)?.screen" :marked="fieldHelp(f.id)?.mark" />
+                        </template>
+                      </HelpPreview>
+                    </span>
                     <Badge v-if="f.required" size="sm" data-badge="required">
                       Обязательное
                     </Badge>
@@ -3709,15 +3738,15 @@ if (import.meta.client) {
                       Зависимое
                     </Badge>
                   </TableCell>
-                  <TableCell class="w-36 px-4" data-field-alias>
+                  <TableCell align="start" class="w-36 px-4" data-field-alias>
                     {{ f.alias || 'не задан' }}
                   </TableCell>
-                  <TableCell variant="slot" class="w-28 px-4">
+                  <TableCell variant="slot" align="start" class="w-28 px-4">
                     <Chip variant="neutral">
                       {{ typeLabel(f.type) }}
                     </Chip>
                   </TableCell>
-                  <TableCell variant="slot" :class="['justify-end px-4', FIELD_ACTIONS_COLUMN]">
+                  <TableCell variant="slot" align="start" :class="['justify-end px-4', FIELD_ACTIONS_COLUMN]">
                     <TableRowActions :inert="ro" :actions="FIELD_ACTIONS" @edit="openField(f.id)" @action="m.removeField(fg.id, f.id)" />
                   </TableCell>
                 </TableRow>
@@ -3967,16 +3996,16 @@ if (import.meta.client) {
                 <TableHead variant="column" class="w-10 px-2">
                   №
                 </TableHead>
-                <TableHead variant="column" class="min-w-0 flex-1 px-4">
+                <TableHead variant="column" class="w-0 min-w-44 flex-1 px-4">
                   Название · тип шага
                 </TableHead>
                 <TableHead variant="column" class="w-28 px-4">
                   Способ
                 </TableHead>
-                <TableHead variant="column" class="w-44 px-4">
+                <TableHead variant="column" class="min-w-41 shrink basis-44 px-4">
                   Нейросети
                 </TableHead>
-                <TableHead variant="column" class="w-44 px-4">
+                <TableHead variant="column" class="min-w-40 shrink basis-44 px-4">
                   Фото-подсказка
                 </TableHead>
                 <TableHead variant="column" aria-label="Действия" :class="['justify-end px-4', STEP_ACTIONS_COLUMN]" />
@@ -4013,7 +4042,7 @@ if (import.meta.client) {
                   Название, описание, тип шага списком у метки и флаги метками — ячейка растит строку. Колонка тянется, а таблица
                   стоит на `min-w-max`: `contain-inline-size` не даёт длинному описанию растянуть строку за карточку.
                 -->
-                <TableCell variant="slot" class="h-auto min-w-0 flex-1 flex-col items-start gap-2 px-4 pt-4.5 pb-3 contain-inline-size" data-step-name>
+                <TableCell variant="slot" class="h-auto w-0 min-w-44 flex-1 flex-col items-start gap-2 px-4 pt-4.5 pb-3 contain-inline-size" data-step-name>
                   <TableCellIdentity class="w-full flex-none">
                     {{ st.title }}
                     <template v-if="st.description" #description>
@@ -4043,8 +4072,11 @@ if (import.meta.client) {
                 <TableCell align="start" class="w-28 px-4" data-step-method>
                   {{ st.method }}
                 </TableCell>
-                <!-- Нейросети строками 13/16 (макет `32765:6684`): длинное имя обрезается с подсказкой; «Настроить нейросети» — сайд шага, секция «Нейросети». -->
-                <TableCell variant="slot" class="h-auto w-44 flex-col items-start gap-1 px-4 pt-4.5 pb-3" data-step-networks>
+                <!--
+                  Нейросети строками 13/16 (макет `32765:6684`): длинное имя обрезается с подсказкой; «Настроить нейросети» — сайд шага, секция «Нейросети».
+                  Такт 105: колонка 176 сжимается до 164 («Настроить нейросети» в строку) после названия; «Фото-подсказка» — до 160 («Выбрать из каталога»).
+                -->
+                <TableCell variant="slot" class="h-auto min-w-41 shrink basis-44 flex-col items-start gap-1 px-4 pt-4.5 pb-3 contain-inline-size" data-step-networks>
                   <TableCellText v-for="n in st.networks" :key="n" size="sm" class="w-full">
                     {{ n }}
                   </TableCellText>
@@ -4062,7 +4094,7 @@ if (import.meta.client) {
                   (Ш-5, решения 4 и 6): до трёх миниатюр и «+N» — `ThumbStrip`, нажатие — просмотр крупно; «Загрузить» и «Выбрать из
                   каталога» рядом — у шага с подсказками тоже (удаление — в сайде шага, раздел «Фото-подсказки»).
                 -->
-                <TableCell variant="slot" class="h-auto w-44 flex-col items-start gap-2 px-4 pt-4 pb-3" :data-step-hints="st.hints.length">
+                <TableCell variant="slot" class="h-auto min-w-40 shrink basis-44 flex-col items-start gap-2 px-4 pt-4 pb-3 contain-inline-size" :data-step-hints="st.hints.length">
                   <Badge size="sm" :variant="st.hints.length ? 'success' : 'warning'" data-hint-status>
                     {{ hintStatus(st.hints.length) }}
                   </Badge>
