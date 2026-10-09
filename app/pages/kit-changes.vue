@@ -76,6 +76,9 @@ const t99Hint = ref(true)
 const T99_ROWS = ['Эксперты Москва', 'Эксперты Казань', 'Агенты Север', 'Агенты Юг', 'Операторы']
 const t99Page = ref(2)
 const t99Size = ref(3)
+/* Такт 101: сайд слотом или немодальным слоем, ширина ручкой. */
+const t101Dock = ref<'slot' | 'layer' | ''>('')
+const t101Width = ref<number | undefined>(undefined)
 /* Такт 100: малый чип внутри поля — набор значений и формула; чип на странице — для сравнения размеров. */
 const t100Roles = ref(['Администратор', 'Эксперт', 'Агент'])
 const t100Formula = ref('Осмотр {Inspection:number} — {Car:vin} {Car:color}')
@@ -93,7 +96,8 @@ const ro = ref({ name: 'КАСКО — осмотр', text: 'Осмотр авт
 </script>
 
 <template>
-  <main data-theme="rososmotr" class="mx-auto max-w-5xl space-y-10 bg-background px-6 py-10 font-sans text-foreground">
+  <!-- Такт 101: сайд-слот примера `modal-card-dock` — страница уступает ему место (`pr-modal-slot`). -->
+  <main data-theme="rososmotr" class="mx-auto max-w-5xl space-y-10 bg-background px-6 py-10 font-sans text-foreground" :class="t101Dock === 'slot' ? 'pr-modal-slot' : ''">
     <header class="space-y-3">
       <Heading level="page">
         Изменения кирпичиков
@@ -130,6 +134,18 @@ const ro = ref({ name: 'КАСКО — осмотр', text: 'Осмотр авт
             <iframe src="/kit-narrow?case=page" title="Формат страницы — Каркас admin.vue" class="h-120 w-full rounded-md border border-border-soft" />
           </template>
           <!-- Такт 99 (решения владельца 2026-10-09): плашка с иконкой — три роли; таблица держит высоту полной страницы. -->
+          <!-- Такт 101 (владелец 2026-10-09, доска scheme-edit-wide-v4 и довесок 1): сайд без подложки — слоем и слотом; ручка ширины. -->
+          <template v-else-if="c.id === 'modal-card-dock' || c.id === 'modal-card-resize'">
+            <div class="flex flex-wrap gap-3">
+              <Button variant="outline" size="sm" :data-act="`${c.id}-layer`" @click="t101Dock = 'layer'">
+                Открыть сайд слоем
+              </Button>
+              <Button variant="outline" size="sm" :data-act="`${c.id}-slot`" @click="t101Dock = 'slot'">
+                Открыть сайд слотом
+              </Button>
+            </div>
+            <span class="text-xs text-muted-foreground">страница под сайдом кликается и прокручивается, Esc и крестик закрывают; слотом — страница отступает на ширину сайда; потяните левый край сайда — 480 … половина окна, двойной щелчок — 642</span>
+          </template>
           <template v-else-if="c.id === 'callout-icon'">
             <Callout tone="plain" icon="info" title="Доступные ИИ-модули зависят от типа объекта схемы">
               Текущий тип: Осмотр недвижимости
@@ -1152,5 +1168,20 @@ const ro = ref({ name: 'КАСКО — осмотр', text: 'Осмотр авт
         </template>
       </Toast>
     </Toaster>
+
+    <!-- Такт 101: сайд примеров `modal-card-dock` и `modal-card-resize` — без подложки, ширина ручкой. -->
+    <ModalCard :open="!!t101Dock" :dock="t101Dock || undefined" @update:open="(v: boolean) => { if (!v) t101Dock = '' }">
+      <ModalCardContent v-model:width="t101Width" placement="edge" resizable data-example-side>
+        <ModalCardHeader :title="t101Dock === 'slot' ? 'Сайд слотом' : 'Сайд слоем'" subtitle="Страница под сайдом работает" />
+        <ModalCardBody>
+          <ModalCardText>Ширина {{ t101Width ?? 642 }}: потяните левый край сайда, стрелки на ручке в фокусе — шаг 16, двойной щелчок — 642.</ModalCardText>
+        </ModalCardBody>
+        <ModalCardFooter>
+          <Button variant="secondary" @click="t101Dock = ''">
+            Закрыть
+          </Button>
+        </ModalCardFooter>
+      </ModalCardContent>
+    </ModalCard>
   </main>
 </template>

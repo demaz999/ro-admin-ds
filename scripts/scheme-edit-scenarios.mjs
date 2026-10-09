@@ -1789,20 +1789,21 @@ const SCENARIOS = {
   ], { query: 'section=pdf' }],
   'СС-57': ['сайд: ловушка фокуса, Esc закрывает, фокус возвращается к триггеру; «Отмена» отбрасывает правки сайда, полотно остаётся прежним (r2 §7; аудит, «Принцип: сайд = атомарная транзакция поверх автосейв-страницы», «Клавиатура и фокус»)', [
     ['сайд шаблона открыт — фокус внутри', K => K.act('template-add'), { surface: 'template', focusInSide: true }],
-    ['Tab по кругу — фокус остаётся в сайде', K => K.tabs(14), { surface: 'template', focusInSide: true }],
+    /* Такт 101 (владелец 2026-10-09, S1): сайд немодальный — Tab с последнего элемента уходит из сайда, сайд остаётся открытым. */
+    ['Tab уходит из немодального сайда, сайд открыт', K => K.tabs(14), { surface: 'template', focusInSide: false }],
     ['название введено, «Отмена» — шаблон не добавлен', async (K) => { await K.typeInto('tplTitle', 'Черновик шаблона'); await K.act('template-cancel') },
       { surface: '', 's.pdf.templates.length': 2, writes: 0, saveLog: [], focusAct: 'template-add' }],
     ['снова открыть — поля пустые; Esc закрывает, фокус на кнопке', async (K) => { await K.act('template-add'); await K.typeInto('tplTitle', 'Ещё черновик'); await K.key('Escape') },
       { surface: '', 's.pdf.templates.length': 2, writes: 0, focusAct: 'template-add' }],
-    ['сайд словаря комментариев: Tab по кругу и Esc', async (K) => { await K.section('general'); await K.act('open-comments'); await K.tabs(8) }, { surface: 'comments', focusInSide: true }],
+    ['сайд словаря комментариев: Tab уходит из немодального сайда (такт 101), Esc', async (K) => { await K.section('general'); await K.act('open-comments'); await K.tabs(8) }, { surface: 'comments', focusInSide: false }],
     ['Esc — сайд словаря закрыт, фокус на строке словаря', K => K.key('Escape'), { surface: '', focusAct: 'open-comments', writes: 0 }],
-    ['сайд поля (такт 69): «Добавить поле», Tab по кругу — фокус в сайде', async (K) => { await K.tab('form'); await K.act('field-add'); await K.tabs(30) }, { surface: 'field', focusInSide: true }],
+    ['сайд поля (такт 69): «Добавить поле», Tab уходит из немодального сайда (такт 101), сайд открыт', async (K) => { await K.tab('form'); await K.act('field-add'); await K.tabs(30) }, { surface: 'field', focusInSide: false }],
     ['заголовок введён, Esc — поле не добавлено, фокус на «Добавить поле»', async (K) => { await K.typeInto('fdTitle', 'Черновик поля'); await K.key('Escape') },
       { surface: '', 'form.title': 'Заявка · 3 поля', writes: 0, focusAct: 'field-add' }],
     ['сайд группы: карандаш, Esc — фокус на карандаше', async (K) => { await K.act('group-edit'); await K.typeInto('gdTitle', ' плюс'); await K.key('Escape') },
       { surface: '', 'form.groups.0': 'Заявка', writes: 0, focusAct: 'group-edit' }],
-    ['сайд процесса (такт 71): «Изменить процесс», Tab по кругу — фокус в сайде', async (K) => { await K.tab('processes'); await K.processAct('p-auto', 'process-edit'); await K.tabs(30) },
-      { surface: 'process', focusIn: 'process' }],
+    ['сайд процесса (такт 71): «Изменить процесс», Tab уходит из немодального сайда (такт 101), сайд открыт', async (K) => { await K.tab('processes'); await K.processAct('p-auto', 'process-edit'); await K.tabs(30) },
+      { surface: 'process', focusIn: null }],
     ['название, Esc — процесс прежний, фокус на «Изменить процесс»', async (K) => { await K.typeInto('pdTitle', ' плюс'); await K.key('Escape') },
       { surface: '', 'proc.cards.0': 'Осмотр автомобиля · 4 шага · auto_inspection', writes: 0, focusAct: 'process-edit' }],
     ['сайд шага: карандаш строки, Tab по кругу, Esc — фокус на строке шага', async (K) => { await K.stepEdit('s-vin-metal'); await K.tabs(40); await K.key('Escape') },
@@ -2013,7 +2014,8 @@ const SCENARIOS = {
     ['Tab по кругу — фокус остаётся в оверлее', K => K.tabs(30), { surface: 'process-overlay', focusIn: 'overlay' }],
     ['«Добавить шаг» — сайд шага поверх оверлея: стек из двух слоёв, фокус в сайде', K => K.act('overlay-step-add'),
       { surface: 'step', surfaces: ['process-overlay', 'step'], focusIn: 'step', 'stepSide.title': 'Добавление шага', 'stepSide.sub': 'Процесс «Осмотр повреждений»', 'stepSide.host': 'overlay', 'overlay.title': 'Осмотр повреждений' }],
-    ['Tab по кругу — фокус остаётся в сайде', K => K.tabs(40), { surface: 'step', focusIn: 'step' }],
+    /* Такт 101: сайд шага поверх оверлея — немодальный слой, Tab с последнего элемента уходит из сайда; сайд и оверлей открыты. */
+    ['Tab уходит из немодального сайда, сайд и оверлей открыты', K => K.tabs(40), { surface: 'step', surfaces: ['process-overlay', 'step'], focusIn: null }],
     ['название, Esc — закрыт только сайд, оверлей открыт, фокус на «Добавить шаг» оверлея', async (K) => { await K.typeInto('sdTitle', 'Черновик шага'); await K.key('Escape') },
       { surface: 'process-overlay', surfaces: ['process-overlay'], focusIn: 'overlay', focusAct: 'overlay-step-add', 'overlay.steps': [], writes: 0 }],
     ['«Добавить шаг», название — «Добавить шаг»: шаг в черновике оверлея, полотно прежнее', async (K) => { await K.act('overlay-step-add'); await K.typeInto('sdTitle', 'Общий план повреждения'); await K.act('step-save') },
@@ -3095,6 +3097,12 @@ const SCENARIOS = {
       { rowMenu: ['Удалить · destructive'] }],
     ['«Удалить» — строки нет, уведомление с «Отменить»', async (K) => { await K.clickEl("document.querySelector('[data-menu=row-actions] [data-action=delete]')"); await K.settled() },
       { rowMenu: [], 'form.rows.length': 2 }],
+  ]],
+  /* Такт 101 — решение владельца 2026-10-09 (доска scheme-edit-wide-v4, S1, L2): сайд немодальный, навигатор слева от колонки. */
+  'СС-129': ['сайд немодальным слоем: страница под ним работает — навигатор «Настроек» слева нажимается, сайд остаётся открытым; Esc закрывает (такт 101, S1)', [
+    ['«Словарь комментариев» — сайд открыт слоем (окно 1440)', K => K.act('open-comments'), { surface: 'comments', section: 'general' }],
+    ['навигатор под сайдом: «Мобильное приложение» — раздел сменился, сайд открыт', K => K.section('mobile'), { surface: 'comments', section: 'mobile' }],
+    ['Esc — сайд закрыт, раздел прежний', K => K.key('Escape'), { surface: '', section: 'mobile', writes: 0 }],
   ]],
 }
 

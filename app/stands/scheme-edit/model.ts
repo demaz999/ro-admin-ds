@@ -814,7 +814,14 @@ export function createModel(data: Dataset, opts: ModelOptions = {}) {
   }
   /** «Перейти к полям» — переход паттерна «вооружает» (СС-19). */
   function goToFields() { setTab('form') }
-  function openSide(id: string) { ui.surfaces.push({ kind: 'side', id }) }
+  /**
+   * Сайд немодальный (такт 101, S1): страница под ним работает, и сайд открывается с неё поверх открытого. Сайд со страницы
+   * заменяет открытый сайд — двух сайдов одного уровня не бывает; сайд из сайда (каталог из сайда шага) ложится сверху — `over`.
+   */
+  function openSide(id: string, over = false) {
+    if (!over && topSurface.value?.kind === 'side') ui.surfaces.pop()
+    ui.surfaces.push({ kind: 'side', id })
+  }
   function closeSurface() { ui.surfaces.pop() }
   const topSurface = computed<Surface | null>(() => ui.surfaces[ui.surfaces.length - 1] ?? null)
 

@@ -17,7 +17,7 @@ import {
   fillRepeatTexts, knownObjectType, REPEAT_TEXT_FIELDS, textVariants, variantChips, variantGroups,
   buildDemo, type DemoSource, type HelpKey, type HelpPreviewView,
   type BehaviorSettings, type Dataset, type DonorScheme, type FieldDraft, type FillRow, type FormulaSettings, type GroupDraft, type HintCategoryFilter, type HintMatch,
-  type NetworkState, type PdfTemplate, type PdfTemplateDraft, type ProcessDraft, type ProcessStep, type RepeatTextKey, type SaveState, type SectionId, type StepDraft,
+  type NetworkState, type PdfTemplate, type PdfTemplateDraft, type ProcessDraft, type ProcessStep, type RepeatTextKey, type SaveState, type SectionId, type SectionStatus, type StepDraft,
   type StepHint, type TabId,
 } from '~/stands/scheme-edit/model'
 import demo from '~/stands/scheme-edit/demo-data.json'
@@ -26,6 +26,8 @@ import SchemeCreate from '~/stands/scheme-edit/SchemeCreate.vue'
 import { createCard, createdDataset, createdNotice, defaultBasics, setHandoff, takeHandoff, type CreateBasics, type CreateFrom } from '~/stands/scheme-edit/create'
 import { RULES_LABEL, type Stage, type StageId } from '~/stands/scheme-edit/readiness'
 import type { ReadinessGroupItem, ReadinessMarkState, ReadinessStageItem } from '~/components/ui/readiness'
+import type { ModalCardDock } from '~/components/ui/modal-card'
+import type { IconName } from '~/components/ui/icon/icons'
 
 /**
  * Страница «Редактирование схемы осмотра» (VA-16377) — стенд, такты 61–65, порции П1–П5 (`docs/scheme-edit.md`,
@@ -183,6 +185,7 @@ import type { ReadinessGroupItem, ReadinessMarkState, ReadinessStageItem } from 
  * | `?open=readiness` | поповер чипа «Готовность N из 5» либо «Проверка: N» открыт (такт 91) |
  * | `?open=copy` | окно «Новая схема осмотра» копии на шаге «Основа» (такт 91) |
  * | `?rules=1` | этап «Правила» отмечен: «Проверил унаследованное…» (такт 91) |
+ * | `?variant=l1-compact` · `l1-rail` | раскладка «Настроек» L1 для живой проверки владельцем: колонка и навигатор справа по центру рабочей зоны; навигатор под сайдом-слоем — выбором раздела списком над колонкой либо рейкой у края сайда (такт 101; временно — до выбора владельца) |
  */
 /*
  * Такт 91: копия переходит на тот же адрес с другим набором — страница пересобирается по полному адресу.
@@ -214,6 +217,8 @@ onBeforeUnmount(() => phoneQuery?.removeEventListener('change', onPhone))
 /** Чип готовности и меню «⋯» — одна разметка: в шапке рабочего стола, на узком экране — в строке статусов и в нижней полосе. */
 const [DefineChip, ReuseChip] = createReusableTemplate()
 const [DefineMenu, ReuseMenu] = createReusableTemplate()
+/** Навигатор «Настроек» — одна разметка на два места (такт 101): слева от колонки (L2) либо справа (варианты L1 оснастки). */
+const [DefineSettingsNav, ReuseSettingsNav] = createReusableTemplate()
 /**
  * Строка-карточка шага (решение 5): «Процессы и шаги» и оверлей повторяемого процесса — одна разметка. Карточка — `Card size="sm"`:
  * номер и название с описанием, тип и признаки, способ и нейросети, фото-подсказки; действия — «⋯» (правка в сайде, удаление).
@@ -443,10 +448,7 @@ function openTemplate(id: string) {
   m.openSide('template')
 }
 if (q('open') === 'template') { m.setSection('pdf'); m.openSide('template') }
-const templateOpen = computed({
-  get: () => m.topSurface.value?.id === 'template',
-  set: (v) => { if (!v) m.closeSurface() },
-})
+const templateOpen = sideSurface('template')
 function saveTemplate() {
   tplInvalid.value = !tpl.value.title.trim()
   if (m.saveTemplate(tpl.value)) m.closeSurface()
@@ -526,10 +528,7 @@ onBeforeUnmount(() => window.removeEventListener('scroll', spy))
 /* ------------------------------ сайд словаря комментариев — № 69 ------------------------------ */
 /** Черновик сайда: выбор словаря живёт здесь до «Сохранить» (r2 §7). */
 const sideDict = ref('')
-const sideOpen = computed({
-  get: () => m.topSurface.value?.id === 'comments',
-  set: (v) => { if (!v) m.closeSurface() },
-})
+const sideOpen = sideSurface('comments')
 watch(sideOpen, (v) => { if (v) sideDict.value = general.value.dictionaries.comments }, { immediate: true })
 const sideComments = computed(() => COMMENT_DICTIONARIES.find(d => d.value === sideDict.value)?.comments ?? [])
 function saveSide() {
@@ -897,11 +896,22 @@ const surface = (id: string) => computed({
   get: () => m.topSurface.value?.id === id,
   set: (v) => { if (!v && m.topSurface.value?.id === id) m.closeSurface() },
 })
+/**
+ * Сайд страницы — такт 101 (владелец 2026-10-09, S1): немодальный, открыт, пока он в стеке, — окно по центру, открытое со
+ * страницы поверх сайда (публикация, удаление), его не прячет. Закрывается, только когда он сверху: Esc и крестик — у верхнего слоя.
+ * Объявлен функцией — сайды шаблона и словаря комментариев объявлены выше.
+ */
+function sideSurface(id: string) {
+  return computed({
+    get: () => m.ui.surfaces.some(x => x.id === id),
+    set: (v: boolean) => { if (!v && m.topSurface.value?.id === id) m.closeSurface() },
+  })
+}
 const publishOpen = surface('publish')
 const firstPublishOpen = surface('first-publish')
 const resetOpen = surface('reset')
 const deleteOpen = surface('delete')
-const historyOpen = surface('history')
+const historyOpen = sideSurface('history')
 const menuOpen = ref(q('open') === 'menu')
 const MENU: { key: 'export' | 'dump' | 'copy' | 'reset', label: string }[] = [
   { key: 'export', label: 'Экспортировать схему' },
@@ -964,7 +974,7 @@ function openField(id: string) {
   fdError.value = null
   m.openSide('field')
 }
-const fieldOpen = surface('field')
+const fieldOpen = sideSurface('field')
 const fieldOrderMax = computed(() => (fg.value?.fields.length ?? 0) + (fd.value.id ? 0 : 1))
 /** «Предложить по названию» — алиас латиницей по заголовку, занятые в группе получают суффикс. */
 function suggestFieldAlias() {
@@ -995,7 +1005,7 @@ function openGroup(id: string) {
   gdInvalid.value = false
   m.openSide('group')
 }
-const groupOpen = surface('group')
+const groupOpen = sideSurface('group')
 /** Алиас группы — с заглавной, как у групп набора данных (`Lead`, `Car`). */
 function suggestGroupAlias() {
   const alias = suggestAlias(gd.value.title, m.formGroups.value.filter(x => x.id !== gd.value.id).map(x => x.alias.toLowerCase()))
@@ -1099,7 +1109,8 @@ function openCatalog(target: CatalogTarget, processId = '', stepId = '') {
     fill.value.layer = 'catalog'
     return
   }
-  m.openSide('catalog')
+  /* Такт 101: из сайда шага каталог ложится поверх него; из ячейки — заменяет открытый сайд. */
+  m.openSide('catalog', target === 'side')
 }
 /** Выбор плитки: в замене строки — одна подсказка, иначе — несколько. */
 function togglePick(id: string) {
@@ -1179,8 +1190,8 @@ function applyFill() {
 }
 
 /** Сайд каталога и сайд массовой заливки — одно окно: заливка показывает каталог вторым слоем, как дифф версии в истории. */
-const hintsSurface = computed(() => (m.topSurface.value?.id === 'catalog' || m.topSurface.value?.id === 'fill' ? m.topSurface.value.id : ''))
-const hintsOpen = computed({ get: () => !!hintsSurface.value, set: (v) => { if (!v && hintsSurface.value) m.closeSurface() } })
+const hintsSurface = computed(() => [...m.ui.surfaces].reverse().find(x => x.id === 'catalog' || x.id === 'fill')?.id ?? '')
+const hintsOpen = computed({ get: () => !!hintsSurface.value, set: (v) => { if (!v && hintsSurface.value && m.topSurface.value?.id === hintsSurface.value) m.closeSurface() } })
 const catalogShown = computed(() => hintsSurface.value === 'catalog' || (hintsSurface.value === 'fill' && fill.value.layer === 'catalog'))
 /** Esc во втором слое заливки — назад к списку, сайд остаётся. */
 function onHintsEscape(event: KeyboardEvent) {
@@ -1201,7 +1212,7 @@ function onHintsEscape(event: KeyboardEvent) {
 type PasteKind = 'fields' | 'steps'
 type PasteLevel = 'schemes' | 'parts' | 'items'
 const paste = ref({ kind: 'fields' as PasteKind, query: '', scheme: '', part: '', picked: [] as string[], target: '' })
-const pasteOpen = surface('paste')
+const pasteOpen = sideSurface('paste')
 const pasteLevel = computed<PasteLevel>(() => (!paste.value.scheme ? 'schemes' : !paste.value.part ? 'parts' : 'items'))
 const pasteDonor = computed(() => m.donorById(paste.value.scheme))
 const pasteSchemes = computed(() => m.donorGroups(paste.value.query))
@@ -1354,7 +1365,7 @@ function openProcess(id: string) {
   pdError.value = null
   m.openSide('process')
 }
-const processOpen = surface('process')
+const processOpen = sideSurface('process')
 const processOrderMax = computed(() => m.processes.value.length + (pd.value.id ? 0 : 1))
 /** «Предложить по названию» — алиас процесса латиницей, занятые получают суффикс. */
 function suggestProcessAlias(d: ProcessDraft) {
@@ -1604,7 +1615,7 @@ function openNetworks() {
   nd.value = Object.fromEntries(NETWORKS.filter(x => !x.denied).map(x => [x.value, m.networkState(x.value)]))
   m.openSide('networks')
 }
-const networksOpen = surface('networks')
+const networksOpen = sideSurface('networks')
 /** Из «все» — снять у выбранных, иначе (часть, нет) — поставить всем. */
 function cycleNetwork(name: string) { nd.value[name] = nd.value[name] === 'all' ? 'none' : 'all' }
 function saveNetworksSide() {
@@ -1931,6 +1942,105 @@ onMounted(() => {
   try { if (sessionStorage.getItem(HINT_KEY) === 'closed') m.closeHint() } catch {}
 })
 
+/* ------------------------------ раскладка «Настроек» и сайды — такт 101 ------------------------------ */
+/**
+ * Решения владельца 2026-10-09 (доска `scheme-edit-wide-v4`): **L2** — навигатор «Настроек» у левого края рабочей зоны, колонка 846
+ * за ним, левый край не двигается; **S1** — сайды страницы немодальные: слотом справа, когда рядом с раскладкой помещаются, иначе
+ * слоем у правого края; страница под сайдом работает. Довесок 1: ширина сайда тянется ручкой (480 — половина окна), помнится в
+ * сессии вкладки и общая для всех сайдов; слот или слой — по текущей ширине.
+ *
+ * Слот помещается, когда справа от раскладки «Настроек» (`--container-settings-group` 1136 от левого поля рабочей зоны) остаётся
+ * ширина сайда и поле 16: при развёрнутом меню 256 + 16 + 1136 + 16 + 642 = 2066 (сайд 480 — 1904). Порог один на все табы.
+ * Узкий экран (уже 768) — сайды как прежде: модальные во всё окно. Сайд поверх полноэкранного слоя (шаг в оверлее процесса) —
+ * слой: страница под оверлеем не видна, место ей не уступается.
+ */
+/** Оснастка приёмки — `?variant=l1-compact` · `l1-rail`: варианты L1 для живой проверки владельцем; по умолчанию — L2. */
+const VARIANT: '' | 'l1-compact' | 'l1-rail' = q('variant') === 'l1-compact' || q('variant') === 'l1-rail' ? q('variant') as 'l1-compact' | 'l1-rail' : ''
+const l1 = VARIANT !== ''
+const SIDE_KEY = 'scheme-edit:side-width'
+/** Ширина сайдов страницы — ручка `ModalCardContent resizable`; не задана — 642. */
+const sideWidth = ref<number | undefined>(undefined)
+onMounted(() => {
+  try {
+    const v = Number(sessionStorage.getItem(SIDE_KEY))
+    if (v > 0) sideWidth.value = v
+  } catch {}
+})
+watch(sideWidth, (v) => {
+  if (!v) return
+  try { sessionStorage.setItem(SIDE_KEY, String(v)) } catch {}
+})
+/** Числа раскладки — токены `tailwind.css`; меряются после монтирования, при смене ширины окна и меню. */
+const layout = ref({ room: 0, edge: 642, min: 480, viewport: 0, navRight: 0 })
+function cssPx(name: string, fallback: number) {
+  const v = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name))
+  return Number.isFinite(v) && v > 0 ? v : fallback
+}
+function measureLayout() {
+  const main = document.querySelector('main')
+  const left = main?.getBoundingClientRect().left ?? 0
+  const px = cssPx('--spacing-page-x', 16)
+  const nav = document.querySelector('[data-settings-nav]')?.getBoundingClientRect()
+  layout.value = {
+    room: window.innerWidth - left - px - cssPx('--container-settings-group', 1136) - px,
+    edge: cssPx('--container-modal-edge', 642),
+    min: cssPx('--container-modal-edge-min', 480),
+    viewport: window.innerWidth,
+    navRight: nav?.width ? nav.right : 0,
+  }
+}
+/** Ширина сайда на экране — те же пределы, что у ручки: не уже 480, не шире половины окна. */
+const sideShown = computed(() => {
+  const { edge, min, viewport } = layout.value
+  const max = Math.max(min, Math.floor(viewport / 2))
+  return Math.round(Math.min(max, Math.max(min, sideWidth.value ?? edge)))
+})
+const sideDock = computed<ModalCardDock | undefined>(() => {
+  if (phone.value || !layout.value.viewport) return undefined
+  if (m.ui.surfaces.some(x => x.kind === 'overlay')) return 'layer'
+  return layout.value.room >= sideShown.value ? 'slot' : 'layer'
+})
+/** Открыт сайд страницы. */
+const sideOpenAny = computed(() => m.ui.surfaces.some(x => x.kind === 'side'))
+/**
+ * L1: навигатор справа от колонки уходит под сайд-слой — тогда он сворачивается: `l1-compact` — выбор раздела списком над
+ * колонкой (часть узкого экрана, такт 92), `l1-rail` — рейка у левого края сайда. Место навигатора держится (`invisible`):
+ * колонка не двигается.
+ */
+const navCovered = computed(() => l1 && !phone.value && sideOpenAny.value && sideDock.value === 'layer'
+  && layout.value.navRight > layout.value.viewport - sideShown.value)
+/** Глиф раздела рейки — из лежащих в `icons.ts`; новых не скачивалось. */
+const RAIL_ICON: Record<SectionId, IconName> = {
+  general: 'settings',
+  mobile: 'photo-camera',
+  web: 'monitoring',
+  access: 'lock',
+  ai: 'auto-awesome',
+  anomalies: 'warning',
+  pdf: 'article',
+}
+const RAIL_TONE: Record<SectionStatus, 'success' | 'neutral' | 'warning' | undefined> = { none: undefined, on: 'success', off: 'neutral', attention: 'warning' }
+let layoutObserver: ResizeObserver | null = null
+onMounted(() => {
+  measureLayout()
+  window.addEventListener('resize', measureLayout)
+  const main = document.querySelector('main')
+  if (main) {
+    layoutObserver = new ResizeObserver(() => measureLayout())
+    layoutObserver.observe(main)
+  }
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', measureLayout)
+  layoutObserver?.disconnect()
+})
+/* Навигатор L1 меряется заново, когда открывается сайд и меняется его ширина: слот сдвигает группу к центру оставшейся ширины. */
+watch([sideOpenAny, sideShown, sideDock, () => m.ui.tab], () => {
+  if (import.meta.client) nextTick(() => measureLayout())
+})
+/** Сетка карточек сайда (довесок 1): уже 560 — одна колонка, от 560 — две, от 900 — три. */
+const sideCols = computed(() => (sideShown.value < 560 ? 'grid-cols-1' : sideShown.value < 900 ? 'grid-cols-2' : 'grid-cols-3'))
+
 /* ------------------------------ уведомления над подвалом окна — такт 88 ------------------------------ */
 /**
  * Угол уведомлений — справа внизу, там же кнопки подвала сайда и оверлея. Уведомление с «Отменить» у «Заполнить по типу
@@ -2092,10 +2202,13 @@ if (import.meta.client) {
         каркаса — первой строкой над «Назад», тон мягкого предупреждения (`Callout warning`); уходит с прокруткой. Одноразовая
         ориентация: закрытая не возвращается (аудит, «Смена парадигмы»; строка 167).
       -->
+      <!-- Такт 101: сайд-слот справа — плашка уступает ему место, как вся страница (`pr-modal-slot`). -->
       <template v-if="!ro && !m.ui.hintClosed" #banner>
-        <Callout tone="warning" icon="info" closable data-autosave-hint @close="closeHint()">
-          Сохранение теперь автоматическое. В боевые осмотры изменения попадают по кнопке «Опубликовать схему»
-        </Callout>
+        <div class="flex flex-col pr-modal-slot">
+          <Callout tone="warning" icon="info" closable data-autosave-hint @close="closeHint()">
+            Сохранение теперь автоматическое. В боевые осмотры изменения попадают по кнопке «Опубликовать схему»
+          </Callout>
+        </div>
       </template>
       <!-- «Назад» — слот `back` каркаса (такт 96): до заголовка 12 держит каркас. -->
       <template #back>
@@ -2104,7 +2217,8 @@ if (import.meta.client) {
         </ButtonNavigation>
       </template>
 
-    <div class="flex min-w-0 flex-col gap-6 max-md:pb-20">
+    <!-- Такт 101: сайд-слот справа (S1) — страница уступает ему место, колонка «Настроек» не двигается (L2). -->
+    <div class="flex min-w-0 flex-col gap-6 pr-modal-slot max-md:pb-20">
 
     <div class="flex flex-col gap-2">
       <!-- Узкий экран (такт 92): имя — ступень 24/28 (макет `33694:3930`), до трёх строк. -->
@@ -2207,7 +2321,8 @@ if (import.meta.client) {
     <!-- ============================ поиск — № 9–11, такт 86: строкой под шапкой, над табами, на всех табах ============================ -->
     <Popover :open="searchOpen">
       <PopoverAnchor as-child>
-        <div class="max-w-settings" data-search :data-find="finding || undefined">
+        <!-- Такт 101: поле — ширина раскладки «Настроек» L2 (навигатор, зазор, колонка — 1136): края по навигатору и колонке. -->
+        <div :class="l1 ? 'mx-auto w-full max-w-settings-group' : 'max-w-settings-group'" data-search :data-find="finding || undefined">
           <div data-field="search" @keydown="onSearchKeydown" @input="onSearchInput" @focusin="onSearchFocusIn" @focusout="searchFocused = false">
             <!--
               Подсказка хоткея — внутри поля справа, слотом `end` (такт 67, строка 98): при непустом значении её место занимает крестик.
@@ -2235,14 +2350,14 @@ if (import.meta.client) {
         </div>
       </PopoverAnchor>
       <!--
-        Выдача — ширина поля 846 (`--container-settings`): охват, строки со значением справа и подвал клавиш (такт 86, строка 99).
+        Выдача — ширина поля 1136 (`--container-settings-group`, такт 101; до него — 846): охват, строки со значением справа и подвал клавиш (такт 86, строка 99).
         Фокус остаётся в поле: выдача его не забирает; клик по выдаче не снимает фокус с поля до перехода.
       -->
       <PopoverContent
         data-search-results
         align="start"
         :side-offset="4"
-        :width="846"
+        :width="1136"
         narrow="full"
         :side-flip="!phone"
         class="max-md:flex max-md:flex-col"
@@ -2382,9 +2497,37 @@ if (import.meta.client) {
         <Toolbar v-if="phone" class="sticky top-0 z-20 -mx-4" data-section-select>
           <Select v-model="section" :items="sectionItems" placeholder="Раздел настроек" :show-icon="false" :searchable="false" data-field="section-select" />
         </Toolbar>
-        <!-- Каркас «Настроек»: колонка содержимого 846 и правый навигатор 266, зазор 24 — макет `33346:5470`. -->
-        <div class="flex items-start gap-6 pt-6">
+        <!--
+          Навигатор — № 14: липкий (r2 §3). Узкий экран — выбор раздела списком над колонкой (такт 92). Такт 101: место навигатора
+          держится, когда он под сайдом-слоем в вариантах L1 (`invisible`) — колонка не двигается.
+        -->
+        <DefineSettingsNav>
+          <SectionNav v-model="section" title="Настройки" :class="navCovered ? 'invisible sticky top-6' : 'sticky top-6'" data-settings-nav>
+            <!-- Режим «найдено» (такт 86; 3.2, п. 16): разделы с совпадениями и раздел на экране, у каждого — число совпадений. -->
+            <SectionNavItem
+              v-for="s in navSections"
+              :key="s.id"
+              :value="s.id"
+              :label="s.label"
+              :status="m.sectionStatus.value[s.id]"
+              :count="finding ? m.findCounts.value.sections[s.id] : undefined"
+            >
+              <SectionNavAnchor v-for="a in SECTION_ANCHORS[s.id]" :key="a.id" :label="a.label" :active="m.ui.anchor === a.id" :data-anchor-link="a.id" @select="goAnchor(a.id)" />
+            </SectionNavItem>
+          </SectionNav>
+        </DefineSettingsNav>
+        <!--
+          Каркас «Настроек» — такт 101, L2 (владелец 2026-10-09, доска `scheme-edit-wide-v4`): навигатор 266 у левого края рабочей
+          зоны, зазор 24, колонка 846; справа свободно — место сайда-слота. Макет `33346:5470` ставит навигатор справа от колонки —
+          отклонение в `figma-fixes.md`. Варианты L1 оснастки (`?variant=`): колонка и навигатор справа — группой по центру.
+        -->
+        <div class="flex items-start gap-6 pt-6" :class="l1 ? 'justify-center' : ''" :data-layout="l1 ? VARIANT : 'l2'">
+          <ReuseSettingsNav v-if="!phone && !l1" />
           <div ref="column" class="flex max-w-settings min-w-0 flex-1 flex-col gap-8" data-settings-column>
+            <!-- Вариант `l1-compact` (такт 101): навигатор под сайдом-слоем — выбор раздела списком над колонкой, липкий; часть узкого экрана (такт 92). -->
+            <Toolbar v-if="navCovered && VARIANT === 'l1-compact'" class="sticky top-0 z-20" data-section-select>
+              <Select v-model="section" :items="sectionItems" placeholder="Раздел настроек" :show-icon="false" :searchable="false" data-field="section-select" />
+            </Toolbar>
             <!-- Просмотр прошлой версии (такт 68): поля — «только чтение» осью `readonly` у `Field` и контролов, значения выделяются; действия разделов закрыты `inert`; навигатор, табы и «Назад / Далее» работают. -->
             <div class="contents" :data-readonly="ro || undefined">
             <template v-if="m.ui.section === 'general'">
@@ -3357,21 +3500,30 @@ if (import.meta.client) {
             </div>
           </div>
 
-          <!-- Правый навигатор — № 14: липкий в колонке (r2 §3). Узкий экран — выбор раздела списком над колонкой (такт 92). -->
-          <SectionNav v-if="!phone" v-model="section" title="Настройки" class="sticky top-6">
-            <!-- Режим «найдено» (такт 86; 3.2, п. 16): разделы с совпадениями и раздел на экране, у каждого — число совпадений. -->
-            <SectionNavItem
-              v-for="s in navSections"
-              :key="s.id"
-              :value="s.id"
-              :label="s.label"
-              :status="m.sectionStatus.value[s.id]"
-              :count="finding ? m.findCounts.value.sections[s.id] : undefined"
-            >
-              <SectionNavAnchor v-for="a in SECTION_ANCHORS[s.id]" :key="a.id" :label="a.label" :active="m.ui.anchor === a.id" :data-anchor-link="a.id" @select="goAnchor(a.id)" />
-            </SectionNavItem>
-          </SectionNav>
+          <ReuseSettingsNav v-if="!phone && l1" />
         </div>
+        <!--
+          Вариант `l1-rail` (такт 101): навигатор под сайдом-слоем — рейка 48 вплотную к левому краю сайда (`right-modal-dock`): по строке
+          на раздел — глиф и точка статуса, активный раздел — тональная кнопка, название — подсказкой; нажатие ведёт в раздел. Сборка
+          из кита — `Card`, `IconButton`, `Tooltip`, `Indicator`; рейка — часть страницы, в кит не выносится.
+        -->
+        <Card v-if="navCovered && VARIANT === 'l1-rail'" class="fixed top-1/2 right-modal-dock z-40 flex -translate-y-1/2 flex-col gap-1 p-1" data-section-rail>
+          <TooltipProvider>
+            <div v-for="s in navSections" :key="s.id" class="flex items-center" :data-rail-section="s.id">
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <IconButton :variant="m.ui.section === s.id ? 'secondary' : 'ghost'" size="md" :label="s.label" :aria-current="m.ui.section === s.id ? 'true' : undefined" @click="section = s.id">
+                    <Icon :name="RAIL_ICON[s.id]" :size="16" />
+                  </IconButton>
+                </TooltipTrigger>
+                <TooltipContent side="left">
+                  {{ s.label }}
+                </TooltipContent>
+              </Tooltip>
+              <Indicator v-if="RAIL_TONE[m.sectionStatus.value[s.id]]" :variant="RAIL_TONE[m.sectionStatus.value[s.id]]" size="sm" />
+            </div>
+          </TooltipProvider>
+        </Card>
       </TabsContent>
 
       <!-- ============================ «Форма» — № 39–42, 62, 70: группы слева, поля выбранной группы справа (r2 §5; макет `32765:5584`) ============================ -->
@@ -4176,8 +4328,8 @@ if (import.meta.client) {
     </Tabs>
 
     <!-- ============================ сайд словаря комментариев — № 69 ============================ -->
-    <ModalCard v-model:open="sideOpen">
-      <ModalCardContent narrow="full" placement="edge" data-side="comments">
+    <ModalCard v-model:open="sideOpen" :dock="sideDock">
+      <ModalCardContent v-model:width="sideWidth" narrow="full" placement="edge" :resizable="!phone" data-side="comments">
         <ModalCardHeader title="Словарь комментариев" subtitle="Привязка словаря к схеме" />
         <ModalCardBody class="flex flex-col gap-6">
           <Field label="Словарь" data-field="sideDict">
@@ -4203,8 +4355,8 @@ if (import.meta.client) {
     </ModalCard>
 
     <!-- ============================ сайд шаблона PDF — № 38 ============================ -->
-    <ModalCard v-model:open="templateOpen">
-      <ModalCardContent narrow="full" placement="edge" data-side="template">
+    <ModalCard v-model:open="templateOpen" :dock="sideDock">
+      <ModalCardContent v-model:width="sideWidth" narrow="full" placement="edge" :resizable="!phone" data-side="template">
         <ModalCardHeader :title="tpl.id ? `Редактирование шаблона — ${tplTitle}` : 'Добавление шаблона'" />
         <ModalCardBody class="flex flex-col gap-4">
           <Field label="Отображаемое название" required :invalid="tplInvalid" :hint="tplInvalid ? 'Заполните отображаемое название' : ''">
@@ -4239,8 +4391,8 @@ if (import.meta.client) {
     </ModalCard>
 
     <!-- ============================ сайд поля — № 42: четыре секции (аудит, «Сайд „Редактирование поля“ — эталон»; макет `32936:16381`) ============================ -->
-    <ModalCard v-model:open="fieldOpen">
-      <ModalCardContent narrow="full" placement="edge" data-side="field">
+    <ModalCard v-model:open="fieldOpen" :dock="sideDock">
+      <ModalCardContent v-model:width="sideWidth" narrow="full" placement="edge" :resizable="!phone" data-side="field">
         <ModalCardHeader :title="fd.id ? `Редактирование поля — ${fdTitle}` : 'Добавление поля'" />
         <ModalCardBody class="flex flex-col gap-6">
           <FieldSet legend="Основное">
@@ -4344,8 +4496,8 @@ if (import.meta.client) {
     </ModalCard>
 
     <!-- ============================ сайд процесса — № 48, 49: три секции макетов `33245:5722`, `33245:6032` ============================ -->
-    <ModalCard v-model:open="processOpen">
-      <ModalCardContent narrow="full" placement="edge" data-side="process">
+    <ModalCard v-model:open="processOpen" :dock="sideDock">
+      <ModalCardContent v-model:width="sideWidth" narrow="full" placement="edge" :resizable="!phone" data-side="process">
         <ModalCardHeader :title="pd.id ? `Редактирование процесса — ${pdTitle}` : 'Добавление процесса'" />
         <ModalCardBody class="flex flex-col gap-6">
           <FieldSet legend="Основное">
@@ -4893,8 +5045,8 @@ if (import.meta.client) {
       «Принцип: всё редактирование сущности — в сайде»: Основное · Поведение · Съёмка · Нейросети («гасит» по компании) ·
       Подсказки · Связи. Образец — сайд поля (№ 42). Поверх оверлея пишет в черновик оверлея.
     -->
-    <ModalCard v-model:open="stepOpen">
-      <ModalCardContent narrow="full" placement="edge" data-side="step" :data-host="sdHost.overlay ? 'overlay' : 'page'">
+    <ModalCard v-model:open="stepOpen" :dock="sideDock">
+      <ModalCardContent v-model:width="sideWidth" narrow="full" placement="edge" :resizable="!phone" data-side="step" :data-host="sdHost.overlay ? 'overlay' : 'page'">
         <ModalCardHeader :title="sd.id ? `Редактирование шага — ${sdTitle}` : 'Добавление шага'" :subtitle="`Процесс «${hostTitle}»`" />
         <ModalCardBody class="flex flex-col gap-6">
           <FieldSet legend="Основное" data-step-section="main">
@@ -5022,8 +5174,8 @@ if (import.meta.client) {
     </ModalCard>
 
     <!-- ============================ сайд «Нейросети выбранных шагов» — «Настроить нейросети» панели (№ 44) ============================ -->
-    <ModalCard v-model:open="networksOpen">
-      <ModalCardContent narrow="full" placement="edge" data-side="networks">
+    <ModalCard v-model:open="networksOpen" :dock="sideDock">
+      <ModalCardContent v-model:width="sideWidth" narrow="full" placement="edge" :resizable="!phone" data-side="networks">
         <ModalCardHeader title="Нейросети выбранных шагов" :subtitle="stepsText" />
         <ModalCardBody class="flex flex-col gap-6">
           <ModalCardText>
@@ -5060,8 +5212,8 @@ if (import.meta.client) {
       Одно окно-сайд 642: каталог из ячейки шага либо поверх сайда шага; заливка — список строк, «Заменить» — каталог вторым слоем
       с «←», как дифф версии в истории. Категории — `SectionNav` колонкой слева, сетка — `MediaGallery` (решение 4).
     -->
-    <ModalCard v-model:open="hintsOpen">
-      <ModalCardContent narrow="full" placement="edge" :data-side="catalogShown ? 'catalog' : 'fill'" :data-target="catalogShown ? cat.target : undefined" @escape-key-down="onHintsEscape">
+    <ModalCard v-model:open="hintsOpen" :dock="sideDock">
+      <ModalCardContent v-model:width="sideWidth" narrow="full" placement="edge" :resizable="!phone" :data-side="catalogShown ? 'catalog' : 'fill'" :data-target="catalogShown ? cat.target : undefined" @escape-key-down="onHintsEscape">
         <template v-if="catalogShown">
           <ModalCardHeader v-if="cat.target === 'fill'" back :title="catalogTitle" :subtitle="catalogSubtitle" @back="closeFillCatalog()" />
           <ModalCardHeader v-else :title="catalogTitle" :subtitle="catalogSubtitle" />
@@ -5074,12 +5226,13 @@ if (import.meta.client) {
                 <SectionNavItem v-for="c in HINT_CATEGORIES" :key="c.id" :value="c.id" :label="c.label" :count="catalogNumbers[c.id]" />
               </SectionNav>
               <div class="min-w-0 flex-1">
-                <MediaGallery v-if="catalogItems.length" size="md" data-catalog-grid>
+                <!-- Довесок 1 к такту 101: сетка по ширине сайда — уже 560 одна колонка, от 560 две, от 900 три; узкий экран — по две. -->
+                <MediaGallery v-if="catalogItems.length" size="md" :class="phone ? undefined : `grid ${sideCols}`" :data-cols="phone ? undefined : sideCols" data-catalog-grid>
                   <MediaGalleryItem
                     v-for="c in catalogItems"
                     :key="c.id"
                     size="md"
-                    class="w-44 max-md:w-36"
+                    :class="phone ? 'w-44 max-md:w-36' : 'w-auto'"
                     :src="c.src"
                     :alt="catalogLabel(c)"
                     selectable
@@ -5208,8 +5361,8 @@ if (import.meta.client) {
       Сайд 642, паттерн «выбор из справочника»: схема → группа (процесс) → поля (шаги) внутри одного сайда; «←» и Esc — уровень
       назад. Схемы и группы — строки-переходы `ListRow` (как список версий истории, № 56); поля и шаги — `Table` с флажками.
     -->
-    <ModalCard v-model:open="pasteOpen">
-      <ModalCardContent narrow="full" placement="edge" data-side="paste" :data-kind="paste.kind" :data-level="pasteLevel" @escape-key-down="onPasteEscape">
+    <ModalCard v-model:open="pasteOpen" :dock="sideDock">
+      <ModalCardContent v-model:width="sideWidth" narrow="full" placement="edge" :resizable="!phone" data-side="paste" :data-kind="paste.kind" :data-level="pasteLevel" @escape-key-down="onPasteEscape">
         <ModalCardHeader v-if="pasteLevel === 'schemes'" :title="pasteTitle" :subtitle="pasteSubtitle" />
         <ModalCardHeader v-else back :title="pasteTitle" :subtitle="pasteSubtitle" @back="pasteBack()" />
         <ModalCardBody class="flex flex-col gap-4">
@@ -5217,7 +5370,8 @@ if (import.meta.client) {
           <template v-if="pasteLevel === 'schemes'">
             <Input v-model="pasteQuery" placeholder="Поиск схемы по названию" data-field="paste-search" />
             <FieldSet v-for="g in pasteSchemes" :key="g.id" :legend="g.title" :data-paste-group="g.id">
-              <div class="flex flex-col gap-2">
+              <!-- Довесок 1 к такту 101: строки-карточки — колонками по ширине сайда, как сетка каталога. -->
+              <div class="grid gap-2" :class="phone ? 'grid-cols-1' : sideCols">
                 <ListRow v-for="d in g.schemes" :key="d.id" :data-paste-scheme="d.id" @click="pasteGo(d.id)">
                   <HighlightText :text="d.title" :query="paste.query" />
                   <template #secondary>
@@ -5235,7 +5389,7 @@ if (import.meta.client) {
           </template>
 
           <!-- Второй уровень — группы полей либо процессы схемы. -->
-          <div v-else-if="pasteLevel === 'parts'" class="flex flex-col gap-2" data-paste-parts>
+          <div v-else-if="pasteLevel === 'parts'" class="grid gap-2" :class="phone ? 'grid-cols-1' : sideCols" data-paste-parts>
             <ListRow v-for="x in pasteParts" :key="x.id" :disabled="x.empty" :data-paste-part="x.id" @click="pasteOpenPart(x.id)">
               {{ x.title }}
               <template #secondary>
@@ -5374,8 +5528,8 @@ if (import.meta.client) {
     </Lightbox>
 
     <!-- ============================ сайд группы — № 68: поля по блоку «Настройки группы» `33179:4467` ============================ -->
-    <ModalCard v-model:open="groupOpen">
-      <ModalCardContent narrow="full" placement="edge" data-side="group">
+    <ModalCard v-model:open="groupOpen" :dock="sideDock">
+      <ModalCardContent v-model:width="sideWidth" narrow="full" placement="edge" :resizable="!phone" data-side="group">
         <ModalCardHeader :title="gd.id ? `Редактирование группы — ${gdTitle}` : 'Добавление группы'" />
         <ModalCardBody class="flex flex-col gap-4">
           <Field label="Название" required :invalid="gdInvalid" :hint="gdInvalid ? 'Заполните название группы' : ''">
@@ -5503,8 +5657,8 @@ if (import.meta.client) {
     </ModalCard>
 
     <!-- ============================ история версий: сайд и дифф версии — № 56 ============================ -->
-    <ModalCard v-model:open="historyOpen">
-      <ModalCardContent narrow="full" placement="edge" data-side="history">
+    <ModalCard v-model:open="historyOpen" :dock="sideDock">
+      <ModalCardContent v-model:width="sideWidth" narrow="full" placement="edge" :resizable="!phone" data-side="history">
         <template v-if="!m.versionShown.value">
           <ModalCardHeader title="История версий" subtitle="Публикации схемы: текущая версия сверху" />
           <ModalCardBody class="flex flex-col gap-2">
